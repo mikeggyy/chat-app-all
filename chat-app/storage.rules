@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Firebase Storage 安全規則
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 允許已認證用戶讀取和寫入他們自己的照片
+    match /photos/{userId}/{allPaths=**} {
+      // 允許用戶讀取自己的照片
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // 允許用戶上傳照片到自己的目錄
+      // 限制文件大小為 10MB
+      // 只允許圖片類型
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // 開發模式：允許所有讀取（僅用於 Emulator）
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+  }
+}

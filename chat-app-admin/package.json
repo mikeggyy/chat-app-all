@@ -1,0 +1,18 @@
+{
+  "name": "chat-app-admin",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "管理後臺 - AI Chat Application Admin Dashboard",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --raw \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ..",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

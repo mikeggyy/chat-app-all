@@ -1,0 +1,184 @@
+import { getFirestoreDb } from "../firebase/index.js";
+import { FieldValue } from "firebase-admin/firestore";
+
+/**
+ * 獲取 Firestore 文檔
+ * @param {string} collection - 集合名稱
+ * @param {string} docId - 文檔 ID
+ * @returns {Promise<Object|null>} 文檔數據或 null
+ */
+export async function getDocument(collection, docId) {
+  const db = getFirestoreDb();
+  const docRef = db.collection(collection).doc(docId);
+  const doc = await docRef.get();
+
+  if (!doc.exists) {
+    return null;
+  }
+
+  return {
+    id: doc.id,
+    ...doc.data(),
+  };
+}
+
+/**
+ * 設置文檔（創建或覆蓋）
+ * @param {string} collection - 集合名稱
+ * @param {string} docId - 文檔 ID
+ * @param {Object} data - 文檔數據
+ * @returns {Promise<void>}
+ */
+export async function setDocument(collection, docId, data) {
+  const db = getFirestoreDb();
+  const docRef = db.collection(collection).doc(docId);
+
+  const timestamp = FieldValue.serverTimestamp();
+  await docRef.set({
+    ...data,
+    updatedAt: timestamp,
+  });
+}
+
+/**
+ * 更新文檔（部分更新）
+ * @param {string} collection - 集合名稱
+ * @param {string} docId - 文檔 ID
+ * @param {Object} data - 要更新的字段
+ * @returns {Promise<void>}
+ */
+export async function updateDocument(collection, docId, data) {
+  const db = getFirestoreDb();
+  const docRef = db.collection(collection).doc(docId);
+
+  await docRef.update({
+    ...data,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+/**
+ * 刪除文檔
+ * @param {string} collection - 集合名稱
+ * @param {string} docId - 文檔 ID
+ * @returns {Promise<void>}
+ */
+export async function deleteDocument(collection, docId) {
+  const db = getFirestoreDb();
+  const docRef = db.collection(collection).doc(docId);
+  await docRef.delete();
+}
+
+/**
+ * 創建文檔（如果不存在）
+ * @param {string} collection - 集合名稱
+ * @param {string} docId - 文檔 ID
+ * @param {Object} data - 文檔數據
+ * @returns {Promise<boolean>} 是否創建了新文檔
+ */
+export async function createDocumentIfNotExists(collection, docId, data) {
+  const db = getFirestoreDb();
+  const docRef = db.collection(collection).doc(docId);
+
+  const timestamp = FieldValue.serverTimestamp();
+  const docData = {
+    ...data,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(docRef);
+      if (!doc.exists) {
+        transaction.set(docRef, docData);
+      }
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * 查詢集合
+ * @param {string} collection - 集合名稱
+ * @param {Object} options - 查詢選項
+ * @param {Array} options.where - where 條件 [[field, op, value], ...]
+ * @param {Array} options.orderBy - 排序 [[field, direction], ...]
+ * @param {number} options.limit - 限制數量
+ * @returns {Promise<Array>} 文檔數組
+ */
+export async function queryCollection(collection, options = {}) {
+  const db = getFirestoreDb();
+  let query = db.collection(collection);
+
+  // 添加 where 條件
+  if (options.where && Array.isArray(options.where)) {
+    for (const [field, op, value] of options.where) {
+      query = query.where(field, op, value);
+    }
+  }
+
+  // 添加排序
+  if (options.orderBy && Array.isArray(options.orderBy)) {
+    for (const [field, direction = "asc"] of options.orderBy) {
+      query = query.orderBy(field, direction);
+    }
+  }
+
+  // 添加限制
+  if (options.limit && typeof options.limit === "number") {
+    query = query.limit(options.limit);
+  }
+
+  const snapshot = await query.get();
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+}
+
+/**
+ * 批量寫入操作
+ * @param {Array} operations - 操作數組 [{type, collection, docId, data}, ...]
+ * @returns {Promise<void>}
+ */
+export async function batchWrite(operations) {
+  const db = getFirestoreDb();
+  const batch = db.batch();
+
+  const timestamp = FieldValue.serverTimestamp();
+
+  for (const op of operations) {
+    const docRef = db.collection(op.collection).doc(op.docId);
+
+    switch (op.type) {
+      case "set":
+        batch.set(docRef, {
+          ...op.data,
+          updatedAt: timestamp,
+        });
+        break;
+
+      case "update":
+        batch.update(docRef, {
+          ...op.data,
+          updatedAt: timestamp,
+        });
+        break;
+
+      case "delete":
+        batch.delete(docRef);
+        break;
+
+      default:
+        throw new Error(`Unknown operation type: ${op.type}`);
+    }
+  }
+
+  await batch.commit();
+}
+
+// 導出 FieldValue 供其他模塊使用
+export { FieldValue };

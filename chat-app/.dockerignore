@@ -1,0 +1,52 @@
+# Node modules
+node_modules
+backend/node_modules
+frontend/node_modules
+
+# 環境變數
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+!backend/.env.production
+!frontend/.env.production
+
+# Git
+.git
+.gitignore
+
+# 文檔
+*.md
+docs/
+reference-images/
+
+# 前端構建
+frontend/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+*-debug.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 測試
+test/
+tests/
+*.test.js
+*.spec.js
+
+# 日誌
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

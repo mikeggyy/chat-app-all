@@ -1,0 +1,65 @@
+# loveStory 專案根目錄 .gitignore
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+lerna-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+# .env.example 應該被提交到版本控制
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+Icon?
+ehthumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+nul
+NUL
+srctemp.txt
+
+# Cleanup scripts (temporary)
+cleanup-*.js
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+service-account-key.json
+*-firebase-adminsdk-*.json
+
+# Backup files
+*.bak
+*.orig
+*~

@@ -1,0 +1,5 @@
+# Cloudflare Pages - SPA 路由配置
+# 這個文件確保前端路由（Vue Router）正常工作
+
+# 將所有請求重定向到 index.html（SPA 模式）
+/*    /index.html   200

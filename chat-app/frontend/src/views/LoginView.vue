@@ -1,0 +1,607 @@
+<script setup>
+import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { apiJson } from "../utils/api";
+import { useUserProfile } from "../composables/useUserProfile";
+import { useFirebaseAuth } from "../composables/useFirebaseAuth";
+import { useGuestGuard } from "../composables/useGuestGuard";
+import {
+  saveTestSession,
+  clearTestSession,
+} from "../services/testAuthSession";
+
+const router = useRouter();
+const { loadUserProfile, setUserProfile } = useUserProfile();
+const { signInWithGoogle, resolveRedirectResult } = useFirebaseAuth();
+const { resetGuestMessageCount } = useGuestGuard();
+
+const statusMessage = ref("");
+const statusType = ref("idle");
+const isLoading = ref(false);
+
+const setStatus = (type, message) => {
+  statusType.value = type;
+  statusMessage.value = message;
+};
+
+const toIsoString = (value) => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  return date.toISOString();
+};
+
+const resolveLocale = (user) => {
+  if (user?.reloadUserInfo?.languageCode) {
+    return user.reloadUserInfo.languageCode;
+  }
+  if (user?.languageCode) {
+    return user.languageCode;
+  }
+  if (navigator?.language) {
+    return navigator.language;
+  }
+  return "zh-TW";
+};
+
+const buildUserRecord = (payload, provider) => {
+  const nowIso = new Date().toISOString();
+
+  return {
+    id: payload.id,
+    displayName: payload.displayName,
+    locale: payload.locale ?? "zh-TW",
+    createdAt: payload.createdAt ?? nowIso,
+    defaultPrompt:
+      payload.defaultPrompt ??
+      "喜歡與 AI 分享靈感與日常，請在對話時保留溫暖且專注的語氣。",
+    email: payload.email ?? "",
+    photoURL: payload.photoURL,
+    lastLoginAt: payload.lastLoginAt ?? nowIso,
+    phoneNumber: payload.phoneNumber ?? null,
+    notificationOptIn:
+      typeof payload.notificationOptIn === "boolean"
+        ? payload.notificationOptIn
+        : false,
+    signInProvider: provider,
+    updatedAt: payload.updatedAt ?? nowIso,
+    conversations: payload.conversations ?? [],
+    favorites: payload.favorites ?? [],
+    isGuest: payload.isGuest ?? false, // 遊客標記
+  };
+};
+
+const navigateToMatch = async () => {
+  await router.push({ name: "match" });
+};
+
+const mapFirebaseErrorMessage = (error) => {
+  const code = error?.code ?? "";
+  switch (code) {
+    case "auth/network-request-failed":
+      return "網路連線異常，請稍後再試。";
+    case "auth/unauthorized-domain":
+      return "Firebase 授權網域未正確設定，請確認 Firebase 主控台的允許網域。";
+    case "auth/invalid-api-key":
+    case "auth/configuration-not-found":
+      return "Firebase 組態似乎不完整，請確認環境變數檔案設定。";
+    case "auth/redirect-cancelled-by-user":
+      return "您已取消 Google 登入流程。";
+    default:
+      if (error instanceof Error && error.message) {
+        return error.message;
+      }
+      return "Google 登入失敗，請稍後再試一次。";
+  }
+};
+
+const handleFirebaseAuthError = (error) => {
+  if (!error) return;
+
+  if (error?.code === "auth/redirect-cancelled-by-user") {
+    setStatus("idle", "您已取消 Google 登入流程。");
+    return;
+  }
+
+  if (
+    error instanceof Error &&
+    error.message.includes("Missing Firebase environment variables")
+  ) {
+    setStatus(
+      "error",
+      "尚未設定 Firebase 必要環境變數，請參考 frontend/.env.example 填寫後再試。"
+    );
+    return;
+  }
+
+  setStatus("error", mapFirebaseErrorMessage(error));
+};
+
+const createGoogleUserPayload = async (credential) => {
+  const { user } = credential;
+  if (!user) {
+    throw new Error("Google 登入未取得使用者資料，請重新登入。");
+  }
+
+  const metadata = user.metadata ?? {};
+  const creationIso = toIsoString(metadata.creationTime);
+  const lastLoginIso = toIsoString(metadata.lastSignInTime);
+  const providerId =
+    credential.providerId ?? user.providerData?.[0]?.providerId ?? "google.com";
+  const provider =
+    providerId === "google.com" ? "google" : providerId ?? "google";
+
+  const baseUser = buildUserRecord(
+    {
+      id: user.uid,
+      displayName: user.displayName ?? user.email ?? "Google 使用者",
+      locale: resolveLocale(user),
+      createdAt: creationIso,
+      email: user.email ?? "",
+      photoURL: user.photoURL ?? "/avatars/defult-01.webp",
+      lastLoginAt: lastLoginIso,
+      phoneNumber: user.phoneNumber ?? null,
+      notificationOptIn: Boolean(user.emailVerified),
+      updatedAt: lastLoginIso ?? creationIso,
+    },
+    provider
+  );
+
+  const profile = {
+    ...baseUser,
+    uid: user.uid,
+    firebaseProviderId: providerId,
+  };
+
+  const idToken = await user.getIdToken();
+
+  return {
+    profile,
+    idToken,
+  };
+};
+
+const finalizeGoogleLogin = async (credential) => {
+  const { profile, idToken } = await createGoogleUserPayload(credential);
+  const savedUser = await apiJson("/api/users", {
+    method: "POST",
+    body: profile,
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+    },
+  });
+
+  clearTestSession();
+  resetGuestMessageCount(); // 清除遊客訊息計數
+  setUserProfile(savedUser);
+  setStatus("success", `歡迎回來，${savedUser.displayName}！`);
+  await navigateToMatch();
+};
+
+const handleGoogleLogin = async () => {
+  if (isLoading.value) return;
+  isLoading.value = true;
+  setStatus("loading", "正在連線至 Google 登入服務...");
+
+  let redirecting = false;
+  try {
+    const outcome = await signInWithGoogle();
+
+    if (outcome.redirected) {
+      redirecting = true;
+
+      setStatus("loading", "即將重新導向至 Google 登入頁面，請稍候...");
+      return;
+    }
+
+    if (!outcome.result) {
+      throw new Error("Google 登入未取得有效結果，請重新操作。");
+    }
+
+    await finalizeGoogleLogin(outcome.result);
+  } catch (err) {
+
+    handleFirebaseAuthError(err);
+  } finally {
+    if (!redirecting) {
+      isLoading.value = false;
+    }
+  }
+};
+
+const handleTestLogin = async () => {
+  if (isLoading.value) return;
+  isLoading.value = true;
+  setStatus("loading", "正在以遊客身份登入...");
+
+  try {
+    const data = await apiJson("/auth/test", {
+      method: "POST",
+    });
+    setStatus("success", `歡迎，${data.user.displayName}！`);
+    const testUser = buildUserRecord(
+      {
+        id: data.user.id,
+        displayName: data.user.displayName,
+        email: data.user.email,
+        locale: "zh-TW",
+        photoURL: "/avatars/defult-01.webp",
+        defaultPrompt: "我是測試帳號，請協助我快速驗證 AI 劇情與對話流程。",
+        notificationOptIn: false,
+        isGuest: true, // 標記為遊客賬號
+      },
+      "guest"
+    );
+    const expiresInSeconds = Number(data.expiresIn);
+    const expiresAt =
+      Number.isFinite(expiresInSeconds) && expiresInSeconds > 0
+        ? Date.now() + expiresInSeconds * 1000
+        : 0;
+
+    saveTestSession({
+      token: data.token,
+      userId: data.user.id,
+      profile: testUser,
+      expiresAt,
+    });
+
+
+    // 遊客直接設定 profile，不從後端載入（避免覆蓋 isGuest 標記）
+    setUserProfile(testUser);
+    await navigateToMatch();
+  } catch (err) {
+    setStatus(
+      "error",
+      err instanceof Error ? err.message : "遊客登入過程發生錯誤"
+    );
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(async () => {
+  try {
+
+    const redirectOutcome = await resolveRedirectResult();
+
+    if (redirectOutcome?.result) {
+
+      isLoading.value = true;
+      setStatus("loading", "正在完成 Google 登入...");
+      await finalizeGoogleLogin(redirectOutcome.result);
+    } else {
+
+    }
+  } catch (error) {
+
+    handleFirebaseAuthError(error);
+  } finally {
+    isLoading.value = false;
+  }
+});
+
+</script>
+
+<template>
+  <main class="login-page">
+    <div class="background">
+      <img src="/login-background.webp" alt="應用程式背景" />
+      <div class="overlay"></div>
+    </div>
+
+    <section class="login-card">
+      <div class="logo-mark">
+        <img
+          src="/branding/app-logo.png"
+          alt="Love Story 品牌識別"
+          class="logo-icon"
+        />
+      </div>
+
+      <h1 class="title">Love Story</h1>
+      <p class="subtitle">與 AI 暢聊</p>
+      <p class="hint">登入後，即刻開始體驗。</p>
+
+      <div class="actions">
+        <button
+          type="button"
+          class="btn google"
+          @click="handleGoogleLogin"
+          :disabled="isLoading"
+        >
+          <span class="btn-icon">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+              />
+              <path
+                fill="#4285F4"
+                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+              />
+              <path
+                fill="#34A853"
+                d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+              />
+              <path fill="none" d="M0 0h48v48H0z" />
+            </svg>
+          </span>
+          <span>使用 Google 登入</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn secondary"
+          @click="handleTestLogin"
+          :disabled="isLoading"
+        >
+          <span class="btn-icon test">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              <path d="M12 4v1m6 2-1 1m3 4h-1m-1 6 1 1m-6 3v-1m-6-2 1-1M4 12h1m2-6 1 1" />
+            </svg>
+          </span>
+          <span>遊客體驗</span>
+        </button>
+      </div>
+
+      <p v-if="statusMessage" class="status" :class="statusType">
+        {{ statusMessage }}
+      </p>
+
+      <p class="terms">
+        登入即代表同意
+        <a href="#">使用者協議</a>
+        與
+        <a href="#">隱私政策</a>
+      </p>
+    </section>
+  </main>
+</template>
+
+<style scoped lang="scss">
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 1.5rem;
+  overflow: hidden;
+  color: #f8fafc;
+
+  .background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: brightness(0.45);
+      transform: scale(1.05);
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        160deg,
+        transparent 0%,
+        rgba(148, 33, 146, 0.35) 100%
+      );
+    }
+  }
+
+  .login-card {
+    position: relative;
+    z-index: 1;
+    width: min(420px, 100%);
+    border-radius: 32px;
+    padding: 3.5rem 2.75rem;
+    text-align: center;
+
+    .logo-mark {
+      margin: 0 auto 1.5rem;
+      border-radius: 40px;
+      display: grid;
+      place-items: center;
+
+      .logo-icon {
+        width: 80px;
+        height: 80px;
+      }
+    }
+
+    .title {
+      font-size: 2.75rem;
+      font-weight: 600;
+      margin: 0;
+      letter-spacing: 0.04em;
+    }
+
+    .subtitle {
+      font-size: 1.2rem;
+      margin: 0.5rem 0 1.25rem;
+      color: #f1f5f9;
+      letter-spacing: 0.4em;
+    }
+
+    .hint {
+      margin-bottom: 2.5rem;
+      color: rgba(248, 250, 252, 0.78);
+    }
+
+    .actions {
+      display: grid;
+      gap: 1rem;
+
+      .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        border: none;
+        border-radius: 999px;
+        padding: 0.9rem 1.5rem;
+        font-size: 1.05rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 160ms ease, box-shadow 160ms ease,
+          background 160ms ease;
+        will-change: transform;
+
+        &:disabled {
+          cursor: not-allowed;
+          opacity: 0.7;
+          box-shadow: none;
+          transform: none;
+        }
+
+        &:not(:disabled):hover {
+          transform: translateY(-2px);
+        }
+
+        .btn-icon {
+          width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+
+          svg {
+            width: 22px;
+            height: 22px;
+          }
+        }
+
+        &.primary {
+          background: linear-gradient(135deg, #ff4d8f, #ff7ab8);
+          color: #fff;
+          box-shadow: 0 12px 24px rgba(255, 77, 143, 0.35);
+
+          &:not(:disabled):hover {
+            box-shadow: 0 16px 32px rgba(255, 77, 143, 0.45);
+          }
+        }
+
+        &.google {
+          background: #fff;
+          color: #3c4043;
+          border: 1px solid #dadce0;
+          font-weight: 500;
+          font-size: 0.95rem;
+          letter-spacing: 0.0125em;
+          min-height: 48px;
+          border-radius: 24px;
+          padding: 0 1.5rem;
+          box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3),
+            0 1px 3px 1px rgba(60, 64, 67, 0.15);
+          transform: none;
+
+          &:not(:disabled):hover {
+            background: #f6f9fe;
+            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3),
+              0 2px 6px rgba(60, 64, 67, 0.2);
+            transform: none;
+          }
+
+          &:not(:disabled):active {
+            background: #e8eaed;
+            box-shadow: inset 0 1px 0 rgba(60, 64, 67, 0.1),
+              0 1px 3px rgba(60, 64, 67, 0.2);
+            transform: none;
+          }
+
+          .btn-icon {
+            width: 18px;
+            height: 18px;
+
+            svg {
+              width: 18px;
+              height: 18px;
+            }
+          }
+
+          span:last-child {
+            font-family: "Roboto", "Noto Sans TC", sans-serif;
+          }
+        }
+
+        &.secondary {
+          background: linear-gradient(
+            160deg,
+            #000 0%,
+            rgba(148, 33, 146, 0.35) 100%
+          );
+          color: #f8fafc;
+          border: 1px solid rgba(248, 250, 252, 0.35);
+
+          &:not(:disabled):hover {
+            background: rgba(248, 250, 252, 0.12);
+          }
+        }
+      }
+    }
+
+    .status {
+      margin: 1.75rem 0 0;
+      padding: 0.75rem 1rem;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid transparent;
+
+      &.loading,
+      &.info {
+        border-color: rgba(148, 163, 184, 0.35);
+        color: #e2e8f0;
+      }
+
+      &.success {
+        border-color: rgba(16, 185, 129, 0.5);
+        color: #bbf7d0;
+        background: rgba(22, 101, 52, 0.35);
+      }
+
+      &.error {
+        border-color: rgba(248, 113, 113, 0.5);
+        color: #fecaca;
+        background: rgba(185, 28, 28, 0.35);
+      }
+    }
+
+    .terms {
+      margin-top: 2.25rem;
+      font-size: 0.85rem;
+      color: rgba(226, 232, 240, 0.7);
+
+      a {
+        color: #fdf4ff;
+        text-decoration: underline;
+      }
+    }
+
+    @media (max-width: 480px) {
+      padding: 2.75rem 2rem;
+      border-radius: 24px;
+
+      .title {
+        font-size: 2.2rem;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+        letter-spacing: 0.3em;
+      }
+    }
+  }
+}
+</style>

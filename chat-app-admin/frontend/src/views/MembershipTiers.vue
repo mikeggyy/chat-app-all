@@ -1,0 +1,330 @@
+<template>
+  <div class="membership-tiers-page">
+    <h2>會員等級配置</h2>
+
+    <el-card>
+      <el-table :data="membershipTiers" v-loading="loading" style="width: 100%">
+        <el-table-column prop="id" label="等級 ID" width="100" />
+        <el-table-column prop="name" label="等級名稱" width="150" />
+        <el-table-column prop="price" label="價格（TWD）" width="120">
+          <template #default="{ row }">
+            <span>{{ row.price || 0 }} TWD</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="狀態" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'active' ? 'success' : 'info'">
+              {{ row.status === 'active' ? '啟用' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="功能限制" min-width="300">
+          <template #default="{ row }">
+            <div style="font-size: 12px">
+              <div>對話: {{ row.features?.messagesPerCharacter === -1 ? '無限' : row.features?.messagesPerCharacter }}</div>
+              <div>語音: {{ row.features?.voicesPerCharacter === -1 ? '無限' : row.features?.voicesPerCharacter }}</div>
+              <div>創建角色: {{ row.features?.maxCreatedCharacters }}/月</div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="editTier(row)">編輯</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 編輯會員等級對話框 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      :title="`編輯會員等級：${editForm.name}`"
+      width="900px"
+      @close="resetEditForm"
+    >
+      <el-form :model="editForm" ref="editFormRef" label-width="180px">
+        <el-divider content-position="left">基本資訊</el-divider>
+
+        <el-form-item label="等級 ID">
+          <el-input v-model="editForm.id" disabled />
+        </el-form-item>
+
+        <el-form-item label="等級名稱">
+          <el-input v-model="editForm.name" placeholder="例如：免費會員、VIP、VVIP" />
+        </el-form-item>
+
+        <el-form-item label="價格（TWD）">
+          <el-input-number v-model="editForm.price" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="計費週期">
+          <el-input v-model="editForm.billingCycle" placeholder="例如：monthly" />
+        </el-form-item>
+
+        <el-form-item label="狀態">
+          <el-radio-group v-model="editForm.status">
+            <el-radio value="active">啟用</el-radio>
+            <el-radio value="inactive">停用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-divider content-position="left">對話功能</el-divider>
+
+        <el-form-item label="每角色對話次數">
+          <el-input-number v-model="editForm.features.messagesPerCharacter" :min="-1" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">-1 表示無限</span>
+        </el-form-item>
+
+        <el-form-item label="無限對話">
+          <el-switch v-model="editForm.features.unlimitedChats" />
+        </el-form-item>
+
+        <el-form-item label="可對話角色數">
+          <el-input-number v-model="editForm.features.totalCharacters" :min="-1" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">-1 表示無限</span>
+        </el-form-item>
+
+        <el-divider content-position="left">語音功能</el-divider>
+
+        <el-form-item label="每角色語音次數">
+          <el-input-number v-model="editForm.features.voicesPerCharacter" :min="-1" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">-1 表示無限</span>
+        </el-form-item>
+
+        <el-form-item label="無限語音">
+          <el-switch v-model="editForm.features.unlimitedVoice" />
+        </el-form-item>
+
+        <el-divider content-position="left">AI 設定</el-divider>
+
+        <el-form-item label="AI 模型">
+          <el-input v-model="editForm.features.aiModel" placeholder="例如：gpt-4o-mini" />
+        </el-form-item>
+
+        <el-form-item label="回復長度（tokens）">
+          <el-input-number v-model="editForm.features.maxResponseTokens" :min="100" />
+        </el-form-item>
+
+        <el-form-item label="記憶容量（tokens）">
+          <el-input-number v-model="editForm.features.maxMemoryTokens" :min="1000" />
+        </el-form-item>
+
+        <el-divider content-position="left">角色功能</el-divider>
+
+        <el-form-item label="可創建角色">
+          <el-switch v-model="editForm.features.canCreateCharacters" />
+        </el-form-item>
+
+        <el-form-item label="最多創建角色數/月">
+          <el-input-number v-model="editForm.features.maxCreatedCharacters" :min="0" />
+        </el-form-item>
+
+        <el-divider content-position="left">配對與搜尋</el-divider>
+
+        <el-form-item label="每日配對次數">
+          <el-input-number v-model="editForm.features.dailyMatchLimit" :min="-1" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">-1 表示無限</span>
+        </el-form-item>
+
+        <el-form-item label="進階搜尋">
+          <el-switch v-model="editForm.features.advancedSearch" />
+        </el-form-item>
+
+        <el-divider content-position="left">廣告相關</el-divider>
+
+        <el-form-item label="需要看廣告">
+          <el-switch v-model="editForm.features.requireAds" />
+        </el-form-item>
+
+        <el-form-item label="廣告解鎖對話所需次數">
+          <el-input-number v-model="editForm.features.adsToUnlock" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="每次廣告解鎖對話數">
+          <el-input-number v-model="editForm.features.unlockedMessagesPerAd" :min="1" />
+        </el-form-item>
+
+        <el-form-item label="每角色每天廣告上限">
+          <el-input-number v-model="editForm.features.dailyAdLimitPerCharacter" :min="0" />
+        </el-form-item>
+
+        <el-divider content-position="left">開通時發放</el-divider>
+
+        <el-form-item label="角色解鎖票">
+          <el-input-number v-model="editForm.features.characterUnlockTickets" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="創建角色卡">
+          <el-input-number v-model="editForm.features.characterCreationCards" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="拍照解鎖卡">
+          <el-input-number v-model="editForm.features.photoUnlockCards" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="影片解鎖卡">
+          <el-input-number v-model="editForm.features.videoUnlockCards" :min="0" />
+        </el-form-item>
+
+        <el-divider content-position="left">其他福利</el-divider>
+
+        <el-form-item label="每月贈送金幣">
+          <el-input-number v-model="editForm.features.monthlyCoinsBonus" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="金幣購買折扣">
+          <el-input-number v-model="editForm.features.coinsDiscount" :min="0" :max="1" :step="0.1" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">0-1 之間，例如 0.2 表示 8 折</span>
+        </el-form-item>
+
+        <el-form-item label="AI 拍照功能">
+          <el-switch v-model="editForm.features.aiPhotoGeneration" />
+        </el-form-item>
+
+        <el-form-item label="AI 拍照折扣">
+          <el-input-number v-model="editForm.features.aiPhotoDiscount" :min="0" :max="1" :step="0.1" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saveLoading" @click="handleSave">保存</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from "vue";
+import api from "../utils/api";
+import { ElMessage } from "element-plus";
+
+const membershipTiers = ref([]);
+const loading = ref(false);
+const editDialogVisible = ref(false);
+const saveLoading = ref(false);
+const editFormRef = ref(null);
+
+const editForm = reactive({
+  id: "",
+  name: "",
+  price: 0,
+  currency: "TWD",
+  billingCycle: "monthly",
+  status: "active",
+  features: {
+    messagesPerCharacter: 0,
+    unlimitedChats: false,
+    totalCharacters: 0,
+    voicesPerCharacter: 0,
+    unlimitedVoice: false,
+    aiModel: "gpt-4o-mini",
+    maxResponseTokens: 300,
+    maxMemoryTokens: 3000,
+    canCreateCharacters: false,
+    maxCreatedCharacters: 0,
+    dailyMatchLimit: 0,
+    advancedSearch: false,
+    requireAds: true,
+    adsToUnlock: 0,
+    unlockedMessagesPerAd: 5,
+    dailyAdLimitPerCharacter: 3,
+    characterUnlockTickets: 0,
+    characterCreationCards: 0,
+    photoUnlockCards: 0,
+    videoUnlockCards: 0,
+    monthlyCoinsBonus: 0,
+    coinsDiscount: 0,
+    aiPhotoGeneration: false,
+    aiPhotoDiscount: 0,
+  },
+});
+
+async function loadMembershipTiers() {
+  loading.value = true;
+  try {
+    const data = await api.get("/api/membership-tiers");
+    membershipTiers.value = data.tiers || [];
+  } catch (error) {
+    ElMessage.error("載入會員等級配置失敗");
+  } finally {
+    loading.value = false;
+  }
+}
+
+function editTier(tier) {
+  editForm.id = tier.id;
+  editForm.name = tier.name || "";
+  editForm.price = tier.price || 0;
+  editForm.currency = tier.currency || "TWD";
+  editForm.billingCycle = tier.billingCycle || "monthly";
+  editForm.status = tier.status || "active";
+
+  // 複製 features 對象
+  if (tier.features) {
+    Object.keys(editForm.features).forEach((key) => {
+      if (tier.features[key] !== undefined) {
+        editForm.features[key] = tier.features[key];
+      }
+    });
+  }
+
+  editDialogVisible.value = true;
+}
+
+async function handleSave() {
+  saveLoading.value = true;
+  try {
+    await api.patch(`/api/membership-tiers/${editForm.id}`, {
+      name: editForm.name,
+      price: editForm.price,
+      currency: editForm.currency,
+      billingCycle: editForm.billingCycle,
+      status: editForm.status,
+      features: editForm.features,
+    });
+
+    ElMessage.success("會員等級配置更新成功");
+    editDialogVisible.value = false;
+    loadMembershipTiers(); // 重新載入列表
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || "更新會員等級配置失敗");
+  } finally {
+    saveLoading.value = false;
+  }
+}
+
+function resetEditForm() {
+  editForm.id = "";
+  editForm.name = "";
+  editForm.price = 0;
+  editForm.currency = "TWD";
+  editForm.billingCycle = "monthly";
+  editForm.status = "active";
+
+  // 重置 features
+  Object.keys(editForm.features).forEach((key) => {
+    if (typeof editForm.features[key] === "boolean") {
+      editForm.features[key] = false;
+    } else if (typeof editForm.features[key] === "number") {
+      editForm.features[key] = 0;
+    } else {
+      editForm.features[key] = "";
+    }
+  });
+
+  if (editFormRef.value) {
+    editFormRef.value.resetFields();
+  }
+}
+
+onMounted(() => {
+  loadMembershipTiers();
+});
+</script>
+
+<style scoped>
+.membership-tiers-page h2 {
+  margin-bottom: 20px;
+}
+</style>

@@ -1,0 +1,34 @@
+{
+  "name": "chat-app-3",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "AI Chat Application with Firebase",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:with-emulator": "node scripts/dev-with-import.js",
+    "dev:no-import": "concurrently --kill-others-on-fail -n \"firebase,backend,frontend\" -c \"yellow,blue,green\" \"npm run dev:firebase\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:production": "concurrently --kill-others-on-fail -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:guide": "node scripts/start-dev.js",
+    "dev:firebase": "firebase emulators:start",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "cleanup-ports": "node scripts/cleanup-ports.js",
+    "wait-for-port": "node scripts/wait-for-port.js",
+    "verify-config": "node scripts/verify-config.js",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ..",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "import:all": "cd backend && npm run import:all",
+    "import:characters": "cd backend && npm run import:characters",
+    "import:configs": "cd backend && npm run import:configs",
+    "import:membership": "cd backend && npm run import:membership",
+    "import:character-styles": "cd backend && npm run import:character-styles",
+    "import:test-data": "cd backend && npm run import:test-data",
+    "deploy:pages": "cd frontend && npm run build && wrangler pages deploy dist --project-name=chat-app-frontend",
+    "deploy:pages:preview": "cd frontend && npm run build && wrangler pages deploy dist --project-name=chat-app-frontend --branch=preview"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

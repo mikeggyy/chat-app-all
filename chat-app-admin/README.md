@@ -1,0 +1,124 @@
+# Admin Dashboard
+
+AI Chat Application 管理後臺系統
+
+## 功能概覽
+
+- 👥 用戶管理（會員資料、會員等級、使用統計）
+- 🤖 AI 角色管理（新增、編輯、刪除角色）
+- 💬 對話監控（對話記錄、內容審核）
+- 📊 數據統計（使用量、營收、用戶活躍度）
+- ⚙️ 系統配置（禮物、會員方案、功能限制）
+- 💰 交易管理（訂單記錄、退款處理）
+
+## 技術棧
+
+- **Frontend**: Vue 3 + Vite + Vue Router + Element Plus
+- **Backend**: Node.js + Express + Firebase Admin SDK
+- **Database**: Firestore (共用主應用資料庫)
+- **Authentication**: Firebase Auth (管理員權限驗證)
+
+## 快速開始
+
+### 1. 安裝依賴
+
+**⚠️ 首次使用必須先安裝依賴：**
+
+```bash
+npm run install:all
+```
+
+這會自動安裝根目錄、backend、frontend 的所有依賴。
+
+### 2. 配置環境變數
+
+複製並填寫環境配置文件：
+
+**Frontend** (`frontend/.env`):
+- 已創建模板，填入 Firebase 配置即可
+- 與主應用 (chat-app-3) 共用相同的 Firebase 專案
+
+**Backend** (`backend/.env`):
+- 已創建模板，填入 Firebase Admin SDK 憑證
+- 可以從主應用的 `chat-app-3/backend/.env` 複製相同配置
+
+### 3. 啟動開發模式
+
+```bash
+# 同時啟動前後端（推薦）
+npm run dev
+
+# 或分別啟動
+npm run dev:backend    # Backend: http://localhost:4001
+npm run dev:frontend   # Frontend: http://localhost:5174
+```
+
+**💡 Windows 用戶注意**: 已使用 `--raw` 選項解決 PowerShell 亂碼問題。
+
+### 訪問端點
+
+- 🟢 管理前端: http://localhost:5174
+- 🔵 管理後端 API: http://localhost:4001
+
+## 專案結構
+
+```
+admin-dashboard/
+├── frontend/           # Vue 3 管理前端
+│   ├── src/
+│   │   ├── components/ # 可復用組件
+│   │   ├── views/      # 頁面組件
+│   │   ├── router/     # 路由配置
+│   │   ├── stores/     # Pinia 狀態管理
+│   │   └── utils/      # 工具函數
+│   └── package.json
+├── backend/           # Express 管理後端
+│   ├── src/
+│   │   ├── routes/    # API 路由
+│   │   ├── services/  # 業務邏輯
+│   │   ├── middleware/# 中間件（權限驗證等）
+│   │   └── utils/     # 工具函數
+│   └── package.json
+└── package.json       # 根配置
+```
+
+## 權限管理
+
+管理後臺使用 Firebase Custom Claims 進行權限控制：
+
+- **super_admin**: 超級管理員（完整權限）
+- **admin**: 一般管理員（部分權限）
+- **moderator**: 內容審核員（僅內容審核權限）
+
+## 環境配置
+
+### Frontend (.env)
+
+```env
+VITE_API_URL=http://localhost:4001
+VITE_FIREBASE_API_KEY=your-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-app.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+```
+
+### Backend (.env)
+
+```env
+PORT=4001
+CORS_ORIGIN=http://localhost:5174
+FIREBASE_ADMIN_PROJECT_ID=your-project-id
+FIREBASE_ADMIN_CLIENT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+```
+
+## 開發規範
+
+- 遵循 chat-app-3 的編碼規範
+- 所有 API 請求需要管理員權限驗證
+- 使用 Firestore 作為數據源（不創建重複數據）
+- UI 組件使用 Element Plus
+- 響應式設計支援平板和桌面端
+
+## 部署
+
+待補充...

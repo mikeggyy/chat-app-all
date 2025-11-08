@@ -1,0 +1,51 @@
+{
+  "name": "chat-app-backend",
+  "version": "0.1.0",
+  "description": "Node.js API backend for the chat app starter",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "generate:voices": "node ./scripts/generateVoicePreviews.js",
+    "import:all": "node ./scripts/import-all-data.js",
+    "import:characters": "node ./scripts/import-characters-to-firestore.js",
+    "import:configs": "node ./scripts/import-configs-to-firestore.js",
+    "import:membership": "node ./scripts/import-membership-configs.js",
+    "import:character-styles": "node ./scripts/import-character-styles.js",
+    "import:test-data": "node ./scripts/seed-test-data.js",
+    "test:add-coins": "node ./scripts/add-test-coins.js",
+    "init:user-assets": "node ./scripts/init-user-assets.js",
+    "test:user-assets": "node ./scripts/test-user-assets.js",
+    "test:admin-assets": "node ./scripts/test-admin-asset-update.js",
+    "test:potions": "node ./scripts/test-potion-system.js",
+    "seed:potions": "node ./scripts/seed-potions-data.js",
+    "normalize:characters": "node ./scripts/normalize-character-data.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
+    "@google-cloud/vertexai": "^1.10.0",
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "firebase-admin": "^13.5.0",
+    "node-cache": "^5.1.2",
+    "openai": "^4.104.0",
+    "replicate": "^1.3.1",
+    "sharp": "^0.34.4",
+    "tiktoken": "^1.0.22",
+    "winston": "^3.18.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

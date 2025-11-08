@@ -1,0 +1,478 @@
+/**
+ * 統一限制服務基礎模組 (Firestore 版本)
+ * 提供所有限制服務的共用邏輯，使用 Firestore 進行數據持久化
+ *
+ * 此版本將原來的 in-memory Map 替換為 Firestore，同時保持模組化結構：
+ * - constants.js - 常量定義
+ * - limitConfig.js - 配置管理
+ * - limitReset.js - 重置邏輯
+ * - limitTracking.js - 追蹤邏輯
+ */
+
+import { getFirestoreDb } from "../firebase/index.js";
+import { FieldValue } from "firebase-admin/firestore";
+import { RESET_PERIOD } from "./limitService/constants.js";
+import { getLimitConfig } from "./limitService/limitConfig.js";
+import { checkAndReset, createLimitData } from "./limitService/limitReset.js";
+import {
+  checkCanUse,
+  recordUse as trackRecordUse,
+  unlockByAd as trackUnlockByAd,
+  purchaseCards as trackPurchaseCards,
+  unlockPermanently as trackUnlockPermanently,
+} from "./limitService/limitTracking.js";
+import { isGuestUser } from "../../../../shared/config/testAccounts.js";
+
+const USAGE_LIMITS_COLLECTION = "usage_limits";
+
+/**
+ * 創建基礎限制服務
+ * @param {Object} config - 配置選項
+ * @param {string} config.serviceName - 服務名稱（用於日誌）
+ * @param {string} config.limitType - 限制類型（用於錯誤訊息）
+ * @param {Function} config.getMembershipLimit - 取得會員等級限制的函數
+ * @param {string} config.testAccountLimitKey - TEST_ACCOUNT_LIMITS 中的鍵名
+ * @param {string} config.resetPeriod - 重置週期 (daily/weekly/monthly/none)
+ * @param {boolean} config.perCharacter - 是否按角色追蹤（預設 false）
+ * @param {boolean} config.allowGuest - 是否允許遊客使用（預設 false）
+ * @param {string} config.fieldName - Firestore 中的欄位名稱 (photos/voice/conversation)
+ */
+export function createLimitService(config) {
+  const {
+    serviceName,
+    limitType,
+    getMembershipLimit,
+    testAccountLimitKey,
+    resetPeriod = RESET_PERIOD.MONTHLY,
+    perCharacter = false,
+    allowGuest = false,
+    fieldName, // 例如: 'photos', 'voice', 'conversation'
+  } = config;
+
+  // ⚠️ 驗證必要參數
+  if (!fieldName || typeof fieldName !== 'string') {
+    throw new Error(`[createLimitService] fieldName 是必要參數，不能是 undefined。服務名稱: ${serviceName}`);
+  }
+
+  /**
+   * 獲取用戶的使用限制文檔引用
+   */
+  const getUserLimitRef = (userId) => {
+    const db = getFirestoreDb();
+    return db.collection(USAGE_LIMITS_COLLECTION).doc(userId);
+  };
+
+  /**
+   * 初始化用戶限制記錄
+   */
+  const initUserLimit = async (userId, characterId = null) => {
+    const userLimitRef = getUserLimitRef(userId);
+    const db = getFirestoreDb();
+
+    const result = await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(userLimitRef);
+
+      let userData = {};
+      if (doc.exists) {
+        userData = doc.data();
+      }
+
+      let limitData;
+
+      if (perCharacter) {
+        // 按角色追蹤（如 voice, conversation）
+        if (!userData[fieldName]) {
+          userData[fieldName] = {};
+        }
+        if (!userData[fieldName][characterId]) {
+          userData[fieldName][characterId] = createLimitData(resetPeriod);
+        }
+        limitData = userData[fieldName][characterId];
+
+        // 補充缺失的欄位（處理舊數據）
+        const defaultData = createLimitData(resetPeriod);
+        limitData = {
+          ...defaultData,
+          ...limitData,
+        };
+        userData[fieldName][characterId] = limitData;
+      } else {
+        // 不按角色追蹤（如 photos, character_creation）
+        if (!userData[fieldName]) {
+          userData[fieldName] = createLimitData(resetPeriod);
+        }
+        limitData = userData[fieldName];
+
+        // 補充缺失的欄位（處理舊數據）
+        const defaultData = createLimitData(resetPeriod);
+        limitData = {
+          ...defaultData,
+          ...limitData,
+        };
+        userData[fieldName] = limitData;
+      }
+
+      // 更新到 Firestore
+      if (!doc.exists) {
+        userData.userId = userId;
+        userData.createdAt = FieldValue.serverTimestamp();
+      }
+      userData.updatedAt = FieldValue.serverTimestamp();
+
+      transaction.set(userLimitRef, userData, { merge: true });
+
+      return limitData;
+    });
+
+    return result;
+  };
+
+  /**
+   * 獲取限制數據
+   */
+  const getLimitData = async (userId, characterId = null) => {
+    const userLimitRef = getUserLimitRef(userId);
+    const doc = await userLimitRef.get();
+
+    if (!doc.exists) {
+      return null;
+    }
+
+    const userData = doc.data();
+
+    if (perCharacter) {
+      return userData[fieldName]?.[characterId] || null;
+    }
+    return userData[fieldName] || null;
+  };
+
+  /**
+   * 更新限制數據
+   */
+  const updateLimitData = async (userId, characterId, limitData) => {
+    const userLimitRef = getUserLimitRef(userId);
+    const db = getFirestoreDb();
+
+    await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(userLimitRef);
+
+      let userData = {};
+      if (doc.exists) {
+        userData = doc.data();
+      } else {
+        userData.userId = userId;
+        userData.createdAt = FieldValue.serverTimestamp();
+      }
+
+      if (perCharacter) {
+        if (!userData[fieldName]) {
+          userData[fieldName] = {};
+        }
+        userData[fieldName][characterId] = limitData;
+      } else {
+        userData[fieldName] = limitData;
+      }
+
+      userData.updatedAt = FieldValue.serverTimestamp();
+
+      transaction.set(userLimitRef, userData, { merge: true });
+    });
+  };
+
+  /**
+   * 檢查是否可以使用
+   */
+  const canUse = async (userId, characterId = null) => {
+    // 檢查遊客權限
+    if (!allowGuest && isGuestUser(userId)) {
+      return {
+        canUse: false,
+        reason: "guest_not_allowed",
+        message: `遊客無法使用${limitType}功能，請先登入`,
+        tier: "guest",
+        limit: 0,
+      };
+    }
+
+    // 如果是 perCharacter 模式但沒有提供有效的 characterId，拋出錯誤
+    if (perCharacter && (!characterId || characterId === 'null' || characterId === 'undefined')) {
+      throw new Error(`${limitType}功能需要提供有效的角色 ID`);
+    }
+
+    const limitData = await initUserLimit(userId, characterId);
+    const wasReset = checkAndReset(limitData, resetPeriod);
+
+    // 如果發生了重置，更新到 Firestore
+    if (wasReset) {
+      await updateLimitData(userId, characterId, limitData);
+    }
+
+    const configData = await getLimitConfig(
+      userId,
+      getMembershipLimit,
+      testAccountLimitKey,
+      serviceName
+    );
+
+    const result = checkCanUse(limitData, configData.limit);
+
+    return {
+      ...result,
+      tier: configData.tier,
+      limit: configData.limit,
+    };
+  };
+
+  /**
+   * 記錄使用
+   */
+  const recordUse = async (userId, characterId = null, metadata = {}) => {
+    // 檢查遊客權限
+    if (!allowGuest && isGuestUser(userId)) {
+      throw new Error(`遊客無法使用${limitType}功能，請先登入`);
+    }
+
+    // 當 perCharacter 為 true 時，必須提供有效的 characterId
+    if (perCharacter && (!characterId || characterId === 'null' || characterId === 'undefined')) {
+      throw new Error(`${limitType}功能需要提供有效的角色 ID`);
+    }
+
+    const limitData = await initUserLimit(userId, characterId);
+    checkAndReset(limitData, resetPeriod);
+
+    trackRecordUse(limitData, metadata);
+
+    await updateLimitData(userId, characterId, limitData);
+
+    return {
+      success: true,
+      count: limitData.count,
+      lifetimeCount: limitData.lifetimeCount,
+    };
+  };
+
+  /**
+   * 透過廣告解鎖額外次數
+   */
+  const unlockByAd = async (userId, amount = 1, characterId = null) => {
+    const limitData = await initUserLimit(userId, characterId);
+    checkAndReset(limitData, resetPeriod);
+
+    const result = trackUnlockByAd(limitData, amount);
+
+    await updateLimitData(userId, characterId, limitData);
+
+    return result;
+  };
+
+  /**
+   * 購買使用卡
+   */
+  const purchaseCards = async (userId, quantity = 1, paymentInfo = {}, characterId = null) => {
+    const limitData = await initUserLimit(userId, characterId);
+
+    const result = trackPurchaseCards(limitData, quantity);
+
+    await updateLimitData(userId, characterId, limitData);
+
+    return {
+      ...result,
+      paymentInfo,
+    };
+  };
+
+  /**
+   * 永久解鎖
+   */
+  const unlockPermanently = async (userId, characterId = null) => {
+    const limitData = await initUserLimit(userId, characterId);
+
+    const result = trackUnlockPermanently(limitData);
+
+    await updateLimitData(userId, characterId, limitData);
+
+    return result;
+  };
+
+  /**
+   * 獲取統計資訊
+   */
+  const getStats = async (userId, characterId = null) => {
+    // 如果是 perCharacter 模式且沒有提供 characterId，返回所有角色的統計
+    if (perCharacter && !characterId) {
+      return await getAllStats(userId);
+    }
+
+    const limitData = await initUserLimit(userId, characterId);
+
+    const wasReset = checkAndReset(limitData, resetPeriod);
+
+    // 如果發生了重置，更新到 Firestore
+    if (wasReset) {
+      await updateLimitData(userId, characterId, limitData);
+    }
+
+    const configData = await getLimitConfig(
+      userId,
+      getMembershipLimit,
+      testAccountLimitKey,
+      serviceName
+    );
+
+    const totalAllowed = configData.limit === -1
+      ? -1
+      : configData.limit + limitData.unlocked + limitData.cards;
+
+    const used = limitData.count;
+    const remaining = totalAllowed === -1 ? -1 : Math.max(0, totalAllowed - used);
+
+    const result = {
+      tier: configData.tier,
+      unlimited: configData.limit === -1,
+      limit: configData.limit,
+      standardLimit: configData.standardLimit,
+      isTestAccount: configData.isTestAccount,
+      used,
+      remaining,
+      total: totalAllowed,
+      permanentUnlock: limitData.permanentUnlock,
+      unlocked: limitData.unlocked,
+      cards: limitData.cards,
+      adsWatchedToday: limitData.adsWatchedToday,
+      lifetimeUsed: limitData.lifetimeCount,
+      lastResetDate: limitData.lastResetDate,
+    };
+
+    return result;
+  };
+
+  /**
+   * 重置用戶限制（管理員功能）
+   */
+  const reset = async (userId, characterId = null) => {
+    const limitData = createLimitData(resetPeriod);
+    await updateLimitData(userId, characterId, limitData);
+
+    return {
+      success: true,
+      message: `${limitType}限制已重置`,
+    };
+  };
+
+  /**
+   * 清除所有限制記錄（測試用）
+   */
+  const clearAll = async () => {
+    const db = getFirestoreDb();
+    const snapshot = await db.collection(USAGE_LIMITS_COLLECTION).get();
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    if (snapshot.docs.length > 0) {
+      await batch.commit();
+    }
+
+    return {
+      success: true,
+      deletedCount: snapshot.docs.length,
+    };
+  };
+
+  /**
+   * 獲取所有用戶的限制統計（管理員功能）
+   */
+  const getAllStats = async (userId = null) => {
+    // 如果提供了 userId 且服務是 perCharacter 的，返回該用戶的所有角色統計
+    if (userId && perCharacter) {
+      const userLimitRef = getUserLimitRef(userId);
+      const doc = await userLimitRef.get();
+
+      if (!doc.exists) {
+        return {
+          tier: "free",
+          unlimited: false,
+          limitPerCharacter: 0,
+          standardLimitPerCharacter: 0,
+          isTestAccount: false,
+          characters: {},
+        };
+      }
+
+      const userData = doc.data();
+      const characterData = userData[fieldName] || {};
+
+      const configData = await getLimitConfig(
+        userId,
+        getMembershipLimit,
+        testAccountLimitKey,
+        serviceName
+      );
+
+      // 為每個角色計算 remaining 值
+      const charactersWithRemaining = {};
+      for (const [characterId, limitData] of Object.entries(characterData)) {
+        // 計算剩餘次數（不做重置，只讀操作）
+        const limit = configData.limit;
+        const totalAllowed = limit === -1
+          ? -1
+          : limit + limitData.unlocked + limitData.cards;
+        const used = limitData.count;
+        const remaining = totalAllowed === -1 ? -1 : Math.max(0, totalAllowed - used);
+
+        charactersWithRemaining[characterId] = {
+          ...limitData,
+          remaining,
+          limit,
+          total: totalAllowed,
+        };
+      }
+
+      return {
+        tier: configData.tier,
+        unlimited: configData.limit === -1,
+        limitPerCharacter: configData.limit,
+        standardLimitPerCharacter: configData.standardLimit,
+        isTestAccount: configData.isTestAccount,
+        characters: charactersWithRemaining,
+      };
+    }
+
+    // 否則返回所有用戶的統計
+    const db = getFirestoreDb();
+    const snapshot = await db.collection(USAGE_LIMITS_COLLECTION).get();
+
+    const stats = [];
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      stats.push({
+        userId: doc.id,
+        [fieldName]: data[fieldName] || null,
+      });
+    });
+
+    return stats;
+  };
+
+  // 返回服務接口
+  return {
+    canUse,
+    recordUse,
+    unlockByAd,
+    purchaseCards,
+    unlockPermanently,
+    getStats,
+    reset,
+    clearAll,
+    getAllStats,
+  };
+}
+
+export { RESET_PERIOD };
+
+export default {
+  createLimitService,
+  RESET_PERIOD,
+};

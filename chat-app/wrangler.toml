@@ -1,0 +1,15 @@
+# Cloudflare Pages 配置文件（用於 Wrangler CLI 部署）
+# 注意：Cloudflare Pages 主要通過 Git 集成部署，此文件為可選配置
+
+name = "chat-app-frontend"
+compatibility_date = "2024-11-08"
+
+# Pages 專案配置
+pages_build_output_dir = "frontend/dist"
+
+# 環境變數（開發環境）
+[env.development.vars]
+VITE_API_URL = "http://localhost:4000"
+
+# 環境變數（生產環境在 Cloudflare Pages Dashboard 設置）
+# 不要在此文件中存放敏感資訊

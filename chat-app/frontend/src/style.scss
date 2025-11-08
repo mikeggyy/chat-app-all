@@ -1,0 +1,103 @@
+:root {
+  font-family: "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #0f172a;
+  background-color: #f8fafc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+[data-drag-scroll] {
+  cursor: grab;
+}
+
+[data-drag-scroll="dragging"] {
+  cursor: grabbing;
+  user-select: none;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: transparent;
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #app {
+    width: min(100vw, 430px);
+    height: min(100vh, 932px);
+  }
+}
+
+button,
+img {
+  border: none;
+  outline: none;
+}
+
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  color: inherit;
+}
+
+button::-moz-focus-inner {
+  border: 0;
+  padding: 0;
+}
+
+button:focus,
+button:focus-visible,
+button:active,
+img:focus,
+img:focus-visible {
+  outline: none !important;
+  border: none;
+  box-shadow: none;
+}
+
+button:active {
+  background-image: none;
+  background-color: transparent;
+}
+
+h2 {
+  color: rgba(226, 232, 240, 0.8);
+}
+
+::selection {
+  background: rgba(255, 77, 143, 0.3);
+  color: inherit;
+}

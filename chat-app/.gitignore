@@ -1,0 +1,95 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+
+# Testing & coverage
+coverage/
+.nyc_output/
+.vitest/
+coverage-final.json
+lcov.info
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+.tmp/
+tmp/
+
+# Caches
+.cache/
+.parcel-cache/
+.rollup.cache/
+.eslintcache
+.stylelintcache
+.tsbuildinfo
+.turbo/
+.pnpm-store/
+node_modules/.cache/
+
+# Local environment & secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+.env.development.local
+.env.test.local
+.npmrc
+# .env.example 應該被提交到版本控制，作為配置範本
+
+
+# Firebase & emulators
+.firebase/
+firebase-debug.log
+firestore-debug.log
+*-debug.log
+
+# Firebase service account keys (sensitive!)
+service-account-key.json
+*-firebase-adminsdk-*.json
+formatted-private-key.txt
+
+# Google Cloud service account keys (sensitive!)
+secrets/
+backend/secrets/
+*-service-account-*.json
+google-cloud-service-account.json
+
+# IDE / editor directories
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+NUL
+
+# Miscellaneous
+*.swp
+*.swo
+*.orig
+*.rej
+*.tmp
+*~

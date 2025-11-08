@@ -7,9 +7,9 @@ compatibility_date = "2024-11-08"
 # Pages 專案配置
 pages_build_output_dir = "frontend/dist"
 
-# 環境變數在 Cloudflare Pages Dashboard 設置
-# Workers & Pages > chat-app-frontend > Settings > Environment variables
+# 環境變數配置
+# 建置時環境變數現在存放在 frontend/.env.production 文件中
+# Vite 會在建置時自動讀取該文件
 #
-# 支持的環境：
-# - production（生產環境）
-# - preview（Pull Request 預覽環境）
+# 如需通過 Cloudflare Pages Dashboard 設置：
+# Workers & Pages > chat-app-frontend > Settings > Environment variables

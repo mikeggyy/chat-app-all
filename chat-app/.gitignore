@@ -45,7 +45,10 @@ node_modules/.cache/
 .env
 .env.local
 .env.*.local
-.env.production
+# 注意：frontend/.env.production 不被忽略（前端環境變數是公開的）
+# 但 backend/.env.production 仍然被忽略（後端環境變數可能包含敏感資訊）
+!frontend/.env.production
+backend/.env.production
 .env.production.local
 .env.development.local
 .env.test.local

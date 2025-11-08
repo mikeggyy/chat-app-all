@@ -27,7 +27,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
-.env.production
+# 注意：.env.production 不被忽略，因為前端環境變數是公開的
+# .env.production
 .env.production.local
 
 # Firebase

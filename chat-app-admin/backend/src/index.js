@@ -4,7 +4,7 @@ import cors from "cors";
 import { db, auth } from "./firebase/index.js";
 
 // ✅ 導入角色快取服務（複用主應用的實現）
-import { initializeCharactersCache } from "../../../chat-app-3/backend/src/services/character/characterCache.service.js";
+import { initializeCharactersCache } from "../../../chat-app/backend/src/services/character/characterCache.service.js";
 
 // 創建 Express 應用
 const app = express();
@@ -45,6 +45,7 @@ import membershipRoutes from "./routes/membership.routes.js";
 import productsRoutes from "./routes/products.routes.js";
 import categoriesRoutes from "./routes/categories.routes.js";
 import aiSettingsRoutes from "./routes/ai-settings.routes.js";
+import voicesRoutes from "./routes/voices.routes.js";
 
 // 註冊路由（所有路由都需要管理員權限）
 app.use("/api/dashboard", authMiddleware, adminMiddleware, dashboardRoutes);
@@ -67,6 +68,7 @@ app.use("/api/membership-tiers", authMiddleware, adminMiddleware, membershipRout
 app.use("/api/products", authMiddleware, adminMiddleware, productsRoutes);
 app.use("/api/categories", authMiddleware, adminMiddleware, categoriesRoutes);
 app.use("/api/ai-settings", authMiddleware, adminMiddleware, aiSettingsRoutes);
+app.use("/api/voices", authMiddleware, adminMiddleware, voicesRoutes);
 
 // 404 處理
 app.use((req, res) => {

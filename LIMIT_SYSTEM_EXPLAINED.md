@@ -383,9 +383,9 @@ const characterPhotoLimitService = createLimitService({
 
 ## 📚 相關文件
 
-- 限制服務基礎模組: `chat-app-3/backend/src/services/baseLimitService.js`
-- 角色創建限制: `chat-app-3/backend/src/characterCreation/characterCreationLimit.service.js`
-- 限制配置管理: `chat-app-3/backend/src/services/limitService/limitConfig.js`
-- 限制追蹤邏輯: `chat-app-3/backend/src/services/limitService/limitTracking.js`
-- 會員配置: `chat-app-3/backend/src/membership/membership.config.js`
-- Firestore 數據結構: `chat-app-3/docs/firestore-collections.md`
+- 限制服務基礎模組: `chat-app/backend/src/services/baseLimitService.js`
+- 角色創建限制: `chat-app/backend/src/characterCreation/characterCreationLimit.service.js`
+- 限制配置管理: `chat-app/backend/src/services/limitService/limitConfig.js`
+- 限制追蹤邏輯: `chat-app/backend/src/services/limitService/limitTracking.js`
+- 會員配置: `chat-app/backend/src/membership/membership.config.js`
+- Firestore 數據結構: `chat-app/docs/firestore-collections.md`

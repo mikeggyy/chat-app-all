@@ -17,7 +17,6 @@ import {
 } from "./generationLog.service.js";
 import {
   canCreateCharacter,
-  recordCreation,
   getCreationStats,
 } from "./characterCreationLimit.service.js";
 import { consumeUserAsset } from "../user/assets.service.js";
@@ -41,9 +40,9 @@ const respondWithError = (res, error, fallbackMessage) => {
   res.status(status).json({ message });
 };
 
-characterCreationRouter.post("/flows", (req, res) => {
+characterCreationRouter.post("/flows", async (req, res) => {
   try {
-    const flow = createCreationFlow({
+    const flow = await createCreationFlow({
       userId: req.body?.userId,
       persona: req.body?.persona,
       appearance: req.body?.appearance,
@@ -61,9 +60,9 @@ characterCreationRouter.post("/flows", (req, res) => {
   }
 });
 
-characterCreationRouter.get("/flows/:flowId", (req, res) => {
+characterCreationRouter.get("/flows/:flowId", async (req, res) => {
   try {
-    const flow = getCreationFlow(req.params.flowId);
+    const flow = await getCreationFlow(req.params.flowId);
     if (!flow) {
       res
         .status(404)
@@ -80,9 +79,9 @@ characterCreationRouter.get("/flows/:flowId", (req, res) => {
   }
 });
 
-characterCreationRouter.patch("/flows/:flowId", (req, res) => {
+characterCreationRouter.patch("/flows/:flowId", async (req, res) => {
   try {
-    const flow = mergeCreationFlow(req.params.flowId, req.body ?? {});
+    const flow = await mergeCreationFlow(req.params.flowId, req.body ?? {});
     res.json({ flow });
   } catch (error) {
     respondWithError(
@@ -95,7 +94,7 @@ characterCreationRouter.patch("/flows/:flowId", (req, res) => {
 
 characterCreationRouter.post(
   "/flows/:flowId/steps/:stepId",
-  (req, res) => {
+  async (req, res) => {
     const step = trimString(req.params.stepId).toLowerCase();
     const flowId = req.params.flowId;
 
@@ -118,7 +117,7 @@ characterCreationRouter.post(
     }
 
     try {
-      const flow = mergeCreationFlow(flowId, payload);
+      const flow = await mergeCreationFlow(flowId, payload);
       res.json({ flow });
     } catch (error) {
       respondWithError(
@@ -130,7 +129,7 @@ characterCreationRouter.post(
   }
 );
 
-characterCreationRouter.post("/flows/:flowId/charges", (req, res) => {
+characterCreationRouter.post("/flows/:flowId/charges", async (req, res) => {
   try {
     const idempotencyKey =
       trimString(req.get("Idempotency-Key")) ||
@@ -142,7 +141,7 @@ characterCreationRouter.post("/flows/:flowId/charges", (req, res) => {
       idempotencyKey,
     };
 
-    const { flow, charge } = recordCreationCharge(
+    const { flow, charge } = await recordCreationCharge(
       req.params.flowId,
       payload
     );
@@ -263,7 +262,7 @@ characterCreationRouter.post(
     const flowId = req.params.flowId;
 
     try {
-      const currentFlow = getCreationFlow(flowId);
+      const currentFlow = await getCreationFlow(flowId);
       if (!currentFlow) {
         res
           .status(404)
@@ -340,7 +339,7 @@ characterCreationRouter.post(
 
     try {
       // 獲取並檢查 flow
-      const flow = getCreationFlow(flowId);
+      const flow = await getCreationFlow(flowId);
       if (!flow) {
         return res.status(404).json({ message: "找不到角色創建流程" });
       }
@@ -372,7 +371,7 @@ characterCreationRouter.post(
       });
 
       // 成功生成後增加使用次數
-      mergeCreationFlow(flowId, {
+      await mergeCreationFlow(flowId, {
         metadata: {
           ...flow.metadata,
           aiMagicianUsageCount: usageCount + 1,
@@ -408,7 +407,7 @@ characterCreationRouter.post(
     }
 
     try {
-      const currentFlow = getCreationFlow(flowId);
+      const currentFlow = await getCreationFlow(flowId);
 
       if (process.env.NODE_ENV !== "test") {
         logger.debug(`[Image Generation API] Flow found:`, {
@@ -442,14 +441,57 @@ characterCreationRouter.post(
         return;
       }
 
-      // 檢查角色創建次數限制
+      // ✅ 檢查是否已經生成過圖片（一個創建流程只能生成一次）
+      if (
+        currentFlow.generation.status === "completed" &&
+        currentFlow.generation.result?.images &&
+        currentFlow.generation.result.images.length > 0
+      ) {
+        logger.info(`[圖片生成] 用戶 ${currentFlow.userId} 已生成過圖片，直接返回之前的結果`);
+        res.status(200).json({
+          flow: currentFlow,
+          reused: true,
+          images: currentFlow.generation.result.images,
+        });
+        return;
+      }
+
+      // 獲取用戶 ID 並檢查創建資源
       const userId = currentFlow.userId;
+      let shouldRecordCreation = false;
+      let needsCreateCard = false;
+
       if (userId) {
-        const limitCheck = canCreateCharacter(userId);
+        const { canCreateCharacter, getCreationStats } = await import("./characterCreationLimit.service.js");
+        const { consumeUserAsset } = await import("../user/assets.service.js");
+
+        const limitCheck = await canCreateCharacter(userId);
         if (!limitCheck.allowed) {
           res.status(403).json({
             message: limitCheck.message || "已達到角色創建次數限制",
             limit: limitCheck,
+          });
+          return;
+        }
+
+        // 檢查是否需要使用創建卡
+        try {
+          const stats = await getCreationStats(userId);
+
+          if (stats.remaining <= 0) {
+            // 免費次數用完，需要使用創建卡
+            logger.info(`[圖片生成] 用戶 ${userId} 免費次數已用完（剩餘 ${stats.remaining}），將在生成成功後扣除創建卡`);
+            needsCreateCard = true;
+            shouldRecordCreation = true;
+          } else {
+            // 有免費次數
+            logger.info(`[圖片生成] 用戶 ${userId} 使用免費次數（剩餘 ${stats.remaining} 次）`);
+            shouldRecordCreation = true;
+          }
+        } catch (error) {
+          logger.error(`[圖片生成] 檢查創建資源失敗: ${error.message}`);
+          res.status(500).json({
+            message: "檢查創建資源失敗",
           });
           return;
         }
@@ -522,28 +564,85 @@ characterCreationRouter.post(
           trimString(req.body?.statusOnFailure) || "failed",
       });
 
-      // 記錄角色創建次數（僅在首次創建時記錄）
-      if (!reused && userId) {
-        try {
-          // 檢查剩餘次數
-          const stats = await getCreationStats(userId);
+      // 生成成功後扣除創建卡並重置 AI 魔術師使用次數
+      if (!reused && userId && shouldRecordCreation) {
+        const { consumeUserAsset } = await import("../user/assets.service.js");
+        const { getFirestoreDb } = await import("../firebase/index.js");
 
-          if (stats.remaining <= 0) {
-            // 免費次數用完，嘗試使用創建卡
-            logger.info(`[角色創建] 用戶 ${userId} 免費次數已用完，嘗試使用創建卡`);
+        // 步驟 1: 使用 Transaction 原子性地設置標記（防止並發覆蓋）
+        const db = getFirestoreDb();
+        const flowRef = db.collection("character_creation_flows").doc(flowId);
+
+        let latestFlowMetadata;
+        try {
+          await db.runTransaction(async (transaction) => {
+            const flowDoc = await transaction.get(flowRef);
+
+            if (!flowDoc.exists) {
+              throw new Error('創建流程不存在');
+            }
+
+            const flowData = flowDoc.data();
+            const currentMetadata = flowData.metadata || {};
+
+            // ⚠️ 檢查是否已經標記為已扣除
+            if (currentMetadata.deductedOnImageGeneration === true) {
+              throw new Error('此流程已經扣除過創建卡，請勿重複提交');
+            }
+
+            // 原子性地設置標記
+            const newMetadata = {
+              ...currentMetadata,
+              aiMagicianUsageCount: 0,
+              deductedOnImageGeneration: needsCreateCard,
+            };
+
+            transaction.update(flowRef, {
+              metadata: newMetadata,
+              updatedAt: new Date().toISOString(),
+            });
+
+            latestFlowMetadata = newMetadata;
+          });
+
+          logger.info(`[圖片生成] 成功設置扣除標記，needsCreateCard: ${needsCreateCard}`);
+        } catch (transactionError) {
+          logger.error("[圖片生成] 設置扣除標記失敗:", transactionError);
+          throw new Error(transactionError.message || "設置扣除標記失敗，請重試");
+        }
+
+        // 步驟 2: 扣除創建卡（獨立的 Transaction）
+        try {
+          if (needsCreateCard) {
             await consumeUserAsset(userId, "createCards", 1);
-            logger.info(`[角色創建] 用戶 ${userId} 成功使用創建卡`);
-          } else {
-            // 有免費次數，記錄使用
-            logger.info(`[角色創建] 用戶 ${userId} 使用免費次數（剩餘 ${stats.remaining} 次）`);
+            logger.info(`[圖片生成] 用戶 ${userId} 成功扣除 1 張創建卡`);
+          }
+          logger.info(`[圖片生成] 用戶 ${userId} 圖片生成成功，AI 魔術師次數已重置${needsCreateCard ? '，創建卡已扣除' : ''}`);
+        } catch (error) {
+          // 步驟 3: 如果扣除失敗，使用 Transaction 回滾標記
+          logger.error("[圖片生成] 扣除創建卡失敗，回滾標記:", error);
+
+          try {
+            await db.runTransaction(async (transaction) => {
+              const flowDoc = await transaction.get(flowRef);
+
+              if (flowDoc.exists) {
+                const flowData = flowDoc.data();
+                transaction.update(flowRef, {
+                  metadata: {
+                    ...(flowData.metadata || {}),
+                    deductedOnImageGeneration: false,
+                  },
+                  updatedAt: new Date().toISOString(),
+                });
+              }
+            });
+            logger.info("[圖片生成] 成功回滾扣除標記");
+          } catch (rollbackError) {
+            logger.error("[圖片生成] 回滾標記失敗:", rollbackError);
           }
 
-          // 記錄創建次數
-          recordCreation(userId, flowId);
-        } catch (recordError) {
-          logger.error("[角色創建限制] 記錄創建次數或扣除創建卡失敗:", recordError);
-          // 如果扣除失敗，應該回滾生成？但這裡已經生成成功了
-          // 這是一個需要考慮的邊界情況
+          throw new Error("創建卡扣除失敗，請重試");
         }
       }
 
@@ -817,6 +916,80 @@ characterCreationRouter.post(
     } catch (error) {
       logger.error("[圖片清理] 清理失敗:", error);
       respondWithError(res, error, "清理未選中圖片失敗");
+    }
+  }
+);
+
+// 取消角色創建並清理所有生成的圖片
+// POST /api/character-creation/flows/:flowId/cancel
+// 用於用戶放棄創建時，刪除所有生成的圖片並標記流程為已取消
+characterCreationRouter.post(
+  "/flows/:flowId/cancel",
+  async (req, res) => {
+    try {
+      const { flowId } = req.params;
+
+      if (!flowId) {
+        return res.status(400).json({ message: "缺少 flowId 參數" });
+      }
+
+      // 獲取 flow 資料
+      const flow = await getCreationFlow(flowId);
+      if (!flow) {
+        return res.status(404).json({ message: "找不到指定的角色創建流程" });
+      }
+
+      logger.info(`[取消創建] 開始處理 flowId=${flowId} 的取消請求`);
+
+      // 獲取所有生成的圖片
+      const generatedImages = flow.generation?.result?.images || [];
+
+      if (generatedImages.length > 0) {
+        logger.info(`[取消創建] 需要刪除 ${generatedImages.length} 張生成的圖片`);
+
+        // 動態導入 deleteImage 函數
+        const { deleteImage } = await import("../firebase/storage.service.js");
+
+        // 刪除所有生成的圖片
+        const deleteResults = await Promise.allSettled(
+          generatedImages.map(async (image) => {
+            const url = typeof image === 'string' ? image : image.url;
+            try {
+              await deleteImage(url);
+              logger.info(`[取消創建] 成功刪除圖片: ${url}`);
+              return { url, success: true };
+            } catch (error) {
+              logger.error(`[取消創建] 刪除圖片失敗: ${url}`, error);
+              return { url, success: false, error: error.message };
+            }
+          })
+        );
+
+        // 統計刪除結果
+        const successCount = deleteResults.filter(r => r.status === "fulfilled" && r.value.success).length;
+        const failCount = deleteResults.length - successCount;
+
+        logger.info(`[取消創建] 圖片刪除完成: 成功 ${successCount} 個，失敗 ${failCount} 個`);
+      } else {
+        logger.info(`[取消創建] 沒有生成的圖片需要刪除`);
+      }
+
+      // 更新 flow 狀態為 cancelled
+      const updatedFlow = await mergeCreationFlow(flowId, {
+        status: "cancelled",
+      });
+
+      logger.info(`[取消創建] 流程已標記為已取消: ${flowId}`);
+
+      res.json({
+        success: true,
+        flow: updatedFlow,
+        deletedImages: generatedImages.length,
+        message: "角色創建已取消，生成的圖片已清理",
+      });
+    } catch (error) {
+      logger.error("[取消創建] 處理失敗:", error);
+      respondWithError(res, error, "取消角色創建失敗");
     }
   }
 );

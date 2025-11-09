@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   XMarkIcon,
@@ -77,6 +77,13 @@ const handleOverlayClick = (event) => {
     handleClose();
   }
 };
+
+// 📊 Console Log: 記錄角色創建次數限制信息（方便調試）
+watch(() => props.isOpen, (isOpen) => {
+  if (isOpen) {
+    console.log(`[角色創建限制] 已使用: ${props.usedCreations} / ${displayTotal.value}, 創建卡: ${props.createCards} 張, 測試帳號: ${props.isTestAccount ? '是' : '否'}`);
+  }
+});
 </script>
 
 <template>
@@ -114,7 +121,7 @@ const handleOverlayClick = (event) => {
             <!-- Body -->
             <div class="modal-body">
               <p class="message">
-                您的角色創建次數已達到本月上限（{{ usedCreations }} / {{ displayTotal }}）。
+                您的角色創建次數已達到本月上限。
                 <span v-if="isTestAccount" style="color: rgba(248, 250, 252, 0.5); font-size: 0.85rem; display: block; margin-top: 0.5rem;">(測試帳號)</span>
               </p>
 

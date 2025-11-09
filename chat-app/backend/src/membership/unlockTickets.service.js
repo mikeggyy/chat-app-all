@@ -137,7 +137,7 @@ export const grantTickets = async (userId, ticketAmounts) => {
 };
 
 /**
- * 使用角色解鎖票
+ * 使用角色解鎖票（限時 7 天）
  */
 export const useCharacterUnlockTicket = async (userId, characterId) => {
   const user = await getUserById(userId);
@@ -155,12 +155,19 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
   // 扣除票數
   tickets.characterUnlockTickets -= 1;
 
+  // 計算解鎖到期時間（7 天後）
+  const now = new Date();
+  const unlockDays = 7;
+  const unlockUntil = new Date(now.getTime() + unlockDays * 24 * 60 * 60 * 1000);
+
   // 記錄使用歷史
   tickets.usageHistory.push({
     type: "use",
     ticketType: TICKET_TYPES.CHARACTER,
     characterId,
-    timestamp: new Date().toISOString(),
+    timestamp: now.toISOString(),
+    unlockDays,
+    unlockUntil: unlockUntil.toISOString(),
   });
 
   // 更新用戶資料
@@ -170,10 +177,18 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
     updatedAt: new Date().toISOString(),
   });
 
+  // 使用對話限制服務的 unlockPermanently 函數設置限時解鎖
+  const { conversationLimitService } = await import("../conversation/conversationLimit.service.js");
+  const unlockResult = await conversationLimitService.unlockPermanently(userId, characterId);
+
   return {
     success: true,
     characterId,
     remaining: tickets.characterUnlockTickets,
+    unlockDays,
+    unlockUntil: unlockUntil.toISOString(),
+    unlockUntilReadable: unlockUntil.toLocaleString('zh-TW'),
+    ...unlockResult,
   };
 };
 

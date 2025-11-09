@@ -1,7 +1,7 @@
 # 資料庫優化總結報告
 
 **日期**: 2025-01-08
-**項目**: loveStory - chat-app-3
+**項目**: loveStory - chat-app
 **優化範圍**: Firestore 資料庫設計
 
 **狀態**: ✅ 第一階段優化完成
@@ -17,7 +17,7 @@
 - 可能導致查詢失敗或效能低下
 
 **解決方案**：
-在 [firestore.indexes.json](chat-app-3/firestore.indexes.json) 中新增 4 個 orders 索引：
+在 [firestore.indexes.json](chat-app/firestore.indexes.json) 中新增 4 個 orders 索引：
 
 ```json
 {
@@ -36,7 +36,7 @@
 - `orders` - status + createdAt
 
 **影響的查詢**：
-- [order.service.js:166-212](chat-app-3/backend/src/payment/order.service.js#L166-L212) `getUserOrders()`
+- [order.service.js:166-212](chat-app/backend/src/payment/order.service.js#L166-L212) `getUserOrders()`
 
 ---
 
@@ -51,10 +51,10 @@
 創建新的 V2 架構，使用子集合存儲訊息：
 
 **文件清單**：
-1. [conversationV2.service.js](chat-app-3/backend/src/conversation/conversationV2.service.js) - 新服務實現
-2. [migrate-conversations-to-v2.js](chat-app-3/backend/scripts/migrate-conversations-to-v2.js) - 數據遷移腳本
-3. [test-conversation-v2.js](chat-app-3/backend/scripts/test-conversation-v2.js) - 測試腳本
-4. [CONVERSATION_MIGRATION_GUIDE.md](chat-app-3/docs/CONVERSATION_MIGRATION_GUIDE.md) - 完整遷移指南
+1. [conversationV2.service.js](chat-app/backend/src/conversation/conversationV2.service.js) - 新服務實現
+2. [migrate-conversations-to-v2.js](chat-app/backend/scripts/migrate-conversations-to-v2.js) - 數據遷移腳本
+3. [test-conversation-v2.js](chat-app/backend/scripts/test-conversation-v2.js) - 測試腳本
+4. [CONVERSATION_MIGRATION_GUIDE.md](chat-app/docs/CONVERSATION_MIGRATION_GUIDE.md) - 完整遷移指南
 
 **新增索引**：
 ```json
@@ -91,23 +91,23 @@
 創建了完整的遷移方案，採用漸進式遷移策略：
 
 **創建的文件**：
-1. **[walletHelpers.js](chat-app-3/backend/src/user/walletHelpers.js)** (175 行)
+1. **[walletHelpers.js](chat-app/backend/src/user/walletHelpers.js)** (175 行)
    - 統一的錢包餘額存取介面
    - 向後兼容舊格式
    - 提供遷移檢查功能
 
-2. **[coins.service.v2.js](chat-app-3/backend/src/payment/coins.service.v2.js)** (555 行)
+2. **[coins.service.v2.js](chat-app/backend/src/payment/coins.service.v2.js)** (555 行)
    - 使用新 wallet helpers 的金幣服務
    - 所有操作只更新 `wallet.balance`
    - 完全向後兼容
 
-3. **[migrate-user-wallet-fields.js](chat-app-3/backend/scripts/migrate-user-wallet-fields.js)** (166 行)
+3. **[migrate-user-wallet-fields.js](chat-app/backend/scripts/migrate-user-wallet-fields.js)** (166 行)
    - 數據遷移腳本
    - 支援 dry-run 測試
    - 自動驗證遷移結果
 
 **修改的文件**：
-- [user.service.js](chat-app-3/backend/src/user/user.service.js) - `normalizeUser` 函數不再生成冗餘欄位
+- [user.service.js](chat-app/backend/src/user/user.service.js) - `normalizeUser` 函數不再生成冗餘欄位
 
 **優點**：
 - ✅ 減少數據冗餘
@@ -194,9 +194,9 @@ export const getAllUsers = async (options = {}) => {
 ```
 
 **更新的文件**：
-- ✅ [user.service.js](chat-app-3/backend/src/user/user.service.js) - 添加分頁參數和邏輯
-- ✅ [user.routes.js](chat-app-3/backend/src/user/user.routes.js) - 支援查詢參數 `limit` 和 `startAfter`
-- ✅ [index.js](chat-app-3/backend/src/index.js) - 更新 cleanup 函數使用新的返回格式
+- ✅ [user.service.js](chat-app/backend/src/user/user.service.js) - 添加分頁參數和邏輯
+- ✅ [user.routes.js](chat-app/backend/src/user/user.routes.js) - 支援查詢參數 `limit` 和 `startAfter`
+- ✅ [index.js](chat-app/backend/src/index.js) - 更新 cleanup 函數使用新的返回格式
 
 **API 使用範例**：
 ```bash
@@ -269,7 +269,7 @@ usage_limits/{userId}/characters/{characterId}
 
 #### 1. 部署索引（必須）
 ```bash
-cd chat-app-3
+cd chat-app
 firebase deploy --only firestore:indexes
 ```
 
@@ -362,26 +362,26 @@ node scripts/migrate-user-wallet-fields.js
 ### 新創建的文件（第一階段）
 
 **對話歷史優化**：
-1. [conversationV2.service.js](chat-app-3/backend/src/conversation/conversationV2.service.js) - V2 服務實現（492 行）
-2. [migrate-conversations-to-v2.js](chat-app-3/backend/scripts/migrate-conversations-to-v2.js) - 對話遷移腳本（211 行）
-3. [test-conversation-v2.js](chat-app-3/backend/scripts/test-conversation-v2.js) - 測試腳本（240 行）
-4. [CONVERSATION_MIGRATION_GUIDE.md](chat-app-3/docs/CONVERSATION_MIGRATION_GUIDE.md) - 遷移指南
+1. [conversationV2.service.js](chat-app/backend/src/conversation/conversationV2.service.js) - V2 服務實現（492 行）
+2. [migrate-conversations-to-v2.js](chat-app/backend/scripts/migrate-conversations-to-v2.js) - 對話遷移腳本（211 行）
+3. [test-conversation-v2.js](chat-app/backend/scripts/test-conversation-v2.js) - 測試腳本（240 行）
+4. [CONVERSATION_MIGRATION_GUIDE.md](chat-app/docs/CONVERSATION_MIGRATION_GUIDE.md) - 遷移指南
 
 **用戶錢包優化**：
-5. [walletHelpers.js](chat-app-3/backend/src/user/walletHelpers.js) - 錢包輔助函數（175 行）
-6. [coins.service.v2.js](chat-app-3/backend/src/payment/coins.service.v2.js) - 金幣服務 V2（555 行）
-7. [migrate-user-wallet-fields.js](chat-app-3/backend/scripts/migrate-user-wallet-fields.js) - 錢包遷移腳本（166 行）
+5. [walletHelpers.js](chat-app/backend/src/user/walletHelpers.js) - 錢包輔助函數（175 行）
+6. [coins.service.v2.js](chat-app/backend/src/payment/coins.service.v2.js) - 金幣服務 V2（555 行）
+7. [migrate-user-wallet-fields.js](chat-app/backend/scripts/migrate-user-wallet-fields.js) - 錢包遷移腳本（166 行）
 
 ### 修改的文件
-1. [firestore.indexes.json](chat-app-3/firestore.indexes.json) - 新增 5 個索引
-2. [user.service.js](chat-app-3/backend/src/user/user.service.js) - 更新 `normalizeUser` 函數、添加 `getAllUsers()` 分頁支援
-3. [coins.service.js](chat-app-3/backend/src/payment/coins.service.js) - 整合 walletHelpers，移除冗餘欄位操作
-4. [user.routes.js](chat-app-3/backend/src/user/user.routes.js) - 更新 GET /api/users 端點支援分頁
-5. [index.js](chat-app-3/backend/src/index.js) - 更新 cleanup 函數使用新的 getAllUsers API
+1. [firestore.indexes.json](chat-app/firestore.indexes.json) - 新增 5 個索引
+2. [user.service.js](chat-app/backend/src/user/user.service.js) - 更新 `normalizeUser` 函數、添加 `getAllUsers()` 分頁支援
+3. [coins.service.js](chat-app/backend/src/payment/coins.service.js) - 整合 walletHelpers，移除冗餘欄位操作
+4. [user.routes.js](chat-app/backend/src/user/user.routes.js) - 更新 GET /api/users 端點支援分頁
+5. [index.js](chat-app/backend/src/index.js) - 更新 cleanup 函數使用新的 getAllUsers API
 
 ### 參考文檔
-1. [firestore-collections.md](chat-app-3/docs/firestore-collections.md) - 資料庫架構說明
-2. [conversation.service.js](chat-app-3/backend/src/conversation/conversation.service.js) - V1 服務（保留）
+1. [firestore-collections.md](chat-app/docs/firestore-collections.md) - 資料庫架構說明
+2. [conversation.service.js](chat-app/backend/src/conversation/conversation.service.js) - V1 服務（保留）
 
 ---
 
@@ -403,8 +403,8 @@ node scripts/migrate-user-wallet-fields.js
 ## 🤝 支援
 
 如有問題，請參考：
-- [CONVERSATION_MIGRATION_GUIDE.md](chat-app-3/docs/CONVERSATION_MIGRATION_GUIDE.md) - 完整遷移指南
-- [firestore-collections.md](chat-app-3/docs/firestore-collections.md) - 資料庫架構文檔
+- [CONVERSATION_MIGRATION_GUIDE.md](chat-app/docs/CONVERSATION_MIGRATION_GUIDE.md) - 完整遷移指南
+- [firestore-collections.md](chat-app/docs/firestore-collections.md) - 資料庫架構文檔
 
 ---
 

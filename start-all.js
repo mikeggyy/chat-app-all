@@ -42,9 +42,9 @@ const main = async () => {
     // 1. 啟動主應用 Backend
     log(colors.blue, "App Backend", "正在啟動主應用後端 API...");
     const appBackendProcess = spawn(npmCmd, ["run", "dev"], {
-      cwd: join(__dirname, "chat-app-3", "backend"),
+      cwd: join(__dirname, "chat-app", "backend"),
       stdio: "pipe",
-      shell: isWindows ? "cmd.exe" : true,
+      shell: true,
     });
 
     appBackendProcess.stdout.on("data", (data) => {
@@ -63,9 +63,9 @@ const main = async () => {
     // 2. 啟動主應用 Frontend
     log(colors.green, "App Frontend", "正在啟動主應用前端...");
     const appFrontendProcess = spawn(npmCmd, ["run", "dev"], {
-      cwd: join(__dirname, "chat-app-3", "frontend"),
+      cwd: join(__dirname, "chat-app", "frontend"),
       stdio: "pipe",
-      shell: isWindows ? "cmd.exe" : true,
+      shell: true,
     });
 
     appFrontendProcess.stdout.on("data", (data) => {
@@ -86,7 +86,7 @@ const main = async () => {
     const adminBackendProcess = spawn(npmCmd, ["run", "dev"], {
       cwd: join(__dirname, "chat-app-admin", "backend"),
       stdio: "pipe",
-      shell: isWindows ? "cmd.exe" : true,
+      shell: true,
     });
 
     adminBackendProcess.stdout.on("data", (data) => {
@@ -107,7 +107,7 @@ const main = async () => {
     const adminFrontendProcess = spawn(npmCmd, ["run", "dev"], {
       cwd: join(__dirname, "chat-app-admin", "frontend"),
       stdio: "pipe",
-      shell: isWindows ? "cmd.exe" : true,
+      shell: true,
     });
 
     adminFrontendProcess.stdout.on("data", (data) => {

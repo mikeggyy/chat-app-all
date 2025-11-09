@@ -1,18 +1,13 @@
 import { getUserById, upsertUser } from './user.service.js';
 import { getPotionInventory } from '../payment/potion.service.js';
-import {
-  ASSET_TYPES,
-  getUserAsset,
-  addAsset as addAssetToSubcollection,
-  deductAsset as deductAssetFromSubcollection,
-  setAssetQuantity,
-  getUnlockCardsBalance,
-} from './userAssets.service.js';
+import { logAssetChange } from './assetAuditLog.service.js';
 import logger from '../utils/logger.js';
+import { getFirestoreDb } from '../firebase/index.js';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * 獲取用戶的資產信息
- * 優先從子集合讀取，如果子集合沒有則從主文檔讀取（向後兼容）
+ * 卡片類資產統一從主文檔讀取，禮物從子集合讀取
  * @param {string} userId - 用戶 ID
  * @returns {Object} 資產對象
  */
@@ -31,43 +26,32 @@ export const getUserAssets = async (userId) => {
   const memoryBoostCount = potionInventory.memoryBoost || 0;
   const brainBoostCount = potionInventory.brainBoost || 0;
 
-  // 從子集合獲取解鎖卡餘額
-  const unlockCardsFromSubcollection = await getUnlockCardsBalance(userId);
-
-  // 向後兼容：如果子集合沒有資料，從主文檔讀取
-  const getCardCount = (cardType, subcollectionValue) => {
-    // 優先使用子集合的值
-    if (subcollectionValue > 0) {
-      logger.debug(`[getUserAssets] ${cardType} 從子集合讀取: ${subcollectionValue}`);
-      return subcollectionValue;
+  // 統一從主文檔讀取卡片類資產
+  // 向後兼容：優先從 assets，其次 unlockTickets，最後頂層
+  const getCardCount = (cardType) => {
+    if (user?.assets?.[cardType] !== undefined) {
+      return user.assets[cardType] || 0;
     }
 
-    // 向後兼容：從主文檔的多個位置查找
-    // 優先順序：unlockTickets > assets > 頂層
-    if (user?.unlockTickets?.[cardType] !== undefined && user.unlockTickets[cardType] > 0) {
-      logger.debug(`[getUserAssets] ${cardType} 從 unlockTickets 讀取: ${user.unlockTickets[cardType]}`);
-      return user.unlockTickets[cardType];
+    if (user?.unlockTickets?.[cardType] !== undefined) {
+      logger.debug(`[getUserAssets] ${cardType} 從舊位置 unlockTickets 讀取: ${user.unlockTickets[cardType]}`);
+      return user.unlockTickets[cardType] || 0;
     }
 
-    if (user?.assets?.[cardType] !== undefined && user.assets[cardType] > 0) {
-      logger.debug(`[getUserAssets] ${cardType} 從 assets 讀取: ${user.assets[cardType]}`);
-      return user.assets[cardType];
-    }
-
-    if (user?.[cardType] !== undefined && user[cardType] > 0) {
-      logger.debug(`[getUserAssets] ${cardType} 從頂層讀取: ${user[cardType]}`);
-      return user[cardType];
+    if (user?.[cardType] !== undefined) {
+      logger.debug(`[getUserAssets] ${cardType} 從舊位置頂層讀取: ${user[cardType]}`);
+      return user[cardType] || 0;
     }
 
     return 0;
   };
 
   return {
-    characterUnlockCards: getCardCount('characterUnlockCards', unlockCardsFromSubcollection.characterUnlockCards),
-    photoUnlockCards: getCardCount('photoUnlockCards', unlockCardsFromSubcollection.photoUnlockCards),
-    videoUnlockCards: getCardCount('videoUnlockCards', unlockCardsFromSubcollection.videoUnlockCards),
-    voiceUnlockCards: getCardCount('voiceUnlockCards', unlockCardsFromSubcollection.voiceUnlockCards),
-    createCards: getCardCount('createCards', unlockCardsFromSubcollection.createCards),
+    characterUnlockCards: getCardCount('characterUnlockCards'),
+    photoUnlockCards: getCardCount('photoUnlockCards'),
+    videoUnlockCards: getCardCount('videoUnlockCards'),
+    voiceUnlockCards: getCardCount('voiceUnlockCards'),
+    createCards: getCardCount('createCards'),
     potions: {
       memoryBoost: memoryBoostCount,
       brainBoost: brainBoostCount,
@@ -78,12 +62,18 @@ export const getUserAssets = async (userId) => {
 
 /**
  * 增加用戶的資產數量
+ *
+ * ⚠️ 使用 Firestore Transaction 確保原子性，防止競態條件
+ *
  * @param {string} userId - 用戶 ID
  * @param {string} assetType - 資產類型
  * @param {number} amount - 數量
- * @returns {Object} 更新後的用戶資產
+ * @param {string} reason - 增加原因（用於審計日誌）
+ * @param {Object} metadata - 額外元數據（用於審計日誌）
+ * @returns {Object} 更新結果，包含 previousQuantity 和 newQuantity
  */
-export const addUserAsset = async (userId, assetType, amount = 1) => {
+export const addUserAsset = async (userId, assetType, amount = 1, reason = '', metadata = {}) => {
+  // 參數驗證
   if (!userId) {
     throw new Error('需要提供用戶 ID');
   }
@@ -92,50 +82,89 @@ export const addUserAsset = async (userId, assetType, amount = 1) => {
     throw new Error('需要提供資產類型');
   }
 
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error('找不到指定的使用者');
+  const validAssetTypes = ['characterUnlockCards', 'photoUnlockCards', 'videoUnlockCards', 'voiceUnlockCards', 'createCards'];
+  if (!validAssetTypes.includes(assetType)) {
+    throw new Error(`無效的資產類型: ${assetType}`);
   }
-
-  const currentAssets = user.assets || {
-    characterUnlockCards: 0,
-    photoUnlockCards: 0,
-    videoUnlockCards: 0,
-    voiceUnlockCards: 0,
-    createCards: 0,
-  };
 
   const numAmount = Number(amount);
   if (!Number.isFinite(numAmount) || numAmount < 0) {
     throw new Error('數量必須是非負數');
   }
 
-  const newAssets = { ...currentAssets };
+  // 使用 Firestore Transaction 確保原子性
+  const db = getFirestoreDb();
+  const userRef = db.collection('users').doc(userId);
 
-  // 處理卡片類型
-  const validAssetTypes = ['characterUnlockCards', 'photoUnlockCards', 'videoUnlockCards', 'voiceUnlockCards', 'createCards'];
-  if (!validAssetTypes.includes(assetType)) {
-    throw new Error(`無效的資產類型: ${assetType}`);
-  }
-  newAssets[assetType] = (currentAssets[assetType] || 0) + numAmount;
+  const result = await db.runTransaction(async (transaction) => {
+    // 在 Transaction 內讀取用戶資料
+    const userDoc = await transaction.get(userRef);
 
-  const updatedUser = await upsertUser({
-    ...user,
-    assets: newAssets,
-    updatedAt: new Date().toISOString(),
+    if (!userDoc.exists) {
+      throw new Error('找不到指定的使用者');
+    }
+
+    const user = userDoc.data();
+    const currentAssets = user.assets || {
+      characterUnlockCards: 0,
+      photoUnlockCards: 0,
+      videoUnlockCards: 0,
+      voiceUnlockCards: 0,
+      createCards: 0,
+    };
+
+    const previousQuantity = currentAssets[assetType] || 0;
+    const newQuantity = previousQuantity + numAmount;
+    const newAssets = {
+      ...currentAssets,
+      [assetType]: newQuantity,
+    };
+
+    // 在 Transaction 內更新
+    transaction.update(userRef, {
+      assets: newAssets,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      previousQuantity,
+      newQuantity,
+      assetType,
+      assets: newAssets, // 返回完整的資產對象（向後兼容）
+    };
   });
 
-  return updatedUser.assets;
+  // 記錄資產變更（Transaction 外，不阻塞主流程）
+  logAssetChange({
+    userId,
+    assetType,
+    action: 'add',
+    amount: numAmount,
+    previousQuantity: result.previousQuantity,
+    newQuantity: result.newQuantity,
+    reason,
+    metadata,
+  }).catch(err => logger.error('[資產審計] 記錄失敗:', err));
+
+  logger.info(`[資產增加] 用戶 ${userId} ${assetType} 增加 ${numAmount}，餘額: ${result.previousQuantity} → ${result.newQuantity}`);
+
+  return result;
 };
 
 /**
  * 減少用戶的資產數量
+ *
+ * ⚠️ 使用 Firestore Transaction 確保原子性，防止競態條件
+ *
  * @param {string} userId - 用戶 ID
  * @param {string} assetType - 資產類型
  * @param {number} amount - 數量
- * @returns {Object} 更新後的用戶資產
+ * @param {string} reason - 消耗原因（用於審計日誌）
+ * @param {Object} metadata - 額外元數據（用於審計日誌）
+ * @returns {Object} 更新結果，包含 previousQuantity 和 newQuantity
  */
-export const consumeUserAsset = async (userId, assetType, amount = 1) => {
+export const consumeUserAsset = async (userId, assetType, amount = 1, reason = '', metadata = {}) => {
+  // 參數驗證
   if (!userId) {
     throw new Error('需要提供用戶 ID');
   }
@@ -144,44 +173,79 @@ export const consumeUserAsset = async (userId, assetType, amount = 1) => {
     throw new Error('需要提供資產類型');
   }
 
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error('找不到指定的使用者');
+  const validAssetTypes = ['characterUnlockCards', 'photoUnlockCards', 'videoUnlockCards', 'voiceUnlockCards', 'createCards'];
+  if (!validAssetTypes.includes(assetType)) {
+    throw new Error(`無效的資產類型: ${assetType}`);
   }
-
-  const currentAssets = user.assets || {
-    characterUnlockCards: 0,
-    photoUnlockCards: 0,
-    videoUnlockCards: 0,
-    voiceUnlockCards: 0,
-    createCards: 0,
-  };
 
   const numAmount = Number(amount);
   if (!Number.isFinite(numAmount) || numAmount < 0) {
     throw new Error('數量必須是非負數');
   }
 
-  const newAssets = { ...currentAssets };
+  // 使用 Firestore Transaction 確保原子性
+  const db = getFirestoreDb();
+  const userRef = db.collection('users').doc(userId);
 
-  // 處理卡片類型
-  const validAssetTypes = ['characterUnlockCards', 'photoUnlockCards', 'videoUnlockCards', 'voiceUnlockCards', 'createCards'];
-  if (!validAssetTypes.includes(assetType)) {
-    throw new Error(`無效的資產類型: ${assetType}`);
-  }
-  const currentAmount = currentAssets[assetType] || 0;
-  if (currentAmount < numAmount) {
-    throw new Error(`${assetType} 數量不足`);
-  }
-  newAssets[assetType] = currentAmount - numAmount;
+  const result = await db.runTransaction(async (transaction) => {
+    // 在 Transaction 內讀取用戶資料
+    const userDoc = await transaction.get(userRef);
 
-  const updatedUser = await upsertUser({
-    ...user,
-    assets: newAssets,
-    updatedAt: new Date().toISOString(),
+    if (!userDoc.exists) {
+      throw new Error('找不到指定的使用者');
+    }
+
+    const user = userDoc.data();
+    const currentAssets = user.assets || {
+      characterUnlockCards: 0,
+      photoUnlockCards: 0,
+      videoUnlockCards: 0,
+      voiceUnlockCards: 0,
+      createCards: 0,
+    };
+
+    const previousQuantity = currentAssets[assetType] || 0;
+
+    // 在 Transaction 內檢查餘額
+    if (previousQuantity < numAmount) {
+      throw new Error(`${assetType} 數量不足，當前: ${previousQuantity}，需要: ${numAmount}`);
+    }
+
+    const newQuantity = previousQuantity - numAmount;
+    const newAssets = {
+      ...currentAssets,
+      [assetType]: newQuantity,
+    };
+
+    // 在 Transaction 內更新
+    transaction.update(userRef, {
+      assets: newAssets,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      previousQuantity,
+      newQuantity,
+      assetType,
+      assets: newAssets, // 返回完整的資產對象（向後兼容）
+    };
   });
 
-  return updatedUser.assets;
+  // 記錄資產變更（Transaction 外，不阻塞主流程）
+  logAssetChange({
+    userId,
+    assetType,
+    action: 'consume',
+    amount: numAmount,
+    previousQuantity: result.previousQuantity,
+    newQuantity: result.newQuantity,
+    reason,
+    metadata,
+  }).catch(err => logger.error('[資產審計] 記錄失敗:', err));
+
+  logger.info(`[資產扣除] 用戶 ${userId} ${assetType} 扣除 ${numAmount}，餘額: ${result.previousQuantity} → ${result.newQuantity}`);
+
+  return result;
 };
 
 /**

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, nextTick } from "vue";
+import { computed, ref, onMounted, nextTick, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
   ArrowLeftIcon,
@@ -57,7 +57,7 @@ const categories = ref([
   {
     id: "character-unlock",
     label: "角色解鎖票",
-    description: "永久解鎖與特定角色的無限對話（300金幣/張）",
+    description: "解鎖與特定角色 7 天無限對話（300金幣/張）",
   },
   {
     id: "photo-unlock",
@@ -465,6 +465,23 @@ const loadPotionPackages = async () => {
     console.error("加載藥水商品失敗:", error);
   }
 };
+
+// 監聽路由變化，更新分類（當用戶在商城頁面內導航時）
+watch(
+  () => route.query.category,
+  (newCategory) => {
+    if (newCategory) {
+      const validCategories = categories.value.map((c) => c.id);
+      if (validCategories.includes(newCategory)) {
+        activeCategory.value = newCategory;
+        // 滾動到對應的分類 tab
+        nextTick(() => {
+          scrollToActiveCategory();
+        });
+      }
+    }
+  }
+);
 
 // 初始化時載入金幣資料
 onMounted(async () => {

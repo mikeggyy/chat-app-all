@@ -7,12 +7,12 @@
   "scripts": {
     "dev": "node start-all.js",
     "dev:concurrently": "concurrently --kill-others-on-fail -n \"app-backend,app-frontend,admin-backend,admin-frontend\" -c \"blue,green,magenta,cyan\" \"npm run dev:app-backend\" \"npm run dev:app-frontend\" \"npm run dev:admin-backend\" \"npm run dev:admin-frontend\"",
-    "dev:app-backend": "cd chat-app-3/backend && npm run dev",
-    "dev:app-frontend": "cd chat-app-3/frontend && npm run dev",
+    "dev:app-backend": "cd chat-app/backend && npm run dev",
+    "dev:app-frontend": "cd chat-app/frontend && npm run dev",
     "dev:admin-backend": "cd chat-app-admin/backend && npm run dev",
     "dev:admin-frontend": "cd chat-app-admin/frontend && npm run dev",
     "install:all": "npm run install:app && npm run install:admin",
-    "install:app": "cd chat-app-3 && npm install && cd backend && npm install && cd ../frontend && npm install",
+    "install:app": "cd chat-app && npm install && cd backend && npm install && cd ../frontend && npm install",
     "install:admin": "cd chat-app-admin && npm install && cd backend && npm install && cd ../frontend && npm install",
     "cleanup-ports": "node scripts/cleanup-ports.js"
   },

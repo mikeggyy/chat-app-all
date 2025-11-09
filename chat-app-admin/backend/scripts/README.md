@@ -9,7 +9,7 @@
 1. **確保 Firebase Emulator 正在運行**：
    ```bash
    # 在另一個終端
-   cd ../../chat-app-3
+   cd ../../chat-app
    firebase emulators:start --project demo-project
    ```
 

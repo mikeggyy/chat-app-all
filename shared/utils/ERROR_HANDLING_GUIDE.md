@@ -329,7 +329,7 @@ app.use(errorHandlerMiddleware);
 
 - `shared/utils/errorCodes.js` - 錯誤碼定義
 - `shared/utils/errorFormatter.js` - 錯誤格式化工具
-- `chat-app-3/backend/src/index.js` - 主應用後端示例
+- `chat-app/backend/src/index.js` - 主應用後端示例
 - `chat-app-admin/backend/src/index.js` - 管理後台後端示例
 
 ## 問題排查

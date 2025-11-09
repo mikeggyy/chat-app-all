@@ -15,8 +15,9 @@ export const ASSET_CARDS_BASE_CONFIG = {
     id: 'character-unlock',
     assetKey: 'characterUnlockCards',
     name: '角色解鎖卡',
-    description: '永久解鎖與特定角色的無限對話',
+    description: '解鎖與特定角色 7 天無限對話',
     basePrice: 300, // 單價
+    duration: 7, // 7 天
     displayConfig: {
       unit: '張',
     },

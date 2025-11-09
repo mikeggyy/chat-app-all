@@ -447,6 +447,107 @@
 
 ---
 
+### 12. character_creation_flows（角色創建流程）
+
+**用途**: 追蹤用戶創建角色的完整流程，支援斷點續傳
+
+**文檔 ID**: 自動生成的唯一 ID（如 `flow-uuid`）
+
+**數據結構**:
+```javascript
+{
+  id: string,                    // 流程 ID
+  userId: string,                // 用戶 ID
+  status: string,                // 流程狀態（draft/persona/appearance/voice/generating/completed/failed/cancelled）
+
+  // 角色設定
+  persona: {
+    name: string,                // 角色名稱
+    tagline: string,             // 角色標語
+    hiddenProfile: string,       // 隱藏設定
+    prompt: string,              // AI 提示詞
+  },
+
+  // 外觀設定
+  appearance: {
+    id: string,                  // 外觀 ID
+    label: string,               // 外觀標籤
+    image: string,               // 圖片 URL
+    alt: string,                 // 圖片描述
+    description: string,         // 外觀描述文字
+    styles: string[],            // 風格標籤
+    referenceInfo: Object,       // 參考資訊
+  } | null,
+
+  // 語音設定
+  voice: {
+    id: string,                  // 語音 ID
+    label: string,               // 語音標籤
+    description: string,         // 語音描述
+    gender: string,              // 聲線性別
+    ageGroup: string,            // 年齡組
+  } | null,
+
+  // 元數據
+  metadata: {
+    gender: string,              // 角色性別
+    aiMagicianUsageCount: number, // AI 魔法師使用次數
+    [key: string]: any,          // 其他元數據
+  },
+
+  // 費用記錄
+  charges: [{
+    id: string,                  // 費用記錄 ID
+    type: string,                // 費用類型（llm-generation/image-generation）
+    amount: number,              // 金額
+    currency: string,            // 貨幣（credits/coins）
+    status: string,              // 狀態（reserved/captured/void）
+    metadata: Object,            // 額外資訊
+    idempotencyKey: string,      // 冪等性鍵值
+    createdAt: Timestamp,        // 創建時間
+    updatedAt: Timestamp,        // 更新時間
+  }],
+
+  // 生成狀態
+  generation: {
+    status: string,              // 生成狀態（idle/generating/completed/failed）
+    idempotencyKey: string,      // 冪等性鍵值
+    requestId: string,           // 請求 ID
+    startedAt: Timestamp,        // 開始時間
+    completedAt: Timestamp,      // 完成時間
+    result: Object | null,       // 生成結果（圖片 URLs、語音等）
+    error: {                     // 錯誤資訊（如果失敗）
+      message: string,
+    } | null,
+  },
+
+  summaryUpdatedAt: Timestamp,   // 摘要更新時間
+  createdAt: Timestamp,          // 創建時間
+  updatedAt: Timestamp,          // 更新時間
+}
+```
+
+**流程狀態**:
+- `draft` - 草稿（初始狀態）
+- `persona` - 角色設定階段
+- `appearance` - 外觀設定階段
+- `voice` - 語音設定階段
+- `generating` - 生成中
+- `completed` - 已完成
+- `failed` - 失敗
+- `cancelled` - 已取消
+
+**特性**:
+- ✅ **持久化存儲**: 後端重啟後數據不丟失
+- ✅ **斷點續傳**: 用戶可以在任何階段中斷並繼續
+- ✅ **冪等性**: 支援重複請求不會重複扣費
+- ✅ **狀態追蹤**: 完整記錄創建流程的每個階段
+- ✅ **自動清理**: 超過 7 天未更新的草稿自動清理
+
+**後台操作**: 查看用戶創建流程、監控創建成功率、清理過期草稿
+
+---
+
 ## 🔄 數據導入
 
 如需重新導入基礎配置數據，執行以下腳本：
@@ -545,6 +646,7 @@ cd backend && node seed-test-data.js
 - **usage_limits**: 根據用戶使用動態生成
 - **transactions**: 根據交易動態生成（所有金幣交易記錄）
 - **orders**: 根據訂單動態生成（所有購買訂單記錄）
+- **character_creation_flows**: 角色創建流程記錄
 
 ---
 

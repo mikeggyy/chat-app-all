@@ -179,9 +179,9 @@ const assetCardsList = computed(() => {
       isCharacterCreationLimitReached.value,
     limitText:
       card.assetKey === "photoUnlockCards"
-        ? `已達上限 (${props.currentPhotoUsage}/${photoLimit.value})`
+        ? "已達上限"
         : card.assetKey === "createCards"
-        ? `已達上限 (${props.currentCharacterCreations}/${characterCreationLimit.value})`
+        ? "已達上限"
         : "",
   }));
 });

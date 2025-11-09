@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   XMarkIcon,
@@ -128,8 +128,8 @@ const typeConfig = {
     shopCategory: 'character-unlock',
     unlockCardsKey: 'characterUnlockCards',
     adDescription: '觀看一則廣告即可繼續對話',
-    unlockUseDescription: '使用角色解鎖卡立即繼續對話',
-    unlockBuyDescription: '購買角色解鎖卡解除對話限制',
+    unlockUseDescription: '使用角色解鎖卡，暢聊 7 天無限制',
+    unlockBuyDescription: '購買角色解鎖卡，獲得 7 天無限對話',
     vipTitle: '升級 VIP 會員',
     vipDescription: '享受無限對話，解鎖所有功能',
     vipBenefits: [
@@ -223,11 +223,11 @@ const displayTotal = computed(() => {
 // 提示訊息
 const message = computed(() => {
   if (props.type === 'conversation') {
-    return `您與「${props.characterName}」的對話次數已達到免費用戶上限（${props.remainingMessages} / 10）。`;
+    return `您與「${props.characterName}」的對話次數已達到免費用戶上限。`;
   } else if (props.type === 'voice') {
-    return `您與「${props.characterName}」的語音播放次數已達到免費用戶上限（${props.usedVoices} / ${props.totalVoices}）。`;
+    return `您與「${props.characterName}」的語音播放次數已達到免費用戶上限。`;
   } else if (props.type === 'photo') {
-    let msg = `您已使用 ${props.used} / ${displayTotal.value} 次 AI 自拍額度`;
+    let msg = `您已達到 AI 自拍額度上限`;
     if (props.tier === 'free') {
       msg += '（免費用戶終生限制）';
     } else if (props.tier === 'vip') {
@@ -322,6 +322,21 @@ const handleOverlayClick = (event) => {
     handleClose();
   }
 };
+
+// 📊 Console Log: 記錄次數限制信息（方便調試）
+watch(() => props.isOpen, (isOpen) => {
+  if (isOpen) {
+    if (props.type === 'conversation') {
+      console.log(`[對話限制] 角色: ${props.characterName}, 剩餘次數: ${props.remainingMessages} / 10`);
+    } else if (props.type === 'voice') {
+      console.log(`[語音限制] 角色: ${props.characterName}, 已使用: ${props.usedVoices} / ${props.totalVoices}`);
+    } else if (props.type === 'photo') {
+      console.log(`[拍照限制] 已使用: ${props.used} / ${displayTotal.value}, 會員等級: ${props.tier}, 拍照卡: ${props.cards} 張`);
+    } else if (props.type === 'video') {
+      console.log(`[影片限制] 已使用: ${props.used} 次, 影片卡: ${props.cards} 張, 會員等級: ${props.tier}`);
+    }
+  }
+});
 </script>
 
 <template>
@@ -361,13 +376,13 @@ const handleOverlayClick = (event) => {
             <div class="modal-body">
               <p class="message" :style="{ '--highlight-color': config.highlightColor }">
                 <template v-if="type === 'conversation'">
-                  您與「<strong>{{ characterName }}</strong>」的對話次數已達到免費用戶上限（{{ remainingMessages }} / 10）。
+                  您與「<strong>{{ characterName }}</strong>」的對話次數已達到免費用戶上限。
                 </template>
                 <template v-else-if="type === 'voice'">
-                  您與「<strong>{{ characterName }}</strong>」的語音播放次數已達到免費用戶上限（{{ usedVoices }} / {{ totalVoices }}）。
+                  您與「<strong>{{ characterName }}</strong>」的語音播放次數已達到免費用戶上限。
                 </template>
                 <template v-else-if="type === 'photo'">
-                  您已使用 <strong>{{ used }} / {{ displayTotal }}</strong> 次 AI 自拍額度<template v-if="tier === 'free'">（免費用戶終生限制）</template><template v-else-if="tier === 'vip'">（VIP 月度限制）</template><template v-else-if="tier === 'vvip'">（VVIP 月度限制）</template><template v-if="cards > 0">，另有 <strong>{{ cards }}</strong> 張拍照卡可用。</template>
+                  您已達到 AI 自拍額度上限<template v-if="tier === 'free'">（免費用戶終生限制）</template><template v-else-if="tier === 'vip'">（VIP 月度限制）</template><template v-else-if="tier === 'vvip'">（VVIP 月度限制）</template><template v-if="cards > 0">，另有 <strong>{{ cards }}</strong> 張拍照卡可用。</template>
                 </template>
                 <template v-else-if="type === 'video'">
                   <template v-if="tier === 'free'">
@@ -446,7 +461,8 @@ const handleOverlayClick = (event) => {
                     class="option-button option-button--unlock-use"
                     @click="handleUseUnlockCard"
                   >
-                    使用解鎖卡
+                    <template v-if="type === 'conversation'">暢聊 7 天</template>
+                    <template v-else>使用解鎖卡</template>
                   </button>
                   <button
                     v-else

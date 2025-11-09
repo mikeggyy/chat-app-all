@@ -71,6 +71,8 @@ cd backend && npm run generate:voices
 
 ### 數據清理
 
+#### 清理使用限制
+
 ```bash
 cd backend && node scripts/clean-invalid-usage-limits.js
 ```
@@ -85,6 +87,42 @@ cd backend && node scripts/clean-invalid-usage-limits.js
 **清理範圍**：
 - 移除頂層無效鍵名（只保留 `userId`, `photos`, `voice`, `conversation`, `createdAt`, `updatedAt`）
 - 移除 `voice` 和 `conversation` 中無效的角色 ID（只保留 `match-XXX` 格式）
+
+#### 診斷和清理用戶對話記錄
+
+**診斷無效的 conversation 記錄**：
+
+```bash
+cd backend && npm run diagnose:conversations
+```
+
+檢查用戶的 `conversations` 數組中是否有指向不存在角色的記錄。
+
+**使用場景**：
+- 用戶相冊中出現「未知角色」
+- conversations 數組中包含已刪除的角色 ID
+- 需要檢查數據一致性
+
+**輸出結果**：
+- 顯示有問題的用戶列表
+- 列出無效的 characterId
+- 提供修復建議
+
+**清理無效的 conversation 記錄**：
+
+```bash
+cd backend && npm run cleanup:conversations
+```
+
+自動清理用戶 `conversations` 數組中指向不存在角色的記錄。
+
+**執行流程**：
+1. 掃描所有用戶的 conversations 數組
+2. 與有效的角色 ID 進行比對
+3. 顯示清理預覽（需要確認）
+4. 批量更新用戶數據
+
+**⚠️ 注意**：執行前會要求確認，建議先運行 `diagnose:conversations` 查看詳細信息。
 
 ### 測試工具
 

@@ -1267,6 +1267,48 @@ const handleWatchAd = async (adType) => {
   }
 };
 
+const handleUseUnlockCard = async () => {
+  const userId = currentUserId.value;
+  const matchId = partner.value?.id;
+
+  if (!userId || !matchId) return;
+
+  try {
+    // 獲取認證權杖
+    const token = await firebaseAuth.getCurrentUserIdToken();
+
+    // 調用後端 API 使用解鎖卡
+    const result = await apiJson("/api/unlock-tickets/use/character", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: {
+        characterId: matchId,
+      },
+      skipGlobalLoading: true,
+    });
+
+    if (result.success) {
+      // 關閉模態框
+      showLimitModal.value = false;
+
+      // 重新加載用戶資產（更新解鎖卡數量）
+      await Promise.all([
+        loadUserAssets(),
+        loadTicketsBalance(userId),
+      ]);
+
+      // 顯示解鎖成功訊息（包含到期時間）
+      const unlockDays = result.unlockDays || 7;
+      const characterName = partnerDisplayName.value || "角色";
+      success(`解鎖成功！與「${characterName}」可暢聊 ${unlockDays} 天 🎉`);
+    }
+  } catch (error) {
+    showError(error instanceof Error ? error.message : "使用解鎖卡失敗");
+  }
+};
+
 const handleCloseVoiceLimitModal = () => {
   showVoiceLimitModal.value = false;
 };
@@ -1721,6 +1763,7 @@ watch(
       :character-unlock-cards="limitModalData.characterUnlockCards"
       @close="handleCloseLimitModal"
       @watch-ad="handleWatchAd"
+      @use-unlock-card="handleUseUnlockCard"
     />
 
     <VoiceLimitModal

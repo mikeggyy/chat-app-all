@@ -36,8 +36,8 @@
 - ✅ 添加緩存監控端點
 
 **位置：**
-- [chat-app-3/backend/src/services/character/characterCache.service.js](chat-app-3/backend/src/services/character/characterCache.service.js)
-- [chat-app-3/backend/src/services/character/CACHE_INTEGRATION_GUIDE.md](chat-app-3/backend/src/services/character/CACHE_INTEGRATION_GUIDE.md)
+- [chat-app/backend/src/services/character/characterCache.service.js](chat-app/backend/src/services/character/characterCache.service.js)
+- [chat-app/backend/src/services/character/CACHE_INTEGRATION_GUIDE.md](chat-app/backend/src/services/character/CACHE_INTEGRATION_GUIDE.md)
 
 ### 5. 圖片處理工具
 - ✅ WebP/JPEG 壓縮
@@ -247,8 +247,8 @@ ab -n 1000 -c 10 http://localhost:4000/match/some-character-id
 
 如果遇到問題，請檢查：
 1. 📚 [ERROR_HANDLING_GUIDE.md](shared/utils/ERROR_HANDLING_GUIDE.md) - 錯誤處理指南
-2. 📚 [CACHE_INTEGRATION_GUIDE.md](chat-app-3/backend/src/services/character/CACHE_INTEGRATION_GUIDE.md) - 緩存集成指南
-3. 📚 [CLAUDE.md](chat-app-3/CLAUDE.md) - 主應用開發指南
+2. 📚 [CACHE_INTEGRATION_GUIDE.md](chat-app/backend/src/services/character/CACHE_INTEGRATION_GUIDE.md) - 緩存集成指南
+3. 📚 [CLAUDE.md](chat-app/CLAUDE.md) - 主應用開發指南
 4. 📚 日誌文件：檢查終端輸出和錯誤消息
 
 ---

@@ -3,8 +3,8 @@
  * 統一管理所有測試用戶相關的常量和檢查函數
  *
  * 使用位置：
- * - chat-app-3/backend
- * - chat-app-3/frontend
+ * - chat-app/backend
+ * - chat-app/frontend
  * - chat-app-admin/backend
  * - chat-app-admin/frontend
  */

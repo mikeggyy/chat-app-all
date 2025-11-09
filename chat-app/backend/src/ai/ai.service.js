@@ -14,8 +14,12 @@ import { getMatchById } from "../match/match.service.js";
 import { MEMBERSHIP_TIERS } from "../membership/membership.config.js";
 import { getExtraMemoryTokens, getEffectiveAIModel } from "../payment/potion.service.js";
 import { getCached, CACHE_TTL } from "../utils/firestoreCache.js";
+import { generateSpeechWithGoogle } from "./googleTts.service.js";
 
 import logger from "../utils/logger.js";
+
+// TTS 服務選擇（環境變數控制）
+const USE_GOOGLE_TTS = process.env.USE_GOOGLE_TTS === 'true';
 const FALLBACK_REPLY =
   "我在這裡，慢慢說給我聽。可以和我分享現在讓你在意的事嗎？";
 const MAX_HISTORY_WINDOW = 12;
@@ -616,12 +620,12 @@ export const createAiSuggestionsForConversation = async (
 };
 
 /**
- * 使用 OpenAI TTS 生成語音
+ * 使用 OpenAI TTS 生成語音（保留作為備用）
  * @param {string} text - 要轉換的文字
  * @param {string} characterId - 角色 ID（用於獲取角色語音設定）
  * @returns {Promise<Buffer>} 音頻數據
  */
-export const generateSpeech = async (text, characterId) => {
+const generateSpeechWithOpenAI = async (text, characterId) => {
   if (!text || typeof text !== 'string' || !text.trim()) {
     const error = new Error("需要提供要轉換的文字");
     error.status = 400;
@@ -651,5 +655,50 @@ export const generateSpeech = async (text, characterId) => {
       error instanceof Error ? error.message : error
     );
     throw new Error("語音生成失敗，請稍後再試");
+  }
+};
+
+/**
+ * 生成語音（根據環境變數選擇 TTS 服務）
+ * @param {string} text - 要轉換的文字
+ * @param {string} characterId - 角色 ID
+ * @param {object} options - 選項（用於 Google TTS 的進階參數）
+ * @returns {Promise<Buffer>} 音頻數據
+ */
+export const generateSpeech = async (text, characterId, options = {}) => {
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    const error = new Error("需要提供要轉換的文字");
+    error.status = 400;
+    throw error;
+  }
+
+  logger.info('[TTS] 生成語音:', {
+    characterId,
+    textLength: text.length,
+    service: USE_GOOGLE_TTS ? 'Google Cloud TTS' : 'OpenAI TTS',
+  });
+
+  try {
+    if (USE_GOOGLE_TTS) {
+      // 使用 Google Cloud TTS（推薦，成本更低）
+      return await generateSpeechWithGoogle(text, characterId, options);
+    } else {
+      // 使用 OpenAI TTS（備用方案）
+      return await generateSpeechWithOpenAI(text, characterId);
+    }
+  } catch (error) {
+    logger.error('[TTS] 語音生成失敗，嘗試備用方案:', {
+      error: error.message,
+      primaryService: USE_GOOGLE_TTS ? 'Google' : 'OpenAI',
+    });
+
+    // 如果主要服務失敗，嘗試切換到備用服務
+    if (USE_GOOGLE_TTS) {
+      logger.warn('[TTS] Google TTS 失敗，切換到 OpenAI TTS');
+      return await generateSpeechWithOpenAI(text, characterId);
+    } else {
+      // OpenAI 失敗且沒有備用方案
+      throw error;
+    }
   }
 };

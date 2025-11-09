@@ -7,7 +7,7 @@
 import { getFirestoreDb } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 import { deductCoins } from "../payment/coins.service.js";
-import { addAsset, ASSET_TYPES } from "./userAssets.service.js";
+import { addUserAsset } from "./assets.service.js";
 import { getUserById } from "./user.service.js";
 
 /**
@@ -119,11 +119,28 @@ export const purchaseAssetPackage = async (userId, sku) => {
     }
   );
 
-  // 2. 增加資產
-  const assetResult = await addAsset(userId, assetType, quantity);
+  // 2. 增加資產（統一使用主文檔）
+  // 轉換 assetType 格式：characterUnlockCard -> characterUnlockCards
+  const assetTypeMapping = {
+    characterUnlockCard: "characterUnlockCards",
+    photoUnlockCard: "photoUnlockCards",
+    videoUnlockCard: "videoUnlockCards",
+    voiceUnlockCard: "voiceUnlockCards",
+    createCards: "createCards",
+  };
+
+  const mainDocAssetType = assetTypeMapping[assetType] || assetType;
+  const updatedAssets = await addUserAsset(
+    userId,
+    mainDocAssetType,
+    quantity,
+    `購買 ${name}`,
+    { sku, packageName: name, category, price }
+  );
+  const newAssetQuantity = updatedAssets[mainDocAssetType] || 0;
 
   logger.info(
-    `[資產購買] 購買成功: userId=${userId}, sku=${sku}, quantity=${quantity}, price=${price}, newBalance=${deductResult.newBalance}, newAssetQuantity=${assetResult.newQuantity}`
+    `[資產購買] 購買成功: userId=${userId}, sku=${sku}, quantity=${quantity}, price=${price}, newBalance=${deductResult.newBalance}, newAssetQuantity=${newAssetQuantity}`
   );
 
   return {
@@ -131,14 +148,14 @@ export const purchaseAssetPackage = async (userId, sku) => {
     sku,
     packageName: name,
     category,
-    assetType,
+    assetType: mainDocAssetType,
     quantity,
     finalPrice: price,
     coinsSpent: price,
     newBalance: deductResult.newBalance,
     previousBalance: deductResult.previousBalance,
-    assetQuantity: assetResult.newQuantity,
-    previousAssetQuantity: assetResult.previousQuantity,
+    assetQuantity: newAssetQuantity,
+    previousAssetQuantity: newAssetQuantity - quantity, // 計算之前的數量
   };
 };
 
@@ -217,36 +234,24 @@ export const purchaseAssetBundle = async (userId, items) => {
     }
   );
 
-  // 2. 增加所有資產
+  // 2. 增加所有資產（統一使用主文檔）
   const assetResults = [];
   for (const detail of purchaseDetails) {
-    let assetType;
-    switch (detail.assetKey) {
-      case "characterUnlockCards":
-        assetType = "characterUnlockCard";
-        break;
-      case "photoUnlockCards":
-        assetType = "photoUnlockCard";
-        break;
-      case "videoUnlockCards":
-        assetType = "videoUnlockCard";
-        break;
-      case "voiceUnlockCards":
-        assetType = "voiceUnlockCard";
-        break;
-      case "createCards":
-        assetType = "createCards";
-        break;
-      default:
-        throw new Error(`未知的資產類型: ${detail.assetKey}`);
-    }
+    // detail.assetKey 已經是正確的格式（複數形式）
+    const updatedAssets = await addUserAsset(
+      userId,
+      detail.assetKey,
+      detail.quantity,
+      `批量購買 ${detail.assetName}`,
+      { assetId: detail.assetId, unitPrice: detail.unitPrice, totalPrice: detail.totalPrice }
+    );
+    const newQuantity = updatedAssets[detail.assetKey] || 0;
 
-    const assetResult = await addAsset(userId, assetType, detail.quantity);
     assetResults.push({
       assetId: detail.assetId,
       assetName: detail.assetName,
       quantity: detail.quantity,
-      newQuantity: assetResult.newQuantity,
+      newQuantity: newQuantity,
     });
   }
 

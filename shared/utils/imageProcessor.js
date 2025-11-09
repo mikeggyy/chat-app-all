@@ -5,7 +5,7 @@
  * 使用 sharp 庫進行高效的圖片處理
  *
  * 使用位置：
- * - chat-app-3/backend（AI 圖片生成）
+ * - chat-app/backend（AI 圖片生成）
  * - chat-app-admin/backend（圖片管理）
  */
 

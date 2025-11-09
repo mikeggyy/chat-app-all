@@ -77,7 +77,7 @@
 - ✅ 免費額度：10GB 儲存 + 1M 寫入/月
 
 **移轉難度：⭐ 非常簡單**
-- 你已經實作了 R2 上傳功能（[r2Storage.service.js](chat-app-3/backend/src/storage/r2Storage.service.js)）
+- 你已經實作了 R2 上傳功能（[r2Storage.service.js](chat-app/backend/src/storage/r2Storage.service.js)）
 - 只需要把圖片也用相同邏輯上傳即可
 
 **替代選項：Supabase Storage**
@@ -189,7 +189,7 @@ const messagesRef = db
 
 **你已經在用 R2 儲存影片了！把圖片也搬過去：**
 
-修改 [imageGeneration.service.js:213](chat-app-3/backend/src/ai/imageGeneration.service.js#L213)：
+修改 [imageGeneration.service.js:213](chat-app/backend/src/ai/imageGeneration.service.js#L213)：
 
 ```javascript
 // ❌ 目前：使用 Firebase Storage
@@ -303,7 +303,7 @@ USE_MOCK_VIDEO=true  // 開發時用這個，不消耗配額
 
 ```bash
 # 1. 前端搬到 Vercel（5分鐘）
-cd chat-app-3/frontend
+cd chat-app/frontend
 # 在 Vercel 上連接 GitHub repo，自動部署
 
 # 2. 啟用影片測試模式（開發環境）

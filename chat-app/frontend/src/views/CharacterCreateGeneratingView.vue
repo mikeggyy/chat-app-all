@@ -37,6 +37,8 @@ let summarySyncTimer = null;
 let flowInitPromise = null;
 let suppressSync = false;
 const genderPreference = ref("");
+// 保存從後端獲取的完整 appearance 數據（包括 description 和 styles）
+const savedAppearanceData = ref(null);
 
 const Step = Object.freeze({
   PROGRESS: "progress",
@@ -257,6 +259,10 @@ const buildSummaryPayload = () => {
         label: selectedResultLabel.value,
         image: selectedResultImage.value,
         alt: selectedResultAlt.value,
+        // 合併保存的 description 和 styles（從後端獲取的原始數據）
+        description: savedAppearanceData.value?.description || "",
+        styles: savedAppearanceData.value?.styles || [],
+        referenceInfo: savedAppearanceData.value?.referenceInfo || null,
       }
     : null;
 
@@ -324,6 +330,16 @@ const applyFlowRecord = (record, options = {}) => {
   personaForm.hiddenProfile = record?.persona?.hiddenProfile ?? "";
   personaForm.prompt = record?.persona?.prompt ?? "";
   selectedResultId.value = record?.appearance?.id ?? "";
+
+  // 保存完整的 appearance 數據（包括 description 和 styles）
+  if (record?.appearance) {
+    savedAppearanceData.value = {
+      description: record.appearance.description || "",
+      styles: Array.isArray(record.appearance.styles) ? [...record.appearance.styles] : [],
+      referenceInfo: record.appearance.referenceInfo || null,
+    };
+  }
+
   suppressSync = false;
 
   // 優先使用本地已設定的 gender（來自 sessionStorage 的 characterCreation.gender）

@@ -25,6 +25,7 @@ import adRouter from "./ad/ad.routes.js";
 import conversationLimitRouter from "./conversation/conversationLimit.routes.js";
 import { voiceLimitRouter } from "./ai/voiceLimit.routes.js";
 import { photoLimitRouter } from "./ai/photoLimit.routes.js";
+import voicesRouter from "./ai/voices.routes.js";
 import giftRouter from "./gift/gift.routes.js";
 import potionRouter from "./payment/potion.routes.js";
 import { photoAlbumRouter } from "./photoAlbum/photoAlbum.routes.js";
@@ -97,6 +98,7 @@ app.use(adRouter);
 app.use("/api/conversations/limit", conversationLimitRouter);
 app.use("/api/voice-limit", voiceLimitRouter);
 app.use("/api/photo-limit", photoLimitRouter);
+app.use("/api/voices", voicesRouter);
 app.use("/api/gifts", giftRouter);
 app.use("/api/potions", potionRouter);
 app.use("/api/photos", photoAlbumRouter);
@@ -245,3 +247,4 @@ function setupMemoryCleanup() {
 
   scheduleNextCleanup();
 }
+

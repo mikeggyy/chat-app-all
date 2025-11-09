@@ -36,11 +36,11 @@ npm run install:all
 
 **Frontend** (`frontend/.env`):
 - 已創建模板，填入 Firebase 配置即可
-- 與主應用 (chat-app-3) 共用相同的 Firebase 專案
+- 與主應用 (chat-app) 共用相同的 Firebase 專案
 
 **Backend** (`backend/.env`):
 - 已創建模板，填入 Firebase Admin SDK 憑證
-- 可以從主應用的 `chat-app-3/backend/.env` 複製相同配置
+- 可以從主應用的 `chat-app/backend/.env` 複製相同配置
 
 ### 3. 啟動開發模式
 
@@ -109,11 +109,24 @@ CORS_ORIGIN=http://localhost:5174
 FIREBASE_ADMIN_PROJECT_ID=your-project-id
 FIREBASE_ADMIN_CLIENT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
 FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
+# Cloudflare R2 Storage（用於刪除用戶圖片）
+# 注意：這些配置需要與主應用 (chat-app) 保持一致
+R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=your-r2-access-key
+R2_SECRET_ACCESS_KEY=your-r2-secret-key
+R2_BUCKET_NAME=your-bucket-name
+R2_PUBLIC_URL=https://your-custom-domain
 ```
+
+**重要說明**：
+- R2 配置用於刪除用戶時同步刪除 Cloudflare R2 上的圖片文件
+- 如果未配置 R2，刪除用戶時會跳過圖片刪除（僅刪除 Firestore 記錄）
+- R2 配置需要與主應用相同，因為兩者使用同一個 R2 bucket
 
 ## 開發規範
 
-- 遵循 chat-app-3 的編碼規範
+- 遵循 chat-app 的編碼規範
 - 所有 API 請求需要管理員權限驗證
 - 使用 Firestore 作為數據源（不創建重複數據）
 - UI 組件使用 Element Plus

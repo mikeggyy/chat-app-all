@@ -22,16 +22,46 @@ const characterCreationLimitService = createLimitService({
 
 /**
  * 檢查是否可以創建角色
+ *
+ * 檢查邏輯：
+ * 1. 優先使用會員等級的免費次數（來自 usage_limits collection）
+ * 2. 如果免費次數用完，檢查用戶的創建卡（來自 users/{userId}/assets）
+ * 3. 返回統一的結果格式，包含可用資源信息
  */
 export const canCreateCharacter = async (userId) => {
-  const result = await characterCreationLimitService.canUse(userId);
-
-  // 獲取統計信息以取得標準限制
+  // 第一步：檢查會員等級的免費次數
+  const baseLimitCheck = await characterCreationLimitService.canUse(userId);
   const stats = await characterCreationLimitService.getStats(userId);
 
+  // 第二步：如果免費次數已用完，檢查創建卡（新 assets 系統）
+  if (!baseLimitCheck.allowed && baseLimitCheck.reason === "limit_exceeded") {
+    try {
+      const { getUserAssets } = await import("../user/assets.service.js");
+      const assets = await getUserAssets(userId);
+
+      // 如果用戶有創建卡，允許創建並返回創建卡信息
+      if (assets && assets.createCards > 0) {
+        return {
+          allowed: true,
+          reason: "create_card_available",
+          remaining: 0, // 會員免費次數已用完
+          createCards: assets.createCards,
+          used: baseLimitCheck.used,
+          total: baseLimitCheck.total,
+          standardTotal: stats.standardLimit,
+          isTestAccount: stats.isTestAccount || false,
+        };
+      }
+    } catch (error) {
+      console.error("[角色創建限制] 獲取用戶資產失敗:", error);
+      // 如果 assets 系統失敗，繼續使用基礎檢查結果（安全降級）
+    }
+  }
+
+  // 第三步：返回基礎檢查結果（允許創建或次數不足）
   return {
-    ...result,
-    standardTotal: stats.standardLimit, // 用於顯示的標準限制
+    ...baseLimitCheck,
+    standardTotal: stats.standardLimit,
     isTestAccount: stats.isTestAccount || false,
   };
 };
@@ -41,6 +71,20 @@ export const canCreateCharacter = async (userId) => {
  */
 export const recordCreation = (userId, characterId) => {
   return characterCreationLimitService.recordUse(userId, null, { characterId });
+};
+
+/**
+ * 回滾一次角色創建（用於創建失敗的情況）
+ *
+ * 用途：當記錄了創建次數但角色創建失敗時，回滾計數
+ * 注意：只減少本期計數，不減少終生計數
+ *
+ * @param {string} userId - 用戶 ID
+ * @param {Object} metadata - 回滾元數據（用於審計）
+ * @returns {Promise<Object>} 回滾結果
+ */
+export const decrementCreation = (userId, metadata = {}) => {
+  return characterCreationLimitService.decrementUse(userId, null, metadata);
 };
 
 /**
@@ -81,6 +125,7 @@ export const clearAllLimits = () => {
 export default {
   canCreateCharacter,
   recordCreation,
+  decrementCreation,
   getCreationStats,
   resetCreationLimit,
   clearAllLimits,

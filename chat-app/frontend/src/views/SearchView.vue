@@ -29,6 +29,9 @@ const isLoadingRecent = ref(false);
 // 人氣排行數據
 const popularCharacters = ref([]);
 const isLoadingPopular = ref(false);
+const popularOffset = ref(0);
+const popularHasMore = ref(true);
+const POPULAR_PAGE_SIZE = 20; // 每次加載 20 個
 
 // 虛擬滾動狀態
 const displayedRecordsCount = ref(5); // 初始顯示5個
@@ -190,20 +193,43 @@ const fetchRecentConversations = async () => {
 };
 
 // 獲取人氣排行角色
-const fetchPopularCharacters = async () => {
+const fetchPopularCharacters = async ({ reset = false } = {}) => {
+  // 如果不是重置且已經沒有更多數據，或者正在加載中，則不執行
+  if (!reset && (!popularHasMore.value || isLoadingPopular.value)) {
+    return;
+  }
+
+  // 如果是重置，清空數據並重置狀態
+  if (reset) {
+    popularCharacters.value = [];
+    popularOffset.value = 0;
+    popularHasMore.value = true;
+  }
+
   isLoadingPopular.value = true;
   try {
     const response = await apiJson(
-      `/api/match/popular?limit=10`,
+      `/api/match/popular?limit=${POPULAR_PAGE_SIZE}&offset=${popularOffset.value}`,
       { skipGlobalLoading: true }
     );
 
     if (response?.characters && Array.isArray(response.characters)) {
-      popularCharacters.value = response.characters;
+      // 如果是重置，直接替換；否則追加
+      if (reset) {
+        popularCharacters.value = response.characters;
+      } else {
+        popularCharacters.value = [...popularCharacters.value, ...response.characters];
+      }
+
+      // 更新 offset 和 hasMore
+      popularOffset.value += response.characters.length;
+      popularHasMore.value = response.hasMore !== false && response.characters.length === POPULAR_PAGE_SIZE;
     }
   } catch (error) {
     console.error("獲取人氣排行失敗:", error);
-    popularCharacters.value = [];
+    if (reset) {
+      popularCharacters.value = [];
+    }
   } finally {
     isLoadingPopular.value = false;
   }
@@ -371,7 +397,7 @@ watch(isRecentRecordsOpen, (isOpen) => {
 
 // 頁面掛載時獲取人氣排行
 onMounted(() => {
-  fetchPopularCharacters();
+  fetchPopularCharacters({ reset: true });
 });
 
 onBeforeUnmount(() => {
@@ -470,8 +496,43 @@ const heroImageByKey = {
   fantasy: "/banner/fantasy-hero.webp",
 };
 
-// 所有記錄（不分頁）
+// 獲取當前面板類型
+const currentPanelType = computed(() => {
+  const panelValue = route.query[RECENT_RECORDS_PANEL_QUERY_KEY];
+  return typeof panelValue === 'string' ? panelValue.trim().toLowerCase() : '';
+});
+
+// 所有記錄（根據面板類型返回不同的數據源）
 const allRecentRecordEntries = computed(() => {
+  // 如果是排行面板，使用 popularCharacters
+  if (currentPanelType.value === 'ranking') {
+    return popularCharacters.value.map((item, index) => {
+      return {
+        id: `popular-record-${item.id}-${index}`,
+        matchId: item.id,
+        name: item.display_name || item.name || "未知角色",
+        description: item.background || "",
+        image: item.portraitUrl || item.avatar || "/ai-role/match-role-01.webp",
+        tagline: "",
+        metrics: [
+          {
+            key: "favorites",
+            label: "收藏",
+            value: formatNumber(item.totalFavorites || 0),
+            icon: HeartIcon,
+          },
+          {
+            key: "messages",
+            label: "對話數",
+            value: formatNumber(item.messageCount || item.totalChatUsers || 0),
+            icon: ChatBubbleLeftRightIcon,
+          },
+        ],
+      };
+    });
+  }
+
+  // 否則使用最近對話數據
   const sourceData =
     recentConversations.value.length > 0
       ? recentConversations.value
@@ -514,17 +575,41 @@ const allRecentRecordEntries = computed(() => {
 
 // 顯示的記錄（虛擬滾動）
 const recentRecordEntries = computed(() => {
+  // 如果是排行面板，顯示所有已加載的數據（不需要虛擬滾動切片）
+  if (currentPanelType.value === 'ranking') {
+    return allRecentRecordEntries.value;
+  }
+  // 其他面板使用虛擬滾動
   return allRecentRecordEntries.value.slice(0, displayedRecordsCount.value);
 });
 
 // 是否還有更多記錄可以加載
 const hasMoreRecords = computed(() => {
+  // 如果是排行面板，使用 API 的 hasMore 狀態
+  if (currentPanelType.value === 'ranking') {
+    return popularHasMore.value;
+  }
+  // 其他面板使用虛擬滾動
   return displayedRecordsCount.value < allRecentRecordEntries.value.length;
 });
 
 // 加載更多記錄
-const loadMoreRecords = () => {
-  if (isLoadingMoreRecords.value || !hasMoreRecords.value) {
+const loadMoreRecords = async () => {
+  if (isLoadingMoreRecords.value) {
+    return;
+  }
+
+  // 如果是排行面板，從 API 加載更多數據
+  if (currentPanelType.value === 'ranking') {
+    if (!popularHasMore.value || isLoadingPopular.value) {
+      return;
+    }
+    await fetchPopularCharacters({ reset: false });
+    return;
+  }
+
+  // 其他面板使用虛擬滾動
+  if (!hasMoreRecords.value) {
     return;
   }
 
@@ -704,7 +789,7 @@ watch(
 );
 
 // 簡化後的 openRecentRecords：只接受面板類型
-const openRecentRecords = (type = 'reconnect') => {
+const openRecentRecords = async (type = 'reconnect') => {
   // 從配置中獲取面板信息
   const config = PANEL_CONFIGS[type] || PANEL_CONFIGS.reconnect;
 
@@ -714,8 +799,13 @@ const openRecentRecords = (type = 'reconnect') => {
   recentRecordsBadgeIconKey.value = config.iconKey;
   recentRecordsHeroImage.value = config.heroImage || recentRecordsHeroFallback;
 
-  // 重置虛擬滾動狀態
-  resetDisplayedRecords();
+  // 如果是排行面板，重置並加載排行數據
+  if (type === 'ranking') {
+    await fetchPopularCharacters({ reset: true });
+  } else {
+    // 重置虛擬滾動狀態
+    resetDisplayedRecords();
+  }
 
   isRecentRecordsOpen.value = true;
 
@@ -1196,7 +1286,7 @@ const openChat = (profile) => {
           </article>
 
           <!-- 加載指示器 -->
-          <div v-if="isLoadingMoreRecords" class="records-loading">
+          <div v-if="isLoadingPopular || isLoadingMoreRecords" class="records-loading">
             <div class="records-loading-spinner"></div>
             <p>載入更多...</p>
           </div>
@@ -1206,7 +1296,12 @@ const openChat = (profile) => {
             v-else-if="!hasMoreRecords && recentRecordEntries.length > 0"
             class="records-end"
           >
-            <p>已顯示全部 {{ recentRecordEntries.length }} 則對話記錄</p>
+            <p v-if="currentPanelType === 'ranking'">
+              已顯示全部 {{ recentRecordEntries.length }} 個角色
+            </p>
+            <p v-else>
+              已顯示全部 {{ recentRecordEntries.length }} 則對話記錄
+            </p>
           </div>
         </div>
       </section>

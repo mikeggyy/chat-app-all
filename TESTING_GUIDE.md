@@ -23,7 +23,7 @@
 
 1. **確保 Firebase Emulator 正在運行**
    ```bash
-   cd d:/project/loveStory/chat-app-3
+   cd d:/project/loveStory/chat-app
    firebase emulators:start
    ```
    保持此終端開啟。
@@ -31,10 +31,10 @@
 2. **確認環境變數已設置**
    ```bash
    # 檢查主應用前端
-   cat chat-app-3/frontend/.env
+   cat chat-app/frontend/.env
 
    # 檢查主應用後端
-   cat chat-app-3/backend/.env
+   cat chat-app/backend/.env
    ```
 
    如果不存在，從 `.env.example` 複製並填入真實配置。
@@ -48,7 +48,7 @@
 #### 測試 1.1：正常啟動（所有環境變數正確）
 
 ```bash
-cd d:/project/loveStory/chat-app-3/backend
+cd d:/project/loveStory/chat-app/backend
 npm run dev
 ```
 
@@ -82,7 +82,7 @@ Server listening on port 4000
 **步驟**:
 1. 備份當前 `.env` 文件
    ```bash
-   cp chat-app-3/backend/.env chat-app-3/backend/.env.backup
+   cp chat-app/backend/.env chat-app/backend/.env.backup
    ```
 
 2. 移除 OPENAI_API_KEY
@@ -111,7 +111,7 @@ Server listening on port 4000
 
 **恢復**:
 ```bash
-mv chat-app-3/backend/.env.backup chat-app-3/backend/.env
+mv chat-app/backend/.env.backup chat-app/backend/.env
 ```
 
 ---
@@ -339,7 +339,7 @@ curl -X PATCH http://localhost:4001/api/characters/char-001 \
 **檢查配置一致性**:
 ```bash
 # 檢查 config/ports.js
-grep FIRESTORE_EMULATOR d:/project/loveStory/chat-app-3/config/ports.js
+grep FIRESTORE_EMULATOR d:/project/loveStory/chat-app/config/ports.js
 
 # 應該顯示: FIRESTORE_EMULATOR: 8080
 ```
@@ -358,7 +358,7 @@ grep FIRESTORE_EMULATOR d:/project/loveStory/chat-app-3/config/ports.js
 
 **啟動主應用前端**:
 ```bash
-cd d:/project/loveStory/chat-app-3/frontend
+cd d:/project/loveStory/chat-app/frontend
 npm run dev
 ```
 
@@ -386,7 +386,7 @@ Connected to Auth Emulator at localhost:9099
 
 **查看 firestore.rules**:
 ```bash
-cat d:/project/loveStory/chat-app-3/firestore.rules | grep -A 5 "document=\*\*"
+cat d:/project/loveStory/chat-app/firestore.rules | grep -A 5 "document=\*\*"
 ```
 
 **期望**:
@@ -405,7 +405,7 @@ cat d:/project/loveStory/chat-app-3/firestore.rules | grep -A 5 "document=\*\*"
 #### 測試 6.2：部署 Rules（生產環境前必做）
 
 ```bash
-cd d:/project/loveStory/chat-app-3
+cd d:/project/loveStory/chat-app
 firebase deploy --only firestore:rules --project chat-app-3-8a7ee
 ```
 
@@ -489,19 +489,19 @@ firebase emulators:start
 **檢查**:
 ```bash
 # 確保 .env 文件存在
-ls -la chat-app-3/backend/.env
+ls -la chat-app/backend/.env
 
 # 檢查內容
-cat chat-app-3/backend/.env
+cat chat-app/backend/.env
 ```
 
 **解決方案**:
 ```bash
 # 從範例複製
-cp chat-app-3/backend/.env.example chat-app-3/backend/.env
+cp chat-app/backend/.env.example chat-app/backend/.env
 
 # 填入真實配置
-nano chat-app-3/backend/.env
+nano chat-app/backend/.env
 ```
 
 ---

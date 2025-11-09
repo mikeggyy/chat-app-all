@@ -85,15 +85,9 @@ const favoriteCards = computed(() => {
   return favoriteIds.value
     .map((id) => {
       const match = map.get(id);
+      // 找不到角色時返回 null，而不是創建「未知角色」卡片
       if (!match) {
-        return {
-          id,
-          displayName: "未知角色",
-          portrait: defaultPortrait,
-          totalFavoritesLabel: "—",
-          totalChatUsersLabel: "—",
-          isMissing: true,
-        };
+        return null;
       }
 
       const portrait =
@@ -182,14 +176,8 @@ const conversationCards = computed(() => {
             isMissing: false,
           };
         }
-        return {
-          id: entry,
-          displayName: "未知角色",
-          portrait: defaultPortrait,
-          totalFavoritesLabel: "—",
-          totalChatUsersLabel: "—",
-          isMissing: true,
-        };
+        // 找不到角色時返回 null，而不是創建「未知角色」卡片
+        return null;
       }
       if (entry && typeof entry === "object") {
         const identifier =
@@ -220,14 +208,8 @@ const conversationCards = computed(() => {
           };
         }
 
-        return {
-          id: identifier,
-          displayName: "未知角色",
-          portrait: defaultPortrait,
-          totalFavoritesLabel: "—",
-          totalChatUsersLabel: "—",
-          isMissing: true,
-        };
+        // 找不到角色時返回 null，而不是創建「未知角色」卡片
+        return null;
       }
       return null;
     })

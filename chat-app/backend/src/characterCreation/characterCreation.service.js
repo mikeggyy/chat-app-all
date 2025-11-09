@@ -6,6 +6,11 @@ import {
   markGenerationSuccess,
   markGenerationFailed,
 } from "./generationLog.service.js";
+import {
+  createFlow,
+  getFlow,
+  setFlow as setFlowInFirestore,
+} from "./characterCreationFlow.firestore.service.js";
 
 const VALID_STATUSES = new Set([
   "draft",
@@ -18,8 +23,6 @@ const VALID_STATUSES = new Set([
   "failed",
   "cancelled",
 ]);
-
-const flowStore = new Map();
 
 const isoNow = () => new Date().toISOString();
 
@@ -101,8 +104,8 @@ const normalizeStatus = (value) => {
   return null;
 };
 
-const ensureFlow = (flowId) => {
-  const flow = flowStore.get(flowId);
+const ensureFlow = async (flowId) => {
+  const flow = await getFlow(flowId);
   if (!flow) {
     const error = new Error("找不到對應的角色創建流程");
     error.status = 404;
@@ -200,19 +203,19 @@ const createFlowRecord = (payload = {}) => {
   };
 };
 
-export const createCreationFlow = (payload = {}) => {
+export const createCreationFlow = async (payload = {}) => {
   const record = createFlowRecord(payload);
-  flowStore.set(record.id, record);
-  return cloneValue(record);
+  const createdFlow = await createFlow(record.id, record);
+  return cloneValue(createdFlow);
 };
 
-export const getCreationFlow = (flowId) => {
-  const flow = flowStore.get(flowId);
+export const getCreationFlow = async (flowId) => {
+  const flow = await getFlow(flowId);
   return flow ? cloneValue(flow) : null;
 };
 
-export const mergeCreationFlow = (flowId, payload = {}) => {
-  const flow = ensureFlow(flowId);
+export const mergeCreationFlow = async (flowId, payload = {}) => {
+  const flow = await ensureFlow(flowId);
   const now = isoNow();
   let summaryTouched = false;
 
@@ -251,13 +254,21 @@ export const mergeCreationFlow = (flowId, payload = {}) => {
   }
 
   flow.updatedAt = now;
+
+  // 保存到 Firestore
+  await setFlowInFirestore(flowId, flow);
+
   return cloneValue(flow);
 };
 
-export const recordCreationCharge = (flowId, payload = {}) => {
-  const flow = ensureFlow(flowId);
+export const recordCreationCharge = async (flowId, payload = {}) => {
+  const flow = await ensureFlow(flowId);
   const entry = recordChargeEntry(flow, payload);
   flow.updatedAt = isoNow();
+
+  // 保存到 Firestore
+  await setFlowInFirestore(flowId, flow);
+
   return {
     flow: cloneValue(flow),
     charge: cloneValue(entry),
@@ -282,7 +293,7 @@ export const generateCreationResult = async (
     throw error;
   }
 
-  const flow = ensureFlow(flowId);
+  const flow = await ensureFlow(flowId);
   const key = trimString(requestedKey) || flowId;
 
   if (
@@ -339,6 +350,9 @@ export const generateCreationResult = async (
     chargeEntry = recordChargeEntry(flow, { ...charge }, key);
   }
 
+  // 保存生成開始狀態到 Firestore
+  await setFlowInFirestore(flowId, flow);
+
   // 標記生成開始
   if (generationLog) {
     try {
@@ -371,6 +385,9 @@ export const generateCreationResult = async (
       chargeEntry.status = "captured";
       chargeEntry.updatedAt = completedAt;
     }
+
+    // 保存成功狀態到 Firestore
+    await setFlowInFirestore(flowId, flow);
 
     // 標記生成成功
     if (generationLog) {
@@ -409,6 +426,9 @@ export const generateCreationResult = async (
       chargeEntry.updatedAt = completedAt;
     }
 
+    // 保存失敗狀態到 Firestore
+    await setFlowInFirestore(flowId, flow);
+
     // 標記生成失敗
     if (generationLog) {
       try {
@@ -427,6 +447,13 @@ export const generateCreationResult = async (
   }
 };
 
+/**
+ * 重置創建流程存儲（已遷移到 Firestore，此函數保留以維持向後兼容性）
+ * @deprecated 數據已存儲在 Firestore，不再需要手動重置
+ */
 export const resetCreationStore = () => {
-  flowStore.clear();
+  // 數據已遷移到 Firestore，此函數不再需要執行任何操作
+  if (process.env.NODE_ENV !== "test") {
+    logger.info("[Character Creation] resetCreationStore called - this is now a no-op as data is stored in Firestore");
+  }
 };

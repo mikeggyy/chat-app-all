@@ -206,21 +206,33 @@ const resolveMatchCreatorId = (match) => {
 /**
  * 獲取按聊天用戶數量排序的熱門角色
  * @param {number} limit - 返回的角色數量（默認 10）
- * @param {Object} options - 選項（保留以兼容現有代碼）
+ * @param {Object} options - 選項
+ * @param {number} options.offset - 分頁偏移量（默認 0）
  * @returns {Promise<Array>} 按 totalChatUsers 排序的角色列表，messageCount 代表與該角色聊過天的用戶數
  */
 export const getPopularMatches = async (limit = 10, options = {}) => {
+  const offset = options.offset || 0;
+
   try {
     const db = getFirestoreDb();
 
     // 直接從 Firestore 獲取所有公開角色，按 totalChatUsers 降序排序
-    const charactersSnapshot = await db
+    let query = db
       .collection("characters")
       .where("status", "==", "active")
       .where("isPublic", "==", true)
-      .orderBy("totalChatUsers", "desc")
-      .limit(limit)
-      .get();
+      .orderBy("totalChatUsers", "desc");
+
+    // 如果有 offset，需要先獲取前 offset 條數據作為起點
+    if (offset > 0) {
+      const offsetSnapshot = await query.limit(offset).get();
+      if (!offsetSnapshot.empty) {
+        const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1];
+        query = query.startAfter(lastDoc);
+      }
+    }
+
+    const charactersSnapshot = await query.limit(limit).get();
 
     const characters = [];
     charactersSnapshot.forEach((doc) => {
@@ -233,7 +245,7 @@ export const getPopularMatches = async (limit = 10, options = {}) => {
     });
 
     if (process.env.NODE_ENV !== "test") {
-      logger.info(`[Match Service] Found ${characters.length} popular characters`);
+      logger.info(`[Match Service] Found ${characters.length} popular characters (offset: ${offset}, limit: ${limit})`);
     }
 
     return characters.map(cloneMatch);
@@ -243,7 +255,7 @@ export const getPopularMatches = async (limit = 10, options = {}) => {
     }
 
     // Fallback：返回內存中的角色
-    return aiMatches.slice(0, limit).map(cloneMatch);
+    return aiMatches.slice(offset, offset + limit).map(cloneMatch);
   }
 };
 

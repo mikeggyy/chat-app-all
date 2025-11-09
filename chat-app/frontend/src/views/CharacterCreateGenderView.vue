@@ -11,6 +11,7 @@ import {
   readStoredCharacterCreationFlowId,
   fetchCharacterCreationFlow,
   clearStoredCharacterCreationFlowId,
+  cancelCharacterCreation,
 } from "../services/characterCreation.service.js";
 
 const router = useRouter();
@@ -138,9 +139,22 @@ const handleResumeFlowConfirm = async () => {
   }
 };
 
-const handleResumeFlowCancel = () => {
+const handleResumeFlowCancel = async () => {
   showResumeFlowModal.value = false;
+
+  const flowToCancel = pendingFlow.value;
   pendingFlow.value = null;
+
+  // 如果有生成的圖片，調用後端 API 刪除所有圖片
+  if (flowToCancel?.id && flowToCancel?.generation?.result?.images?.length > 0) {
+    try {
+      await cancelCharacterCreation(flowToCancel.id);
+      console.log(`[角色創建] 已取消流程並清理 ${flowToCancel.generation.result.images.length} 張生成的圖片`);
+    } catch (error) {
+      console.error("[角色創建] 取消流程失敗:", error);
+      // 即使刪除失敗也繼續清除本地狀態
+    }
+  }
 
   // 用戶選擇重新開始，清除所有狀態
   clearStoredCharacterCreationFlowId();
@@ -155,13 +169,9 @@ onMounted(async () => {
     return;
   }
 
-  // 檢查並恢復未完成的流程
-  const resumed = await checkAndResumeFlow();
-  if (resumed) {
-    // 已跳轉到其他頁面，不繼續執行
-    return;
-  }
-
+  // 強制清除所有舊的創建狀態，確保每次都是全新開始
+  // 這樣可以避免圖片重用問題和創建卡未扣除問題
+  clearStoredCharacterCreationFlowId();
   clearCreationState();
 
   // 查詢角色創建限制

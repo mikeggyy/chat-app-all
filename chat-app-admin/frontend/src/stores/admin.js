@@ -7,9 +7,11 @@ export const useAdminStore = defineStore("admin", () => {
   const user = ref(null);
   const token = ref(null);
   const isAdmin = ref(false);
+  const userRole = ref(null); // 儲存具體的權限等級：'super_admin', 'admin', 'moderator'
   const loading = ref(true);
 
   const isAuthenticated = computed(() => !!user.value && isAdmin.value);
+  const isSuperAdmin = computed(() => userRole.value === "super_admin");
 
   // 初始化認證狀態
   function initializeAuth() {
@@ -20,15 +22,27 @@ export const useAdminStore = defineStore("admin", () => {
 
         // 檢查用戶是否有管理員權限
         const tokenResult = await firebaseUser.getIdTokenResult();
-        isAdmin.value = !!(
-          tokenResult.claims.admin ||
-          tokenResult.claims.super_admin ||
-          tokenResult.claims.moderator
-        );
+        const claims = tokenResult.claims;
+
+        // 判斷具體的權限等級（優先級：super_admin > admin > moderator）
+        if (claims.super_admin) {
+          userRole.value = "super_admin";
+          isAdmin.value = true;
+        } else if (claims.admin) {
+          userRole.value = "admin";
+          isAdmin.value = true;
+        } else if (claims.moderator) {
+          userRole.value = "moderator";
+          isAdmin.value = true;
+        } else {
+          userRole.value = null;
+          isAdmin.value = false;
+        }
       } else {
         user.value = null;
         token.value = null;
         isAdmin.value = false;
+        userRole.value = null;
       }
       loading.value = false;
     });
@@ -41,6 +55,7 @@ export const useAdminStore = defineStore("admin", () => {
       user.value = null;
       token.value = null;
       isAdmin.value = false;
+      userRole.value = null;
     } catch (error) {
       throw error;
     }
@@ -50,6 +65,24 @@ export const useAdminStore = defineStore("admin", () => {
   async function refreshToken() {
     if (user.value) {
       token.value = await user.value.getIdToken(true);
+
+      // 重新獲取權限
+      const tokenResult = await user.value.getIdTokenResult(true);
+      const claims = tokenResult.claims;
+
+      if (claims.super_admin) {
+        userRole.value = "super_admin";
+        isAdmin.value = true;
+      } else if (claims.admin) {
+        userRole.value = "admin";
+        isAdmin.value = true;
+      } else if (claims.moderator) {
+        userRole.value = "moderator";
+        isAdmin.value = true;
+      } else {
+        userRole.value = null;
+        isAdmin.value = false;
+      }
     }
   }
 
@@ -57,6 +90,8 @@ export const useAdminStore = defineStore("admin", () => {
     user,
     token,
     isAdmin,
+    userRole,
+    isSuperAdmin,
     loading,
     isAuthenticated,
     initializeAuth,

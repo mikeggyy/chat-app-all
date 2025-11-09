@@ -12,17 +12,16 @@ import { useUserProfile } from "../composables/useUserProfile";
 const router = useRouter();
 const { user } = useUserProfile();
 
-// 返回上一頁
+// 返回上一頁（固定返回 Profile 頁面）
 const handleBack = () => {
-  router.back();
+  router.push({ name: "profile" });
 };
 
 // 跳轉到創建角色頁面
 const handleCreateCharacter = async () => {
   try {
     await router.push({ name: "character-create-gender" });
-  } catch (error) {
-  }
+  } catch (error) {}
 };
 
 // Utility functions
@@ -203,8 +202,19 @@ const handleCharacterSelect = (character) => {
 
 // Load characters on mount
 onMounted(() => {
+  // 調試：輸出用戶資訊
+  if (import.meta.env.DEV) {
+    console.log("[MyCharacters] 當前用戶:", user.value);
+    console.log("[MyCharacters] 用戶 ID:", user.value?.id);
+  }
+
   if (user.value?.id) {
     loadUserCharacters(user.value.id);
+  } else {
+    // 如果沒有用戶資訊，嘗試從 Firebase 獲取
+    if (import.meta.env.DEV) {
+      console.warn("[MyCharacters] 沒有用戶資訊，無法載入角色");
+    }
   }
 });
 </script>
@@ -234,11 +244,7 @@ onMounted(() => {
     </header>
 
     <main class="my-characters-content" :aria-busy="isCharactersLoading">
-      <p
-        v-if="isCharactersLoading"
-        class="my-characters-status"
-        role="status"
-      >
+      <p v-if="isCharactersLoading" class="my-characters-status" role="status">
         正在載入角色...
       </p>
 
@@ -256,7 +262,9 @@ onMounted(() => {
         role="status"
       >
         <p class="my-characters-empty__title">尚未創建任何角色</p>
-        <p class="my-characters-empty__hint">點擊右上角「+」按鈕開始創建你的第一個角色！</p>
+        <p class="my-characters-empty__hint">
+          點擊右上角「+」按鈕開始創建你的第一個角色！
+        </p>
       </div>
 
       <ul v-else class="character-list" role="list">
@@ -411,8 +419,9 @@ onMounted(() => {
 }
 
 .my-characters-content {
-  flex: 1;
   padding: 1.5rem 1.75rem;
+  overflow-y: auto;
+  height: 195vw;
 }
 
 .my-characters-status {

@@ -22,9 +22,9 @@
 
 ## 啟動指令
 
-### 前台應用 (chat-app-3)
+### 前台應用 (chat-app)
 ```bash
-cd chat-app-3
+cd chat-app
 npm run dev
 ```
 這會啟動：
@@ -42,11 +42,11 @@ npm run dev
 
 ## 配置文件
 
-### chat-app-3/package.json
+### chat-app/package.json
 - `dev`: 只啟動前後端（不含 Emulator）
 - `dev:with-emulator`: 啟動 Emulator + 前後端 + 自動導入數據
 
-### chat-app-3/backend/.env
+### chat-app/backend/.env
 - `PORT=4000`
 - 沒有設置 `USE_FIREBASE_EMULATOR`（默認使用雲端 Firebase）
 
@@ -71,9 +71,9 @@ netstat -ano | findstr :5174
 taskkill //F //PID <PID>
 ```
 
-### 清理端口（chat-app-3）
+### 清理端口（chat-app）
 ```bash
-cd chat-app-3
+cd chat-app
 npm run cleanup-ports
 ```
 

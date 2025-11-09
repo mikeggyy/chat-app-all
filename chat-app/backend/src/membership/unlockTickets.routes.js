@@ -46,7 +46,7 @@ router.get("/api/unlock-tickets/balance", requireFirebaseAuth, async (req, res) 
  * Body: { characterId }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人解鎖票
  */
-router.post("/api/unlock-tickets/use/character", requireFirebaseAuth, (req, res) => {
+router.post("/api/unlock-tickets/use/character", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.body;
@@ -58,7 +58,7 @@ router.post("/api/unlock-tickets/use/character", requireFirebaseAuth, (req, res)
       });
     }
 
-    const result = useCharacterUnlockTicket(userId, characterId);
+    const result = await useCharacterUnlockTicket(userId, characterId);
 
     res.json({
       success: true,

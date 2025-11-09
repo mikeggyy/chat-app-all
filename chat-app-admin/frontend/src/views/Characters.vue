@@ -45,10 +45,17 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="200">
+        <el-table-column label="操作" fixed="right" :width="adminStore.isSuperAdmin ? 200 : 100">
           <template #default="{ row }">
             <el-button size="small" @click="editCharacter(row)">編輯</el-button>
-            <el-button size="small" type="danger" @click="deleteCharacter(row)">刪除</el-button>
+            <el-button
+              v-if="adminStore.isSuperAdmin"
+              size="small"
+              type="danger"
+              @click="deleteCharacter(row)"
+            >
+              刪除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -80,13 +87,13 @@
         </el-form-item>
 
         <el-form-item label="語音" prop="voice">
-          <el-select v-model="editForm.voice" placeholder="請選擇語音">
-            <el-option label="Shimmer（女性）" value="shimmer" />
-            <el-option label="Nova（女性）" value="nova" />
-            <el-option label="Coral（女性）" value="coral" />
-            <el-option label="Alloy（男性）" value="alloy" />
-            <el-option label="Echo（男性）" value="echo" />
-            <el-option label="Fable（男性）" value="fable" />
+          <el-select v-model="editForm.voice" placeholder="請選擇語音" :loading="voicesLoading">
+            <el-option
+              v-for="voiceOption in availableVoices"
+              :key="voiceOption.id"
+              :label="voiceOption.label"
+              :value="voiceOption.value"
+            />
           </el-select>
         </el-form-item>
 
@@ -211,12 +218,18 @@ import { ref, reactive, onMounted } from "vue";
 import api from "../utils/api";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
+import { useAdminStore } from "../stores/admin";
 
+const adminStore = useAdminStore();
 const characters = ref([]);
 const loading = ref(false);
 const editDialogVisible = ref(false);
 const saveLoading = ref(false);
 const editFormRef = ref(null);
+
+// 語音選項相關
+const availableVoices = ref([]);
+const voicesLoading = ref(false);
 
 const editForm = reactive({
   id: "",
@@ -298,6 +311,32 @@ async function loadCharacters() {
     ElMessage.error("載入角色列表失敗");
   } finally {
     loading.value = false;
+  }
+}
+
+// 載入可用的語音列表
+async function loadVoices() {
+  voicesLoading.value = true;
+  try {
+    const data = await api.get("/api/voices");
+
+    // 將 API 返回的語音數據格式化為選項
+    if (data?.voices && Array.isArray(data.voices)) {
+      availableVoices.value = data.voices.map(voice => ({
+        id: voice.id,
+        label: `${voice.description || voice.name} (${formatGender(voice.gender)})`,
+        value: voice.id,
+        gender: voice.gender,
+        locale: voice.locale,
+      }));
+    }
+  } catch (error) {
+    console.error("載入語音列表失敗:", error);
+    ElMessage.warning("載入語音列表失敗，將使用預設選項");
+    // 失敗時使用空陣列，讓用戶可以手動輸入
+    availableVoices.value = [];
+  } finally {
+    voicesLoading.value = false;
   }
 }
 
@@ -386,24 +425,40 @@ function resetEditForm() {
 
 async function deleteCharacter(character) {
   try {
-    await ElMessageBox.confirm(`確定要刪除角色「${character.display_name}」嗎？`, "警告", {
-      confirmButtonText: "確定",
-      cancelButtonText: "取消",
-      type: "warning",
-    });
+    await ElMessageBox.confirm(
+      `確定要刪除角色「${character.display_name}」嗎？\n\n⚠️ 此操作將永久刪除：\n• 角色資料\n• 角色頭像圖片\n• 所有用戶與此角色的對話記錄\n• 所有對話中的生成照片\n\n此操作無法撤銷！`,
+      "警告",
+      {
+        confirmButtonText: "確定刪除",
+        cancelButtonText: "取消",
+        type: "warning",
+        dangerouslyUseHTMLString: false,
+      }
+    );
 
-    // TODO: 實現刪除 API 調用
-    ElMessage.success("刪除成功");
-    loadCharacters();
+    loading.value = true;
+
+    try {
+      await api.delete(`/api/characters/${character.id}`);
+      ElMessage.success("角色刪除成功");
+      loadCharacters();
+    } catch (error) {
+      console.error("刪除角色失敗:", error);
+      ElMessage.error(error.response?.data?.error || "刪除角色失敗");
+    } finally {
+      loading.value = false;
+    }
   } catch (err) {
+    // 用戶取消刪除
     if (err !== "cancel") {
-      ElMessage.error("刪除失敗");
+      console.error("刪除操作錯誤:", err);
     }
   }
 }
 
 onMounted(() => {
   loadCharacters();
+  loadVoices(); // 載入語音列表
 });
 </script>
 

@@ -6,7 +6,7 @@
  * - HTTP 狀態碼對應：根據錯誤類型返回適當的狀態碼
  *
  * 使用位置：
- * - chat-app-3/backend
+ * - chat-app/backend
  * - chat-app-admin/backend
  */
 

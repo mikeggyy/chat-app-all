@@ -89,7 +89,7 @@ export const createLimitData = (resetPeriod) => {
     count: 0, // 本期已使用次數
     lifetimeCount: 0, // 終生使用次數
     unlocked: 0, // 透過廣告等方式解鎖的額外次數
-    cards: 0, // 擁有的使用卡數量（如拍照卡）
+    cards: 0, // ⚠️ 已廢棄：請使用 users/{userId}/assets 系統管理卡片資產
     permanentUnlock: false, // 是否永久解鎖
     lastResetDate:
       resetPeriod === RESET_PERIOD.MONTHLY ? dateStr.slice(0, 7) : dateStr, // YYYY-MM 或 YYYY-MM-DD

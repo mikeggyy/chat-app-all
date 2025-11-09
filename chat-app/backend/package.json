@@ -20,7 +20,9 @@
     "test:admin-assets": "node ./scripts/test-admin-asset-update.js",
     "test:potions": "node ./scripts/test-potion-system.js",
     "seed:potions": "node ./scripts/seed-potions-data.js",
-    "normalize:characters": "node ./scripts/normalize-character-data.js"
+    "normalize:characters": "node ./scripts/normalize-character-data.js",
+    "diagnose:conversations": "node ./scripts/diagnoseConversations.js",
+    "cleanup:conversations": "node ./scripts/cleanupConversations.js"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +33,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.922.0",
     "@aws-sdk/s3-request-presigner": "^3.922.0",
+    "@google-cloud/text-to-speech": "^6.4.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.5",

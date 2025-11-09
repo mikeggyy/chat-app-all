@@ -261,6 +261,26 @@ export const cleanupUnselectedImages = async (flowId, selectedImageUrl, allImage
   return response;
 };
 
+/**
+ * 取消角色創建並清理所有生成的圖片
+ * @param {string} flowId - 角色創建流程 ID
+ * @returns {Promise} - 返回取消結果
+ */
+export const cancelCharacterCreation = async (flowId) => {
+  if (!flowId) {
+    throw new Error("flowId is required to cancel character creation");
+  }
+
+  const response = await apiJson(
+    `${BASE_PATH}/flows/${flowId}/cancel`,
+    {
+      method: "POST",
+    }
+  );
+
+  return response;
+};
+
 export const finalizeCharacterCreation = async (flowId, currentUser, selectedImageUrl = null) => {
   if (!flowId) {
     throw new Error("flowId is required to finalize character creation");
@@ -280,17 +300,38 @@ export const finalizeCharacterCreation = async (flowId, currentUser, selectedIma
   // 選擇生成的圖片
   const generatedImages = flow.generation?.result?.images || [];
 
-  // 使用傳入的選擇圖片 URL，如果沒有則使用第一張圖片
+  // 優先使用傳入的 selectedImageUrl（用戶在生成結果頁選擇的圖片）
   let portraitUrl = selectedImageUrl || "";
+
+  // 如果沒有傳入，嘗試從 flow.appearance.image 獲取（這應該是用戶選擇的生成圖片）
+  if (!portraitUrl && flow.appearance?.image) {
+    // 檢查是否是生成的圖片 URL（包含 r2.dev 或 storage.googleapis.com）
+    const image = flow.appearance.image;
+    if (image.includes('r2.dev') || image.includes('storage.googleapis.com') || image.includes('firebasestorage.googleapis.com')) {
+      portraitUrl = image;
+    }
+  }
+
+  // 如果還是沒有，使用生成圖片的第一張
   if (!portraitUrl && generatedImages.length > 0) {
     portraitUrl = generatedImages[0]?.url || "";
   }
+
+  // 最後的備選：flow.appearance.image（可能是預設或參考圖）
   if (!portraitUrl) {
     portraitUrl = flow.appearance?.image || "";
   }
 
+  console.log('[finalizeCharacterCreation] 圖片 URL 選擇:', {
+    selectedImageUrl,
+    flowAppearanceImage: flow.appearance?.image,
+    generatedImagesCount: generatedImages.length,
+    finalPortraitUrl: portraitUrl
+  });
+
   // 將 flow 資料轉換為 match 格式
   const matchData = {
+    flowId, // 傳入 flowId，讓後端檢查是否已扣除創建卡
     display_name: flow.persona?.name || "",
     gender: flow.metadata?.gender || "",
     background: flow.persona?.tagline || "",
@@ -308,10 +349,14 @@ export const finalizeCharacterCreation = async (flowId, currentUser, selectedIma
   };
 
   // 調用後端 API 創建角色
-  const match = await apiJson("/match/create", {
+  const response = await apiJson("/match/create", {
     method: "POST",
     body: matchData,
   });
+
+  // 後端使用 sendSuccess 返回數據，格式為 { success: true, data: match }
+  // 需要解包 data 字段
+  const match = response?.data || response;
 
   // 創建成功後，刪除未選中的圖片以節省儲存空間
   if (generatedImages.length > 1) {

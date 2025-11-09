@@ -20,7 +20,7 @@
 ## ✅ 已修復 (27/27) - 全部完成！🎉
 
 ### 1. 禮物系統
-**文件**: `chat-app-3/backend/src/gift/gift.routes.js`
+**文件**: `chat-app/backend/src/gift/gift.routes.js`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -34,7 +34,7 @@ const { characterId, giftId, requestId } = req.body;
 ```
 
 ### 2. 影片生成 API
-**文件**: `chat-app-3/backend/src/ai/ai.routes.js:605`
+**文件**: `chat-app/backend/src/ai/ai.routes.js:605`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -48,7 +48,7 @@ const { characterId, requestId, ... } = req.body;
 ```
 
 ### 3. 照片生成 API
-**文件**: `chat-app-3/backend/src/ai/ai.routes.js:415`
+**文件**: `chat-app/backend/src/ai/ai.routes.js:415`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -62,7 +62,7 @@ const { characterId, requestId, usePhotoCard } = req.body;
 ```
 
 ### 4. 廣告系統 (3 個端點)
-**文件**: `chat-app-3/backend/src/ad/ad.routes.js`
+**文件**: `chat-app/backend/src/ad/ad.routes.js`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -84,7 +84,7 @@ const userId = req.firebaseUser.uid;
 ## 🚨 待修復 (0/27) - 全部修復完成！✅
 
 ### 5. 金幣系統 (10 處)
-**文件**: `chat-app-3/backend/src/payment/coins.routes.js`
+**文件**: `chat-app/backend/src/payment/coins.routes.js`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -104,7 +104,7 @@ const userId = req.firebaseUser.uid;
 ```
 
 ### 6. 解鎖卡系統 (6 處)
-**文件**: `chat-app-3/backend/src/membership/unlockTickets.routes.js`
+**文件**: `chat-app/backend/src/membership/unlockTickets.routes.js`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -121,7 +121,7 @@ const { characterId } = req.body;
 ```
 
 ### 7. 照片限制購買 API
-**文件**: `chat-app-3/backend/src/ai/photoLimit.routes.js:45`
+**文件**: `chat-app/backend/src/ai/photoLimit.routes.js:45`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -132,7 +132,7 @@ const { quantity, paymentInfo } = req.body;
 ```
 
 ### 8. 送禮系統 (額外 4 處)
-**文件**: `chat-app-3/backend/src/gift/gift.routes.js`
+**文件**: `chat-app/backend/src/gift/gift.routes.js`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -149,7 +149,7 @@ const userId = req.firebaseUser.uid;
 ```
 
 ### 9. 限制路由工具類
-**文件**: `chat-app-3/backend/src/utils/createLimitRouter.js`
+**文件**: `chat-app/backend/src/utils/createLimitRouter.js`
 **修復日期**: 2025-11-05
 **狀態**: ✅ 已修復
 
@@ -307,14 +307,14 @@ body: {
 ## 📋 修復摘要
 
 ### 已修復的文件清單
-1. ✅ `chat-app-3/backend/src/ai/ai.routes.js` - 2 個端點
-2. ✅ `chat-app-3/backend/src/ad/ad.routes.js` - 3 個端點
-3. ✅ `chat-app-3/backend/src/payment/coins.routes.js` - 10 個端點
-4. ✅ `chat-app-3/backend/src/membership/unlockTickets.routes.js` - 6 個端點
-5. ✅ `chat-app-3/backend/src/ai/photoLimit.routes.js` - 1 個端點
-6. ✅ `chat-app-3/backend/src/gift/gift.routes.js` - 5 個端點（含原先修復的 1 個）
-7. ✅ `chat-app-3/backend/src/utils/createLimitRouter.js` - 通用工具類
-8. ✅ `chat-app-3/frontend/src/views/ChatView.vue` - 1 處前端調用
+1. ✅ `chat-app/backend/src/ai/ai.routes.js` - 2 個端點
+2. ✅ `chat-app/backend/src/ad/ad.routes.js` - 3 個端點
+3. ✅ `chat-app/backend/src/payment/coins.routes.js` - 10 個端點
+4. ✅ `chat-app/backend/src/membership/unlockTickets.routes.js` - 6 個端點
+5. ✅ `chat-app/backend/src/ai/photoLimit.routes.js` - 1 個端點
+6. ✅ `chat-app/backend/src/gift/gift.routes.js` - 5 個端點（含原先修復的 1 個）
+7. ✅ `chat-app/backend/src/utils/createLimitRouter.js` - 通用工具類
+8. ✅ `chat-app/frontend/src/views/ChatView.vue` - 1 處前端調用
 
 ### 統一修復模式
 ```javascript

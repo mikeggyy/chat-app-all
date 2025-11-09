@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 這是一個 **monorepo**，包含兩個相關但獨立的應用：
 
-1. **chat-app-3** - AI 聊天應用（主應用）
+1. **chat-app** - AI 聊天應用（主應用）
    - 用戶與 AI 角色對話
    - 會員系統、虛擬貨幣、AI 生成圖片等功能
 
@@ -45,8 +45,8 @@ npm run dev           # 啟動所有服務
 ### 單獨啟動應用
 
 ```bash
-# 主應用 (chat-app-3)
-cd chat-app-3
+# 主應用 (chat-app)
+cd chat-app
 npm run install:all    # 首次安裝依賴
 npm run dev            # 啟動前後端（連接生產環境 Firebase）
 
@@ -60,7 +60,7 @@ npm run dev            # 啟動前後端
 
 ```
 loveStory/
-├── chat-app-3/          # 主應用 - AI 聊天應用
+├── chat-app/          # 主應用 - AI 聊天應用
 │   ├── frontend/        # Vue 3 + Vite 前端 (port 5173)
 │   ├── backend/         # Node.js + Express 後端 (port 4000)
 │   ├── shared/          # 應用內共享配置和工具
@@ -90,7 +90,7 @@ loveStory/
 
 ⚠️ **重要**: 默認情況下，所有服務連接到**生產環境 Firebase**。修改數據時需格外小心。
 
-💡 **本地開發**: 如需使用 Firebase Emulator 進行本地測試，請參閱 [chat-app-3/docs/firebase-emulator-setup.md](chat-app-3/docs/firebase-emulator-setup.md)。
+💡 **本地開發**: 如需使用 Firebase Emulator 進行本地測試，請參閱 [chat-app/docs/firebase-emulator-setup.md](chat-app/docs/firebase-emulator-setup.md)。
 
 ## 常用命令
 
@@ -102,10 +102,10 @@ npm run dev                 # 啟動所有服務 (主應用 + 管理後臺，共
 npm run install:all         # 安裝所有子項目的依賴
 ```
 
-### 主應用 (chat-app-3) 命令
+### 主應用 (chat-app) 命令
 
 ```bash
-cd chat-app-3
+cd chat-app
 
 # 開發
 npm run dev                 # 啟動前後端（生產環境 Firebase）
@@ -147,7 +147,7 @@ npm run build:backend       # 構建後端（如需要）
 
 ## 技術棧
 
-### 主應用 (chat-app-3)
+### 主應用 (chat-app)
 
 - **Frontend**: Vue 3, Vite, Vue Router, Pinia
 - **Backend**: Node.js, Express, Firebase Admin SDK
@@ -186,8 +186,8 @@ npm run build:backend       # 構建後端（如需要）
 ### 主應用配置
 
 配置文件位置：
-- 前端：`chat-app-3/frontend/.env`（複製自 `.env.example`）
-- 後端：`chat-app-3/backend/.env`（複製自 `.env.example`）
+- 前端：`chat-app/frontend/.env`（複製自 `.env.example`）
+- 後端：`chat-app/backend/.env`（複製自 `.env.example`）
 
 **關鍵環境變數**：
 ```env
@@ -203,7 +203,7 @@ OPENAI_API_KEY=sk-...
 REPLICATE_API_TOKEN=r8_...
 ```
 
-詳細配置說明請參閱：[chat-app-3/CLAUDE.md](chat-app-3/CLAUDE.md#environment-configuration)
+詳細配置說明請參閱：[chat-app/CLAUDE.md](chat-app/CLAUDE.md#environment-configuration)
 
 ### 管理後臺配置
 
@@ -251,7 +251,7 @@ console.log(user.customClaims);
 在此儲存庫中工作時遵循以下原則：
 
 1. **使用集中化配置** - 從 `config/` 和 `shared/config/` 導入而非硬編碼值
-2. **所有消耗性操作必須實現冪等性** - 使用 `handleIdempotentRequest()` 中間件（詳見 [chat-app-3/docs/IDEMPOTENCY.md](chat-app-3/docs/IDEMPOTENCY.md)）
+2. **所有消耗性操作必須實現冪等性** - 使用 `handleIdempotentRequest()` 中間件（詳見 [chat-app/docs/IDEMPOTENCY.md](chat-app/docs/IDEMPOTENCY.md)）
 3. **優先使用 Firestore** - 對於持久化數據，優先使用 Firestore 而非內存存儲
 4. **保持組件精簡** - 組件保持在 500 行以下；提取邏輯到 composables
 5. **謹慎處理生產環境** - 默認連接生產環境 Firebase，修改數據時需格外小心
@@ -275,14 +275,14 @@ console.log(user.customClaims);
 - **[docs/cloudflare-pages-deployment.md](docs/cloudflare-pages-deployment.md)** - Cloudflare Pages 完整部署指南
 - **[docs/cloudflare-pages-migration-summary.md](docs/cloudflare-pages-migration-summary.md)** - 遷移總結和檢查清單
 
-### 主應用文檔（chat-app-3）
+### 主應用文檔（chat-app）
 
-- **[chat-app-3/CLAUDE.md](chat-app-3/CLAUDE.md)** - 主應用完整開發指南 ⭐
-- [chat-app-3/docs/firestore-collections.md](chat-app-3/docs/firestore-collections.md) - Firestore 資料庫架構
-- [chat-app-3/docs/firebase-emulator-setup.md](chat-app-3/docs/firebase-emulator-setup.md) - Firebase Emulator 設置指南
-- [chat-app-3/docs/IDEMPOTENCY.md](chat-app-3/docs/IDEMPOTENCY.md) - 冪等性系統實現指南
-- [chat-app-3/docs/DEPLOYMENT.md](chat-app-3/docs/DEPLOYMENT.md) - 部署指南
-- [chat-app-3/backend/scripts/README.md](chat-app-3/backend/scripts/README.md) - 數據導入腳本指南
+- **[chat-app/CLAUDE.md](chat-app/CLAUDE.md)** - 主應用完整開發指南 ⭐
+- [chat-app/docs/firestore-collections.md](chat-app/docs/firestore-collections.md) - Firestore 資料庫架構
+- [chat-app/docs/firebase-emulator-setup.md](chat-app/docs/firebase-emulator-setup.md) - Firebase Emulator 設置指南
+- [chat-app/docs/IDEMPOTENCY.md](chat-app/docs/IDEMPOTENCY.md) - 冪等性系統實現指南
+- [chat-app/docs/DEPLOYMENT.md](chat-app/docs/DEPLOYMENT.md) - 部署指南
+- [chat-app/backend/scripts/README.md](chat-app/backend/scripts/README.md) - 數據導入腳本指南
 
 ### 管理後臺文檔（chat-app-admin）
 
@@ -291,8 +291,8 @@ console.log(user.customClaims);
 ### 詳細架構說明
 
 詳細的系統架構、API 設計、數據流程等說明請參閱各子項目的文檔：
-- 主應用架構：[chat-app-3/CLAUDE.md](chat-app-3/CLAUDE.md#architecture-overview)
-- Firestore 集合：[chat-app-3/docs/firestore-collections.md](chat-app-3/docs/firestore-collections.md)
+- 主應用架構：[chat-app/CLAUDE.md](chat-app/CLAUDE.md#architecture-overview)
+- Firestore 集合：[chat-app/docs/firestore-collections.md](chat-app/docs/firestore-collections.md)
 
 ## 常見任務
 
@@ -313,7 +313,7 @@ npm install           # 安裝根目錄依賴
 npm run install:all   # 安裝所有子項目依賴
 
 # 單獨安裝主應用依賴
-cd chat-app-3
+cd chat-app
 npm run install:all
 
 # 單獨安裝管理後臺依賴
@@ -328,7 +328,7 @@ npm run install:all
 cat PORTS.md
 
 # 清理被占用的端口（Windows）
-cd chat-app-3
+cd chat-app
 npm run cleanup-ports
 
 # 手動清理特定端口
@@ -340,7 +340,7 @@ taskkill //F //PID <PID>        # 終止進程
 
 ```bash
 # 主應用
-cd chat-app-3
+cd chat-app
 npm run build:frontend
 
 # 管理後臺
@@ -363,7 +363,7 @@ npm run build:frontend
 
 **方法 3: 使用導入腳本（Emulator 模式）**
 ```bash
-cd chat-app-3
+cd chat-app
 npm run import:characters
 ```
 
@@ -371,7 +371,7 @@ npm run import:characters
 
 ```bash
 # 驗證端口和環境配置
-cd chat-app-3
+cd chat-app
 npm run verify-config
 ```
 
@@ -379,7 +379,7 @@ npm run verify-config
 
 ```bash
 # 1. 清理端口
-cd chat-app-3
+cd chat-app
 npm run cleanup-ports
 
 # 2. 重新安裝依賴（如果需要）
@@ -404,7 +404,7 @@ netstat -ano | findstr :5174
 taskkill //F //PID <PID>
 
 # 或使用清理腳本
-cd chat-app-3
+cd chat-app
 npm run cleanup-ports
 ```
 
@@ -424,7 +424,7 @@ npm run cleanup-ports
 
 ```bash
 # 清理並重新安裝所有依賴
-cd chat-app-3
+cd chat-app
 rm -rf node_modules backend/node_modules frontend/node_modules
 npm run install:all
 
@@ -449,13 +449,13 @@ npm run install:all
 ### 更多故障排除
 
 請參閱各子項目的詳細文檔：
-- 主應用：[chat-app-3/CLAUDE.md](chat-app-3/CLAUDE.md)
+- 主應用：[chat-app/CLAUDE.md](chat-app/CLAUDE.md)
 - 管理後臺：[chat-app-admin/README.md](chat-app-admin/README.md)
 
 ## 部署
 
 詳細的部署指南請參閱：
-- **[chat-app-3/docs/DEPLOYMENT.md](chat-app-3/docs/DEPLOYMENT.md)** - 完整部署指南
+- **[chat-app/docs/DEPLOYMENT.md](chat-app/docs/DEPLOYMENT.md)** - 完整部署指南
 
 **推薦架構**：
 - **前端**: Firebase Hosting
@@ -466,13 +466,13 @@ npm run install:all
 
 ```bash
 # 1. 後端部署到 Cloud Run
-cd chat-app-3/backend
+cd chat-app/backend
 ./deploy-cloudrun.sh  # Linux/Mac
 # 或
 deploy-cloudrun.bat   # Windows
 
 # 2. 前端部署到 Firebase Hosting
-cd chat-app-3
+cd chat-app
 npm run build:frontend
 firebase deploy --only hosting
 
@@ -510,9 +510,9 @@ npm run import:all
 - **參考現有文檔**: 開發前先查閱 `docs/` 目錄中的相關文檔
 - **更新文檔**: 重大功能變更時更新相關文檔
 - **文檔位置**:
-  - 架構說明 → `chat-app-3/CLAUDE.md`
-  - API 文檔 → `chat-app-3/docs/`
-  - 部署指南 → `chat-app-3/docs/DEPLOYMENT.md`
+  - 架構說明 → `chat-app/CLAUDE.md`
+  - API 文檔 → `chat-app/docs/`
+  - 部署指南 → `chat-app/docs/DEPLOYMENT.md`
 
 ### 重要提醒
 

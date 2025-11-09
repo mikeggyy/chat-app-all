@@ -6,7 +6,7 @@
 
 ```
 loveStory/
-├── chat-app-3/          # 主應用 - AI 聊天應用
+├── chat-app/          # 主應用 - AI 聊天應用
 │   ├── frontend/        # Vue 3 前端 (port 5173)
 │   ├── backend/         # Node.js 後端 (port 4000)
 │   └── ...
@@ -74,13 +74,13 @@ npm run dev:admin-frontend
 
 ## 環境配置
 
-### 主應用 (chat-app-3)
+### 主應用 (chat-app)
 
-1. **Backend** (`chat-app-3/backend/.env`)
+1. **Backend** (`chat-app/backend/.env`)
    - 已配置連接真實 Firebase
    - Firebase Emulator 已關閉
 
-2. **Frontend** (`chat-app-3/frontend/.env`)
+2. **Frontend** (`chat-app/frontend/.env`)
    - `VITE_USE_EMULATOR=false` - 連接真實 Firebase
    - `VITE_API_URL=http://127.0.0.1:4000` - 後端 API 地址
 
@@ -96,7 +96,7 @@ npm run dev:admin-frontend
 
 ## 主要功能
 
-### 主應用 (chat-app-3)
+### 主應用 (chat-app)
 - 🤖 與 AI 角色實時對話
 - 🎤 TTS 語音播放
 - 📸 AI 生成角色照片
@@ -123,7 +123,7 @@ npm run dev:admin-frontend
 ## 開發指南
 
 詳細的開發文檔請參閱：
-- [主應用文檔](./chat-app-3/CLAUDE.md)
+- [主應用文檔](./chat-app/CLAUDE.md)
 - [管理後台文檔](./chat-app-admin/README.md)
 - [專案總覽](./CLAUDE.md)
 
@@ -133,7 +133,7 @@ npm run dev:admin-frontend
 如果遇到端口被占用的問題：
 
 ```bash
-cd chat-app-3
+cd chat-app
 npm run cleanup-ports
 ```
 
@@ -152,7 +152,7 @@ npm run install:all
 ## 部署
 
 生產環境部署請參閱：
-- [部署指南](./chat-app-3/docs/DEPLOYMENT.md)
+- [部署指南](./chat-app/docs/DEPLOYMENT.md)
 
 ## 授權
 

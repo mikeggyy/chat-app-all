@@ -51,6 +51,7 @@ matchRouter.get(
  * GET /match/popular - 取得按聊天數量排序的熱門角色
  * Query params:
  *   - limit: 返回的角色數量（默認 10）
+ *   - offset: 分頁偏移量（默認 0）
  *   - sync: 是否同步更新 Firestore 中的 totalChatUsers（true/false，默認 false）
  * 注意：返回包含聊天數量的角色列表
  */
@@ -58,13 +59,19 @@ matchRouter.get(
   "/popular",
   asyncHandler(async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
+    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
     const sync = req.query.sync === "true" || req.query.sync === "1";
 
-    const matches = await getPopularMatches(limit, { syncToFirestore: sync });
+    const matches = await getPopularMatches(limit, {
+      offset,
+      syncToFirestore: sync
+    });
 
     res.json({
       characters: matches,
       total: matches.length,
+      offset,
+      hasMore: matches.length === limit, // 如果返回的數量等於 limit，可能還有更多
       synced: sync, // 告知前端是否進行了同步
     });
   })
@@ -96,19 +103,148 @@ matchRouter.post(
   "/create",
   requireFirebaseAuth,
   asyncHandler(async (req, res) => {
-    const match = await createMatch(req.body);
-
-    // 記錄角色創建次數
     const userId = req.body.creatorUid || req.firebaseUser?.uid;
+    const flowId = req.body.flowId; // 從前端獲取 flowId
+
+    // ✅ 檢查創建資源並扣除（如果在圖片生成時未扣除）
+    let needsCreateCard = false;
+    let alreadyDeducted = false;
+
     if (userId) {
       try {
-        recordCreation(userId, match.id);
-        if (process.env.NODE_ENV !== "test") {
-          logger.info(`[角色創建限制] 已記錄用戶 ${userId} 創建角色 ${match.id}`);
+        // 如果有 flowId，檢查是否已在圖片生成時扣除過創建卡
+        if (flowId) {
+          const { getCreationFlow } = await import("../characterCreation/characterCreation.service.js");
+          const flow = await getCreationFlow(flowId);
+          alreadyDeducted = flow?.metadata?.deductedOnImageGeneration === true;
+
+          if (alreadyDeducted) {
+            logger.info(`[角色創建] 用戶 ${userId} 創建卡已在圖片生成時扣除，跳過扣除`);
+          }
         }
-      } catch (recordError) {
-        logger.error("[角色創建限制] 記錄創建次數失敗:", recordError);
+
+        // 如果未在圖片生成時扣除，則在此處檢查並扣除
+        if (!alreadyDeducted) {
+          const { canCreateCharacter } = await import("../characterCreation/characterCreationLimit.service.js");
+          const { consumeUserAsset } = await import("../user/assets.service.js");
+
+          const limitCheck = await canCreateCharacter(userId);
+          if (!limitCheck.allowed) {
+            res.status(403).json({
+              message: limitCheck.message || "已達到角色創建次數限制",
+              limit: limitCheck,
+            });
+            return;
+          }
+
+          // ⚠️ 使用 limitCheck 的信息來判斷是否需要扣除創建卡
+          // limitCheck.reason === "create_card_available" 表示需要使用創建卡
+          if (limitCheck.reason === "create_card_available" && limitCheck.createCards > 0) {
+            // 免費次數用完，需要使用創建卡
+            logger.info(`[角色創建] 用戶 ${userId} 免費次數已用完（剩餘 ${limitCheck.remaining}），扣除創建卡（擁有 ${limitCheck.createCards} 張）`);
+            needsCreateCard = true;
+
+            // 立即扣除創建卡
+            await consumeUserAsset(userId, "createCards", 1);
+            logger.info(`[角色創建] 用戶 ${userId} 成功扣除 1 張創建卡`);
+          } else {
+            logger.info(`[角色創建] 用戶 ${userId} 使用免費次數（剩餘 ${limitCheck.remaining} 次）`);
+          }
+        }
+      } catch (error) {
+        logger.error(`[角色創建] 檢查或扣除創建資源失敗: ${error.message}`);
+        res.status(500).json({
+          message: "檢查創建資源失敗",
+        });
+        return;
       }
+    }
+
+    // ⚠️ 重要：先記錄創建次數，再創建角色
+    // 這樣可以確保即使角色創建失敗，免費次數也會被正確記錄
+    // 避免用戶重複使用免費次數
+
+    // 步驟 1: 記錄角色創建次數（增加計數）
+    let tempCharacterId = null;
+    if (userId) {
+      // 暫時使用一個臨時 ID，稍後會更新為真實的角色 ID
+      tempCharacterId = `temp-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      try {
+        await recordCreation(userId, tempCharacterId);
+        logger.info(`[角色創建] 用戶 ${userId} 創建計數已增加${needsCreateCard ? '（已扣除創建卡）' : '（使用免費次數）'}`);
+      } catch (recordError) {
+        logger.error("[角色創建] 記錄創建次數失敗:", recordError);
+        // ⚠️ 記錄失敗必須拋出錯誤，避免免費次數被重複使用
+        throw new Error("記錄創建次數失敗，請重試");
+      }
+    }
+
+    // 步驟 2: 創建角色
+    let match;
+    try {
+      match = await createMatch(req.body);
+      logger.info(`[角色創建] 角色創建成功: ${match.id}`);
+    } catch (createError) {
+      logger.error("[角色創建] 創建角色失敗，回滾計數:", createError);
+
+      // ✅ 回滾創建次數（如果之前記錄了的話）
+      if (userId && tempCharacterId) {
+        try {
+          const { decrementCreation } = await import("../characterCreation/characterCreationLimit.service.js");
+          const rollbackResult = await decrementCreation(userId, {
+            reason: 'character_creation_failed',
+            error: createError.message,
+            tempCharacterId,
+            idempotencyKey: tempCharacterId, // ⚠️ 使用 tempCharacterId 作為冪等性鍵，防止重複回滾
+          });
+
+          if (rollbackResult.idempotent) {
+            logger.info(`[角色創建] 用戶 ${userId} 創建失敗，回滾操作為冪等（已執行過）: ${tempCharacterId}`);
+          } else {
+            logger.info(`[角色創建] 用戶 ${userId} 創建失敗，已回滾計數: ${tempCharacterId}`);
+          }
+        } catch (rollbackError) {
+          logger.error("[角色創建] 回滾計數失敗:", rollbackError);
+
+          // ⚠️ 回滾失敗 - 記錄到錯誤日誌並生成支持參考號
+          try {
+            const { logCriticalError } = await import("../utils/errorLogger.service.js");
+            const errorReference = await logCriticalError({
+              errorType: 'rollback_failure',
+              userId,
+              operation: 'character_creation',
+              error: rollbackError,
+              context: {
+                tempCharacterId,
+                originalError: createError.message,
+                timestamp: new Date().toISOString(),
+              },
+            });
+
+            logger.error(
+              `[角色創建] 回滾失敗已記錄，錯誤參考號: ${errorReference}，用戶 ${userId} 的創建次數可能未正確回滾，需要管理員手動檢查`
+            );
+
+            // 拋出包含支持參考的錯誤
+            const detailedError = new Error(
+              `角色創建失敗，且系統未能正確回滾您的創建次數。請聯繫客服並提供此參考號：${errorReference}`
+            );
+            detailedError.errorReference = errorReference;
+            detailedError.originalError = createError.message;
+            throw detailedError;
+          } catch (logError) {
+            // 如果連日誌記錄都失敗了，至少要告知用戶
+            logger.error("[角色創建] 記錄回滾失敗日誌時出錯:", logError);
+            const fallbackError = new Error(
+              `角色創建失敗，且系統未能正確回滾您的創建次數。請聯繫客服並提供您的用戶 ID: ${userId}`
+            );
+            fallbackError.originalError = createError.message;
+            throw fallbackError;
+          }
+        }
+      }
+
+      throw createError;
     }
 
     sendSuccess(res, match, 201);

@@ -16,21 +16,32 @@ const props = defineProps({
 const emit = defineEmits(["close", "viewCharacter"]);
 
 const genderText = computed(() => {
+  const gender = props.character?.gender;
+  if (!gender) return "未設定";
+
+  // 支援英文和繁體中文兩種格式
   const genderMap = {
+    // 英文格式
     male: "男性",
     female: "女性",
     "non-binary": "非二元",
+    // 繁體中文格式（已經是最終格式）
+    "男性": "男性",
+    "女性": "女性",
+    "非二元": "非二元",
   };
-  return genderMap[props.character?.gender] || props.character?.gender || "未設定";
+
+  return genderMap[gender] || gender;
 });
 
 const voiceText = computed(() => {
   const voice = props.character?.voice;
   if (!voice) return "未設定";
 
-  // 如果 voice 是物件，取 label
-  if (typeof voice === "object" && voice.label) {
-    return voice.label;
+  // 如果 voice 是物件，優先取 description（描述最友好）
+  if (typeof voice === "object") {
+    // 優先順序：description > name > label > id
+    return voice.description || voice.name || voice.label || voice.id;
   }
 
   // 如果 voice 是字串，直接返回

@@ -115,7 +115,7 @@ router.get("/api/shop/categories", async (req, res) => {
       {
         id: 'character-unlock',
         name: '角色解鎖',
-        description: '永久解鎖與特定角色的無限對話',
+        description: '解鎖與特定角色 7 天無限對話',
         icon: '🎭',
         order: 2,
       },

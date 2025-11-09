@@ -30,7 +30,7 @@ const CATEGORIES = [
   {
     id: "character-unlock",
     label: "角色解鎖票",
-    description: "永久解鎖與特定角色的無限對話（300金幣/張）",
+    description: "解鎖與特定角色 7 天無限對話（300金幣/張）",
     order: 3,
     collection: "unlock_cards",
     icon: "🎫",

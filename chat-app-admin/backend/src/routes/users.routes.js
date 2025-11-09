@@ -9,6 +9,7 @@ import { updateUsageLimits, cleanNullKeys } from "../services/limits/usage-limit
 import { addOrRemovePotions } from "../services/potions/potion.service.js";
 import { setInventory } from "../services/potions/potion-inventory.service.js";
 import { getEffects, addEffect, updateEffect, deleteEffect } from "../services/potions/potion-effects.service.js";
+import { deleteImages } from "../storage/r2Storage.service.js";
 
 const router = express.Router();
 
@@ -398,6 +399,7 @@ router.delete("/:userId", requireRole("super_admin"), async (req, res) => {
     }
 
     // 2. 刪除用戶照片相簿（user_photos/{userId}/photos 子集合）
+    // 同時刪除 Firestore 記錄和 Cloudflare R2 圖片
     try {
       const photosSnapshot = await db
         .collection("user_photos")
@@ -405,13 +407,37 @@ router.delete("/:userId", requireRole("super_admin"), async (req, res) => {
         .collection("photos")
         .get();
 
-      const photoDeletePromises = photosSnapshot.docs.map(doc => doc.ref.delete());
-      await Promise.all(photoDeletePromises);
-      deletionStats.photos = photosSnapshot.size;
+      if (!photosSnapshot.empty) {
+        // 收集所有照片的 imageUrl（用於刪除 R2 圖片）
+        const photoUrls = [];
+        photosSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data?.imageUrl) {
+            photoUrls.push(data.imageUrl);
+          }
+        });
+
+        // 先刪除 R2 上的圖片文件
+        if (photoUrls.length > 0) {
+          try {
+            const r2DeleteResult = await deleteImages(photoUrls);
+            console.log(`[管理後台] 刪除用戶 R2 圖片: userId=${userId}, 成功=${r2DeleteResult.success}, 失敗=${r2DeleteResult.failed}`);
+          } catch (error) {
+            console.error(`[管理後台] 刪除用戶 R2 圖片失敗: userId=${userId}`, error);
+            // 繼續執行，不中斷刪除流程
+          }
+        }
+
+        // 再刪除 Firestore 記錄
+        const photoDeletePromises = photosSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(photoDeletePromises);
+        deletionStats.photos = photosSnapshot.size;
+      }
 
       // 刪除用戶照片文檔本身
       await db.collection("user_photos").doc(userId).delete();
     } catch (error) {
+      console.error(`[管理後台] 刪除用戶照片失敗: userId=${userId}`, error);
       // 繼續執行
     }
 

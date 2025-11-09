@@ -1,6 +1,7 @@
 import express from "express";
 import { db } from "../firebase/index.js";
 import { requireMinRole, requireRole } from "../middleware/admin.middleware.js";
+import { deleteCharacter } from "../services/character/character.service.js";
 
 const router = express.Router();
 
@@ -185,6 +186,42 @@ router.patch("/:characterId", requireMinRole("admin"), async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: "更新角色失敗", message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/characters/:characterId
+ * 刪除角色及其相關數據
+ * 包括：角色肖像圖片、所有用戶的對話照片、對話記錄、usage_limits 數據
+ * 🔒 權限：僅限 super_admin
+ */
+router.delete("/:characterId", requireRole("super_admin"), async (req, res) => {
+  try {
+    const { characterId } = req.params;
+
+    console.log(`[管理後台] 收到刪除角色請求: ${characterId}`);
+
+    // 調用服務函數刪除角色及相關數據
+    const deletionStats = await deleteCharacter(characterId);
+
+    res.json({
+      message: "角色刪除成功",
+      characterId,
+      deletionStats: {
+        characterDeleted: deletionStats.characterDeleted,
+        portraitImageDeleted: deletionStats.portraitImageDeleted,
+        photosDeleted: deletionStats.photosDeleted,
+        photoImagesDeleted: deletionStats.photoImagesDeleted,
+        conversationsDeleted: deletionStats.conversationsDeleted,
+        usageLimitsUpdated: deletionStats.usageLimitsUpdated,
+      },
+    });
+  } catch (error) {
+    if (error.message === "角色不存在") {
+      return res.status(404).json({ error: "角色不存在" });
+    }
+    console.error(`[管理後台] 刪除角色失敗:`, error);
+    res.status(500).json({ error: "刪除角色失敗", message: error.message });
   }
 });
 

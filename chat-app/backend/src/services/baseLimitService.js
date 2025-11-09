@@ -17,6 +17,7 @@ import { checkAndReset, createLimitData } from "./limitService/limitReset.js";
 import {
   checkCanUse,
   recordUse as trackRecordUse,
+  decrementUse as trackDecrementUse,
   unlockByAd as trackUnlockByAd,
   purchaseCards as trackPurchaseCards,
   unlockPermanently as trackUnlockPermanently,
@@ -252,6 +253,32 @@ export function createLimitService(config) {
   };
 
   /**
+   * 回滾使用次數（用於失敗的操作）
+   *
+   * 用途：當操作記錄了使用次數但最終失敗時，可以回滾計數
+   * 例如：記錄了角色創建次數，但角色創建失敗
+   *
+   * @param {string} userId - 用戶 ID
+   * @param {string} characterId - 角色 ID（perCharacter 模式需要）
+   * @param {Object} metadata - 回滾元數據（用於審計）
+   * @returns {Object} 回滾結果
+   */
+  const decrementUse = async (userId, characterId = null, metadata = {}) => {
+    // 當 perCharacter 為 true 時，必須提供有效的 characterId
+    if (perCharacter && (!characterId || characterId === 'null' || characterId === 'undefined')) {
+      throw new Error(`${limitType}功能需要提供有效的角色 ID`);
+    }
+
+    const limitData = await initUserLimit(userId, characterId);
+
+    const result = trackDecrementUse(limitData, metadata);
+
+    await updateLimitData(userId, characterId, limitData);
+
+    return result;
+  };
+
+  /**
    * 透過廣告解鎖額外次數
    */
   const unlockByAd = async (userId, amount = 1, characterId = null) => {
@@ -267,6 +294,17 @@ export function createLimitService(config) {
 
   /**
    * 購買使用卡
+   *
+   * @deprecated 此方法已廢棄，請使用 assets.service.js 的 addUserAsset() 管理卡片資產
+   *
+   * 遷移指南：
+   * - 舊方法：`limitService.purchaseCards(userId, 5)`
+   * - 新方法：`addUserAsset(userId, 'createCards', 5, '購買原因', metadata)`
+   *
+   * 優點：
+   * - 統一的資產管理系統
+   * - 完整的審計日誌
+   * - 更好的查詢性能
    */
   const purchaseCards = async (userId, quantity = 1, paymentInfo = {}, characterId = null) => {
     const limitData = await initUserLimit(userId, characterId);
@@ -319,6 +357,8 @@ export function createLimitService(config) {
       serviceName
     );
 
+    // 注意：limitData.cards 已廢棄，保留用於向後兼容
+    // 新的卡片資產應使用 users/{userId}/assets 系統管理
     const totalAllowed = configData.limit === -1
       ? -1
       : configData.limit + limitData.unlocked + limitData.cards;
@@ -416,6 +456,7 @@ export function createLimitService(config) {
       for (const [characterId, limitData] of Object.entries(characterData)) {
         // 計算剩餘次數（不做重置，只讀操作）
         const limit = configData.limit;
+        // 注意：limitData.cards 已廢棄，保留用於向後兼容
         const totalAllowed = limit === -1
           ? -1
           : limit + limitData.unlocked + limitData.cards;
@@ -460,6 +501,7 @@ export function createLimitService(config) {
   return {
     canUse,
     recordUse,
+    decrementUse,
     unlockByAd,
     purchaseCards,
     unlockPermanently,

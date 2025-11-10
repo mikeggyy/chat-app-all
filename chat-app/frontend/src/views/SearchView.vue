@@ -1,14 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import {
-  ArrowRightIcon,
-  BoltIcon,
-  FireIcon,
-  HeartIcon,
-  SparklesIcon,
-  StarIcon,
-} from "@heroicons/vue/24/solid";
+import { ArrowRightIcon, FireIcon, HeartIcon } from "@heroicons/vue/24/solid";
 import {
   ChatBubbleLeftRightIcon,
   MagnifyingGlassIcon,
@@ -17,6 +10,8 @@ import {
 import { fallbackMatches } from "../utils/matchFallback";
 import { apiJson } from "../utils/api";
 import { useUserProfile } from "../composables/useUserProfile";
+import { useVirtualScroll } from "../composables/useVirtualScroll";
+import { usePanelManager } from "../composables/usePanelManager";
 
 const router = useRouter();
 const route = useRoute();
@@ -33,140 +28,19 @@ const popularOffset = ref(0);
 const popularHasMore = ref(true);
 const POPULAR_PAGE_SIZE = 20; // 每次加載 20 個
 
-// 虛擬滾動狀態
-const displayedRecordsCount = ref(5); // 初始顯示5個
-const isLoadingMoreRecords = ref(false);
-const recordsListRef = ref(null);
-
-const sectionCards = computed(() => {
-  const pool = [
-    {
-      id: "spotlight-aurora",
-      name: "極光觀測者",
-      tagline: "夜貓子相談家",
-      description: "擅長捕捉你情緒的色彩，用溫柔的節奏陪你度過漫長夜晚。",
-      image: "/ai-role/match-role-01.webp",
-    },
-    {
-      id: "spotlight-evie",
-      name: "伊薇",
-      tagline: "暖心支援者",
-      description: "一杯熱可可的溫度，細膩梳理你的煩惱與計畫。",
-      image: "/ai-role/match-role-02.webp",
-    },
-    {
-      id: "spotlight-luna",
-      name: "露娜",
-      tagline: "劇情寫手",
-      description: "擅長用戲劇感對白替你翻轉日常，出其不意帶來亮點。",
-      image: "/ai-role/match-role-03.webp",
-    },
-    {
-      id: "spotlight-neo",
-      name: "新星譜寫者",
-      tagline: "節奏控",
-      description: "當你需要一點推動力，他會替你切換到高昂節拍。",
-      image:
-        "/ai-role/assets_task_01k7gy56zgey096wccc2zsw42m_1760431449_img_2.webp",
-    },
-    {
-      id: "ranking-iris",
-      name: "艾莉絲",
-      tagline: "人氣榜首",
-      description: "以細緻洞察力聞名，讓每段對話都有被理解的瞬間。",
-      image: "/ai-role/match-role-02.webp",
-    },
-    {
-      id: "ranking-blaze",
-      name: "炙焰守望",
-      tagline: "戰術顧問",
-      description: "策略派夥伴，精準拆解你的挑戰並給出行動清單。",
-      image: "/ai-role/match-role-03.webp",
-    },
-    {
-      id: "ranking-sora",
-      name: "空野",
-      tagline: "沉浸主播",
-      description: "把抽象情緒轉成具象意象，打造專屬於你的聲音劇場。",
-      image: "/ai-role/match-role-01.webp",
-    },
-    {
-      id: "ranking-v",
-      name: "V-Project",
-      tagline: "全息伴侶",
-      description: "多人格切換玩法，依照心情切換語氣與角色設定。",
-      image:
-        "/ai-role/assets_task_01k7gy56zgey096wccc2zsw42m_1760431449_img_2.webp",
-    },
-    {
-      id: "fantasy-muse",
-      name: "星塵繆思",
-      tagline: "浪漫系創作者",
-      description: "擅長以詩句作答，讓告白與日常都多一點戲劇張力。",
-      image: "/ai-role/match-role-01.webp",
-    },
-    {
-      id: "fantasy-ivy",
-      name: "艾薇琳",
-      tagline: "奇幻導遊",
-      description: "帶你穿越平行時空，從多重視角拼出完整故事線。",
-      image: "/ai-role/match-role-02.webp",
-    },
-    {
-      id: "fantasy-rhea",
-      name: "芮亞",
-      tagline: "異能伙伴",
-      description: "專精危機即刻支援，提供高壓情境下的理性判斷。",
-      image: "/ai-role/match-role-03.webp",
-    },
-    {
-      id: "fantasy-blitz",
-      name: "疾風列車長",
-      tagline: "速度型隊友",
-      description: "節奏鮮明的鼓勵高手，幫你把拖延症扭轉成行動力。",
-      image:
-        "/ai-role/assets_task_01k7gy56zgey096wccc2zsw42m_1760431449_img_2.webp",
-    },
-    {
-      id: "newvoice-sene",
-      name: "森涅",
-      tagline: "低音療癒",
-      description: "沉穩磁性嗓音與節奏呼吸練習，替你調整放鬆頻率。",
-      image:
-        "/ai-role/assets_task_01k7gy56zgey096wccc2zsw42m_1760431449_img_2.webp",
-    },
-    {
-      id: "newvoice-haze",
-      name: "赫茲",
-      tagline: "潮流說書人",
-      description: "流行文化行家，總能用梗圖語彙把對話點綴得更有趣。",
-      image: "/ai-role/match-role-03.webp",
-    },
-    {
-      id: "newvoice-ryker",
-      name: "萊克",
-      tagline: "菁英教練",
-      description: "高效率節奏結合心理調節，讓你專注在下一個里程碑。",
-      image: "/ai-role/match-role-02.webp",
-    },
-    {
-      id: "newvoice-shion",
-      name: "蒔音",
-      tagline: "城市旅伴",
-      description: "熟悉巷弄與咖啡店的情報王者，補給你的生活靈感。",
-      image: "/ai-role/match-role-01.webp",
-    },
-  ];
-
-  return {
-    spotlight: pool.slice(0, 4),
-    ranking: pool.slice(4, 8),
-    fantasy: pool.slice(8, 12),
-  };
+// 虛擬滾動
+const {
+  displayedCount: displayedRecordsCount,
+  isLoadingMore: isLoadingMoreRecords,
+  containerRef: recordsListRef,
+  reset: resetDisplayedRecords,
+  handleScroll: handleVirtualScroll,
+} = useVirtualScroll({
+  initialCount: 5,
+  incrementCount: 5,
+  loadDelay: 300,
+  scrollThreshold: 200,
 });
-
-// featureSections 已移除人氣排行（現在使用獨立的 section）
-const featureSections = computed(() => []);
 
 // 獲取真實的最近對話列表
 const fetchRecentConversations = async () => {
@@ -337,11 +211,8 @@ const popularRanking = computed(() => {
 const searchQuery = ref("");
 const submittedQuery = ref("");
 const searchInputRef = ref(null);
-const isRecentRecordsOpen = ref(false);
 
-const RECENT_RECORDS_PANEL_QUERY_KEY = "panel";
-
-// 面板類型配置（簡化 URL，只需傳遞類型）
+// 面板類型配置
 const PANEL_CONFIGS = {
   reconnect: {
     description: "",
@@ -359,167 +230,18 @@ const PANEL_CONFIGS = {
   },
 };
 
-const RECENT_RECORDS_ICON_MAP = {
-  heart: HeartIcon,
-  sparkles: SparklesIcon,
-  fire: FireIcon,
-  star: StarIcon,
-  bolt: BoltIcon,
-};
-
-const DEFAULT_RECENT_RECORDS_ICON_KEY = "heart";
-
-const resolveBadgeIconKey = (input) => {
-  if (typeof input !== "string") return "";
-  const normalized = input.trim().toLowerCase();
-  return Object.prototype.hasOwnProperty.call(
-    RECENT_RECORDS_ICON_MAP,
-    normalized
-  )
-    ? normalized
-    : "";
-};
-
-const resolveBadgeIconKeyFromComponent = (component) => {
-  if (!component) return "";
-  for (const [key, entry] of Object.entries(RECENT_RECORDS_ICON_MAP)) {
-    if (entry === component) {
-      return key;
-    }
-  }
-  return "";
-};
-
-const recentRecordsBadgeIconKey = ref(DEFAULT_RECENT_RECORDS_ICON_KEY);
-
-const updateBottomNavVisibility = (shouldHide) => {
-  if (typeof document === "undefined") return;
-  document.body.classList.toggle("hide-bottom-nav", shouldHide);
-};
-
-updateBottomNavVisibility(isRecentRecordsOpen.value);
-
-watch(isRecentRecordsOpen, (isOpen) => {
-  updateBottomNavVisibility(isOpen);
-});
+// 使用 Panel Manager
+const panel = usePanelManager(router, route, PANEL_CONFIGS);
 
 // 頁面掛載時獲取人氣排行
 onMounted(() => {
   fetchPopularCharacters({ reset: true });
 });
 
-onBeforeUnmount(() => {
-  updateBottomNavVisibility(false);
-});
-const recentRecordsDescription = ref("");
-const recentRecordsBadgeLabel = ref("");
-const recentRecordsHeroFallback =
-  "/banner/recent-records-banner-placeholder.webp";
-const recentRecordsHeroImage = ref(recentRecordsHeroFallback);
-const recentRecordsBadgeIcon = computed(
-  () => RECENT_RECORDS_ICON_MAP[recentRecordsBadgeIconKey.value] ?? HeartIcon
-);
-
-const normalizeQueryValue = (value) => {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length ? trimmed : "";
-  }
-  if (value == null) {
-    return "";
-  }
-  const stringified = String(value).trim();
-  return stringified.length ? stringified : "";
-};
-
-// 簡化後的 URL 更新：只處理面板類型
-const updateRecentRecordsQuery = (metadata = {}) => {
-  const nextQuery = { ...route.query };
-  let changed = false;
-
-  if (Object.prototype.hasOwnProperty.call(metadata, "panel")) {
-    const panelValue = metadata.panel;
-
-    if (!panelValue) {
-      // 移除 panel 參數
-      if (
-        Object.prototype.hasOwnProperty.call(
-          route.query,
-          RECENT_RECORDS_PANEL_QUERY_KEY
-        )
-      ) {
-        delete nextQuery[RECENT_RECORDS_PANEL_QUERY_KEY];
-        changed = true;
-      }
-    } else if (route.query[RECENT_RECORDS_PANEL_QUERY_KEY] !== panelValue) {
-      // 設置 panel 參數
-      nextQuery[RECENT_RECORDS_PANEL_QUERY_KEY] = panelValue;
-      changed = true;
-    }
-  }
-
-  if (!changed) {
-    return;
-  }
-
-  router.replace({ query: nextQuery }).catch((error) => {
-    if (error?.name === "NavigationDuplicated") {
-      return;
-    }
-  });
-};
-
-const resolvePanelQueryValue = (value) => {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value.trim().toLowerCase();
-};
-
-const syncRecentRecordsPanelStateFromRoute = () => {
-  const normalizedPanel = resolvePanelQueryValue(
-    route.query[RECENT_RECORDS_PANEL_QUERY_KEY]
-  );
-  // 檢查 panel 值是否為有效的配置類型
-  const shouldOpen =
-    normalizedPanel.length > 0 && PANEL_CONFIGS[normalizedPanel] !== undefined;
-
-  if (isRecentRecordsOpen.value !== shouldOpen) {
-    isRecentRecordsOpen.value = shouldOpen;
-  }
-};
-
-syncRecentRecordsPanelStateFromRoute();
-
-watch(
-  () => route.query[RECENT_RECORDS_PANEL_QUERY_KEY],
-  () => {
-    syncRecentRecordsPanelStateFromRoute();
-  }
-);
-const recentRecordsMetrics = [
-  { favorites: "43.4K", messages: "1.2M" },
-  { favorites: "21.8K", messages: "389.4K" },
-  { favorites: "23.8K", messages: "446.0K" },
-  { favorites: "19.2K", messages: "312.5K" },
-];
-const heroImageByKey = {
-  reconnect: "/banner/reconnect-hero.webp",
-  spotlight: "/banner/spotlight-hero.webp",
-  ranking: "/banner/ranking-hero.webp",
-  fantasy: "/banner/fantasy-hero.webp",
-};
-
-// 獲取當前面板類型
-const currentPanelType = computed(() => {
-  const panelValue = route.query[RECENT_RECORDS_PANEL_QUERY_KEY];
-  return typeof panelValue === "string" ? panelValue.trim().toLowerCase() : "";
-});
-
 // 所有記錄（根據面板類型返回不同的數據源）
 const allRecentRecordEntries = computed(() => {
   // 如果是排行面板，使用 popularCharacters
-  if (currentPanelType.value === "ranking") {
+  if (panel.currentType.value === "ranking") {
     return popularCharacters.value.map((item, index) => {
       return {
         id: `popular-record-${item.id}-${index}`,
@@ -553,8 +275,6 @@ const allRecentRecordEntries = computed(() => {
       : fallbackMatches;
 
   return sourceData.map((item, index) => {
-    const metrics = recentRecordsMetrics[index] ?? {};
-
     // 處理對話數據格式
     const isConversation = item.conversationId || item.characterId;
     const matchId = isConversation
@@ -576,13 +296,13 @@ const allRecentRecordEntries = computed(() => {
         {
           key: "favorites",
           label: "收藏",
-          value: metrics.favorites ?? "—",
+          value: formatNumber(character?.totalFavorites || 0),
           icon: HeartIcon,
         },
         {
           key: "messages",
           label: "對話數",
-          value: metrics.messages ?? "—",
+          value: formatNumber(character?.messageCount || 0),
           icon: ChatBubbleLeftRightIcon,
         },
       ],
@@ -593,7 +313,7 @@ const allRecentRecordEntries = computed(() => {
 // 顯示的記錄（虛擬滾動）
 const recentRecordEntries = computed(() => {
   // 如果是排行面板，顯示所有已加載的數據（不需要虛擬滾動切片）
-  if (currentPanelType.value === "ranking") {
+  if (panel.currentType.value === "ranking") {
     return allRecentRecordEntries.value;
   }
   // 其他面板使用虛擬滾動
@@ -603,58 +323,30 @@ const recentRecordEntries = computed(() => {
 // 是否還有更多記錄可以加載
 const hasMoreRecords = computed(() => {
   // 如果是排行面板，使用 API 的 hasMore 狀態
-  if (currentPanelType.value === "ranking") {
+  if (panel.currentType.value === "ranking") {
     return popularHasMore.value;
   }
   // 其他面板使用虛擬滾動
   return displayedRecordsCount.value < allRecentRecordEntries.value.length;
 });
 
-// 加載更多記錄
-const loadMoreRecords = async () => {
-  if (isLoadingMoreRecords.value) {
+// 加載更多記錄（用於排行面板的 API 調用）
+const loadMoreRecordsForRanking = async () => {
+  if (!popularHasMore.value || isLoadingPopular.value) {
     return;
   }
-
-  // 如果是排行面板，從 API 加載更多數據
-  if (currentPanelType.value === "ranking") {
-    if (!popularHasMore.value || isLoadingPopular.value) {
-      return;
-    }
-    await fetchPopularCharacters({ reset: false });
-    return;
-  }
-
-  // 其他面板使用虛擬滾動
-  if (!hasMoreRecords.value) {
-    return;
-  }
-
-  isLoadingMoreRecords.value = true;
-
-  // 模擬加載延遲（可選）
-  setTimeout(() => {
-    displayedRecordsCount.value += 5;
-    isLoadingMoreRecords.value = false;
-  }, 300);
+  await fetchPopularCharacters({ reset: false });
 };
 
 // 滾動事件處理
 const handleRecordsScroll = (event) => {
-  const container = event.target;
-  const scrollTop = container.scrollTop;
-  const scrollHeight = container.scrollHeight;
-  const clientHeight = container.clientHeight;
-
-  // 當滾動到距離底部 200px 時開始加載
-  if (scrollHeight - scrollTop - clientHeight < 200) {
-    loadMoreRecords();
+  // 如果是排行面板，使用 API 加載
+  if (panel.currentType.value === "ranking") {
+    handleVirtualScroll(event, hasMoreRecords.value, loadMoreRecordsForRanking);
+  } else {
+    // 其他面板使用本地虛擬滾動
+    handleVirtualScroll(event, hasMoreRecords.value);
   }
-};
-
-// 重置顯示數量
-const resetDisplayedRecords = () => {
-  displayedRecordsCount.value = 5;
 };
 
 const openChatForEntry = (entry) => {
@@ -674,182 +366,22 @@ const openChatForEntry = (entry) => {
   void router.push({ name: "chat-list" });
 };
 
-const normalizeText = (input) => {
-  if (typeof input === "string") {
-    return input.trim();
-  }
-
-  if (Array.isArray(input)) {
-    const candidate = input.find(
-      (value) => typeof value === "string" && value.trim().length
-    );
-    return typeof candidate === "string" ? candidate.trim() : "";
-  }
-
-  return "";
-};
-
-const normalizeHeroKey = (input) => {
-  if (typeof input !== "string") {
-    return "";
-  }
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "");
-};
-
-const resolveHeroImageFromKey = (key) => {
-  const normalizedKey = normalizeHeroKey(key);
-  return heroImageByKey[normalizedKey] ?? "";
-};
-
-const resolveDescriptionFromRoute = () => {
-  const candidates = [
-    route.query.sectionDescription,
-    route.query.description,
-    route.query.section,
-  ];
-
-  for (const candidate of candidates) {
-    const normalized = normalizeText(candidate);
-    if (normalized.length) {
-      return normalized;
-    }
-  }
-
-  if (typeof window !== "undefined") {
-    const stateValue = window.history?.state?.recentRecordsDescription;
-    const normalized = normalizeText(stateValue);
-    if (normalized.length) {
-      return normalized;
-    }
-  }
-
-  return "";
-};
-
-const resolveBadgeLabelFromRoute = () => {
-  const candidates = [route.query.sectionTitle, route.query.title];
-
-  for (const candidate of candidates) {
-    const normalized = normalizeText(candidate);
-    if (normalized.length) {
-      return normalized;
-    }
-  }
-
-  if (typeof window !== "undefined") {
-    const stateValue = window.history?.state?.recentRecordsBadgeLabel;
-    const normalized = normalizeText(stateValue);
-    if (normalized.length) {
-      return normalized;
-    }
-  }
-
-  return "";
-};
-
-const resolveHeroImageFromRoute = () => {
-  const routeHeroKey = resolveHeroImageFromKey(route.query.heroKey);
-  if (routeHeroKey.length) {
-    return routeHeroKey;
-  }
-
-  const heroImageCandidate = normalizeText(route.query.heroImage);
-  if (heroImageCandidate.length) {
-    return heroImageCandidate;
-  }
-
-  if (typeof window !== "undefined") {
-    const state = window.history?.state ?? {};
-    const stateHeroKey = resolveHeroImageFromKey(state.recentRecordsHeroKey);
-    if (stateHeroKey.length) {
-      return stateHeroKey;
-    }
-
-    const stateHeroImage = normalizeText(state.recentRecordsHeroImage);
-    if (stateHeroImage.length) {
-      return stateHeroImage;
-    }
-  }
-
-  return "";
-};
-
-// 簡化後的同步函數：從 URL 讀取類型並從配置加載
-const syncRecentRecordsMetadata = () => {
-  const panelType = route.query[RECENT_RECORDS_PANEL_QUERY_KEY];
-
-  if (panelType && PANEL_CONFIGS[panelType]) {
-    const config = PANEL_CONFIGS[panelType];
-    recentRecordsDescription.value = config.description;
-    recentRecordsBadgeLabel.value = config.badgeLabel;
-    recentRecordsBadgeIconKey.value = config.iconKey;
-    recentRecordsHeroImage.value =
-      config.heroImage || recentRecordsHeroFallback;
-  } else {
-    // 重置為默認值
-    recentRecordsDescription.value = "";
-    recentRecordsBadgeLabel.value = "";
-    recentRecordsBadgeIconKey.value = DEFAULT_RECENT_RECORDS_ICON_KEY;
-    recentRecordsHeroImage.value = recentRecordsHeroFallback;
-  }
-};
-
-syncRecentRecordsMetadata();
-
-watch(
-  () => route.fullPath,
-  () => {
-    syncRecentRecordsMetadata();
-  }
-);
-
-// 簡化後的 openRecentRecords：只接受面板類型
+// 開啟面板 - 包裝 panel.open 並添加業務邏輯
 const openRecentRecords = async (type = "reconnect") => {
-  // 從配置中獲取面板信息
-  const config = PANEL_CONFIGS[type] || PANEL_CONFIGS.reconnect;
-
-  // 設置面板顯示內容
-  recentRecordsDescription.value = config.description;
-  recentRecordsBadgeLabel.value = config.badgeLabel;
-  recentRecordsBadgeIconKey.value = config.iconKey;
-  recentRecordsHeroImage.value = config.heroImage || recentRecordsHeroFallback;
-
-  // 如果是排行面板，重置並加載排行數據
-  if (type === "ranking") {
-    await fetchPopularCharacters({ reset: true });
-  } else {
-    // 重置虛擬滾動狀態
-    resetDisplayedRecords();
-  }
-
-  isRecentRecordsOpen.value = true;
-
-  // 只在 URL 中設置類型參數
-  updateRecentRecordsQuery({ panel: type });
-};
-
-const closeRecentRecords = () => {
-  isRecentRecordsOpen.value = false;
-  updateRecentRecordsQuery({ panel: null });
-};
-
-const handleSectionAction = (section) => {
-  if (!section) return;
-  if (section.id === "ranking") {
-    router.push({ name: "ranking" });
-    return;
-  }
-
-  openRecentRecords({
-    description: section.description,
-    badgeLabel: section.title,
-    iconKey: section.iconKey,
-    icon: section.icon,
-    heroKey: section.heroKey,
+  await panel.open(type, async (panelType) => {
+    // 如果是排行面板，重置並加載排行數據
+    if (panelType === "ranking") {
+      await fetchPopularCharacters({ reset: true });
+    } else {
+      // 其他面板重置虛擬滾動狀態
+      resetDisplayedRecords();
+    }
   });
+};
+
+// 關閉面板
+const closeRecentRecords = () => {
+  panel.close();
 };
 
 const hasSubmittedQuery = computed(
@@ -1101,53 +633,6 @@ const openChat = (profile) => {
             </article>
           </div>
         </section>
-
-        <section
-          v-for="section in featureSections"
-          :key="section.id"
-          class="content-section"
-        >
-          <header class="section-header">
-            <div class="section-title">
-              <div class="section-icon" :class="`accent-${section.accent}`">
-                <component :is="section.icon" aria-hidden="true" />
-              </div>
-              <div>
-                <p class="section-kicker">{{ section.kicker }}</p>
-                <h2>{{ section.title }}</h2>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="section-action"
-              @click="handleSectionAction(section)"
-            >
-              <span>{{ section.actionLabel }}</span>
-              <ArrowRightIcon class="icon" aria-hidden="true" />
-            </button>
-          </header>
-          <p class="section-description">
-            {{ section.description }}
-          </p>
-          <div class="card-grid">
-            <article
-              v-for="card in section.cards"
-              :key="card.id"
-              class="profile-card"
-            >
-              <div class="card-media">
-                <img :src="card.image" :alt="card.name" loading="lazy" />
-              </div>
-              <div class="card-body">
-                <h3>{{ card.name }}</h3>
-                <p class="card-tagline">{{ card.tagline }}</p>
-                <p class="card-summary">
-                  {{ card.description }}
-                </p>
-              </div>
-            </article>
-          </div>
-        </section>
       </template>
 
       <template v-else>
@@ -1204,7 +689,7 @@ const openChat = (profile) => {
     </div>
 
     <div
-      v-if="isRecentRecordsOpen"
+      v-if="panel.isOpen.value"
       class="recent-records-overlay"
       role="dialog"
       aria-modal="true"
@@ -1228,7 +713,7 @@ const openChat = (profile) => {
           </button>
           <div class="recent-records-hero__media" aria-hidden="true">
             <img
-              :src="recentRecordsHeroImage || recentRecordsHeroFallback"
+              :src="panel.heroImage.value || panel.DEFAULT_HERO_FALLBACK"
               alt=""
               loading="lazy"
             />
@@ -1236,18 +721,18 @@ const openChat = (profile) => {
           <div class="recent-records-hero__content">
             <div class="recent-records-hero__badge">
               <div class="recent-records-hero__badge-icon">
-                <component :is="recentRecordsBadgeIcon" aria-hidden="true" />
+                <component :is="panel.badgeIcon.value" aria-hidden="true" />
               </div>
               <span
                 id="recent-records-badge"
                 class="recent-records-hero__badge-label"
               >
-                {{ recentRecordsBadgeLabel || "重連精選" }}
+                {{ panel.badgeLabel.value || "重連精選" }}
               </span>
             </div>
             <div class="recent-records-hero__text">
               <p id="recent-records-description">
-                {{ recentRecordsDescription }}
+                {{ panel.description.value }}
               </p>
             </div>
           </div>
@@ -1325,7 +810,7 @@ const openChat = (profile) => {
             v-else-if="!hasMoreRecords && recentRecordEntries.length > 0"
             class="records-end"
           >
-            <p v-if="currentPanelType === 'ranking'">
+            <p v-if="panel.currentType.value === 'ranking'">
               已顯示全部 {{ recentRecordEntries.length }} 個角色
             </p>
             <p v-else>已顯示全部 {{ recentRecordEntries.length }} 則對話記錄</p>
@@ -1529,16 +1014,6 @@ const openChat = (profile) => {
     height: 20px;
   }
 
-  &.accent-luminous {
-    background: linear-gradient(
-      135deg,
-      rgba(236, 72, 153, 0.24),
-      rgba(79, 70, 229, 0.2)
-    );
-    border-color: rgba(236, 72, 153, 0.4);
-    color: #fce7f3;
-  }
-
   &.accent-ember {
     background: linear-gradient(
       135deg,
@@ -1547,26 +1022,6 @@ const openChat = (profile) => {
     );
     border-color: rgba(251, 146, 60, 0.5);
     color: #fffbeb;
-  }
-
-  &.accent-twilight {
-    background: linear-gradient(
-      135deg,
-      rgba(96, 165, 250, 0.25),
-      rgba(196, 181, 253, 0.2)
-    );
-    border-color: rgba(129, 140, 248, 0.45);
-    color: #e0e7ff;
-  }
-
-  &.accent-pulse {
-    background: linear-gradient(
-      135deg,
-      rgba(45, 212, 191, 0.3),
-      rgba(20, 184, 166, 0.2)
-    );
-    border-color: rgba(34, 197, 94, 0.38);
-    color: #ecfdf5;
   }
 
   &.accent-rose {
@@ -1609,81 +1064,6 @@ const openChat = (profile) => {
   color: rgba(226, 232, 240, 0.6);
   font-size: 0.9rem;
   line-height: 1.6;
-}
-
-.content-section {
-  background: rgba(15, 23, 42, 0.68);
-  border-radius: 18px;
-  padding: clamp(1.35rem, 4vw, 1.75rem);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 28px 54px rgba(2, 6, 23, 0.48);
-  backdrop-filter: blur(18px);
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 1rem;
-}
-
-.profile-card {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 16px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.05);
-  transition: transform 180ms ease, border-color 180ms ease,
-    box-shadow 180ms ease;
-
-  &:hover {
-    transform: translateY(-4px);
-    border-color: rgba(236, 72, 153, 0.35);
-    box-shadow: 0 14px 30px rgba(236, 72, 153, 0.18);
-  }
-
-  .card-media {
-    position: relative;
-    width: 100%;
-    padding-top: 120%;
-    overflow: hidden;
-
-    img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-  }
-
-  .card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.85rem;
-
-    h3 {
-      margin: 0;
-      font-size: 1rem;
-      color: #f8fafc;
-    }
-
-    .card-tagline {
-      margin: 0;
-      font-size: 0.82rem;
-      color: rgba(248, 250, 252, 0.65);
-      letter-spacing: 0.03em;
-    }
-
-    .card-summary {
-      margin: 0;
-      font-size: 0.78rem;
-      color: rgba(226, 232, 240, 0.65);
-      line-height: 1.5;
-    }
-  }
 }
 
 .recent-section {
@@ -2045,8 +1425,8 @@ const openChat = (profile) => {
       linear-gradient(200deg, rgba(39, 18, 32, 0.1), rgba(13, 4, 10, 0.1));
     z-index: 1;
     pointer-events: none;
-    height: 7rem;
-    top: 11rem;
+    height: 29vw;
+    top: 40vw;
   }
 }
 
@@ -2439,26 +1819,6 @@ const openChat = (profile) => {
   .recent-records-close {
     top: 0.9rem;
     left: 0.9rem;
-  }
-}
-
-@media (max-width: 520px) {
-  .hero-section .hero-card {
-    flex-direction: column;
-    align-items: flex-start;
-
-    .hero-visual {
-      width: 100%;
-      justify-content: flex-start;
-
-      img {
-        width: min(220px, 70%);
-      }
-    }
-  }
-
-  .card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }
 </style>

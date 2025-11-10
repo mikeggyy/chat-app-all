@@ -10,20 +10,12 @@ import {
   watchEffect,
 } from "vue";
 import {
-  BellAlertIcon,
-  UserGroupIcon,
-  StarIcon,
   BoltIcon,
   PencilSquareIcon,
   Cog6ToothIcon,
-  TicketIcon,
-  PhotoIcon,
-  VideoCameraIcon,
-  ShoppingBagIcon,
   WalletIcon,
-  UsersIcon,
 } from "@heroicons/vue/24/outline";
-import { ArrowRightIcon, HeartIcon } from "@heroicons/vue/24/solid";
+import { ArrowRightIcon } from "@heroicons/vue/24/solid";
 import AvatarEditorModal from "../components/AvatarEditorModal.vue";
 import StatsModal from "../components/StatsModal.vue";
 import { useUserProfile } from "../composables/useUserProfile";
@@ -36,6 +28,20 @@ import { useCoins } from "../composables/useCoins";
 import { useUnlockTickets } from "../composables/useUnlockTickets";
 import { clearTestSession } from "../services/testAuthSession";
 import { COIN_ICON_PATH } from "../config/assets";
+import {
+  PROFILE_LIMITS,
+  FALLBACK_USER,
+  BUILTIN_AVATAR_OPTIONS,
+  QUICK_ACTIONS,
+  QUICK_ACTION_ROUTES,
+  GENDER_OPTIONS,
+  ASSET_TYPE_MAP,
+  CARD_CATEGORY_MAP,
+  DEFAULT_USER_ASSETS,
+  generateAgeOptions,
+  isValidGender,
+  isValidAge,
+} from "../config/profile";
 
 const router = useRouter();
 const firebaseAuth = useFirebaseAuth();
@@ -58,9 +64,6 @@ const {
 const { balance, formattedBalance, loadBalance } = useCoins();
 
 const {
-  characterTickets,
-  photoCards,
-  videoCards,
   loadBalance: loadTicketsBalance,
 } = useUnlockTickets();
 
@@ -74,17 +77,7 @@ const handleCoinIconError = () => {
 };
 
 // 用戶資產
-const userAssets = ref({
-  characterUnlockCards: 0,
-  photoUnlockCards: 0,
-  videoUnlockCards: 0,
-  voiceUnlockCards: 0,
-  createCards: 0,
-  potions: {
-    memoryBoost: 0,
-    brainBoost: 0,
-  },
-});
+const userAssets = ref({ ...DEFAULT_USER_ASSETS });
 
 const loadUserAssets = async (userId) => {
   if (!userId) return;
@@ -118,48 +111,12 @@ const {
   clearUserProfile,
 } = useUserProfile();
 
-const quickActions = [
-  {
-    key: "notifications",
-    label: "通知",
-    icon: BellAlertIcon,
-  },
-  {
-    key: "shop",
-    label: "商城",
-    icon: ShoppingBagIcon,
-  },
-  {
-    key: "membership",
-    label: "會員",
-    icon: UserGroupIcon,
-  },
-  {
-    key: "favorites",
-    label: "相冊",
-    icon: PhotoIcon,
-  },
-  {
-    key: "my-characters",
-    label: "已創建角色",
-    icon: UsersIcon,
-  },
-];
-
-const quickActionRoutes = {
-  notifications: "notifications",
-  shop: "shop",
-  membership: "membership",
-  favorites: "favorites",
-  "my-characters": "my-characters",
-};
-
 const handleQuickActionSelect = async (action) => {
   if (!action || typeof action !== "object") {
     return;
   }
 
-  const routeName = quickActionRoutes[action.key];
+  const routeName = QUICK_ACTION_ROUTES[action.key];
 
   if (!routeName) {
     return;
@@ -171,42 +128,14 @@ const handleQuickActionSelect = async (action) => {
   }
 };
 
-const fallbackUser = {
-  id: "demo-user",
-  uid: "LoveDemo晨霧星語",
-  displayName: "小高0556",
-  locale: "zh-TW",
-  createdAt: "2024-01-01T00:00:00.000Z",
-  defaultPrompt: "",
-  email: "demo@example.com",
-  photoURL: "/avatars/defult-01.webp",
-  lastLoginAt: "2024-01-01T00:00:00.000Z",
-  phoneNumber: null,
-  gender: "other",
-  notificationOptIn: true,
-  signInProvider: "google",
-  updatedAt: "2024-01-01T00:00:00.000Z",
-  conversations: [],
-  favorites: [],
-};
-
-const builtinAvatarOptions = [
-  { src: "/avatars/defult-01.webp", label: "預設頭像 1" },
-  { src: "/avatars/defult-02.webp", label: "預設頭像 2" },
-  { src: "/avatars/defult-03.webp", label: "預設頭像 3" },
-  { src: "/avatars/defult-04.webp", label: "預設頭像 4" },
-  { src: "/avatars/defult-05.webp", label: "預設頭像 5" },
-  { src: "/avatars/defult-06.webp", label: "預設頭像 6" },
-];
-
-const profile = computed(() => user.value ?? fallbackUser);
-const targetUserId = computed(() => profile.value.id ?? fallbackUser.id ?? "");
+const profile = computed(() => user.value ?? FALLBACK_USER);
+const targetUserId = computed(() => profile.value.id ?? FALLBACK_USER.id ?? "");
 
 const displayedId = computed(
   () => profile.value.uid ?? profile.value.id ?? "尚未設定"
 );
 
-const avatarPreview = ref(fallbackUser.photoURL);
+const avatarPreview = ref(FALLBACK_USER.photoURL);
 const isAvatarModalOpen = ref(false);
 const isAvatarSaving = ref(false);
 const isAvatarImageLoading = ref(true);
@@ -215,7 +144,7 @@ const isStatsModalOpen = ref(false);
 watch(
   () => profile.value.photoURL,
   (next) => {
-    const nextSrc = next ?? fallbackUser.photoURL;
+    const nextSrc = next ?? FALLBACK_USER.photoURL;
     if (nextSrc !== avatarPreview.value) {
       isAvatarImageLoading.value = true;
     }
@@ -246,25 +175,7 @@ const isLoggingOut = ref(false);
 const isLogoutConfirmVisible = ref(false);
 const logoutConfirmCancelButtonRef = ref(null);
 
-const genderOptions = [
-  { value: "other", label: "其他" },
-  { value: "female", label: "女性" },
-  { value: "male", label: "男性" },
-];
-
-const ageOptions = computed(() => {
-  const options = [];
-  for (let i = 13; i <= 120; i++) {
-    options.push(i);
-  }
-  return options;
-});
-
-const PROFILE_MAX_NAME_LENGTH = 10;
-const PROFILE_MAX_PROMPT_LENGTH = 50;
-const allowedGenderValues = new Set(
-  genderOptions.map((option) => option.value)
-);
+const ageOptions = computed(() => generateAgeOptions());
 
 const clampTextLength = (value, maxLength) => {
   if (typeof value !== "string") {
@@ -274,8 +185,8 @@ const clampTextLength = (value, maxLength) => {
 };
 
 const fallbackDisplayName =
-  typeof fallbackUser.displayName === "string"
-    ? clampTextLength(fallbackUser.displayName.trim(), PROFILE_MAX_NAME_LENGTH)
+  typeof FALLBACK_USER.displayName === "string"
+    ? clampTextLength(FALLBACK_USER.displayName.trim(), PROFILE_LIMITS.MAX_NAME_LENGTH)
     : "";
 
 const normalizeDisplayName = (
@@ -289,7 +200,7 @@ const normalizeDisplayName = (
   if (!trimmed.length) {
     return allowEmpty ? "" : fallback;
   }
-  return clampTextLength(trimmed, PROFILE_MAX_NAME_LENGTH);
+  return clampTextLength(trimmed, PROFILE_LIMITS.MAX_NAME_LENGTH);
 };
 
 const normalizePrompt = (value) => {
@@ -297,7 +208,7 @@ const normalizePrompt = (value) => {
     return "";
   }
   const trimmed = value.trim();
-  return clampTextLength(trimmed, PROFILE_MAX_PROMPT_LENGTH);
+  return clampTextLength(trimmed, PROFILE_LIMITS.MAX_PROMPT_LENGTH);
 };
 
 const normalizeGender = (value) => {
@@ -305,10 +216,10 @@ const normalizeGender = (value) => {
     return "other";
   }
   const trimmed = value.trim();
-  return allowedGenderValues.has(trimmed) ? trimmed : "other";
+  return isValidGender(trimmed) ? trimmed : "other";
 };
 
-const buildNormalizedProfile = (sourceProfile = fallbackUser) => ({
+const buildNormalizedProfile = (sourceProfile = FALLBACK_USER) => ({
   displayName: normalizeDisplayName(sourceProfile.displayName, {
     allowEmpty: true,
   }),
@@ -338,27 +249,15 @@ const closeStatsModal = () => {
 };
 
 const handleBuyUnlockCard = (cardType) => {
-  // 跳轉到商城頁面，並根據卡片類型選擇對應的分類
-  const categoryMap = {
-    photo: 'photo-unlock',
-    voice: 'voice-unlock',
-    character: 'character-unlock',
-    create: 'create',
-  };
-
-  const category = categoryMap[cardType] || 'coins';
+  const category = CARD_CATEGORY_MAP[cardType] || 'coins';
   router.push({ path: '/shop', query: { category } });
 };
 
 const handleUsePotion = async (potionType) => {
-  if (!targetUserId.value) return;
-
   try {
-    const { apiJson } = await import("../utils/api.js");
     const { useToast } = await import("../composables/useToast");
-    const { success, error: showError, warning } = useToast();
+    const { warning } = useToast();
 
-    // 記憶增強藥水和腦力激盪藥水都需要在聊天頁面使用（綁定特定角色）
     if (potionType === 'memoryBoost') {
       warning("請在與角色聊天時使用記憶增強藥水");
       return;
@@ -381,15 +280,7 @@ const handleUseUnlockCard = async (cardType) => {
   try {
     const { apiJson } = await import("../utils/api.js");
 
-    // 消耗對應的解鎖卡
-    const assetTypeMap = {
-      photo: 'photoUnlockCards',
-      voice: 'voiceUnlockCards',
-      character: 'characterUnlockCards',
-      create: 'createCards',
-    };
-
-    const assetType = assetTypeMap[cardType];
+    const assetType = ASSET_TYPE_MAP[cardType];
     if (!assetType) return;
 
     await apiJson(`/api/users/${encodeURIComponent(targetUserId.value)}/assets/consume`, {
@@ -397,13 +288,11 @@ const handleUseUnlockCard = async (cardType) => {
       body: JSON.stringify({ assetType, amount: 1 }),
     });
 
-    // 重新載入資產數據
     await loadUserAssets(targetUserId.value);
-
-    // 顯示成功訊息
-    if (import.meta.env.DEV) {
-    }
   } catch (error) {
+    if (import.meta.env.DEV) {
+      console.error('使用解鎖卡失敗:', error);
+    }
   }
 };
 
@@ -455,9 +344,9 @@ const handleAvatarLoad = () => {
 };
 
 const handleAvatarError = () => {
-  if (avatarPreview.value !== fallbackUser.photoURL) {
+  if (avatarPreview.value !== FALLBACK_USER.photoURL) {
     isAvatarImageLoading.value = true;
-    avatarPreview.value = fallbackUser.photoURL;
+    avatarPreview.value = FALLBACK_USER.photoURL;
     return;
   }
   isAvatarImageLoading.value = false;
@@ -701,8 +590,8 @@ const validateProfileForm = () => {
   if (!trimmedName.length) {
     profileFormErrors.displayName = "請輸入名稱";
     isValid = false;
-  } else if (rawNameLength > PROFILE_MAX_NAME_LENGTH) {
-    profileFormErrors.displayName = `名稱請勿超過 ${PROFILE_MAX_NAME_LENGTH} 個字`;
+  } else if (rawNameLength > PROFILE_LIMITS.MAX_NAME_LENGTH) {
+    profileFormErrors.displayName = `名稱請勿超過 ${PROFILE_LIMITS.MAX_NAME_LENGTH} 個字`;
     isValid = false;
   } else {
     profileFormErrors.displayName = "";
@@ -712,8 +601,8 @@ const validateProfileForm = () => {
   const age = profileForm.age;
   if (age !== null && age !== undefined && age !== "") {
     const ageNum = Number(age);
-    if (!Number.isFinite(ageNum) || ageNum < 13 || ageNum > 120) {
-      profileFormErrors.age = "年齡必須在 13 到 120 歲之間";
+    if (!isValidAge(ageNum)) {
+      profileFormErrors.age = `年齡必須在 ${PROFILE_LIMITS.MIN_AGE} 到 ${PROFILE_LIMITS.MAX_AGE} 歲之間`;
       isValid = false;
     } else {
       profileFormErrors.age = "";
@@ -728,8 +617,8 @@ const validateProfileForm = () => {
       ? profileForm.defaultPrompt.trim().length
       : 0;
 
-  if (rawPromptLength > PROFILE_MAX_PROMPT_LENGTH) {
-    profileFormErrors.defaultPrompt = `角色設定請勿超過 ${PROFILE_MAX_PROMPT_LENGTH} 個字`;
+  if (rawPromptLength > PROFILE_LIMITS.MAX_PROMPT_LENGTH) {
+    profileFormErrors.defaultPrompt = `角色設定請勿超過 ${PROFILE_LIMITS.MAX_PROMPT_LENGTH} 個字`;
     isValid = false;
   } else {
     profileFormErrors.defaultPrompt = "";
@@ -871,7 +760,7 @@ onBeforeUnmount(() => {
 const ensureProfileLoaded = async (id) => {
   if (!id) return;
   try {
-    await loadUserProfile(id, { fallback: fallbackUser });
+    await loadUserProfile(id, { fallback: FALLBACK_USER });
   } catch (error) {
     if (import.meta.env.DEV) {
     }
@@ -902,7 +791,7 @@ watch(
   targetUserId,
   (next, prev) => {
     // 不要載入 fallback 用戶資料（demo-user）
-    if (next && next !== prev && next !== fallbackUser.id) {
+    if (next && next !== prev && next !== FALLBACK_USER.id) {
       void ensureProfileLoaded(next);
     }
   },
@@ -957,7 +846,7 @@ watch(
       suppressProfileFormDirty = false;
       return;
     }
-    const clamped = clampTextLength(value, PROFILE_MAX_NAME_LENGTH);
+    const clamped = clampTextLength(value, PROFILE_LIMITS.MAX_NAME_LENGTH);
     if (clamped !== value) {
       suppressProfileFormDirty = true;
       profileForm.displayName = clamped;
@@ -989,7 +878,7 @@ watch(
       suppressProfileFormDirty = false;
       return;
     }
-    const clamped = clampTextLength(value, PROFILE_MAX_PROMPT_LENGTH);
+    const clamped = clampTextLength(value, PROFILE_LIMITS.MAX_PROMPT_LENGTH);
     if (clamped !== value) {
       suppressProfileFormDirty = true;
       profileForm.defaultPrompt = clamped;
@@ -1148,7 +1037,7 @@ watch(
     <section class="quick-actions" aria-label="功能捷徑">
       <ul>
         <li
-          v-for="action in quickActions"
+          v-for="action in QUICK_ACTIONS"
           :key="action.key"
           class="quick-action"
         >
@@ -1208,14 +1097,14 @@ watch(
               ref="profileNameInputRef"
               v-model="profileForm.displayName"
               type="text"
-              :maxlength="PROFILE_MAX_NAME_LENGTH"
+              :maxlength="PROFILE_LIMITS.MAX_NAME_LENGTH"
               class="profile-editor-input"
               :disabled="isProfileSaving"
             />
             <div class="profile-editor-meta">
               <span
                 >{{ profileDisplayNameLength }} /
-                {{ PROFILE_MAX_NAME_LENGTH }}</span
+                {{ PROFILE_LIMITS.MAX_NAME_LENGTH }}</span
               >
             </div>
             <p
@@ -1238,7 +1127,7 @@ watch(
               :disabled="isProfileSaving"
             >
               <option
-                v-for="option in genderOptions"
+                v-for="option in GENDER_OPTIONS"
                 :key="option.value"
                 :value="option.value"
               >
@@ -1278,7 +1167,7 @@ watch(
             <textarea
               id="profile-editor-prompt"
               v-model="profileForm.defaultPrompt"
-              :maxlength="PROFILE_MAX_PROMPT_LENGTH"
+              :maxlength="PROFILE_LIMITS.MAX_PROMPT_LENGTH"
               class="profile-editor-textarea"
               rows="4"
               :disabled="isProfileSaving"
@@ -1286,7 +1175,7 @@ watch(
             <div class="profile-editor-meta profile-editor-meta--counter">
               <span
                 >{{ profilePromptLength }} /
-                {{ PROFILE_MAX_PROMPT_LENGTH }}</span
+                {{ PROFILE_LIMITS.MAX_PROMPT_LENGTH }}</span
               >
             </div>
             <p
@@ -1375,7 +1264,7 @@ watch(
   </Teleport>
   <AvatarEditorModal
     v-if="isAvatarModalOpen"
-    :default-avatars="builtinAvatarOptions"
+    :default-avatars="BUILTIN_AVATAR_OPTIONS"
     :current-photo="avatarPreview"
     :saving="isAvatarSaving"
     @close="closeAvatarEditor"
@@ -1409,10 +1298,27 @@ watch(
 
 <style scoped lang="scss">
 .profile-view {
+  // CSS 變數定義 - 限定在組件作用域內
+  --color-bg-primary: #0f1016;
+  --color-bg-secondary: rgba(15, 17, 28, 0.85);
+  --color-text-primary: #f8f9ff;
+  --color-text-secondary: rgba(226, 232, 240, 0.92);
+  --color-border: rgba(148, 163, 184, 0.35);
+  --color-border-light: rgba(255, 255, 255, 0.15);
+  --color-overlay: rgba(255, 255, 255, 0.15);
+  --color-danger: #fca5a5;
+  --gradient-pink: linear-gradient(135deg, #ff4d8f, #ff7ab8);
+  --gradient-danger: linear-gradient(135deg, #f43f5e, #fb7185);
+  --transition-base: 150ms ease;
+  --border-radius-lg: 16px;
+  --border-radius-xl: 24px;
+  --border-radius-full: 999px;
+
+  // 基本樣式
   position: relative;
   min-height: 100vh;
-  background: #0f1016;
-  color: #f8f9ff;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
@@ -1469,7 +1375,7 @@ watch(
   align-items: center;
   gap: 0.35rem;
   padding: 0.45rem 0.9rem;
-  border-radius: 999px;
+  border-radius: var(--border-radius-full);
   border: 1px solid rgba(255, 255, 255, 0.55);
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
@@ -1477,8 +1383,8 @@ watch(
   font-weight: 600;
   letter-spacing: 0.04em;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-  transition: background 150ms ease, transform 150ms ease,
-    border-color 150ms ease;
+  transition: background var(--transition-base), transform var(--transition-base),
+    border-color var(--transition-base);
 
   .icon {
     width: 18px;
@@ -1499,11 +1405,11 @@ watch(
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-overlay);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  transition: background 150ms ease, transform 150ms ease,
-    border-color 150ms ease;
+  transition: background var(--transition-base), transform var(--transition-base),
+    border-color var(--transition-base);
 
   &:hover {
     background: rgba(255, 255, 255, 0.25);
@@ -1535,9 +1441,9 @@ watch(
   gap: 0.35rem;
   min-width: 190px;
   padding: 0.6rem;
-  border-radius: 16px;
+  border-radius: var(--border-radius-lg);
   background: rgba(15, 17, 28, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--color-border);
   box-shadow: 0 18px 36px rgba(15, 17, 28, 0.55);
   backdrop-filter: blur(14px);
   z-index: 2300;
@@ -1579,7 +1485,7 @@ watch(
   margin: 0.35rem 0 0;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
-  color: #fca5a5;
+  color: var(--color-danger);
 }
 
 .fade-scale-enter-active,
@@ -1618,7 +1524,7 @@ watch(
   padding: 1.6rem;
   border-radius: 20px;
   background: rgba(22, 25, 36, 0.98);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border: 1px solid var(--color-border);
   box-shadow: 0 28px 56px rgba(15, 17, 28, 0.6);
   display: flex;
   flex-direction: column;
@@ -1666,15 +1572,15 @@ watch(
 .logout-confirm__btn {
   min-width: 110px;
   padding: 0.55rem 1.35rem;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(15, 17, 28, 0.85);
-  color: rgba(226, 232, 240, 0.92);
+  border-radius: var(--border-radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
   font-size: 0.95rem;
   letter-spacing: 0.08em;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease,
-    transform 150ms ease;
+  transition: background var(--transition-base), border-color var(--transition-base),
+    transform var(--transition-base);
 
   &:hover:not(:disabled),
   &:focus-visible:not(:disabled) {
@@ -1690,7 +1596,7 @@ watch(
 }
 
 .logout-confirm__btn--danger {
-  background: linear-gradient(135deg, #f43f5e, #fb7185);
+  background: var(--gradient-danger);
   border-color: transparent;
   color: #fff;
   box-shadow: 0 16px 28px rgba(244, 63, 94, 0.45);
@@ -1743,7 +1649,6 @@ watch(
     position: absolute;
     bottom: 0;
     right: 0;
-    transform: translate(0%, 0%);
     width: 30px;
     height: 30px;
     border: none;
@@ -1751,13 +1656,13 @@ watch(
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #ff4d8f, #ff7ab8);
+    background: var(--gradient-pink);
     color: #fff;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-    transition: transform 150ms ease, box-shadow 150ms ease;
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
 
     &:hover {
-      transform: translate(30%, 30%) scale(1.05);
+      transform: scale(1.05);
       box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
     }
 
@@ -1801,23 +1706,23 @@ watch(
   width: 100%;
   margin-top: 1rem;
   padding: 0.875rem 1.125rem;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--color-border-light);
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(8px);
   color: #fff;
   cursor: pointer;
   transition: all 0.2s ease;
-}
 
-.stats-button:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
-}
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+  }
 
-.stats-button:active {
-  transform: translateY(0);
+  &:active {
+    transform: translateY(0);
+  }
 }
 
 .stats-button__icon {
@@ -2001,8 +1906,8 @@ watch(
 
 .profile-editor-dialog {
   width: min(520px, 100%);
-  border-radius: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--border-radius-xl);
+  border: 1px solid var(--color-border);
   background: linear-gradient(
     170deg,
     rgba(16, 18, 30, 0.96),
@@ -2044,9 +1949,9 @@ watch(
 .profile-editor-close {
   width: 36px;
   height: 36px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(15, 17, 28, 0.85);
+  border-radius: var(--border-radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
   color: rgba(226, 232, 240, 0.85);
   display: inline-flex;
   align-items: center;
@@ -2088,14 +1993,14 @@ watch(
 .profile-editor-select,
 .profile-editor-textarea {
   width: 100%;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--color-border);
   background: rgba(17, 20, 32, 0.85);
-  color: #f8f9ff;
+  color: var(--color-text-primary);
   font-size: 0.95rem;
   letter-spacing: 0.03em;
   padding: 0.65rem 0.8rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
 
   &:focus {
     outline: none;
@@ -2150,7 +2055,7 @@ watch(
   margin: 0;
   font-size: 0.8rem;
   letter-spacing: 0.05em;
-  color: #fca5a5;
+  color: var(--color-danger);
 }
 
 .profile-editor-error--global {
@@ -2169,7 +2074,7 @@ watch(
 
 .profile-editor-btn {
   min-width: 108px;
-  border-radius: 999px;
+  border-radius: var(--border-radius-full);
   padding: 0.6rem 1.4rem;
   font-size: 0.95rem;
   letter-spacing: 0.08em;
@@ -2197,7 +2102,7 @@ watch(
 }
 
 .profile-editor-btn--primary {
-  background: linear-gradient(135deg, #ff4d8f, #ff7ab8);
+  background: var(--gradient-pink);
   color: #fff;
   box-shadow: 0 16px 30px rgba(255, 77, 143, 0.4);
 

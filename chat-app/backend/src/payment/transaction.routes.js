@@ -10,7 +10,8 @@ import {
   deleteUserTransactions,
   clearAllTransactions,
 } from "./transaction.service.js";
-import { isGuestUser } from "../../../../shared/config/testAccounts.js";
+import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
+import { requireAdmin } from "../middleware/adminAuth.middleware.js";
 
 const router = express.Router();
 
@@ -18,17 +19,9 @@ const router = express.Router();
  * GET /api/transactions
  * 獲取當前用戶的交易記錄
  */
-router.get("/", async (req, res) => {
+router.get("/", requireFirebaseAuth, async (req, res) => {
   try {
-    const userId = req.userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
-
+    const userId = req.firebaseUser.uid;
     const { limit, offset, type, status, startDate, endDate } = req.query;
 
     const options = {
@@ -62,17 +55,9 @@ router.get("/", async (req, res) => {
  * GET /api/transactions/stats
  * 獲取當前用戶的交易統計
  */
-router.get("/stats", async (req, res) => {
+router.get("/stats", requireFirebaseAuth, async (req, res) => {
   try {
-    const userId = req.userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
-
+    const userId = req.firebaseUser.uid;
     const { startDate, endDate } = req.query;
 
     const options = {};
@@ -98,17 +83,10 @@ router.get("/stats", async (req, res) => {
  * GET /api/transactions/:transactionId
  * 獲取單個交易記錄詳情
  */
-router.get("/:transactionId", async (req, res) => {
+router.get("/:transactionId", requireFirebaseAuth, async (req, res) => {
   try {
-    const userId = req.userId;
+    const userId = req.firebaseUser.uid;
     const { transactionId } = req.params;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
 
     const transaction = await getTransaction(transactionId);
 
@@ -143,18 +121,8 @@ router.get("/:transactionId", async (req, res) => {
  * DELETE /api/transactions (管理員功能)
  * 清除所有交易記錄（測試用）
  */
-router.delete("/", async (req, res) => {
+router.delete("/", requireFirebaseAuth, requireAdmin, async (req, res) => {
   try {
-    const userId = req.userId;
-
-    // 只允許測試帳號使用
-    if (!isGuestUser(userId) && userId !== "dev-user") {
-      return res.status(403).json({
-        success: false,
-        message: "此功能僅供測試帳號使用",
-      });
-    }
-
     const result = await clearAllTransactions();
 
     res.json({
@@ -170,21 +138,12 @@ router.delete("/", async (req, res) => {
 });
 
 /**
- * DELETE /api/transactions/user/:userId (管理員功能)
+ * DELETE /api/transactions/user/:targetUserId (管理員功能)
  * 刪除指定用戶的所有交易記錄
  */
-router.delete("/user/:targetUserId", async (req, res) => {
+router.delete("/user/:targetUserId", requireFirebaseAuth, requireAdmin, async (req, res) => {
   try {
-    const userId = req.userId;
     const { targetUserId } = req.params;
-
-    // 只允許管理員或測試帳號使用
-    if (!isGuestUser(userId) && userId !== "dev-user") {
-      return res.status(403).json({
-        success: false,
-        message: "此功能僅供管理員使用",
-      });
-    }
 
     const result = await deleteUserTransactions(targetUserId);
 

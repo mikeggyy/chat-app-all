@@ -61,16 +61,21 @@ const getConversationRef = (userId, conversationId) => {
 };
 
 /**
- * 獲取用戶的所有對話列表
+ * 獲取用戶的所有對話列表（支援 cursor 分頁）
  * @param {string} userId - 用戶 ID
  * @param {Object} options - 查詢選項
- * @returns {Promise<Array>} 對話列表
+ * @param {number} options.limit - 每頁數量
+ * @param {string} options.orderBy - 排序欄位
+ * @param {string} options.orderDirection - 排序方向
+ * @param {string} options.cursor - 分頁游標（上一頁最後一個文檔的 ID）
+ * @returns {Promise<Object>} 對話列表和分頁資訊
  */
 export const getUserConversations = async (userId, options = {}) => {
   const {
-    limit = 100,
+    limit = 20,
     orderBy = "updatedAt",
     orderDirection = "desc",
+    cursor = null,
   } = options;
 
   const db = getFirestoreDb();
@@ -80,16 +85,48 @@ export const getUserConversations = async (userId, options = {}) => {
     .collection(CONVERSATIONS_SUBCOLLECTION)
     .orderBy(orderBy, orderDirection);
 
+  // 如果有 cursor，從該文檔之後開始查詢
+  if (cursor) {
+    try {
+      const cursorDoc = await db
+        .collection(USERS_COLLECTION)
+        .doc(userId)
+        .collection(CONVERSATIONS_SUBCOLLECTION)
+        .doc(cursor)
+        .get();
+
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc);
+      }
+    } catch (error) {
+      logger.warn(`[對話子集合] 無效的 cursor: ${cursor}`, error);
+    }
+  }
+
   if (limit) {
     query = query.limit(limit);
   }
 
   const snapshot = await query.get();
 
-  return snapshot.docs.map((doc) => ({
+  const conversations = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   }));
+
+  // 返回分頁資訊
+  const nextCursor = conversations.length > 0
+    ? conversations[conversations.length - 1].id
+    : null;
+
+  const hasMore = conversations.length === limit;
+
+  return {
+    conversations,
+    nextCursor,
+    hasMore,
+    total: conversations.length,
+  };
 };
 
 /**

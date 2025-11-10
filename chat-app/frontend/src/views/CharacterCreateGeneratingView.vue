@@ -11,35 +11,18 @@ import { useRouter, useRoute } from "vue-router";
 import { ArrowLeftIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
 import {
-  createCharacterCreationFlow,
   fetchCharacterCreationFlow,
-  storeCharacterCreationFlowId,
   readStoredCharacterCreationFlowId,
-  updateCharacterCreationFlow,
   generateCharacterPersonaWithAI,
   generateCharacterImages,
 } from "../services/characterCreation.service.js";
-
-const CREATION_SUMMARY_STORAGE_KEY = "character-create-summary";
-const GENDER_STORAGE_KEY = "characterCreation.gender";
-const ALLOWED_GENDERS = new Set(["male", "female", "non-binary"]);
+import { useGenderPreference } from "../composables/useGenderPreference.js";
+import { useCharacterCreationFlow } from "../composables/useCharacterCreationFlow.js";
 
 const router = useRouter();
 const route = useRoute();
 
-const flowId = ref("");
-const flowStatus = ref("draft");
-const isFlowInitializing = ref(false);
-const isSyncingSummary = ref(false);
-const lastFlowSyncError = ref(null);
-const isReadyForSync = ref(false);
-let summarySyncTimer = null;
-let flowInitPromise = null;
-let suppressSync = false;
-const genderPreference = ref("");
-// 保存從後端獲取的完整 appearance 數據（包括 description 和 styles）
-const savedAppearanceData = ref(null);
-
+// 常量定義
 const Step = Object.freeze({
   PROGRESS: "progress",
   SELECTION: "selection",
@@ -51,51 +34,20 @@ const MAX_TAGLINE_LENGTH = 200;
 const MAX_PROMPT_LENGTH = 50;
 const MAX_HIDDEN_PROFILE_LENGTH = 200;
 
+// 進度條狀態
 const progress = ref(18);
 const isAnimating = ref(false);
 let progressTimer = null;
 
-const normalizeGenderPreference = (value) => {
-  if (typeof value !== "string") {
-    return "";
-  }
-  const trimmed = value.trim();
-  return ALLOWED_GENDERS.has(trimmed) ? trimmed : "";
-};
-
-const readStoredGenderPreference = () => {
-  if (typeof window === "undefined" || !window.sessionStorage) {
-    return "";
-  }
-  try {
-    return window.sessionStorage.getItem(GENDER_STORAGE_KEY) ?? "";
-  } catch (error) {
-    return "";
-  }
-};
-
-const ensureGenderPreference = (value) => {
-  const normalized = normalizeGenderPreference(value);
-  if (normalized) {
-    genderPreference.value = normalized;
-    return normalized;
-  }
-  const stored = normalizeGenderPreference(readStoredGenderPreference());
-  if (stored) {
-    genderPreference.value = stored;
-    return stored;
-  }
-  genderPreference.value = "";
-  return "";
-};
-
+// 生成結果
 const generatedResults = ref([]);
 const selectedResultId = ref("");
-
 const generatingEmblem = "/character-create/generating-emblem.png";
 
+// 當前步驟
 const currentStep = ref(Step.PROGRESS);
 
+// 表單數據
 const personaForm = reactive({
   name: "",
   tagline: "",
@@ -103,14 +55,21 @@ const personaForm = reactive({
   prompt: "",
 });
 
-const isSummaryVisible = ref(false);
-const isFinalizing = ref(false);
+// 使用 Gender Preference Composable
+const {
+  genderPreference,
+  normalizeGenderPreference,
+  readStoredGenderPreference,
+  ensureGenderPreference,
+} = useGenderPreference();
+
+// AI 相關狀態
 const isAIMagicianLoading = ref(false);
 const aiMagicianError = ref(null);
-const isCancelConfirmVisible = ref(false);
 const isGeneratingImages = ref(false);
 const imageGenerationError = ref(null);
 
+// Computed 屬性
 const isComplete = computed(() => progress.value >= 100);
 const progressText = computed(() => `${progress.value}%`);
 const statusText = computed(() =>
@@ -147,20 +106,6 @@ const selectedResultAlt = computed(
 );
 const selectedResultLabel = computed(() => selectedResult.value?.label ?? "");
 
-const previewName = computed(() => {
-  if (personaForm.name.trim().length) {
-    return personaForm.name.trim();
-  }
-  return selectedResult.value?.name ?? "";
-});
-
-const previewTagline = computed(() => {
-  if (personaForm.tagline.trim().length) {
-    return personaForm.tagline.trim();
-  }
-  return selectedResult.value?.tagline ?? "";
-});
-
 const nameLength = computed(() => personaForm.name.length);
 const taglineLength = computed(() => personaForm.tagline.length);
 const hiddenProfileLength = computed(() => personaForm.hiddenProfile.length);
@@ -194,6 +139,42 @@ const isConfirmDisabled = computed(() => {
   return true;
 });
 
+// 使用 Character Creation Flow Composable
+const {
+  flowId,
+  flowStatus,
+  isFlowInitializing,
+  isSyncingSummary,
+  lastFlowSyncError,
+  isReadyForSync,
+  savedAppearanceData,
+  buildSummaryPayload,
+  buildMetadataPayload,
+  persistSummaryToSession,
+  restoreSummaryFromSession,
+  applyFlowRecord,
+  ensureFlowInitialized,
+  syncSummaryToBackend,
+  scheduleBackendSync,
+  initializeFlowState,
+  cleanup: cleanupFlow,
+  getSuppressSync,
+  setSuppressSync,
+} = useCharacterCreationFlow({
+  personaForm,
+  selectedResult,
+  selectedResultId,
+  selectedResultLabel,
+  selectedResultImage,
+  selectedResultAlt,
+  genderPreference,
+  normalizeGenderPreference,
+  readStoredGenderPreference,
+  ensureGenderPreference,
+  currentStep,
+});
+
+// 工具函數
 const stopTimer = () => {
   if (progressTimer) {
     window.clearInterval(progressTimer);
@@ -218,311 +199,6 @@ const beginProgressAnimation = () => {
 
     // 不再自動完成，等待實際 API 完成
   }, 1500); // 改為 1.5 秒一次，讓動畫更慢更真實
-};
-
-const restoreSummaryFromSession = () => {
-  if (typeof window === "undefined" || !window.sessionStorage) {
-    return null;
-  }
-  try {
-    const raw = window.sessionStorage.getItem(CREATION_SUMMARY_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw);
-
-    // 優先從 characterCreation.gender 讀取性別，因為這是用戶在性別選擇頁面的選擇
-    const storedGender = readStoredGenderPreference();
-    const genderToUse = storedGender || parsed?.gender;
-
-    suppressSync = true;
-    personaForm.name = parsed?.persona?.name ?? "";
-    personaForm.tagline = parsed?.persona?.tagline ?? "";
-    personaForm.hiddenProfile = parsed?.persona?.hiddenProfile ?? "";
-    personaForm.prompt = parsed?.persona?.prompt ?? "";
-    if (parsed?.appearance?.id) {
-      selectedResultId.value = parsed.appearance.id;
-    }
-    ensureGenderPreference(genderToUse);
-    suppressSync = false;
-    return parsed;
-  } catch (error) {
-    suppressSync = false;
-    return null;
-  }
-};
-
-const buildSummaryPayload = () => {
-  const appearance = selectedResult.value
-    ? {
-        id: selectedResult.value.id,
-        label: selectedResultLabel.value,
-        image: selectedResultImage.value,
-        alt: selectedResultAlt.value,
-        // 合併保存的 description 和 styles（從後端獲取的原始數據）
-        description: savedAppearanceData.value?.description || "",
-        styles: savedAppearanceData.value?.styles || [],
-        referenceInfo: savedAppearanceData.value?.referenceInfo || null,
-      }
-    : null;
-
-  return {
-    persona: {
-      name: personaForm.name.trim(),
-      tagline: personaForm.tagline.trim(),
-      hiddenProfile: personaForm.hiddenProfile.trim(),
-      prompt: personaForm.prompt.trim(),
-    },
-    appearance,
-    gender: genderPreference.value,
-    updatedAt: Date.now(),
-  };
-};
-
-const buildMetadataPayload = (summary = null) => {
-  const source = summary && typeof summary === "object" ? summary : null;
-  const rawGender =
-    source && typeof source.gender === "string"
-      ? source.gender
-      : genderPreference.value;
-  const normalized = normalizeGenderPreference(rawGender);
-  return normalized ? { gender: normalized } : undefined;
-};
-
-const persistSummaryToSession = (summary) => {
-  if (typeof window === "undefined" || !window.sessionStorage) {
-    return;
-  }
-  try {
-    // 不要儲存大型 base64 圖片到 sessionStorage
-    // 只儲存必要的元資料
-    const sanitizedSummary = {
-      ...summary,
-      appearance: summary.appearance
-        ? {
-            id: summary.appearance.id,
-            label: summary.appearance.label,
-            // 不要儲存 image (可能是大型 base64 data URL)
-            // 圖片會從後端 API 重新獲取
-          }
-        : null,
-    };
-    window.sessionStorage.setItem(
-      CREATION_SUMMARY_STORAGE_KEY,
-      JSON.stringify(sanitizedSummary)
-    );
-  } catch (error) {
-    // Silent fail
-  }
-};
-
-const applyFlowRecord = (record, options = {}) => {
-  if (!record || typeof record !== "object") {
-    return;
-  }
-
-  flowId.value = record.id ?? flowId.value;
-  flowStatus.value = record.status ?? flowStatus.value;
-
-  suppressSync = true;
-  personaForm.name = record?.persona?.name ?? "";
-  personaForm.tagline = record?.persona?.tagline ?? "";
-  personaForm.hiddenProfile = record?.persona?.hiddenProfile ?? "";
-  personaForm.prompt = record?.persona?.prompt ?? "";
-  selectedResultId.value = record?.appearance?.id ?? "";
-
-  // 保存完整的 appearance 數據（包括 description 和 styles）
-  if (record?.appearance) {
-    savedAppearanceData.value = {
-      description: record.appearance.description || "",
-      styles: Array.isArray(record.appearance.styles) ? [...record.appearance.styles] : [],
-      referenceInfo: record.appearance.referenceInfo || null,
-    };
-  }
-
-  suppressSync = false;
-
-  // 優先使用本地已設定的 gender（來自 sessionStorage 的 characterCreation.gender）
-  // 只有在本地沒有 gender 時，才使用後端回傳的 metadata.gender
-  const normalizedGender = ensureGenderPreference(
-    genderPreference.value || record?.metadata?.gender
-  );
-
-  const summary = {
-    persona: {
-      name: personaForm.name,
-      tagline: personaForm.tagline,
-      hiddenProfile: personaForm.hiddenProfile,
-      prompt: personaForm.prompt,
-    },
-    appearance: record?.appearance ?? null,
-    gender: normalizedGender,
-    updatedAt: Date.now(),
-  };
-
-  if (!options.skipSession) {
-    persistSummaryToSession(summary);
-  }
-
-  if (record?.id) {
-    storeCharacterCreationFlowId(record.id);
-  }
-};
-
-const ensureFlowInitialized = async () => {
-  if (flowId.value) {
-    return flowId.value;
-  }
-
-  if (flowInitPromise) {
-    return flowInitPromise;
-  }
-
-  flowInitPromise = (async () => {
-    isFlowInitializing.value = true;
-    try {
-      const storedId = readStoredCharacterCreationFlowId();
-      if (storedId) {
-        try {
-          const existing = await fetchCharacterCreationFlow(storedId);
-          applyFlowRecord(existing);
-          flowId.value = existing?.id ?? "";
-          return flowId.value;
-        } catch (error) {
-          if (error?.status !== 404) {
-            throw error;
-          }
-        }
-      }
-
-      const summary = buildSummaryPayload();
-      const metadata = buildMetadataPayload(summary);
-      const status =
-        selectedResultId.value && summary.appearance ? "appearance" : "pending";
-
-      const creationPayload = {
-        status,
-        persona: summary.persona,
-        appearance: summary.appearance,
-      };
-      if (metadata) {
-        creationPayload.metadata = metadata;
-      }
-      const created = await createCharacterCreationFlow(creationPayload);
-      applyFlowRecord(created);
-      flowId.value = created?.id ?? "";
-      return flowId.value;
-    } finally {
-      isFlowInitializing.value = false;
-    }
-  })()
-    .catch((error) => {
-      lastFlowSyncError.value = error;
-      return "";
-    })
-    .finally(() => {
-      flowInitPromise = null;
-    });
-
-  return flowInitPromise;
-};
-
-const syncSummaryToBackend = async (options = {}) => {
-  const summary =
-    options.summary && typeof options.summary === "object"
-      ? options.summary
-      : buildSummaryPayload();
-
-  const statusOverride = options.statusOverride;
-  const status =
-    statusOverride ||
-    (currentStep.value === Step.SETTINGS
-      ? "persona"
-      : selectedResultId.value
-      ? "appearance"
-      : "pending");
-
-  try {
-    await ensureFlowInitialized();
-  } catch (error) {
-    return;
-  }
-
-  if (!flowId.value) {
-    return;
-  }
-
-  try {
-    isSyncingSummary.value = true;
-    const metadata = buildMetadataPayload(summary);
-    const payload = {
-      persona: summary.persona,
-      appearance: summary.appearance,
-      status,
-    };
-    if (metadata) {
-      payload.metadata = metadata;
-    }
-    const updated = await updateCharacterCreationFlow(flowId.value, payload);
-    applyFlowRecord(updated);
-    lastFlowSyncError.value = null;
-  } catch (error) {
-    lastFlowSyncError.value = error;
-  } finally {
-    isSyncingSummary.value = false;
-  }
-};
-
-const scheduleBackendSync = (options = {}) => {
-  const summary =
-    options.summary && typeof options.summary === "object"
-      ? options.summary
-      : buildSummaryPayload();
-
-  persistSummaryToSession(summary);
-
-  if (!isReadyForSync.value || typeof window === "undefined") {
-    return;
-  }
-
-  if (summarySyncTimer) {
-    window.clearTimeout(summarySyncTimer);
-    summarySyncTimer = null;
-  }
-
-  const executeSync = () => {
-    syncSummaryToBackend({
-      summary,
-      statusOverride: options.statusOverride,
-    }).catch(() => {
-      // 已在 syncSummaryToBackend 處理錯誤
-    });
-  };
-
-  if (options.immediate) {
-    executeSync();
-    return;
-  }
-
-  summarySyncTimer = window.setTimeout(
-    () => {
-      summarySyncTimer = null;
-      executeSync();
-    },
-    typeof options.delay === "number" ? options.delay : 600
-  );
-};
-
-const initializeFlowState = async () => {
-  restoreSummaryFromSession();
-  ensureGenderPreference(genderPreference.value);
-  try {
-    await ensureFlowInitialized();
-  } catch (error) {
-    // Silent fail
-  } finally {
-    isReadyForSync.value = true;
-  }
 };
 
 // beforeunload 處理函數
@@ -604,7 +280,7 @@ const triggerImageGeneration = async () => {
 };
 
 const applyResultToPersona = (result) => {
-  suppressSync = true;
+  setSuppressSync(true);
   const fallbackName = result?.name || "";
   personaForm.name = fallbackName.slice(0, MAX_NAME_LENGTH);
 
@@ -615,7 +291,7 @@ const applyResultToPersona = (result) => {
 
   const fallbackPrompt = result?.prompt || "";
   personaForm.prompt = fallbackPrompt.slice(0, MAX_PROMPT_LENGTH);
-  suppressSync = false;
+  setSuppressSync(false);
   scheduleBackendSync();
 };
 
@@ -624,18 +300,6 @@ const handleBack = () => {
   router.push({ name: "profile" }).catch(() => {
     // Silent fail
   });
-};
-
-const confirmCancelCreation = () => {
-  // 關閉對話框並返回首頁或個人檔案頁
-  isCancelConfirmVisible.value = false;
-  router.push({ name: "profile" }).catch(() => {
-    // Silent fail
-  });
-};
-
-const closeCancelConfirm = () => {
-  isCancelConfirmVisible.value = false;
 };
 
 const persistCreationSummary = async () => {
@@ -683,29 +347,6 @@ const handleConfirm = async () => {
   }
 };
 
-const finalizeCreation = () => {
-  if (isFinalizing.value) {
-    return;
-  }
-  isFinalizing.value = true;
-  isSummaryVisible.value = false;
-  router
-    .replace({ name: "profile" })
-    .catch(() => {
-      // Silent fail
-    })
-    .finally(() => {
-      isFinalizing.value = false;
-    });
-};
-
-const closeSummary = () => {
-  if (isFinalizing.value) {
-    return;
-  }
-  isSummaryVisible.value = false;
-};
-
 const isResultSelected = (resultId) =>
   selectedResultId.value === resultId && currentStep.value === Step.SELECTION;
 
@@ -741,12 +382,12 @@ const openAIMagician = async () => {
     const persona = await generateCharacterPersonaWithAI(flowId.value);
 
     if (persona) {
-      suppressSync = true;
+      setSuppressSync(true);
       personaForm.name = persona.name || "";
       personaForm.tagline = persona.tagline || "";
       personaForm.hiddenProfile = persona.hiddenProfile || "";
       personaForm.prompt = persona.prompt || "";
-      suppressSync = false;
+      setSuppressSync(false);
 
       scheduleBackendSync({ immediate: true });
     }
@@ -762,112 +403,45 @@ watch(
   (step) => {
     if (step === "settings") {
       currentStep.value = Step.SETTINGS;
-      isSummaryVisible.value = false;
       return;
     }
     if (step === "selection") {
       currentStep.value = Step.SELECTION;
-      isSummaryVisible.value = false;
     }
   },
   { immediate: true }
 );
 
-watch(
-  () => personaForm.name,
-  (value) => {
-    if (suppressSync) {
-      return;
-    }
-    if (typeof value !== "string") {
-      suppressSync = true;
-      personaForm.name = "";
-      suppressSync = false;
-      scheduleBackendSync();
-      return;
-    }
-    if (value.length > MAX_NAME_LENGTH) {
-      suppressSync = true;
-      personaForm.name = value.slice(0, MAX_NAME_LENGTH);
-      suppressSync = false;
-      scheduleBackendSync();
-      return;
-    }
-    scheduleBackendSync();
-  }
-);
+// 創建表單欄位 watcher 的工具函數（避免重複代碼）
+const createFieldWatcher = (fieldName, maxLength) => {
+  return (value) => {
+    if (getSuppressSync()) return;
 
-watch(
-  () => personaForm.tagline,
-  (value) => {
-    if (suppressSync) {
-      return;
-    }
     if (typeof value !== "string") {
-      suppressSync = true;
-      personaForm.tagline = "";
-      suppressSync = false;
+      setSuppressSync(true);
+      personaForm[fieldName] = "";
+      setSuppressSync(false);
       scheduleBackendSync();
       return;
     }
-    if (value.length > MAX_TAGLINE_LENGTH) {
-      suppressSync = true;
-      personaForm.tagline = value.slice(0, MAX_TAGLINE_LENGTH);
-      suppressSync = false;
-      scheduleBackendSync();
-      return;
-    }
-    scheduleBackendSync();
-  }
-);
 
-watch(
-  () => personaForm.hiddenProfile,
-  (value) => {
-    if (suppressSync) {
-      return;
-    }
-    if (typeof value !== "string") {
-      suppressSync = true;
-      personaForm.hiddenProfile = "";
-      suppressSync = false;
+    if (value.length > maxLength) {
+      setSuppressSync(true);
+      personaForm[fieldName] = value.slice(0, maxLength);
+      setSuppressSync(false);
       scheduleBackendSync();
       return;
     }
-    if (value.length > MAX_HIDDEN_PROFILE_LENGTH) {
-      suppressSync = true;
-      personaForm.hiddenProfile = value.slice(0, MAX_HIDDEN_PROFILE_LENGTH);
-      suppressSync = false;
-      scheduleBackendSync();
-      return;
-    }
-    scheduleBackendSync();
-  }
-);
 
-watch(
-  () => personaForm.prompt,
-  (value) => {
-    if (suppressSync) {
-      return;
-    }
-    if (typeof value !== "string") {
-      suppressSync = true;
-      personaForm.prompt = "";
-      suppressSync = false;
-      scheduleBackendSync();
-      return;
-    }
-    if (value.length > MAX_PROMPT_LENGTH) {
-      suppressSync = true;
-      personaForm.prompt = value.slice(0, MAX_PROMPT_LENGTH);
-      suppressSync = false;
-      scheduleBackendSync();
-      return;
-    }
     scheduleBackendSync();
-  }
-);
+  };
+};
+
+// 為每個表單欄位創建 watcher
+watch(() => personaForm.name, createFieldWatcher("name", MAX_NAME_LENGTH));
+watch(() => personaForm.tagline, createFieldWatcher("tagline", MAX_TAGLINE_LENGTH));
+watch(() => personaForm.hiddenProfile, createFieldWatcher("hiddenProfile", MAX_HIDDEN_PROFILE_LENGTH));
+watch(() => personaForm.prompt, createFieldWatcher("prompt", MAX_PROMPT_LENGTH));
 
 watch(
   () => isComplete.value,
@@ -942,10 +516,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopTimer();
-  if (summarySyncTimer) {
-    window.clearTimeout(summarySyncTimer);
-    summarySyncTimer = null;
-  }
+  cleanupFlow(); // 清理 composable 中的定時器
   // 確保移除 beforeunload 監聽
   if (typeof window !== "undefined") {
     window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -1134,18 +705,16 @@ onBeforeUnmount(() => {
               <span>{{ isAIMagicianLoading ? "生成中..." : "AI魔法師" }}</span>
             </button>
           </div>
-          <div class="generating__field-control">
-            <input
-              id="generating-name"
-              v-model="personaForm.name"
-              type="text"
-              class="generating__input"
-              :maxlength="MAX_NAME_LENGTH"
-              placeholder="請輸入角色名，例如：星野未來"
-              required
-              aria-required="true"
-            />
-          </div>
+          <input
+            id="generating-name"
+            v-model="personaForm.name"
+            type="text"
+            class="generating__input"
+            :maxlength="MAX_NAME_LENGTH"
+            placeholder="請輸入角色名，例如：星野未來"
+            required
+            aria-required="true"
+          />
           <div class="generating__field-meta">
             <span>{{ nameLength }} / {{ MAX_NAME_LENGTH }}</span>
           </div>
@@ -1231,134 +800,17 @@ onBeforeUnmount(() => {
         {{ confirmButtonLabel }}
       </button>
     </footer>
-
-    <Teleport to="body">
-      <div
-        v-if="isSummaryVisible"
-        class="generating__summary"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="generating-summary-title"
-      >
-        <div
-          class="generating__summary-backdrop"
-          aria-hidden="true"
-          @click="closeSummary"
-        ></div>
-        <div class="generating__summary-panel">
-          <header class="generating__summary-header">
-            <h2 id="generating-summary-title">確認角色設定</h2>
-            <p>建立後仍可在個人檔案中微調內容。</p>
-            <button
-              type="button"
-              class="generating__summary-close"
-              aria-label="關閉確認視窗"
-              @click="closeSummary"
-            >
-              ×
-            </button>
-          </header>
-          <div class="generating__summary-body">
-            <div class="generating__summary-preview">
-              <img
-                v-if="selectedResultImage"
-                :src="selectedResultImage"
-                :alt="selectedResultAlt"
-              />
-              <div v-else class="generating__summary-placeholder">無預覽</div>
-            </div>
-            <dl class="generating__summary-list">
-              <div class="generating__summary-item">
-                <dt>角色名</dt>
-                <dd>{{ previewName }}</dd>
-              </div>
-              <div class="generating__summary-item">
-                <dt>角色設定</dt>
-                <dd>{{ previewTagline }}</dd>
-              </div>
-              <div class="generating__summary-item">
-                <dt>隱藏設定</dt>
-                <dd>
-                  {{ personaForm.hiddenProfile.trim() || "尚未填寫" }}
-                </dd>
-              </div>
-              <div class="generating__summary-item">
-                <dt>開場白</dt>
-                <dd>
-                  {{ personaForm.prompt.trim() || "尚未填寫" }}
-                </dd>
-              </div>
-            </dl>
-          </div>
-          <footer class="generating__summary-actions">
-            <button
-              type="button"
-              class="generating__summary-action generating__summary-action--ghost"
-              @click="closeSummary"
-            >
-              返回編輯
-            </button>
-            <button
-              type="button"
-              class="generating__summary-action generating__summary-action--primary"
-              :disabled="isFinalizing"
-              @click="finalizeCreation"
-            >
-              {{ isFinalizing ? "建立中..." : "確認建立" }}
-            </button>
-          </footer>
-        </div>
-      </div>
-
-      <!-- 取消創建確認對話框 -->
-      <div
-        v-if="isCancelConfirmVisible"
-        class="generating__summary"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cancel-confirm-title"
-      >
-        <div
-          class="generating__summary-backdrop"
-          aria-hidden="true"
-          @click="closeCancelConfirm"
-        ></div>
-        <div class="generating__summary-panel">
-          <header class="generating__summary-header">
-            <h2 id="cancel-confirm-title">確認取消創建</h2>
-            <p>關閉後將會取消角色創建，且不會返還創建角色次數。</p>
-            <button
-              type="button"
-              class="generating__summary-close"
-              aria-label="關閉確認視窗"
-              @click="closeCancelConfirm"
-            >
-              ×
-            </button>
-          </header>
-          <footer class="generating__summary-actions">
-            <button
-              type="button"
-              class="generating__summary-action generating__summary-action--ghost"
-              @click="closeCancelConfirm"
-            >
-              繼續編輯
-            </button>
-            <button
-              type="button"
-              class="generating__summary-action generating__summary-action--danger"
-              @click="confirmCancelCreation"
-            >
-              確認取消
-            </button>
-          </footer>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
 <style scoped>
+/* CSS 變數定義 */
+:root {
+  --gradient-primary: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
+  --focus-border-color: rgba(255, 119, 195, 0.95);
+  --focus-shadow: 0 0 0 3px rgba(255, 119, 195, 0.24);
+}
+
 .generating {
   min-height: 100vh;
   display: flex;
@@ -1687,13 +1139,6 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-.generating__results-heading {
-  font-size: 18px;
-  letter-spacing: 0.08em;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.78);
-}
-
 .generating__result-scroll {
   display: flex;
   gap: 14px;
@@ -1793,47 +1238,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.08em;
 }
 
-.generating__settings-step {
-  font-size: 12px;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.generating__settings-name {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  margin: 0;
-}
-
-.generating__settings-tagline {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.generating__settings-tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.generating__settings-tag {
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.86);
-  background: rgba(255, 255, 255, 0.06);
-}
-
 .generating__settings-card {
   border-radius: 22px;
   padding: 20px 18px;
@@ -1843,19 +1247,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.generating__settings-card-header h2 {
-  margin: 0;
-  font-size: 18px;
-  letter-spacing: 0.08em;
-}
-
-.generating__settings-card-header p {
-  margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.65);
 }
 
 .generating__field {
@@ -1871,10 +1262,6 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-.generating__field-control {
-  display: block;
-}
-
 .generating__field-label {
   font-size: 14px;
   letter-spacing: 0.07em;
@@ -1888,7 +1275,7 @@ onBeforeUnmount(() => {
   padding: 6px 14px;
   border-radius: 999px;
   border: none;
-  background: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
+  background: var(--gradient-primary);
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
@@ -1919,15 +1306,6 @@ onBeforeUnmount(() => {
   }
 }
 
-.generating__field-info {
-  font-size: 13px;
-  color: #7ec9ff;
-  padding: 6px 12px;
-  background: rgba(126, 201, 255, 0.1);
-  border-radius: 8px;
-  border: 1px solid rgba(126, 201, 255, 0.2);
-}
-
 .generating__field-error {
   font-size: 13px;
   color: #ff6b6b;
@@ -1935,6 +1313,14 @@ onBeforeUnmount(() => {
   background: rgba(255, 107, 107, 0.1);
   border-radius: 8px;
   border: 1px solid rgba(255, 107, 107, 0.2);
+}
+
+/* 共用的 focus 樣式 */
+.generating__input:focus-visible,
+.generating__textarea:focus-visible {
+  border-color: var(--focus-border-color);
+  outline: none;
+  box-shadow: var(--focus-shadow);
 }
 
 .generating__input {
@@ -1947,12 +1333,6 @@ onBeforeUnmount(() => {
   font-size: 16px;
   letter-spacing: 0.04em;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.generating__input:focus-visible {
-  border-color: rgba(255, 119, 195, 0.95);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 119, 195, 0.24);
 }
 
 .generating__field-meta {
@@ -1981,12 +1361,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.05em;
 }
 
-.generating__textarea:focus-visible {
-  border-color: rgba(255, 119, 195, 0.95);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 119, 195, 0.24);
-}
-
 .generating__footer {
   display: flex;
   justify-content: center;
@@ -1998,7 +1372,7 @@ onBeforeUnmount(() => {
   padding: 14px 20px;
   border: none;
   border-radius: 999px;
-  background: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
+  background: var(--gradient-primary);
   color: #ffffff;
   font-size: 16px;
   font-weight: 700;
@@ -2018,159 +1392,6 @@ onBeforeUnmount(() => {
 .generating__confirm:focus-visible {
   outline: 2px solid #ffffff;
   outline-offset: 3px;
-}
-
-.generating__summary {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.generating__summary-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(5, 5, 8, 0.82);
-  backdrop-filter: blur(4px);
-}
-
-.generating__summary-panel {
-  position: relative;
-  width: min(480px, 100%);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(15, 15, 20, 0.96);
-  padding: 24px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  box-shadow: 0 20px 50px rgba(4, 4, 10, 0.65);
-}
-
-.generating__summary-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  position: relative;
-}
-
-.generating__summary-header h2 {
-  margin: 0;
-  font-size: 20px;
-  letter-spacing: 0.08em;
-}
-
-.generating__summary-header p {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.68);
-}
-
-.generating__summary-close {
-  position: absolute;
-  top: 0;
-  right: 0;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 22px;
-  cursor: pointer;
-}
-
-.generating__summary-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.generating__summary-preview {
-  width: 100%;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(22, 22, 30, 0.9);
-  min-height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.generating__summary-preview img {
-  width: 100%;
-  display: block;
-  object-fit: cover;
-}
-
-.generating__summary-placeholder {
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 0.08em;
-}
-
-.generating__summary-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-}
-
-.generating__summary-item {
-  display: grid;
-  grid-template-columns: 92px 1fr;
-  gap: 12px;
-  font-size: 14px;
-  letter-spacing: 0.05em;
-}
-
-.generating__summary-item dt {
-  color: rgba(255, 255, 255, 0.54);
-}
-
-.generating__summary-item dd {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.generating__summary-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.generating__summary-action {
-  border-radius: 999px;
-  padding: 12px 16px;
-  font-size: 15px;
-  letter-spacing: 0.08em;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.generating__summary-action--ghost {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.generating__summary-action--primary {
-  background: linear-gradient(90deg, #ff458f 0%, #ff7eca 100%);
-  color: #ffffff;
-}
-
-.generating__summary-action--danger {
-  background: linear-gradient(90deg, #ff4545 0%, #ff7070 100%);
-  color: #ffffff;
-}
-
-.generating__summary-action:disabled {
-  opacity: 0.52;
-  cursor: not-allowed;
-}
-
-.generating__summary-action:not(:disabled):hover {
-  transform: translateY(-1px);
 }
 
 @media (min-width: 640px) {
@@ -2205,19 +1426,6 @@ onBeforeUnmount(() => {
   .generating__settings-portrait {
     flex: 1 1 48%;
     min-height: 260px;
-  }
-
-  .generating__summary-panel {
-    width: min(520px, 90%);
-  }
-
-  .generating__summary-actions {
-    flex-direction: row;
-    justify-content: space-between;
-  }
-
-  .generating__summary-action {
-    flex: 1;
   }
 }
 </style>

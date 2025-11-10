@@ -57,7 +57,34 @@ import { getGiftById } from "../config/gifts";
 const router = useRouter();
 const route = useRoute();
 
+// ====================
+// Constants
+// ====================
+const MESSAGE_ID_PREFIXES = {
+  SELFIE_REQUEST: 'msg-selfie-request-',
+  VIDEO_REQUEST: 'msg-video-request-',
+  VIDEO_AI: 'msg-video-ai-',
+  FIRST: 'msg-first-',
+};
+
+const VIDEO_REQUEST_MESSAGES = [
+  "能給我看一段你的影片嗎？",
+  "想看看你的影片！",
+  "可以拍一段影片給我看嗎？",
+  "期待看到你的影片！",
+];
+
+const VIDEO_CONFIG = {
+  DURATION: "4s",
+  RESOLUTION: "720p",
+  ASPECT_RATIO: "9:16",
+};
+
+const AI_VIDEO_RESPONSE_TEXT = "這是我為你準備的影片！";
+
+// ====================
 // User & Auth
+// ====================
 const { user, setUserProfile, addConversationHistory } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
 const { success, error: showError } = useToast();
@@ -102,8 +129,6 @@ const { loadBalance: loadTicketsBalance } = useUnlockTickets();
 // Partner Data
 const partnerId = computed(() => route.params.id);
 const partner = ref(null);
-const isLoadingPartner = ref(false);
-const partnerLoadError = ref(null);
 
 // Chat Page Ref (用於截圖)
 const chatPageRef = ref(null);
@@ -115,9 +140,6 @@ const loadPartner = async (characterId) => {
     return;
   }
 
-  isLoadingPartner.value = true;
-  partnerLoadError.value = null;
-
   try {
     const response = await apiJson(
       `/match/${encodeURIComponent(characterId)}`,
@@ -127,11 +149,8 @@ const loadPartner = async (characterId) => {
     );
     partner.value = response?.character || null;
   } catch (error) {
-    partnerLoadError.value = error;
     // Fallback 到内存数组
     partner.value = fallbackMatches.find((m) => m.id === characterId) || null;
-  } finally {
-    isLoadingPartner.value = false;
   }
 };
 
@@ -161,7 +180,6 @@ const {
   messages,
   isReplying,
   isLoadingHistory,
-  loadHistoryError,
   loadHistory,
   sendMessage: sendMessageToApi,
   requestReply,
@@ -362,6 +380,78 @@ const getConversationContext = () => {
 };
 
 // ====================
+// Helper Functions
+// ====================
+const getRandomVideoRequestMessage = () => {
+  return VIDEO_REQUEST_MESSAGES[
+    Math.floor(Math.random() * VIDEO_REQUEST_MESSAGES.length)
+  ];
+};
+
+/**
+ * 撤回用戶消息（從後端和前端同時刪除）
+ * @param {string} userId - 用戶 ID
+ * @param {string} matchId - 角色 ID
+ * @param {string} messageId - 消息 ID
+ * @returns {Promise<boolean>} - 是否成功撤回
+ */
+const rollbackUserMessage = async (userId, matchId, messageId) => {
+  if (!userId || !matchId || !messageId) {
+    return false;
+  }
+
+  try {
+    const token = await firebaseAuth.getCurrentUserIdToken();
+
+    // ✅ 先從後端 Firestore 刪除
+    await apiJson(`/api/conversations/${userId}/${matchId}/messages`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: {
+        messageIds: [messageId],
+      },
+      skipGlobalLoading: true,
+    });
+
+    // ✅ 成功後才從前端訊息列表中刪除
+    const msgIndex = messages.value.findIndex((m) => m.id === messageId);
+    if (msgIndex !== -1) {
+      messages.value.splice(msgIndex, 1);
+    }
+
+    // ✅ 更新緩存
+    writeCachedHistory(userId, matchId, messages.value);
+
+    return true;
+  } catch (error) {
+    showError("撤回訊息失敗，請重新整理頁面");
+    return false;
+  }
+};
+
+/**
+ * 創建限制 Modal 的數據結構
+ * @param {Object} limitCheck - 限制檢查結果
+ * @param {string} type - 限制類型 ('photo' 或 'video')
+ * @returns {Object} Modal 數據對象
+ */
+const createLimitModalData = (limitCheck, type = 'photo') => {
+  const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
+  return {
+    used: limitCheck.used || 0,
+    remaining: limitCheck.remaining || 0,
+    total: limitCheck.total || 0,
+    standardTotal: limitCheck[`standard${capitalizedType}sLimit`] || null,
+    isTestAccount: limitCheck.isTestAccount || false,
+    cards: limitCheck[`${type}Cards`] || 0,
+    tier: limitCheck.tier || "free",
+    resetPeriod: limitCheck.resetPeriod || "lifetime",
+  };
+};
+
+// ====================
 // Send Message Handler
 // ====================
 const handleSendMessage = async (text) => {
@@ -468,8 +558,6 @@ const handleMenuAction = (action) => {
 // ====================
 // Share Handler
 // ====================
-const isCapturingScreenshot = ref(false);
-
 const handleShare = async () => {
   if (!chatPageRef.value) {
     showError("無法截圖，請稍後再試。");
@@ -481,8 +569,6 @@ const handleShare = async () => {
   const shareUrl = window.location.href;
 
   try {
-    isCapturingScreenshot.value = true;
-
     // 截取聊天畫面
     const canvas = await html2canvas(chatPageRef.value, {
       backgroundColor: "#0f1016",
@@ -531,8 +617,6 @@ const handleShare = async () => {
     }
   } catch (err) {
     showError("截圖失敗，請稍後再試。");
-  } finally {
-    isCapturingScreenshot.value = false;
   }
 };
 
@@ -666,7 +750,7 @@ const confirmResetConversation = async () => {
 
     if (needsFirstMessage) {
       const firstMessage = {
-        id: `msg-first-${Date.now()}`,
+        id: `${MESSAGE_ID_PREFIXES.FIRST}${Date.now()}`,
         role: "partner",
         text: partner.value.first_message.trim(),
         createdAt: new Date().toISOString(),
@@ -821,16 +905,7 @@ const handleRequestSelfie = async () => {
   // - cards > 0: 顯示「使用解鎖卡」按鈕
   // - cards = 0: 顯示「次數已達上限」及升級選項
   if (!limitCheck.allowed) {
-    photoLimitModalData.value = {
-      used: limitCheck.used || 0,
-      remaining: limitCheck.remaining || 0,
-      total: limitCheck.total || 0,
-      standardTotal: limitCheck.standardPhotosLimit || null,
-      isTestAccount: limitCheck.isTestAccount || false,
-      cards: limitCheck.photoCards || 0,
-      tier: limitCheck.tier || "free",
-      resetPeriod: limitCheck.resetPeriod || "lifetime",
-    };
+    photoLimitModalData.value = createLimitModalData(limitCheck, 'photo');
     showPhotoLimitModal.value = true;
     return;
   }
@@ -844,7 +919,7 @@ const handleRequestSelfie = async () => {
 
     // 創建用戶消息
     const userMessage = {
-      id: `msg-selfie-request-${Date.now()}`,
+      id: `${MESSAGE_ID_PREFIXES.SELFIE_REQUEST}${Date.now()}`,
       role: "user",
       text: randomMessage,
       createdAt: new Date().toISOString(),
@@ -893,66 +968,14 @@ const handleRequestSelfie = async () => {
 
     // 如果拍照失敗（返回 null），撤回用戶訊息
     if (!photoResult && userMessageId) {
-      try {
-        // ✅ 先從後端 Firestore 刪除
-        await apiJson(`/api/conversations/${userId}/${matchId}/messages`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: {
-            messageIds: [userMessageId],
-          },
-          skipGlobalLoading: true,
-        });
-
-        // ✅ 成功後才從前端訊息列表中刪除
-        const userMsgIndex = messages.value.findIndex(
-          (m) => m.id === userMessageId
-        );
-        if (userMsgIndex !== -1) {
-          messages.value.splice(userMsgIndex, 1);
-        }
-
-        // ✅ 更新緩存
-        writeCachedHistory(userId, matchId, messages.value);
-      } catch (deleteError) {
-        showError("撤回訊息失敗，請重新整理頁面");
-      }
+      await rollbackUserMessage(userId, matchId, userMessageId);
     }
   } catch (error) {
     showError(error instanceof Error ? error.message : "請求自拍失敗");
 
     // 撤回用戶剛發送的訊息
     if (userMessageId) {
-      try {
-        const token = await firebaseAuth.getCurrentUserIdToken();
-
-        // ✅ 先從後端 Firestore 刪除
-        await apiJson(`/api/conversations/${userId}/${matchId}/messages`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: {
-            messageIds: [userMessageId],
-          },
-          skipGlobalLoading: true,
-        });
-
-        // ✅ 成功後才從前端訊息列表中刪除
-        const userMsgIndex = messages.value.findIndex(
-          (m) => m.id === userMessageId
-        );
-        if (userMsgIndex !== -1) {
-          messages.value.splice(userMsgIndex, 1);
-        }
-
-        // ✅ 更新緩存
-        writeCachedHistory(userId, matchId, messages.value);
-      } catch (deleteError) {
-        showError("撤回訊息失敗，請重新整理頁面");
-      }
+      await rollbackUserMessage(userId, matchId, userMessageId);
     }
   }
 };
@@ -979,20 +1002,11 @@ const generateVideo = async (options = {}) => {
     const token = await firebaseAuth.getCurrentUserIdToken();
 
     // 1. 先發送一條隨機的影片請求訊息
-    const videoRequestMessages = [
-      "能給我看一段你的影片嗎？",
-      "想看看你的影片！",
-      "可以拍一段影片給我看嗎？",
-      "期待看到你的影片！",
-    ];
-    const randomMessage =
-      videoRequestMessages[
-        Math.floor(Math.random() * videoRequestMessages.length)
-      ];
+    const randomMessage = getRandomVideoRequestMessage();
 
     // 創建用戶消息
     const userMessage = {
-      id: `msg-video-request-${Date.now()}`,
+      id: `${MESSAGE_ID_PREFIXES.VIDEO_REQUEST}${Date.now()}`,
       role: "user",
       text: randomMessage,
       createdAt: new Date().toISOString(),
@@ -1037,9 +1051,9 @@ const generateVideo = async (options = {}) => {
         // userId 從後端認證 token 自動獲取，無需傳遞
         characterId: matchId,
         requestId: `video-${userId}-${matchId}-${Date.now()}`, // 冪等性 ID
-        duration: "4s",
-        resolution: "720p",
-        aspectRatio: "9:16",
+        duration: VIDEO_CONFIG.DURATION,
+        resolution: VIDEO_CONFIG.RESOLUTION,
+        aspectRatio: VIDEO_CONFIG.ASPECT_RATIO,
         useVideoCard, // 告訴後端是否使用影片卡
       },
     });
@@ -1051,9 +1065,9 @@ const generateVideo = async (options = {}) => {
 
     // 3. 創建包含影片的 AI 消息
     const aiVideoMessage = {
-      id: `msg-video-ai-${Date.now()}`,
+      id: `${MESSAGE_ID_PREFIXES.VIDEO_AI}${Date.now()}`,
       role: "ai",
-      text: "這是我為你準備的影片！",
+      text: AI_VIDEO_RESPONSE_TEXT,
       createdAt: new Date().toISOString(),
       video: {
         url: videoResult.videoUrl,
@@ -1107,34 +1121,7 @@ const generateVideo = async (options = {}) => {
 
     // 撤回用戶剛發送的訊息
     if (userMessageId) {
-      try {
-        const token = await firebaseAuth.getCurrentUserIdToken();
-
-        // ✅ 先從後端 Firestore 刪除
-        await apiJson(`/api/conversations/${userId}/${matchId}/messages`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: {
-            messageIds: [userMessageId],
-          },
-          skipGlobalLoading: true,
-        });
-
-        // ✅ 成功後才從前端訊息列表中刪除
-        const userMsgIndex = messages.value.findIndex(
-          (m) => m.id === userMessageId
-        );
-        if (userMsgIndex !== -1) {
-          messages.value.splice(userMsgIndex, 1);
-        }
-
-        // ✅ 更新緩存
-        writeCachedHistory(userId, matchId, messages.value);
-      } catch (deleteError) {
-        showError("撤回訊息失敗，請重新整理頁面");
-      }
+      await rollbackUserMessage(userId, matchId, userMessageId);
     }
   } finally {
     isRequestingVideo.value = false;
@@ -1176,16 +1163,7 @@ const handleRequestVideo = async () => {
     // - cards > 0: 顯示「使用解鎖卡」按鈕
     // - cards = 0: 顯示「次數已達上限」及升級選項
     if (!limitCheck.allowed) {
-      videoLimitModalData.value = {
-        used: limitCheck.used || 0,
-        remaining: limitCheck.remaining || 0,
-        total: limitCheck.total || 0,
-        standardTotal: limitCheck.standardVideosLimit || null,
-        isTestAccount: limitCheck.isTestAccount || false,
-        cards: limitCheck.videoCards || 0,
-        tier: limitCheck.tier || "free",
-        resetPeriod: limitCheck.resetPeriod || "lifetime",
-      };
+      videoLimitModalData.value = createLimitModalData(limitCheck, 'video');
       showVideoLimitModal.value = true;
       return;
     }
@@ -1536,7 +1514,7 @@ onMounted(async () => {
 
     if (needsFirstMessage) {
       const firstMessage = {
-        id: `msg-first-${Date.now()}`,
+        id: `${MESSAGE_ID_PREFIXES.FIRST}${Date.now()}`,
         role: "partner",
         text: partner.value.first_message.trim(),
         createdAt: new Date().toISOString(),
@@ -1799,7 +1777,6 @@ watch(
       :cards="photoLimitModalData.cards"
       :tier="photoLimitModalData.tier"
       :reset-period="photoLimitModalData.resetPeriod"
-      :photo-unlock-cards="photoLimitModalData.cards"
       @close="handleClosePhotoLimitModal"
       @use-unlock-card="handleUsePhotoUnlockCard"
       @upgrade-membership="handleUpgradeFromVideoModal"
@@ -1815,7 +1792,6 @@ watch(
       :cards="videoLimitModalData.cards"
       :tier="videoLimitModalData.tier"
       :reset-period="videoLimitModalData.resetPeriod"
-      :video-unlock-cards="videoLimitModalData.cards"
       @close="handleCloseVideoLimitModal"
       @use-unlock-card="handleUseVideoUnlockCard"
       @upgrade-membership="handleUpgradeFromVideoModal"
@@ -1847,6 +1823,9 @@ watch(
 </template>
 
 <style scoped lang="scss">
+/* ===================
+   Main Container
+   =================== */
 .chat-page {
   display: flex;
   flex-direction: column;
@@ -1858,18 +1837,9 @@ watch(
   position: relative;
 }
 
-.chat-backdrop {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to bottom,
-    rgba(15, 23, 42, 0.95),
-    rgba(30, 41, 59, 0.95)
-  );
-  z-index: 0;
-}
-
-/* Modal Styles */
+/* ===================
+   Modal Base Styles
+   =================== */
 .chat-confirm-backdrop {
   position: fixed;
   inset: 0;
@@ -1894,8 +1864,16 @@ watch(
   padding: 1.8rem;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(148, 163, 184, 0.2);
+
+  p {
+    color: rgba(226, 232, 240, 0.85);
+    font-size: 0.98rem;
+    line-height: 1.65;
+    margin: 0 0 1.5rem 0;
+  }
 }
 
+/* Modal Header */
 .chat-confirm-header {
   display: flex;
   align-items: center;
@@ -1910,6 +1888,7 @@ watch(
   }
 }
 
+/* Modal Close Button */
 .chat-confirm-close {
   width: 36px;
   height: 36px;
@@ -1934,19 +1913,16 @@ watch(
   }
 }
 
-.chat-confirm-dialog p {
-  color: rgba(226, 232, 240, 0.85);
-  font-size: 0.98rem;
-  line-height: 1.65;
-  margin: 0 0 1.5rem 0;
-}
-
+/* Modal Footer */
 .chat-confirm-footer {
   display: flex;
   gap: 0.8rem;
   justify-content: flex-end;
 }
 
+/* ===================
+   Modal Buttons
+   =================== */
 .chat-confirm-btn {
   padding: 0.7rem 1.5rem;
   border-radius: 12px;
@@ -1996,23 +1972,9 @@ watch(
   }
 }
 
-.memory-boost-content {
-  margin-bottom: 1.5rem;
-
-  p {
-    margin-bottom: 1.2rem;
-  }
-}
-
-.memory-boost-details {
-  background: rgba(51, 65, 85, 0.4);
-  border-radius: 12px;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
+/* ===================
+   Detail Items
+   =================== */
 .detail-item {
   display: flex;
   justify-content: space-between;
@@ -2038,7 +2000,9 @@ watch(
   }
 }
 
-// Buff Details Modal
+/* ===================
+   Buff Details Modal
+   =================== */
 .buff-details-title {
   display: flex;
   align-items: center;
@@ -2069,6 +2033,9 @@ watch(
   gap: 0.7rem;
 }
 
+/* ===================
+   Responsive Styles
+   =================== */
 @media (max-width: 540px) {
   .chat-confirm-dialog {
     padding: 1.5rem;

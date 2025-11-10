@@ -3,12 +3,32 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useUserProfile } from "../composables/useUserProfile";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth";
+import { usePaginatedConversations } from "../composables/usePaginatedConversations";
+import { useInfiniteScroll } from "../composables/useInfiniteScroll";
 import { fallbackMatches } from "../utils/matchFallback";
 import { apiJson } from "../utils/api";
 
 const router = useRouter();
 const { user, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
+
+// 分頁對話列表
+const userId = computed(() => user.value?.id);
+const {
+  conversations: paginatedConversations,
+  hasMore: hasMoreConversations,
+  isLoading: isLoadingConversations,
+  isLoadingMore: isLoadingMoreConversations,
+  loadInitial,
+  loadMore: loadMoreConversations,
+  reload: reloadConversations,
+} = usePaginatedConversations(userId, 20);
+
+// 無限滾動
+const { containerRef } = useInfiniteScroll(loadMoreConversations, {
+  threshold: 200,
+  enabled: true,
+});
 
 const activeTab = ref("all");
 const isFavoriteTab = computed(() => activeTab.value === "favorite");
@@ -31,7 +51,6 @@ const deleteConfirm = reactive({
   displayName: "",
   lastMessage: "",
   timeLabel: "",
-  error: "",
 });
 const HIDDEN_THREADS_STORAGE_KEY = "chat-list-hidden-threads";
 const hiddenThreads = reactive(new Map());
@@ -121,10 +140,8 @@ const persistHiddenThreads = () => {
       resolveHiddenThreadsKey(),
       JSON.stringify(payload)
     );
-  } catch (error) {
-    if (import.meta.env.DEV) {
-
-    }
+  } catch {
+    // 儲存失敗時靜默處理
   }
 };
 
@@ -148,10 +165,8 @@ const loadHiddenThreads = (ownerId) => {
           typeof entry?.timestamp === "number" ? entry.timestamp : Date.now(),
       });
     });
-  } catch (error) {
-    if (import.meta.env.DEV) {
-
-    }
+  } catch {
+    // 載入失敗時靜默處理
   }
 };
 
@@ -242,19 +257,12 @@ onBeforeUnmount(() => {
   clearActionMessageTimer();
 });
 
-const normalizeDisplayName = (value) => {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  return trimmed.length ? trimmed : "";
-};
-
 const clearDeleteConfirmState = () => {
   deleteConfirm.open = false;
   deleteConfirm.threadId = "";
   deleteConfirm.displayName = "";
   deleteConfirm.lastMessage = "";
   deleteConfirm.timeLabel = "";
-  deleteConfirm.error = "";
 };
 
 const truncatePreview = (text, maxLength = 15) => {
@@ -350,10 +358,8 @@ const normalizeThread = (source, index = 0) => {
           const day = `${date.getDate()}`.padStart(2, "0");
           return `${month}/${day}`;
         }
-      } catch (error) {
-        if (import.meta.env.DEV) {
-
-        }
+      } catch {
+        // 日期解析失敗時使用預設時間
       }
     }
     return DEFAULT_TIMES[safeIndex % DEFAULT_TIMES.length];
@@ -458,19 +464,24 @@ watch(
       }
 
       favoriteMatches.value = [];
-      if (import.meta.env.DEV) {
+    }
+  },
+  { immediate: true }
+);
 
-      }
+// 監聽用戶 ID 變化，載入對話列表
+watch(
+  userId,
+  async (newUserId) => {
+    if (newUserId) {
+      await loadInitial();
     }
   },
   { immediate: true }
 );
 
 const conversationThreads = computed(() => {
-  const profile = user.value;
-  const conversations = Array.isArray(profile?.conversations)
-    ? profile.conversations
-    : [];
+  const conversations = paginatedConversations.value || [];
   const favoritesSet = new Set(favoriteIds.value);
 
   if (!conversations.length) {
@@ -876,9 +887,6 @@ const handleFavoriteAction = async (thread) => {
         ? requestError.message
         : "更新收藏時發生錯誤，請稍後再試。";
     showActionMessage(message, "error");
-    if (import.meta.env.DEV) {
-
-    }
   } finally {
     setFavoriteMutating(threadId, false);
   }
@@ -901,13 +909,11 @@ const requestDeleteAction = (thread) => {
   }
 
   deleteConfirm.threadId = threadId;
-  deleteConfirm.displayName =
-    normalizeDisplayName(thread?.displayName) || "這則對話";
+  deleteConfirm.displayName = normalizeId(thread?.displayName) || "這則對話";
   deleteConfirm.lastMessage =
     typeof thread?.lastMessage === "string" ? thread.lastMessage : "";
   deleteConfirm.timeLabel =
     typeof thread?.timeLabel === "string" ? thread.timeLabel : "";
-  deleteConfirm.error = "";
   deleteConfirm.open = true;
 };
 
@@ -930,8 +936,6 @@ const confirmDeleteAction = () => {
   if (isFavoriteMutating(threadId)) {
     return;
   }
-
-  deleteConfirm.error = "";
 
   const threads = conversationThreads.value;
   const targetThread = threads.find((thread) => thread.id === threadId) ?? null;
@@ -1021,9 +1025,18 @@ const handleThreadSelect = (thread) => {
     <section
       v-if="!isEmpty"
       :id="isFavoriteTab ? 'chat-thread-favorite' : 'chat-thread-all'"
+      :ref="!isFavoriteTab ? containerRef : undefined"
       class="chat-thread-scroll chat-thread-list"
       role="list"
     >
+      <!-- 載入更多指示器（顯示在頂部） -->
+      <div
+        v-if="isLoadingMoreConversations && !isFavoriteTab"
+        class="chat-list-loading"
+      >
+        <div class="chat-list-loading__spinner"></div>
+        <p>載入更多對話...</p>
+      </div>
       <article
         v-for="thread in visibleThreads"
         :key="thread.id"
@@ -1141,6 +1154,18 @@ const handleThreadSelect = (thread) => {
     </section>
 
     <section
+      v-else-if="isLoadingConversations && !isFavoriteTab"
+      :id="isFavoriteTab ? 'chat-thread-favorite' : 'chat-thread-all'"
+      class="chat-thread-scroll chat-thread-empty"
+      aria-live="polite"
+    >
+      <div class="chat-list-loading">
+        <div class="chat-list-loading__spinner"></div>
+        <p>載入對話列表...</p>
+      </div>
+    </section>
+
+    <section
       v-else
       :id="isFavoriteTab ? 'chat-thread-favorite' : 'chat-thread-all'"
       class="chat-thread-scroll chat-thread-empty"
@@ -1167,14 +1192,6 @@ const handleThreadSelect = (thread) => {
         確定要隱藏
         <strong>{{ deleteConfirm.displayName }}</strong>
         嗎？對話紀錄會保留，隨時都能重新開啟。
-      </p>
-      <p
-        v-if="deleteConfirm.error"
-        class="chat-list-dialog__error"
-        role="alert"
-        aria-live="assertive"
-      >
-        {{ deleteConfirm.error }}
       </p>
       <div class="chat-list-dialog__actions">
         <button
@@ -1301,7 +1318,7 @@ const handleThreadSelect = (thread) => {
   padding: 0.55rem 0.92rem;
   border-radius: 14px;
   background: rgba(18, 21, 34, 0.92);
-  box-shadow: 0 16px 40px rgba(5, 6, 10, 0.42);
+  box-shadow: 0 16px 40px rgba(5, 6, 10, 0.4);
   color: rgba(226, 232, 240, 0.96);
   pointer-events: none;
   z-index: 32;
@@ -1360,12 +1377,6 @@ const handleThreadSelect = (thread) => {
 
 .chat-list-dialog__message strong {
   color: #ffffff;
-}
-
-.chat-list-dialog__error {
-  margin: -0.4rem 0 0;
-  font-size: clamp(0.82rem, 2.8vw, 0.9rem);
-  color: rgba(248, 113, 113, 0.92);
 }
 
 .chat-list-dialog__actions {
@@ -1456,8 +1467,13 @@ const handleThreadSelect = (thread) => {
   grid-template-rows: auto auto;
   padding: 0.85rem 1rem;
   border-radius: 18px 0 0 18px;
-  background: rgba(15, 17, 28, 0.78);
-  box-shadow: 0 12px 32px rgba(5, 6, 10, 0.4);
+  background: linear-gradient(
+    135deg,
+    rgba(20, 22, 36, 0.88) 0%,
+    rgba(15, 17, 28, 0.82) 100%
+  );
+  box-shadow: 0 8px 24px rgba(5, 6, 10, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease,
     background 160ms ease, box-shadow 160ms ease;
@@ -1471,7 +1487,14 @@ const handleThreadSelect = (thread) => {
 
 .chat-thread:hover .chat-thread__content {
   --chat-thread-hover: -2px;
-  background: rgba(15, 17, 28, 0.78);
+  background: linear-gradient(
+    135deg,
+    rgba(25, 27, 42, 0.92) 0%,
+    rgba(18, 20, 32, 0.88) 100%
+  );
+  border-color: rgba(255, 122, 184, 0.15);
+  box-shadow: 0 12px 32px rgba(5, 6, 10, 0.5),
+    0 0 20px rgba(255, 122, 184, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .chat-thread:active .chat-thread__content {
@@ -1492,7 +1515,11 @@ const handleThreadSelect = (thread) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 17, 28, 0.78);
+  background: linear-gradient(
+    135deg,
+    rgba(20, 22, 36, 0.88) 0%,
+    rgba(15, 17, 28, 0.82) 100%
+  );
   pointer-events: none;
   will-change: transform;
 }
@@ -1620,12 +1647,42 @@ const handleThreadSelect = (thread) => {
   margin-top: clamp(3rem, 10vw, 4rem);
   padding: 2rem 1.5rem;
   border-radius: 20px;
-  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border: 1px dashed rgba(148, 163, 184, 0.75);
   background: rgba(15, 17, 28, 0.6);
   text-align: center;
   color: rgba(148, 163, 184, 0.85);
   letter-spacing: 0.06em;
   font-size: 0.95rem;
+}
+
+.chat-list-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+  color: rgba(148, 163, 184, 0.85);
+  font-size: 0.9rem;
+}
+
+.chat-list-loading__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(148, 163, 184, 0.2);
+  border-top-color: #ff4d8f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chat-list-loading p {
+  margin: 0;
+  letter-spacing: 0.05em;
 }
 
 @media (min-width: 768px) {

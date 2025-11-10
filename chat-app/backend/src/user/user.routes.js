@@ -19,6 +19,7 @@ import {
 import { getUserConversations } from "./userConversations.service.js";
 import { requireFirebaseAuth } from "../auth/index.js";
 import { requireOwnership, asyncHandler, sendSuccess, sendError } from "../utils/routeHelpers.js";
+import { requireAdmin } from "../middleware/adminAuth.middleware.js";
 import {
   getMatchesByIds,
   listMatchesByCreator,
@@ -62,9 +63,8 @@ const buildFavoritesPayload = (user, includeMatches) => {
 
 export const userRouter = Router();
 
-// 獲取所有用戶列表 - 僅供管理員使用（需要額外的管理員權限檢查）
-userRouter.get("/", requireFirebaseAuth, asyncHandler(async (req, res) => {
-  // TODO: 添加管理員權限檢查
+// 獲取所有用戶列表 - 僅供管理員使用
+userRouter.get("/", requireFirebaseAuth, requireAdmin, asyncHandler(async (req, res) => {
   const { limit, startAfter } = req.query;
 
   const result = await getAllUsers({
@@ -181,7 +181,7 @@ userRouter.patch(
   })
 );
 
-userRouter.get("/:id/favorites", asyncHandler(async (req, res) => {
+userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res) => {
   let user = await getUserById(req.params.id);
 
   // 如果用戶不存在，為測試用戶自動創建基本記錄
@@ -206,7 +206,7 @@ userRouter.get("/:id/favorites", asyncHandler(async (req, res) => {
   res.json(buildFavoritesPayload(user, includeMatches));
 }));
 
-userRouter.get("/:id/characters", asyncHandler(async (req, res) => {
+userRouter.get("/:id/characters", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const characters = await listMatchesByCreator(id);
   res.json({
@@ -265,17 +265,21 @@ userRouter.delete(
   })
 );
 
-userRouter.get("/:id/conversations", asyncHandler(async (req, res) => {
+userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+  const cursor = req.query.cursor || null;
 
   try {
-    // 從 Firestore 子集合獲取對話列表，按最近更新時間排序
-    const conversations = await getUserConversations(id, {
+    // 從 Firestore 子集合獲取對話列表（支援分頁）
+    const result = await getUserConversations(id, {
       limit,
       orderBy: "updatedAt",
       orderDirection: "desc",
+      cursor,
     });
+
+    const { conversations, nextCursor, hasMore } = result;
 
     // 補充角色詳細信息（包含統計數據）
     const characterIds = conversations
@@ -328,12 +332,16 @@ userRouter.get("/:id/conversations", asyncHandler(async (req, res) => {
     res.json({
       conversations: enrichedConversations,
       total: enrichedConversations.length,
+      nextCursor,
+      hasMore,
     });
   } catch (error) {
     // 如果用戶不存在或出錯，返回空數組
     res.json({
       conversations: [],
       total: 0,
+      nextCursor: null,
+      hasMore: false,
     });
   }
 }));

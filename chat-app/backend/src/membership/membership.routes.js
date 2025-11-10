@@ -4,6 +4,7 @@
 
 import express from "express";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
+import { requireOwnership } from "../utils/routeHelpers.js";
 import {
   getUserMembership,
   upgradeMembership,
@@ -19,7 +20,7 @@ const router = express.Router();
  * 獲取用戶會員資訊
  * GET /api/membership/:userId
  */
-router.get("/api/membership/:userId", async (req, res) => {
+router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId } = req.params;
     const membership = await getUserMembership(userId);
@@ -41,7 +42,7 @@ router.get("/api/membership/:userId", async (req, res) => {
  * POST /api/membership/:userId/upgrade
  * Body: { tier: "vip" | "vvip", durationMonths?: number, autoRenew?: boolean }
  */
-router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, async (req, res) => {
+router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId } = req.params;
     const { tier, durationMonths, autoRenew } = req.body;
@@ -81,7 +82,7 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, async (req, 
  * POST /api/membership/:userId/cancel
  * Body: { immediate?: boolean }
  */
-router.post("/api/membership/:userId/cancel", requireFirebaseAuth, async (req, res) => {
+router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId } = req.params;
     const { immediate } = req.body;
@@ -106,7 +107,7 @@ router.post("/api/membership/:userId/cancel", requireFirebaseAuth, async (req, r
  * POST /api/membership/:userId/renew
  * Body: { durationMonths?: number }
  */
-router.post("/api/membership/:userId/renew", requireFirebaseAuth, async (req, res) => {
+router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId } = req.params;
     const { durationMonths } = req.body;
@@ -132,7 +133,7 @@ router.post("/api/membership/:userId/renew", requireFirebaseAuth, async (req, re
  * 檢查功能權限
  * GET /api/membership/:userId/features/:featureName
  */
-router.get("/api/membership/:userId/features/:featureName", async (req, res) => {
+router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId, featureName } = req.params;
     const hasAccess = checkFeatureAccess(userId, featureName);
@@ -155,7 +156,7 @@ router.get("/api/membership/:userId/features/:featureName", async (req, res) => 
  * 獲取用戶所有功能權限
  * GET /api/membership/:userId/features
  */
-router.get("/api/membership/:userId/features", async (req, res) => {
+router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId } = req.params;
     const features = getUserFeatures(userId);

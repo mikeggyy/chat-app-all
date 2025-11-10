@@ -33,11 +33,11 @@ export const requireSameUser = (options = {}) => {
     const authenticatedUserId = req.firebaseUser?.uid;
 
     if (!authenticatedUserId) {
-      return sendError(res, "UNAUTHORIZED", "未認證的用戶");
+      return sendError(res, "AUTH_UNAUTHORIZED", "未認證的用戶");
     }
 
     if (authenticatedUserId !== resourceUserId) {
-      return sendError(res, "FORBIDDEN", errorMessage);
+      return sendError(res, "AUTH_INSUFFICIENT_PERMISSIONS", errorMessage);
     }
 
     next();
@@ -75,7 +75,7 @@ export const requireRole = (roles, options = {}) => {
     const hasRole = allowedRoles.some(role => userClaims[role] === true);
 
     if (!hasRole) {
-      return sendError(res, "FORBIDDEN", errorMessage);
+      return sendError(res, "AUTH_INSUFFICIENT_PERMISSIONS", errorMessage);
     }
 
     next();

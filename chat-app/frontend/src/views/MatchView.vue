@@ -27,6 +27,7 @@ const firebaseAuth = useFirebaseAuth();
 const { requireLogin } = useGuestGuard();
 const isLoading = ref(false);
 const error = ref("");
+const conversationError = ref("");
 const favoriteIds = ref(new Set());
 const favoriteMutating = ref(false);
 const favoriteError = ref("");

@@ -22,8 +22,7 @@ import { useFirebaseAuth } from "../composables/useFirebaseAuth";
 import { useGuestGuard } from "../composables/useGuestGuard";
 
 const router = useRouter();
-const { user, loadUserProfile, setUserProfile, addConversationHistory } =
-  useUserProfile();
+const { user, loadUserProfile, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
 const { requireLogin } = useGuestGuard();
 const isLoading = ref(false);
@@ -35,8 +34,6 @@ const favoriteRequestState = reactive({
   loading: false,
   lastUserId: "",
 });
-const conversationMutating = ref(false);
-const conversationError = ref("");
 const matches = ref([]);
 const currentIndex = ref(0);
 const swipeOffset = ref(0);
@@ -601,13 +598,11 @@ watch(
       lastLoadedUserId = "";
       favoriteRequestState.lastUserId = "";
       syncFavoriteSet([]);
-      conversationError.value = "";
       loadMatches();
       return;
     }
 
     favoriteError.value = "";
-    conversationError.value = "";
 
     if (nextId !== lastLoadedUserId) {
       lastLoadedUserId = nextId;
@@ -633,10 +628,10 @@ watch(
   { immediate: true }
 );
 
-const enterChatRoom = async () => {
+const enterChatRoom = () => {
   conversationError.value = "";
 
-  if (conversationMutating.value || !match.id) {
+  if (!match.id) {
     return;
   }
 
@@ -646,24 +641,11 @@ const enterChatRoom = async () => {
     return;
   }
 
-  conversationMutating.value = true;
-
-  try {
-    await addConversationHistory(match.id);
-    router.push({
-      name: "chat",
-      params: { id: match.id },
-    });
-  } catch (error) {
-    conversationError.value =
-      error instanceof Error
-        ? error.message
-        : "更新聊天紀錄時發生錯誤，請稍後再試。";
-    if (import.meta.env.DEV) {
-    }
-  } finally {
-    conversationMutating.value = false;
-  }
+  // 直接跳轉到聊天視窗，對話記錄將在 ChatView 中處理
+  router.push({
+    name: "chat",
+    params: { id: match.id },
+  });
 };
 
 onMounted(() => {
@@ -762,16 +744,13 @@ onBeforeUnmount(() => {
               type="button"
               class="btn primary"
               @click="enterChatRoom"
-              :disabled="isLoading || conversationMutating"
+              :disabled="isLoading"
             >
               <ChatBubbleBottomCenterTextIcon class="icon" aria-hidden="true" />
               <span>{{ isLoading ? "尋找配對中…" : "進入聊天室" }}</span>
             </button>
             <p v-if="favoriteError" class="action-error">
               {{ favoriteError }}
-            </p>
-            <p v-if="conversationError" class="action-error">
-              {{ conversationError }}
             </p>
           </div>
         </section>

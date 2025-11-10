@@ -39,6 +39,7 @@ import { voiceLimitService } from "./ai/voiceLimit.service.js";
 import { photoLimitService } from "./ai/photoLimit.service.js";
 import { getConversationCacheStats } from "./conversation/index.js";
 import { initializeCharactersCache, getCacheStats as getCharacterCacheStats } from "./services/character/characterCache.service.js";
+import { startCacheStatsMonitoring, getCacheStats as getUserCacheStats } from "./user/userProfileCache.service.js";
 import { errorHandlerMiddleware } from "../../../shared/utils/errorFormatter.js";
 
 const app = express();
@@ -116,12 +117,14 @@ app.get("/health/cache", (_, res) => {
   try {
     const characterCache = getCharacterCacheStats();
     const conversationCache = getConversationCacheStats();
+    const userProfileCache = getUserCacheStats();
 
     res.json({
       status: "ok",
       caches: {
         characters: characterCache,
         conversations: conversationCache,
+        userProfiles: userProfileCache,
       },
       timestamp: new Date().toISOString(),
     });
@@ -172,6 +175,10 @@ app.listen(port, async () => {
     logger.error(`❌ Characters 緩存初始化失敗:`, error);
     logger.warn(`⚠️ 應用將繼續運行，但會直接查詢 Firestore（性能較差）`);
   }
+
+  // 啟動用戶檔案緩存統計監控（每 10 分鐘打印一次）
+  startCacheStatsMonitoring(10 * 60 * 1000);
+  logger.info(`✅ 用戶檔案緩存監控已啟動`);
 
   // 設置定時清理任務以防止記憶體洩漏
   setupMemoryCleanup();

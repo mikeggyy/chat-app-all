@@ -4,6 +4,7 @@
  */
 
 import { getUserById } from "../user/user.service.js";
+import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 import { isDevUser, isGuestUser } from "../../../../shared/config/testAccounts.js";
 import { TEST_ACCOUNT_LIMITS } from "../config/limits.js";
 
@@ -11,10 +12,16 @@ import { TEST_ACCOUNT_LIMITS } from "../config/limits.js";
  * 獲取用戶的會員等級
  * 會自動檢查會員是否過期，過期則返回 "free"
  *
+ * ⚡ 性能優化：使用緩存減少 Firestore 查詢（5 分鐘緩存）
+ *
  * @param {string} userId - 用戶 ID
+ * @param {Object} options - 選項
+ * @param {boolean} options.useCache - 是否使用緩存（默認 true）
  * @returns {Promise<string>} 會員等級 ("guest" | "free" | "vip" | "vvip")
  */
-export const getUserTier = async (userId) => {
+export const getUserTier = async (userId, options = {}) => {
+  const { useCache = true } = options;
+
   // 檢查是否為遊客（優先級最高）
   if (isGuestUser(userId)) {
     return "guest";
@@ -25,7 +32,11 @@ export const getUserTier = async (userId) => {
     return TEST_ACCOUNT_LIMITS.MEMBERSHIP_TIER || "free";
   }
 
-  const user = await getUserById(userId);
+  // 使用緩存獲取用戶資料（默認啟用緩存）
+  const user = useCache
+    ? await getUserProfileWithCache(userId)
+    : await getUserById(userId);
+
   if (!user) {
     return "free";
   }
@@ -67,11 +78,20 @@ export const isFreeMember = async (userId) => {
 /**
  * 檢查用戶會員是否已過期
  *
+ * ⚡ 性能優化：使用緩存
+ *
  * @param {string} userId - 用戶 ID
+ * @param {Object} options - 選項
+ * @param {boolean} options.useCache - 是否使用緩存（默認 true）
  * @returns {Promise<boolean>}
  */
-export const isMembershipExpired = async (userId) => {
-  const user = await getUserById(userId);
+export const isMembershipExpired = async (userId, options = {}) => {
+  const { useCache = true } = options;
+
+  const user = useCache
+    ? await getUserProfileWithCache(userId)
+    : await getUserById(userId);
+
   if (!user || !user.membershipExpiresAt) {
     return false;
   }

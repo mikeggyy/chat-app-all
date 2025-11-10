@@ -218,12 +218,17 @@ const fetchPopularCharacters = async ({ reset = false } = {}) => {
       if (reset) {
         popularCharacters.value = response.characters;
       } else {
-        popularCharacters.value = [...popularCharacters.value, ...response.characters];
+        popularCharacters.value = [
+          ...popularCharacters.value,
+          ...response.characters,
+        ];
       }
 
       // 更新 offset 和 hasMore
       popularOffset.value += response.characters.length;
-      popularHasMore.value = response.hasMore !== false && response.characters.length === POPULAR_PAGE_SIZE;
+      popularHasMore.value =
+        response.hasMore !== false &&
+        response.characters.length === POPULAR_PAGE_SIZE;
     }
   } catch (error) {
     console.error("獲取人氣排行失敗:", error);
@@ -249,19 +254,22 @@ watch(
 const recentlyViewed = computed(() => {
   // 如果有真實的對話數據，使用真實數據
   if (recentConversations.value.length > 0) {
-    return recentConversations.value
-      .slice(0, 10)
-      .map((conv, index) => ({
-        id: `recent-${conv.conversationId || conv.id}-${index}`,
-        matchId: conv.conversationId || conv.characterId || conv.id,
-        name: conv.character?.display_name || conv.character?.name || "未知角色",
-        description: conv.character?.background || "",
-        image: conv.character?.portraitUrl || conv.character?.avatar || "/ai-role/match-role-01.webp",
-        messageCount: conv.character?.messageCount || 0,
-        favoritesCount: conv.character?.totalFavorites || 0,
-        messageCountFormatted: formatNumber(conv.character?.messageCount || 0),
-        favoritesCountFormatted: formatNumber(conv.character?.totalFavorites || 0),
-      }));
+    return recentConversations.value.slice(0, 10).map((conv, index) => ({
+      id: `recent-${conv.conversationId || conv.id}-${index}`,
+      matchId: conv.conversationId || conv.characterId || conv.id,
+      name: conv.character?.display_name || conv.character?.name || "未知角色",
+      description: conv.character?.background || "",
+      image:
+        conv.character?.portraitUrl ||
+        conv.character?.avatar ||
+        "/ai-role/match-role-01.webp",
+      messageCount: conv.character?.messageCount || 0,
+      favoritesCount: conv.character?.totalFavorites || 0,
+      messageCountFormatted: formatNumber(conv.character?.messageCount || 0),
+      favoritesCountFormatted: formatNumber(
+        conv.character?.totalFavorites || 0
+      ),
+    }));
   }
 
   // 如果用戶已登入但沒有對話數據，返回空數組（顯示空狀態提示）
@@ -278,19 +286,19 @@ const recentlyViewed = computed(() => {
     image: item.portraitUrl,
     messageCount: 0,
     favoritesCount: item.totalFavorites || 0,
-    messageCountFormatted: '0',
+    messageCountFormatted: "0",
     favoritesCountFormatted: formatNumber(item.totalFavorites || 0),
   }));
 });
 
 // 格式化數字為簡短形式（K, M）
 const formatNumber = (num) => {
-  if (!num || num === 0) return '0';
+  if (!num || num === 0) return "0";
   if (num >= 1000000) {
-    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
   }
   if (num >= 1000) {
-    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
   }
   return num.toString();
 };
@@ -321,7 +329,7 @@ const popularRanking = computed(() => {
     image: item.portraitUrl,
     messageCount: 0,
     favoritesCount: item.totalFavorites || 0,
-    messageCountFormatted: '0',
+    messageCountFormatted: "0",
     favoritesCountFormatted: formatNumber(item.totalFavorites || 0),
   }));
 });
@@ -336,18 +344,18 @@ const RECENT_RECORDS_PANEL_QUERY_KEY = "panel";
 // 面板類型配置（簡化 URL，只需傳遞類型）
 const PANEL_CONFIGS = {
   reconnect: {
-    description: '',
-    badgeLabel: '重新連線',
+    description: "",
+    badgeLabel: "重新連線",
     icon: HeartIcon,
-    iconKey: 'heart',
-    heroImage: '/banner/reconnect-hero.webp',
+    iconKey: "heart",
+    heroImage: "/banner/reconnect-hero.webp",
   },
   ranking: {
-    description: '排行榜每日更新，鎖定最受歡迎的互動角色與連載。',
-    badgeLabel: '人氣排行',
+    description: "排行榜每日更新，鎖定最受歡迎的互動角色與連載。",
+    badgeLabel: "人氣排行",
     icon: FireIcon,
-    iconKey: 'fire',
-    heroImage: '/banner/ranking-hero.webp',
+    iconKey: "fire",
+    heroImage: "/banner/ranking-hero.png",
   },
 };
 
@@ -434,7 +442,12 @@ const updateRecentRecordsQuery = (metadata = {}) => {
 
     if (!panelValue) {
       // 移除 panel 參數
-      if (Object.prototype.hasOwnProperty.call(route.query, RECENT_RECORDS_PANEL_QUERY_KEY)) {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          route.query,
+          RECENT_RECORDS_PANEL_QUERY_KEY
+        )
+      ) {
         delete nextQuery[RECENT_RECORDS_PANEL_QUERY_KEY];
         changed = true;
       }
@@ -468,7 +481,8 @@ const syncRecentRecordsPanelStateFromRoute = () => {
     route.query[RECENT_RECORDS_PANEL_QUERY_KEY]
   );
   // 檢查 panel 值是否為有效的配置類型
-  const shouldOpen = normalizedPanel.length > 0 && PANEL_CONFIGS[normalizedPanel] !== undefined;
+  const shouldOpen =
+    normalizedPanel.length > 0 && PANEL_CONFIGS[normalizedPanel] !== undefined;
 
   if (isRecentRecordsOpen.value !== shouldOpen) {
     isRecentRecordsOpen.value = shouldOpen;
@@ -499,13 +513,13 @@ const heroImageByKey = {
 // 獲取當前面板類型
 const currentPanelType = computed(() => {
   const panelValue = route.query[RECENT_RECORDS_PANEL_QUERY_KEY];
-  return typeof panelValue === 'string' ? panelValue.trim().toLowerCase() : '';
+  return typeof panelValue === "string" ? panelValue.trim().toLowerCase() : "";
 });
 
 // 所有記錄（根據面板類型返回不同的數據源）
 const allRecentRecordEntries = computed(() => {
   // 如果是排行面板，使用 popularCharacters
-  if (currentPanelType.value === 'ranking') {
+  if (currentPanelType.value === "ranking") {
     return popularCharacters.value.map((item, index) => {
       return {
         id: `popular-record-${item.id}-${index}`,
@@ -553,7 +567,10 @@ const allRecentRecordEntries = computed(() => {
       matchId,
       name: character?.display_name || character?.name || "未知角色",
       description: character?.background || "",
-      image: character?.portraitUrl || character?.avatar || "/ai-role/match-role-01.webp",
+      image:
+        character?.portraitUrl ||
+        character?.avatar ||
+        "/ai-role/match-role-01.webp",
       tagline: "",
       metrics: [
         {
@@ -576,7 +593,7 @@ const allRecentRecordEntries = computed(() => {
 // 顯示的記錄（虛擬滾動）
 const recentRecordEntries = computed(() => {
   // 如果是排行面板，顯示所有已加載的數據（不需要虛擬滾動切片）
-  if (currentPanelType.value === 'ranking') {
+  if (currentPanelType.value === "ranking") {
     return allRecentRecordEntries.value;
   }
   // 其他面板使用虛擬滾動
@@ -586,7 +603,7 @@ const recentRecordEntries = computed(() => {
 // 是否還有更多記錄可以加載
 const hasMoreRecords = computed(() => {
   // 如果是排行面板，使用 API 的 hasMore 狀態
-  if (currentPanelType.value === 'ranking') {
+  if (currentPanelType.value === "ranking") {
     return popularHasMore.value;
   }
   // 其他面板使用虛擬滾動
@@ -600,7 +617,7 @@ const loadMoreRecords = async () => {
   }
 
   // 如果是排行面板，從 API 加載更多數據
-  if (currentPanelType.value === 'ranking') {
+  if (currentPanelType.value === "ranking") {
     if (!popularHasMore.value || isLoadingPopular.value) {
       return;
     }
@@ -769,7 +786,8 @@ const syncRecentRecordsMetadata = () => {
     recentRecordsDescription.value = config.description;
     recentRecordsBadgeLabel.value = config.badgeLabel;
     recentRecordsBadgeIconKey.value = config.iconKey;
-    recentRecordsHeroImage.value = config.heroImage || recentRecordsHeroFallback;
+    recentRecordsHeroImage.value =
+      config.heroImage || recentRecordsHeroFallback;
   } else {
     // 重置為默認值
     recentRecordsDescription.value = "";
@@ -789,7 +807,7 @@ watch(
 );
 
 // 簡化後的 openRecentRecords：只接受面板類型
-const openRecentRecords = async (type = 'reconnect') => {
+const openRecentRecords = async (type = "reconnect") => {
   // 從配置中獲取面板信息
   const config = PANEL_CONFIGS[type] || PANEL_CONFIGS.reconnect;
 
@@ -800,7 +818,7 @@ const openRecentRecords = async (type = 'reconnect') => {
   recentRecordsHeroImage.value = config.heroImage || recentRecordsHeroFallback;
 
   // 如果是排行面板，重置並加載排行數據
-  if (type === 'ranking') {
+  if (type === "ranking") {
     await fetchPopularCharacters({ reset: true });
   } else {
     // 重置虛擬滾動狀態
@@ -988,7 +1006,9 @@ const openChat = (profile) => {
             class="recent-empty"
           >
             <p>目前無對話紀錄</p>
-            <p class="recent-empty-hint">開始與角色聊天，這裡會顯示你的對話記錄</p>
+            <p class="recent-empty-hint">
+              開始與角色聊天，這裡會顯示你的對話記錄
+            </p>
           </div>
           <!-- 對話列表 -->
           <div v-else class="recent-scroll">
@@ -1011,7 +1031,10 @@ const openChat = (profile) => {
                     {{ profile.favoritesCountFormatted }}
                   </span>
                   <span class="stat-item">
-                    <ChatBubbleLeftRightIcon class="stat-icon" aria-hidden="true" />
+                    <ChatBubbleLeftRightIcon
+                      class="stat-icon"
+                      aria-hidden="true"
+                    />
                     {{ profile.messageCountFormatted }}
                   </span>
                 </div>
@@ -1067,7 +1090,10 @@ const openChat = (profile) => {
                     {{ profile.favoritesCountFormatted }}
                   </span>
                   <span class="stat-item">
-                    <ChatBubbleLeftRightIcon class="stat-icon" aria-hidden="true" />
+                    <ChatBubbleLeftRightIcon
+                      class="stat-icon"
+                      aria-hidden="true"
+                    />
                     {{ profile.messageCountFormatted }}
                   </span>
                 </div>
@@ -1286,7 +1312,10 @@ const openChat = (profile) => {
           </article>
 
           <!-- 加載指示器 -->
-          <div v-if="isLoadingPopular || isLoadingMoreRecords" class="records-loading">
+          <div
+            v-if="isLoadingPopular || isLoadingMoreRecords"
+            class="records-loading"
+          >
             <div class="records-loading-spinner"></div>
             <p>載入更多...</p>
           </div>
@@ -1299,9 +1328,7 @@ const openChat = (profile) => {
             <p v-if="currentPanelType === 'ranking'">
               已顯示全部 {{ recentRecordEntries.length }} 個角色
             </p>
-            <p v-else>
-              已顯示全部 {{ recentRecordEntries.length }} 則對話記錄
-            </p>
+            <p v-else>已顯示全部 {{ recentRecordEntries.length }} 則對話記錄</p>
           </div>
         </div>
       </section>
@@ -1464,10 +1491,6 @@ const openChat = (profile) => {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-
-  &.compact {
-    align-items: flex-start;
-  }
 }
 
 .section-title {
@@ -2137,7 +2160,7 @@ const openChat = (profile) => {
   gap: 0.8rem;
   position: relative;
   z-index: 2;
-  margin-top: 10rem;
+  margin-top: 32vw;
 }
 
 .recent-records-hero__badge {
@@ -2399,12 +2422,6 @@ const openChat = (profile) => {
 }
 
 @media (max-width: 640px) {
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-
   .section-action {
     align-self: flex-start;
   }

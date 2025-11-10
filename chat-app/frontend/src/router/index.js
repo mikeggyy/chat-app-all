@@ -1,28 +1,6 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import { effectScope, watch, onScopeDispose } from "vue";
 import { getAuth } from "firebase/auth";
-import LoginView from "../views/LoginView.vue";
-import OnboardingView from "../views/OnboardingView.vue";
-import MatchView from "../views/MatchView.vue";
-import ProfileView from "../views/ProfileView.vue";
-import ChatListView from "../views/ChatListView.vue";
-import ChatView from "../views/ChatView.vue";
-import SearchView from "../views/SearchView.vue";
-import RankingView from "../views/RankingView.vue";
-import FavoritesView from "../views/FavoritesView.vue";
-import WalletView from "../views/WalletView.vue";
-import MembershipView from "../views/MembershipView.vue";
-import ShopView from "../views/ShopView.vue";
-import NotificationsView from "../views/NotificationsView.vue";
-import NotificationDetailView from "../views/NotificationDetailView.vue";
-import CharacterCreateGenderView from "../views/CharacterCreateGenderView.vue";
-import CharacterCreateAppearanceView from "../views/CharacterCreateAppearanceView.vue";
-import CharacterCreateGeneratingView from "../views/CharacterCreateGeneratingView.vue";
-import CharacterCreateVoiceView from "../views/CharacterCreateVoiceView.vue";
-import GuestUpgradeView from "../views/GuestUpgradeView.vue";
-import CharacterPhotoGalleryView from "../views/CharacterPhotoGalleryView.vue";
-import MyCharactersView from "../views/MyCharactersView.vue";
-import CharacterDetailView from "../views/CharacterDetailView.vue";
 import { useUserProfile } from "../composables/useUserProfile.js";
 import { getFirebaseApp } from "../utils/firebase.js";
 import {
@@ -30,6 +8,30 @@ import {
   hasValidTestSession,
 } from "../services/testAuthSession.js";
 import { isGuestUser } from "../../../../shared/config/testAccounts.js";
+
+// 使用動態導入實現路由懶加載
+const LoginView = () => import("../views/LoginView.vue");
+const OnboardingView = () => import("../views/OnboardingView.vue");
+const MatchView = () => import("../views/MatchView.vue");
+const ProfileView = () => import("../views/ProfileView.vue");
+const ChatListView = () => import("../views/ChatListView.vue");
+const ChatView = () => import("../views/ChatView.vue");
+const SearchView = () => import("../views/SearchView.vue");
+const RankingView = () => import("../views/RankingView.vue");
+const FavoritesView = () => import("../views/FavoritesView.vue");
+const WalletView = () => import("../views/WalletView.vue");
+const MembershipView = () => import("../views/MembershipView.vue");
+const ShopView = () => import("../views/ShopView.vue");
+const NotificationsView = () => import("../views/NotificationsView.vue");
+const NotificationDetailView = () => import("../views/NotificationDetailView.vue");
+const CharacterCreateGenderView = () => import("../views/CharacterCreateGenderView.vue");
+const CharacterCreateAppearanceView = () => import("../views/CharacterCreateAppearanceView.vue");
+const CharacterCreateGeneratingView = () => import("../views/CharacterCreateGeneratingView.vue");
+const CharacterCreateVoiceView = () => import("../views/CharacterCreateVoiceView.vue");
+const GuestUpgradeView = () => import("../views/GuestUpgradeView.vue");
+const CharacterPhotoGalleryView = () => import("../views/CharacterPhotoGalleryView.vue");
+const MyCharactersView = () => import("../views/MyCharactersView.vue");
+const CharacterDetailView = () => import("../views/CharacterDetailView.vue");
 
 const routes = [
   {

@@ -58,7 +58,7 @@ const router = useRouter();
 const route = useRoute();
 
 // User & Auth
-const { user, setUserProfile } = useUserProfile();
+const { user, setUserProfile, addConversationHistory } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
 const { success, error: showError } = useToast();
 
@@ -1516,6 +1516,16 @@ onMounted(async () => {
 
     // Load conversation history
     await loadHistory(userId, matchId);
+
+    // 記錄對話歷史（靜默失敗，不影響聊天功能）
+    try {
+      await addConversationHistory(matchId);
+    } catch (error) {
+      // 靜默失敗，不影響用戶體驗
+      if (import.meta.env.DEV) {
+        console.warn('記錄對話歷史失敗:', error);
+      }
+    }
 
     // 檢查是否需要添加角色的第一句話
     // 條件：沒有消息，或者第一條消息不是角色的 first_message

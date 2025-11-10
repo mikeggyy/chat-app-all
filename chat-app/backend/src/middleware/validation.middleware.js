@@ -102,6 +102,29 @@ export const commonSchemas = {
     .refine(
       (val) => val.startsWith("http") || val.startsWith("data:image"),
       "無效的圖片 URL 格式"
+    )
+    .refine(
+      (val) => {
+        // HTTP URL 不檢查大小
+        if (val.startsWith("http")) {
+          return true;
+        }
+
+        // Base64 圖片大小限制為 5MB
+        // data:image/png;base64,iVBORw0KG... 格式
+        const base64Match = val.match(/^data:image\/\w+;base64,(.+)$/);
+        if (base64Match) {
+          const base64Data = base64Match[1];
+          // Base64 編碼後的大小約為原始大小的 4/3
+          // 5MB = 5 * 1024 * 1024 bytes
+          const maxSizeInBytes = 5 * 1024 * 1024;
+          const estimatedSize = (base64Data.length * 3) / 4;
+          return estimatedSize <= maxSizeInBytes;
+        }
+
+        return true;
+      },
+      "Base64 圖片大小不得超過 5MB"
     ),
 };
 

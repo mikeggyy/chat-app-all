@@ -8,6 +8,11 @@ import {
 } from "../utils/firestoreHelpers.js";
 import { normalizeGender, normalizeArray, trimString } from "../../../shared/utils/userUtils.js";
 import { clearConversationHistory } from "../conversation/conversation.service.js";
+import {
+  getUserProfileWithCache,
+  setCachedUserProfile,
+  deleteCachedUserProfile,
+} from "./userProfileCache.service.js";
 
 const USERS_COLLECTION = "users";
 
@@ -191,6 +196,10 @@ export const upsertUser = async (payload = {}) => {
   const userRef = db.collection(USERS_COLLECTION).doc(user.id);
 
   await userRef.set(user, { merge: true });
+
+  // 更新緩存
+  setCachedUserProfile(user.id, user);
+
   return user;
 };
 
@@ -224,11 +233,16 @@ export const updateUserPhoto = async (id, photoURL) => {
 
   await userRef.update(updated);
 
-  return {
+  const updatedUser = {
     ...existing,
     photoURL,
     updatedAt: new Date().toISOString(),
   };
+
+  // 刪除舊緩存，下次讀取時會重新緩存
+  deleteCachedUserProfile(id);
+
+  return updatedUser;
 };
 
 const hasOwn = (object, key) =>
@@ -342,7 +356,7 @@ export const updateUserProfileFields = async (id, updates = {}) => {
 
   await userRef.update(updateData);
 
-  return {
+  const updatedUser = {
     ...existing,
     displayName: nextDisplayName,
     gender: nextGender,
@@ -351,6 +365,11 @@ export const updateUserProfileFields = async (id, updates = {}) => {
     defaultPrompt: nextDefaultPrompt,
     updatedAt: new Date().toISOString(),
   };
+
+  // 刪除舊緩存，下次讀取時會重新緩存
+  deleteCachedUserProfile(id);
+
+  return updatedUser;
 };
 
 const updateUserFavorites = async (id, buildFavorites) => {

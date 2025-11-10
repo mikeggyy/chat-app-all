@@ -1229,9 +1229,9 @@ watch(
 .ranking-item {
   position: relative;
   display: grid;
-  grid-template-columns: clamp(66px, 12vw, 74px) clamp(58px, 12vw, 68px) 1fr auto auto;
+  gap: 10px;
+  grid-template-columns: 5vw clamp(58px, 12vw, 68px) 1fr auto auto;
   align-items: center;
-  gap: clamp(0.65rem, 2vw, 0.9rem);
   padding: clamp(0.85rem, 2.4vw, 1.05rem) clamp(0.9rem, 3vw, 1.4rem);
   border-radius: 22px;
   background: linear-gradient(165deg, var(--card-bg), rgba(0, 0, 0, 0.58));
@@ -1273,9 +1273,6 @@ watch(
   justify-content: center;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 18px;
-  background: linear-gradient(160deg, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.22));
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
   font-weight: 700;
   font-size: clamp(1.35rem, 4.2vw, 1.7rem);
   color: var(--accent-strong);
@@ -1374,10 +1371,6 @@ watch(
   .podium-placeholder {
     gap: 0.9rem;
   }
-
-  .ranking-item {
-    grid-template-columns: clamp(64px, 16vw, 70px) clamp(56px, 16vw, 64px) 1fr auto auto;
-  }
 }
 
 @media (max-width: 720px) {
@@ -1392,10 +1385,6 @@ watch(
   .tab-button {
     min-width: 104px;
   }
-
-  .ranking-item {
-    grid-template-columns: clamp(60px, 20vw, 66px) clamp(54px, 20vw, 62px) 1fr auto;
-  }
 }
 
 @media (max-width: 520px) {
@@ -1403,12 +1392,7 @@ watch(
     gap: 0.6rem;
   }
 
-  .ranking-item {
-    grid-template-columns: clamp(54px, 22vw, 60px) clamp(50px, 22vw, 56px) 1fr auto;
-  }
-
   .rank-badge {
-    border-radius: 16px;
     font-size: 1.3rem;
   }
 

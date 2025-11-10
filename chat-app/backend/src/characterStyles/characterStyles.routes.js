@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler, sendSuccess, sendError } from "../utils/routeHelpers.js";
+import { requireAdmin } from "../middleware/adminAuth.middleware.js";
 import {
   listCharacterStyles,
   getCharacterStyle,
@@ -42,11 +43,10 @@ characterStylesRouter.get(
 /**
  * POST /api/character-styles/:id
  * 創建或更新角色風格（管理員功能）
- * 注意：此端點應該加上管理員權限驗證
  */
 characterStylesRouter.post(
   "/:id",
-  // TODO: 加入管理員權限驗證中介層
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const styleData = req.body;
@@ -64,11 +64,10 @@ characterStylesRouter.post(
 /**
  * DELETE /api/character-styles/:id
  * 刪除角色風格（管理員功能）
- * 注意：此端點應該加上管理員權限驗證
  */
 characterStylesRouter.delete(
   "/:id",
-  // TODO: 加入管理員權限驗證中介層
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     await deleteCharacterStyle(id);

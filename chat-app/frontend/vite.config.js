@@ -66,6 +66,8 @@ export default defineConfig(async () => {
   return {
     plugins: [vue()],
     server: {
+      host: '0.0.0.0', // 允許外部訪問
+      port: 5173,
       proxy: proxyEnabled ? createProxyConfig(proxyTarget) : undefined,
     },
     esbuild: {

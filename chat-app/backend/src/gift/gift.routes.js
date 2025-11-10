@@ -4,6 +4,7 @@
 
 import express from "express";
 import logger from "../utils/logger.js";
+import { asyncHandler } from "../utils/routeHelpers.js";
 import { sendGift, getUserGiftHistory, getCharacterGiftStats, getGiftPricing } from "./gift.service.js";
 import { processGiftResponse } from "./giftResponse.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
@@ -16,7 +17,7 @@ const router = express.Router();
  * 送禮物給角色（支持冪等性）
  * ⚠️ 安全修復：userId 從認證 token 獲取，不從請求體讀取
  */
-router.post("/send", requireFirebaseAuth, async (req, res) => {
+router.post("/send", requireFirebaseAuth, asyncHandler(async (req, res) => {
   try {
     // 從認證信息獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;
@@ -58,7 +59,7 @@ router.post("/send", requireFirebaseAuth, async (req, res) => {
       error: error.message || "送禮物失敗",
     });
   }
-});
+}));
 
 /**
  * GET /api/gifts/history

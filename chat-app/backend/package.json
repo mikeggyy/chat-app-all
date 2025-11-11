@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
+    "test:env": "node ./scripts/test-env-validation.js",
     "generate:voices": "node ./scripts/generateVoicePreviews.js",
     "import:all": "node ./scripts/import-all-data.js",
     "import:characters": "node ./scripts/import-characters-to-firestore.js",

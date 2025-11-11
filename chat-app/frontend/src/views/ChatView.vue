@@ -9,7 +9,6 @@ import {
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { XMarkIcon } from "@heroicons/vue/24/outline";
-import html2canvas from "html2canvas";
 
 // 新的組件
 import ChatHeader from "../components/chat/ChatHeader.vue";
@@ -46,18 +45,23 @@ import { useChatMessages } from "../composables/chat/useChatMessages";
 import { useSuggestions } from "../composables/chat/useSuggestions";
 import { useChatActions } from "../composables/chat/useChatActions";
 import { useModalManager } from "../composables/chat/useModalManager";
+import { useVideoGeneration } from "../composables/chat/useVideoGeneration";
+import { usePotionManagement } from "../composables/chat/usePotionManagement";
+import { useSelfieGeneration } from "../composables/chat/useSelfieGeneration";
+import { useCharacterUnlock } from "../composables/chat/useCharacterUnlock";
+import { useVoiceManagement } from "../composables/chat/useVoiceManagement";
+import { useConversationLimitActions } from "../composables/chat/useConversationLimitActions";
+import { useGiftManagement } from "../composables/chat/useGiftManagement";
+import { useFavoriteManagement } from "../composables/chat/useFavoriteManagement";
+import { useShareFunctionality } from "../composables/chat/useShareFunctionality";
+import { useConversationReset } from "../composables/chat/useConversationReset";
+import { usePhotoVideoHandler } from "../composables/chat/usePhotoVideoHandler";
 
 // Utils
 import { fallbackMatches } from "../utils/matchFallback";
 import { isGuestUser } from "../../../../shared/config/testAccounts";
 import { apiJson } from "../utils/api";
-import { getRandomSelfieMessage } from "../config/selfieMessages";
-import {
-  appendCachedHistory,
-  writeCachedHistory,
-  clearPendingMessages,
-} from "../utils/conversationCache";
-import { getGiftById } from "../config/gifts";
+import { appendCachedHistory } from "../utils/conversationCache";
 
 const router = useRouter();
 const route = useRoute();
@@ -101,7 +105,6 @@ const isFavorited = computed(() => {
     : [];
   return favoritesList.includes(partnerId.value);
 });
-const isFavoriteMutating = ref(false);
 
 // Limits
 const { checkLimit, unlockByAd, getLimitState } = useConversationLimit();
@@ -246,6 +249,34 @@ const {
 });
 
 // ====================
+// Video Generation
+// ====================
+const {
+  isRequestingVideo,
+  generateVideo,
+  handleRequestVideo,
+} = useVideoGeneration({
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partner.value?.id,
+  getFirebaseAuth: () => firebaseAuth,
+  messages,
+  messageListRef,
+  rollbackUserMessage,
+  requireLogin,
+  showVideoLimit,
+  showPhotoSelector,
+  createLimitModalData,
+  showError,
+  showSuccess: success,
+  config: {
+    MESSAGE_ID_PREFIXES,
+    VIDEO_CONFIG,
+    AI_VIDEO_RESPONSE_TEXT,
+    VIDEO_REQUEST_MESSAGES,
+  },
+});
+
+// ====================
 // Local State
 // ====================
 const draft = ref("");
@@ -289,53 +320,201 @@ const {
   update: updateModal,
 } = useModalManager();
 
-// Active potion effects (保留在外部，因為與 Potion Management 相關)
-const activePotionEffects = ref([]);
-
-// Active unlock effects (保留在外部，因為與 Unlock Management 相關)
-const activeUnlockEffects = ref([]);
-
-// 控制是否允許顯示解鎖效果（避免初始閃爍）
-const isUnlockDataLoaded = ref(false);
-
-// Computed: Active potion effects for current character
-const activeMemoryBoost = computed(() => {
-  return activePotionEffects.value.find(
-    (effect) =>
-      effect.potionType === "memory_boost" &&
-      effect.characterId === partnerId.value
-  );
+// ====================
+// Potion Management
+// ====================
+const {
+  userPotions,
+  activePotionEffects,
+  activeMemoryBoost,
+  activeBrainBoost,
+  loadPotions,
+  loadActivePotions,
+  handleConfirmUsePotion,
+} = usePotionManagement({
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partnerId.value,
+  getPotionType: () => modals.potionConfirm.type,
+  closePotionConfirm,
+  setLoading,
+  showError,
+  showSuccess: success,
 });
 
-const activeBrainBoost = computed(() => {
-  return activePotionEffects.value.find(
-    (effect) =>
-      effect.potionType === "brain_boost" &&
-      effect.characterId === partnerId.value
-  );
+// ====================
+// Selfie Generation
+// ====================
+const {
+  handleRequestSelfie,
+  handleUsePhotoUnlockCard,
+} = useSelfieGeneration({
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partnerId.value,
+  getFirebaseAuth: () => firebaseAuth,
+  messages,
+  messageListRef,
+  rollbackUserMessage,
+  requireLogin,
+  canGeneratePhoto,
+  fetchPhotoStats,
+  showPhotoLimit,
+  createLimitModalData,
+  requestSelfie,
+  closePhotoLimit,
+  loadTicketsBalance,
+  showError,
+  showSuccess: success,
+  config: {
+    MESSAGE_ID_PREFIXES,
+  },
 });
 
-// Computed: Active character unlock for current character
-const activeCharacterUnlock = computed(() => {
-  // 只有在數據加載完成後才返回結果，避免閃爍
-  if (!isUnlockDataLoaded.value) {
-    return null;
-  }
-
-  return activeUnlockEffects.value.find(
-    (unlock) =>
-      unlock.unlockType === "character" &&
-      unlock.characterId === partnerId.value
-  );
+// ====================
+// Character Unlock Management
+// ====================
+const {
+  activeUnlockEffects,
+  activeCharacterUnlock,
+  isCharacterUnlocked,
+  loadActiveUnlocks,
+  handleConfirmUnlockCharacter,
+  resetUnlockDataLoadedState,
+} = useCharacterUnlock({
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partnerId.value,
+  getFirebaseAuth: () => firebaseAuth,
+  getPartnerDisplayName: () => partnerDisplayName.value,
+  closeUnlockConfirm,
+  loadTicketsBalance,
+  setLoading,
+  showError,
+  showSuccess: success,
 });
 
-// Computed: Is character unlocked (based on active unlock)
-const isCharacterUnlocked = computed(() => {
-  // 在數據未加載時，預設視為"已解鎖"（從而隱藏解鎖按鈕，避免閃爍）
-  if (!isUnlockDataLoaded.value) {
-    return true;
-  }
-  return !!activeCharacterUnlock.value;
+// ====================
+// Voice Management
+// ====================
+const {
+  handlePlayVoice,
+  handleWatchVoiceAd: watchVoiceAd,
+  handleUseVoiceUnlockCard,
+} = useVoiceManagement({
+  getCurrentUserId: () => currentUserId.value,
+  playVoice,
+  loadVoiceStats,
+  checkVoiceLimit,
+  unlockVoiceByAd,
+  loadTicketsBalance,
+  showVoiceLimit,
+  closeVoiceLimit,
+  getVoiceLimitPendingMessage: () => modals.voiceLimit.pending,
+  showError,
+  showSuccess: success,
+});
+
+// ====================
+// Conversation Limit Actions
+// ====================
+const {
+  handleWatchAd,
+  handleUseUnlockCard,
+} = useConversationLimitActions({
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partner.value?.id,
+  getPartnerDisplayName: () => partnerDisplayName.value,
+  getFirebaseAuth: () => firebaseAuth,
+  unlockByAd,
+  getLimitState,
+  loadTicketsBalance,
+  closeConversationLimit,
+  updateModal,
+  showError,
+  showSuccess: success,
+});
+
+// ====================
+// Gift Management
+// ====================
+const {
+  handleOpenGiftSelector,
+  handleSelectGift,
+} = useGiftManagement({
+  getCurrentUserId: () => currentUserId.value,
+  openGiftSelector,
+  sendGift,
+  loadBalance,
+  showGiftAnimation,
+  closeGiftAnimation,
+});
+
+// ====================
+// Favorite Management
+// ====================
+const {
+  isFavoriteMutating,
+  toggleFavorite,
+} = useFavoriteManagement({
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partnerId.value,
+  getUser: () => user.value,
+  getFirebaseAuth: () => firebaseAuth,
+  setUserProfile,
+  requireLogin,
+  showError,
+  showSuccess: success,
+});
+
+// ====================
+// Share Functionality
+// ====================
+const {
+  handleShare,
+} = useShareFunctionality({
+  getChatPageRef: () => chatPageRef.value,
+  getPartnerDisplayName: () => partnerDisplayName.value,
+  showError,
+  showSuccess: success,
+});
+
+// ====================
+// Conversation Reset
+// ====================
+const {
+  confirmResetConversation,
+  cancelResetConversation,
+} = useConversationReset({
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partner.value?.id,
+  getPartner: () => partner.value,
+  getMessages: () => messages.value,
+  getDraft: () => draft.value,
+  setDraft: (value) => { draft.value = value; },
+  resetConversationApi,
+  invalidateSuggestions,
+  closeResetConfirm,
+  setLoading,
+  showError,
+  showSuccess: success,
+  config: { MESSAGE_ID_PREFIXES },
+});
+
+// ====================
+// Photo Video Handler
+// ====================
+const {
+  handlePhotoSelect,
+  handleUseVideoUnlockCard,
+  handleUpgradeFromVideoModal,
+} = usePhotoVideoHandler({
+  getCurrentUserId: () => currentUserId.value,
+  getPhotoSelectorModal: () => modals.photoSelector,
+  generateVideo,
+  loadTicketsBalance,
+  closePhotoSelector,
+  closeVideoLimit,
+  showPhotoSelector,
+  navigateToMembership: () => router.push('/membership'),
+  showError,
 });
 
 // Computed: Current buff details
@@ -384,12 +563,6 @@ const currentBuffDetails = computed(() => {
   };
 });
 
-// User Assets (Potions only - other assets moved to useUnlockTickets)
-const userPotions = ref({
-  memoryBoost: 0,
-  brainBoost: 0,
-});
-
 // ====================
 // Conversation Context
 // ====================
@@ -403,11 +576,6 @@ const getConversationContext = () => {
 // ====================
 // Helper Functions
 // ====================
-const getRandomVideoRequestMessage = () => {
-  return VIDEO_REQUEST_MESSAGES[
-    Math.floor(Math.random() * VIDEO_REQUEST_MESSAGES.length)
-  ];
-};
 
 /**
  * 撤回用戶消息（從後端和前端同時刪除）
@@ -588,223 +756,19 @@ const handleMenuAction = (action) => {
 // ====================
 // Share Handler
 // ====================
-const handleShare = async () => {
-  if (!chatPageRef.value) {
-    showError("無法截圖，請稍後再試。");
-    return;
-  }
-
-  const characterName = partnerDisplayName.value || "角色";
-  const shareText = `我正在與 ${characterName} 聊天！`;
-  const shareUrl = window.location.href;
-
-  try {
-    // 截取聊天畫面
-    const canvas = await html2canvas(chatPageRef.value, {
-      backgroundColor: "#0f1016",
-      scale: 2, // 提高截圖品質
-      logging: false,
-      useCORS: true, // 允許跨域圖片
-      allowTaint: true,
-    });
-
-    // 轉換為 Blob
-    const blob = await new Promise((resolve) => {
-      canvas.toBlob(resolve, "image/png", 0.95);
-    });
-
-    if (!blob) {
-      throw new Error("截圖失敗");
-    }
-
-    // 創建 File 物件
-    const file = new File([blob], `chat-${characterName}-${Date.now()}.png`, {
-      type: "image/png",
-    });
-
-    // 檢查是否支援分享檔案
-    if (
-      navigator.share &&
-      navigator.canShare &&
-      navigator.canShare({ files: [file] })
-    ) {
-      try {
-        await navigator.share({
-          title: "分享聊天",
-          text: shareText,
-          files: [file],
-        });
-        success("分享成功！");
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          // 降級為下載圖片
-          downloadScreenshot(file);
-        }
-      }
-    } else {
-      // 不支援分享檔案，提供下載選項
-      downloadScreenshot(file);
-    }
-  } catch (err) {
-    showError("截圖失敗，請稍後再試。");
-  }
-};
-
-// 下載截圖
-const downloadScreenshot = (file) => {
-  const url = URL.createObjectURL(file);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = file.name;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  success("截圖已保存，您可以手動分享！");
-};
+// handleShare 由 useShareFunctionality 提供
+// downloadScreenshot 由 useShareFunctionality 內部處理
 
 // ====================
 // Favorite Handler
 // ====================
-const toggleFavorite = async () => {
-  const userId = currentUserId.value;
-  const matchId = partnerId.value;
-
-  if (!userId || !matchId) return;
-
-  // Check if guest
-  if (requireLogin({ feature: "收藏角色" })) {
-    return;
-  }
-
-  if (isFavoriteMutating.value) return;
-
-  const currentProfile = user.value;
-  if (!currentProfile?.id) {
-    showError("請登入後才能收藏角色。");
-    return;
-  }
-
-  isFavoriteMutating.value = true;
-
-  const previousFavorites = Array.isArray(currentProfile.favorites)
-    ? [...currentProfile.favorites]
-    : [];
-
-  const wasFavorited = previousFavorites.includes(matchId);
-  const optimisticSet = new Set(previousFavorites);
-
-  if (wasFavorited) {
-    optimisticSet.delete(matchId);
-  } else {
-    optimisticSet.add(matchId);
-  }
-
-  // Optimistic update
-  setUserProfile({
-    ...currentProfile,
-    favorites: Array.from(optimisticSet),
-  });
-
-  try {
-    const token = await firebaseAuth.getCurrentUserIdToken();
-    const endpoint = wasFavorited
-      ? `/api/users/${encodeURIComponent(
-          userId
-        )}/favorites/${encodeURIComponent(matchId)}`
-      : `/api/users/${encodeURIComponent(userId)}/favorites`;
-
-    const response = await apiJson(endpoint, {
-      method: wasFavorited ? "DELETE" : "POST",
-      body: wasFavorited ? undefined : { matchId },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      skipGlobalLoading: true,
-    });
-
-    const favoritesList = Array.isArray(response?.favorites)
-      ? response.favorites
-      : Array.from(optimisticSet);
-
-    setUserProfile({
-      ...currentProfile,
-      favorites: favoritesList,
-    });
-
-    success(wasFavorited ? "已取消收藏" : "已加入收藏");
-  } catch (error) {
-    // Revert on error
-    setUserProfile({
-      ...currentProfile,
-      favorites: previousFavorites,
-    });
-    showError(
-      error instanceof Error
-        ? error.message
-        : "更新收藏時發生錯誤，請稍後再試。"
-    );
-  } finally {
-    isFavoriteMutating.value = false;
-  }
-};
+// toggleFavorite 由 useFavoriteManagement 提供
 
 // ====================
 // Reset Conversation
 // ====================
-const confirmResetConversation = async () => {
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-
-  if (!userId || !matchId) return;
-
-  try {
-    setLoading('resetConfirm', true);
-    await resetConversationApi(userId, matchId);
-
-    // Clear pending messages
-    clearPendingMessages(userId, matchId);
-
-    // Clear draft
-    draft.value = "";
-
-    // Invalidate suggestions
-    invalidateSuggestions();
-
-    // 檢查是否需要添加角色的第一句話
-    // 條件：沒有消息，或者第一條消息不是角色的 first_message
-    const needsFirstMessage =
-      partner.value?.first_message &&
-      (messages.value.length === 0 ||
-        messages.value[0]?.text !== partner.value.first_message.trim());
-
-    if (needsFirstMessage) {
-      const firstMessage = {
-        id: `${MESSAGE_ID_PREFIXES.FIRST}${Date.now()}`,
-        role: "partner",
-        text: partner.value.first_message.trim(),
-        createdAt: new Date().toISOString(),
-      };
-
-      // 添加到消息列表開頭
-      messages.value.unshift(firstMessage);
-
-      // 保存到緩存（完整歷史）
-      writeCachedHistory(userId, matchId, messages.value);
-    }
-
-    closeResetConfirm();
-    success("對話已重置");
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "重置對話失敗");
-  } finally {
-    setLoading('resetConfirm', false);
-  }
-};
-
-const cancelResetConversation = () => {
-  closeResetConfirm();
-};
+// confirmResetConversation 由 useConversationReset 提供
+// cancelResetConversation 由 useConversationReset 提供
 
 // ====================
 // Character Info
@@ -815,55 +779,7 @@ const cancelResetConversation = () => {
 // Potion Usage
 // ====================
 // handleClosePotionConfirm 由 closePotionConfirm 替代
-
-const handleConfirmUsePotion = async () => {
-  const userId = currentUserId.value;
-  if (!userId) {
-    showError("請先登入");
-    return;
-  }
-
-  const potionType = modals.potionConfirm.type;
-  setLoading('potionConfirm', true);
-
-  try {
-    if (potionType === "memoryBoost") {
-      // 使用記憶增強藥水
-      const result = await apiJson(`/api/potions/use/memory-boost`, {
-        method: "POST",
-        body: {
-          characterId: partnerId.value,
-        },
-      });
-
-      if (result.success) {
-        success(`記憶增強藥水使用成功！效果將持續 ${result.duration} 天`);
-        // 重新載入活躍藥水效果和藥水數量
-        await Promise.all([loadActivePotions(), loadPotions()]);
-      }
-    } else if (potionType === "brainBoost") {
-      // 使用腦力激盪藥水
-      const result = await apiJson(`/api/potions/use/brain-boost`, {
-        method: "POST",
-        body: {
-          characterId: partnerId.value,
-        },
-      });
-
-      if (result.success) {
-        success(`腦力激盪藥水使用成功！效果將持續 ${result.duration} 天`);
-        // 重新載入活躍藥水效果和藥水數量
-        await Promise.all([loadActivePotions(), loadPotions()]);
-      }
-    }
-
-    closePotionConfirm();
-  } catch (error) {
-    showError(error.message || "使用藥水失敗");
-  } finally {
-    setLoading('potionConfirm', false);
-  }
-};
+// handleConfirmUsePotion 由 confirmUsePotion (來自 usePotionManagement) 替代
 
 // ====================
 // Buff Details
@@ -877,14 +793,7 @@ const handleViewBuffDetails = (buffType) => {
 // ====================
 // Voice Handler
 // ====================
-const handlePlayVoice = async (message) => {
-  if (!message) return;
-
-  await playVoice(message, { loadVoiceStats, checkVoiceLimit }, (limitInfo) => {
-    // On limit exceeded - 保存待播放的消息並顯示限制彈窗
-    showVoiceLimit(limitInfo, message);
-  });
-};
+// handlePlayVoice 由 useVoiceManagement 提供
 
 // ====================
 // Image Viewer
@@ -898,510 +807,34 @@ const handleImageClick = ({ url, alt }) => {
 // ====================
 // Selfie Handler
 // ====================
-const handleRequestSelfie = async () => {
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-
-  if (!userId || !matchId) return;
-
-  // 檢查遊客權限
-  if (requireLogin({ feature: "請求自拍照片" })) {
-    return;
-  }
-
-  // 先檢查拍照限制，避免發送訊息後才發現限制不足
-  const limitCheck = await canGeneratePhoto();
-
-  // ✅ 修復：當免費額度用完時，顯示彈窗讓用戶決定是否使用解鎖卡
-  // 彈窗會根據 cards 數量顯示不同按鈕：
-  // - cards > 0: 顯示「使用解鎖卡」按鈕
-  // - cards = 0: 顯示「次數已達上限」及升級選項
-  if (!limitCheck.allowed) {
-    showPhotoLimit(createLimitModalData(limitCheck, "photo"));
-    return;
-  }
-
-  // 用於追蹤用戶消息 ID，以便失敗時撤回
-  let userMessageId = null;
-
-  try {
-    // 1. 先發送一條隨機的拍照請求訊息
-    const randomMessage = getRandomSelfieMessage();
-
-    // 創建用戶消息
-    const userMessage = {
-      id: `${MESSAGE_ID_PREFIXES.SELFIE_REQUEST}${Date.now()}`,
-      role: "user",
-      text: randomMessage,
-      createdAt: new Date().toISOString(),
-    };
-
-    // 保存消息 ID 以便失敗時撤回
-    userMessageId = userMessage.id;
-
-    // 添加到消息列表
-    messages.value.push(userMessage);
-
-    // 滾動到底部
-    await nextTick();
-    messageListRef.value?.scrollToBottom();
-
-    // 獲取認證權杖
-    const token = await firebaseAuth.getCurrentUserIdToken();
-
-    // 發送到後端（只保存訊息，不請求 AI 回覆）
-    await apiJson(`/api/conversations/${userId}/${matchId}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        id: userMessage.id, // ✅ 傳遞消息 ID，確保前後端一致
-        text: randomMessage,
-        role: "user",
-      },
-      skipGlobalLoading: true,
-    });
-
-    // 更新緩存
-    writeCachedHistory(userId, matchId, messages.value);
-
-    // 2. 然後調用拍照功能
-    const photoResult = await requestSelfie(
-      { canGeneratePhoto, fetchPhotoStats },
-      (limitInfo) => {
-        // On limit exceeded
-        showPhotoLimit(limitInfo);
-      },
-      { usePhotoCard: false } // ✅ 此處僅在有免費額度時才被調用
-    );
-
-    // 如果拍照失敗（返回 null），撤回用戶訊息
-    if (!photoResult && userMessageId) {
-      await rollbackUserMessage(userId, matchId, userMessageId);
-    }
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "請求自拍失敗");
-
-    // 撤回用戶剛發送的訊息
-    if (userMessageId) {
-      await rollbackUserMessage(userId, matchId, userMessageId);
-    }
-  }
-};
-
-// ====================
-// Video Handler
-// ====================
-const isRequestingVideo = ref(false);
-
-// 生成影片的核心邏輯（可重用）
-const generateVideo = async (options = {}) => {
-  const { useVideoCard = false, imageUrl = null } = options;
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-
-  if (!userId || !matchId) return;
-
-  isRequestingVideo.value = true;
-
-  // 用於追蹤用戶消息 ID，以便失敗時撤回
-  let userMessageId = null;
-
-  try {
-    const token = await firebaseAuth.getCurrentUserIdToken();
-
-    // 1. 先發送一條隨機的影片請求訊息
-    const randomMessage = getRandomVideoRequestMessage();
-
-    // 創建用戶消息
-    const userMessage = {
-      id: `${MESSAGE_ID_PREFIXES.VIDEO_REQUEST}${Date.now()}`,
-      role: "user",
-      text: randomMessage,
-      createdAt: new Date().toISOString(),
-    };
-
-    // 保存消息 ID 以便失敗時撤回
-    userMessageId = userMessage.id;
-
-    // 添加到消息列表
-    messages.value.push(userMessage);
-
-    // 滾動到底部
-    await nextTick();
-    messageListRef.value?.scrollToBottom();
-
-    // 發送到後端（只保存訊息）
-    await apiJson(`/api/conversations/${userId}/${matchId}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        id: userMessage.id, // ✅ 傳遞消息 ID，確保前後端一致
-        text: randomMessage,
-        role: "user",
-      },
-      skipGlobalLoading: true,
-    });
-
-    // 更新緩存
-    writeCachedHistory(userId, matchId, messages.value);
-
-    // 2. 創建臨時影片消息顯示 loading
-    const tempVideoMessageId = `temp-video-${Date.now()}`;
-    const tempVideoMessage = {
-      id: tempVideoMessageId,
-      role: "ai",
-      text: "",
-      video: "loading", // ⭐ 關鍵：設為 'loading'
-      createdAt: new Date().toISOString(),
-      state: "pending",
-    };
-
-    messages.value.push(tempVideoMessage);
-    await nextTick();
-    messageListRef.value?.scrollToBottom();
-
-    // 3. 生成影片
-    success("角色正在錄製影片給你，稍等一下下哦～");
-
-    const videoResult = await apiJson(`/api/ai/generate-video`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        // userId 從後端認證 token 自動獲取，無需傳遞
-        characterId: matchId,
-        requestId: `video-${userId}-${matchId}-${Date.now()}`, // 冪等性 ID
-        duration: VIDEO_CONFIG.DURATION,
-        resolution: VIDEO_CONFIG.RESOLUTION,
-        aspectRatio: VIDEO_CONFIG.ASPECT_RATIO,
-        useVideoCard, // 告訴後端是否使用影片卡
-        imageUrl, // 🎨 自定義圖片 URL（從相簿選擇）
-      },
-      skipGlobalLoading: true, // ✅ 允許用戶繼續聊天
-    });
-
-    // ✅ 驗證影片生成結果
-    if (!videoResult || !videoResult.videoUrl) {
-      // 移除臨時消息
-      const tempIndex = messages.value.findIndex((m) => m.id === tempVideoMessageId);
-      if (tempIndex !== -1) {
-        messages.value.splice(tempIndex, 1);
-      }
-      throw new Error("影片生成失敗：未返回有效的影片 URL");
-    }
-
-    // 4. 創建包含影片的 AI 消息
-    const aiVideoMessage = {
-      id: `${MESSAGE_ID_PREFIXES.VIDEO_AI}${Date.now()}`,
-      role: "ai",
-      text: AI_VIDEO_RESPONSE_TEXT,
-      createdAt: new Date().toISOString(),
-      video: {
-        url: videoResult.videoUrl,
-        duration: videoResult.duration,
-        resolution: videoResult.resolution,
-      },
-    };
-
-    // 用於追蹤 AI 消息 ID，以便失敗時撤回
-    let aiMessageId = aiVideoMessage.id;
-
-    try {
-      // 替換臨時消息
-      const tempIndex = messages.value.findIndex((m) => m.id === tempVideoMessageId);
-      if (tempIndex !== -1) {
-        messages.value.splice(tempIndex, 1, aiVideoMessage);
-      } else {
-        messages.value.push(aiVideoMessage);
-      }
-
-      // 保存影片消息到後端
-      await apiJson(`/api/conversations/${userId}/${matchId}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: {
-          id: aiVideoMessage.id, // ✅ 傳遞消息 ID
-          text: aiVideoMessage.text,
-          role: "ai",
-          video: aiVideoMessage.video,
-        },
-        skipGlobalLoading: true,
-      });
-
-      // 更新緩存
-      writeCachedHistory(userId, matchId, messages.value);
-
-      // 滾動到底部
-      await nextTick();
-      messageListRef.value?.scrollToBottom();
-
-      success("影片錄好了！快來看看吧 ✨");
-    } catch (saveError) {
-      // ✅ 保存 AI 訊息失敗，撤回前端的 AI 訊息
-      const aiMsgIndex = messages.value.findIndex((m) => m.id === aiMessageId);
-      if (aiMsgIndex !== -1) {
-        messages.value.splice(aiMsgIndex, 1);
-      }
-
-      // 重新拋出錯誤，進入外層 catch 處理
-      throw new Error("保存影片訊息失敗");
-    }
-  } catch (error) {
-    // 移除臨時影片消息
-    const tempIndex = messages.value.findIndex((m) => m.video === "loading");
-    if (tempIndex !== -1) {
-      messages.value.splice(tempIndex, 1);
-    }
-
-    showError(error instanceof Error ? error.message : "生成影片失敗");
-
-    // 撤回用戶剛發送的訊息
-    if (userMessageId) {
-      await rollbackUserMessage(userId, matchId, userMessageId);
-    }
-  } finally {
-    isRequestingVideo.value = false;
-  }
-};
-
-const handleRequestVideo = async () => {
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-
-  if (!userId || !matchId) return;
-
-  // 檢查遊客權限
-  if (requireLogin({ feature: "生成影片" })) {
-    return;
-  }
-
-  // 防止重複請求
-  if (isRequestingVideo.value) {
-    showError("影片生成中，請稍候...");
-    return;
-  }
-
-  try {
-    // 獲取認證權杖
-    const token = await firebaseAuth.getCurrentUserIdToken();
-
-    // 先檢查影片生成權限
-    const limitCheck = await apiJson(`/api/ai/video/check/${userId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      skipGlobalLoading: true,
-    });
-
-    // 如果免費額度用完，顯示彈窗讓用戶決定是否使用解鎖卡
-    if (!limitCheck.allowed) {
-      showVideoLimit(createLimitModalData(limitCheck, "video"));
-      return;
-    }
-
-    // ✅ 權限檢查通過，顯示照片選擇器
-    showPhotoSelector();
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "檢查影片權限失敗");
-  }
-};
-
-// 處理用戶選擇照片（從照片選擇器）
-const handlePhotoSelect = async (imageUrl) => {
-  try {
-    // 根據標記決定是否使用影片卡
-    const useCard = modals.photoSelector.useCard;
-
-    // 生成影片
-    await generateVideo({
-      useVideoCard: useCard,
-      imageUrl: imageUrl
-    });
-
-    // 成功後關閉選擇器
-    closePhotoSelector();
-
-    // ✅ 如果使用了影片卡，重新加載解鎖卡餘額
-    if (useCard) {
-      const userId = currentUserId.value;
-      if (userId) {
-        await loadTicketsBalance(userId);
-      }
-    }
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "生成影片失敗");
-    closePhotoSelector();
-  }
-};
+// handleRequestSelfie 由 useSelfieGeneration 提供
+// handlePhotoSelect 由 usePhotoVideoHandler 提供
 
 // handleClosePhotoSelector 由 closePhotoSelector 替代
 
 // ====================
 // Gift Handlers
 // ====================
-const handleOpenGiftSelector = async () => {
-  const userId = currentUserId.value;
-  if (!userId) return;
-
-  await openGiftSelector(async () => {
-    // Load user assets
-    await loadBalance(userId);
-  });
-};
-
-const handleSelectGift = async (giftData) => {
-  const userId = currentUserId.value;
-  if (!userId) return;
-
-  // 獲取禮物資訊用於動畫
-  const gift = getGiftById(giftData.giftId);
-  if (gift) {
-    // 立即顯示禮物動畫
-    showGiftAnimation(gift.emoji, gift.name);
-
-    // 2秒後自動隱藏動畫
-    setTimeout(() => {
-      closeGiftAnimation();
-    }, 2000);
-  }
-
-  // 發送禮物（動畫已經在播放）
-  await sendGift(giftData, () => {
-    // On success - 動畫已經在顯示，不需要再做處理
-  });
-
-  // Reload balance
-  await loadBalance(userId);
-};
+// handleOpenGiftSelector 由 useGiftManagement 提供
+// handleSelectGift 由 useGiftManagement 提供
 
 // ====================
 // Limit Modal Handlers
 // ====================
 // handleCloseLimitModal 由 closeConversationLimit 替代
-
-const handleWatchAd = async (adType) => {
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-
-  if (!userId || !matchId) return;
-
-  try {
-    if (adType === "conversation") {
-      await unlockByAd(userId, matchId);
-      const state = await getLimitState(userId, matchId);
-      updateModal('conversationLimit', {
-        remainingMessages: state.remaining || 0,
-        adsWatchedToday: state.adsWatchedToday || 0,
-      });
-      closeConversationLimit();
-      success("已解鎖 5 則訊息！");
-    }
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "觀看廣告失敗");
-  }
-};
-
-const handleUseUnlockCard = async () => {
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-
-  if (!userId || !matchId) return;
-
-  try {
-    // 獲取認證權杖
-    const token = await firebaseAuth.getCurrentUserIdToken();
-
-    // 調用後端 API 使用解鎖卡
-    const result = await apiJson("/api/unlock-tickets/use/character", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        characterId: matchId,
-      },
-      skipGlobalLoading: true,
-    });
-
-    if (result.success) {
-      // 關閉模態框
-      closeConversationLimit();
-
-      // 重新加載解鎖卡數量
-      await loadTicketsBalance(userId);
-
-      // 顯示解鎖成功訊息（包含到期時間）
-      const unlockDays = result.unlockDays || 7;
-      const characterName = partnerDisplayName.value || "角色";
-      success(`解鎖成功！與「${characterName}」可暢聊 ${unlockDays} 天 🎉`);
-    }
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "使用解鎖卡失敗");
-  }
-};
+// handleWatchAd 由 useConversationLimitActions 提供
+// handleUseUnlockCard 由 useConversationLimitActions 提供
 
 // handleCloseVoiceLimitModal 由 closeVoiceLimit 替代
 
+// 包裝函數：觀看語音廣告（從 template 調用）
 const handleWatchVoiceAd = async () => {
   const userId = currentUserId.value;
   const matchId = partner.value?.id;
-
-  if (!userId || !matchId) return;
-
-  try {
-    await unlockVoiceByAd(userId, matchId);
-    await loadVoiceStats(userId);
-    closeVoiceLimit();
-    success("已解鎖 5 次語音！");
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "觀看廣告失敗");
-  }
+  await watchVoiceAd(userId, matchId);
 };
 
-const handleUseVoiceUnlockCard = async () => {
-  const message = modals.voiceLimit.pending;
-
-  if (!message) {
-    showError("無法使用語音解鎖卡");
-    return;
-  }
-
-  try {
-    // 1. 關閉模態框
-    closeVoiceLimit();
-
-    // 2. 使用解鎖卡選項播放語音
-    // ✅ 正確做法：傳遞 useVoiceUnlockCard 選項給 TTS API
-    // API 會先生成音頻，只在成功後才扣除解鎖卡
-    const playSuccess = await playVoice(
-      message,
-      { loadVoiceStats, checkVoiceLimit },
-      () => {
-        // 如果仍然失敗（例如沒有解鎖卡），顯示錯誤
-        showError("使用解鎖卡失敗，請重試");
-      },
-      undefined, // getVoiceRemaining
-      { useVoiceUnlockCard: true } // ✅ 使用解鎖卡選項
-    );
-
-    if (playSuccess) {
-      // 4. 重新加載語音統計和解鎖卡數據
-      await Promise.all([loadVoiceStats(), loadTicketsBalance()]);
-
-      success("語音解鎖卡使用成功！");
-    }
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "使用語音解鎖卡失敗");
-  }
-};
+// handleUseVoiceUnlockCard 由 useVoiceManagement 提供（直接使用）
 
 // handleClosePhotoLimitModal 由 closePhotoLimit 替代
 
@@ -1409,50 +842,10 @@ const handleUseVoiceUnlockCard = async () => {
 // Video Limit Modal Handlers
 // ====================
 // handleCloseVideoLimitModal 由 closeVideoLimit 替代
+// handleUseVideoUnlockCard 由 usePhotoVideoHandler 提供
+// handleUpgradeFromVideoModal 由 usePhotoVideoHandler 提供
 
-const handleUseVideoUnlockCard = async () => {
-  try {
-    // 關閉模態框
-    closeVideoLimit();
-
-    // ✅ 顯示照片選擇器，讓用戶選擇照片（標記需要使用影片卡）
-    // 實際的影片生成會在用戶選擇照片後（handlePhotoSelect）執行
-    showPhotoSelector(true); // true = useCard
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "使用影片卡失敗");
-  }
-};
-
-const handleUpgradeFromVideoModal = () => {
-  closeVideoLimit();
-  router.push("/membership");
-};
-
-const handleUsePhotoUnlockCard = async () => {
-  try {
-    // 關閉模態框
-    closePhotoLimit();
-
-    // 使用照片卡生成照片
-    const result = await requestSelfie(
-      { canGeneratePhoto, fetchPhotoStats },
-      (limitInfo) => {
-        // 如果仍然失敗（例如沒有解鎖卡），顯示錯誤
-        showError("使用拍照解鎖卡失敗，請重試");
-      },
-      { usePhotoCard: true } // 告訴 requestSelfie 使用照片卡
-    );
-
-    // 成功後重新加載解鎖卡數據
-    if (result) {
-      await Promise.all([fetchPhotoStats(), loadTicketsBalance()]);
-
-      success("拍照解鎖卡使用成功！");
-    }
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "使用照片卡失敗");
-  }
-};
+// handleUsePhotoUnlockCard 由 useSelfieGeneration 提供
 
 // ====================
 // Navigation
@@ -1462,134 +855,18 @@ const handleBack = () => {
 };
 
 // ====================
-// Load Potions Only (卡片統一由 useUnlockTickets 管理)
-// ====================
-const loadPotions = async () => {
-  const userId = currentUserId.value;
-  if (!userId) return;
-
-  try {
-    const data = await apiJson(
-      `/api/users/${encodeURIComponent(userId)}/assets`,
-      {
-        skipGlobalLoading: true,
-      }
-    );
-
-    if (data?.potions) {
-      userPotions.value = {
-        memoryBoost: data.potions.memoryBoost || 0,
-        brainBoost: data.potions.brainBoost || 0,
-      };
-    }
-  } catch (error) {
-    // Silent fail
-  }
-};
-
-// ====================
-// Load Active Potion Effects
-// ====================
-const loadActivePotions = async () => {
-  const userId = currentUserId.value;
-  if (!userId) return;
-
-  // 先清空舊數據，避免閃爍
-  activePotionEffects.value = [];
-
-  try {
-    const data = await apiJson(`/api/potions/active`, {
-      skipGlobalLoading: true,
-    });
-
-    if (data && data.potions) {
-      activePotionEffects.value = data.potions;
-    }
-  } catch (error) {
-    // Silent fail
-  }
-};
-
-// ====================
-// Load Active Unlock Effects
-// ====================
-const loadActiveUnlocks = async () => {
-  const userId = currentUserId.value;
-  if (!userId) return;
-
-  // 先清空舊數據，避免閃爍
-  activeUnlockEffects.value = [];
-
-  try {
-    const data = await apiJson(`/api/unlock-tickets/active`, {
-      skipGlobalLoading: true,
-    });
-
-    if (data && data.unlocks) {
-      activeUnlockEffects.value = data.unlocks;
-    }
-  } catch (error) {
-    // Silent fail
-  } finally {
-    // 數據加載完成，允許顯示圖標
-    isUnlockDataLoaded.value = true;
-  }
-};
-
-// ====================
 // Character Unlock Handlers
 // ====================
 // handleCloseUnlockConfirm 由 closeUnlockConfirm 替代
 // handleCloseUnlockLimit 由 closeUnlockLimit 替代
-
-const handleConfirmUnlockCharacter = async () => {
-  const userId = currentUserId.value;
-  const matchId = partnerId.value;
-
-  if (!userId || !matchId) return;
-
-  setLoading('unlockConfirm', true);
-
-  try {
-    // 獲取認證權杖
-    const token = await firebaseAuth.getCurrentUserIdToken();
-
-    // 調用後端 API 使用解鎖卡
-    const result = await apiJson("/api/unlock-tickets/use/character", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        characterId: matchId,
-      },
-      skipGlobalLoading: true,
-    });
-
-    if (result.success) {
-      // 關閉模態框
-      closeUnlockConfirm();
-
-      // 重新加載解鎖卡餘額和活躍解鎖效果
-      await Promise.all([loadTicketsBalance(userId), loadActiveUnlocks()]);
-
-      // 顯示解鎖成功訊息
-      const unlockDays = result.unlockDays || 7;
-      const characterName = partnerDisplayName.value || "角色";
-      success(`解鎖成功！與「${characterName}」可暢聊 ${unlockDays} 天 🎉`);
-    }
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "使用解鎖卡失敗");
-  } finally {
-    setLoading('unlockConfirm', false);
-  }
-};
+// loadActiveUnlocks 由 useCharacterUnlock 提供
+// handleConfirmUnlockCharacter 由 useCharacterUnlock 提供
 
 // Watch partnerId changes
 watch(partnerId, (newId) => {
   if (newId) {
     // 立即隱藏解鎖圖標，避免顯示閃爍
-    isUnlockDataLoaded.value = false;
+    resetUnlockDataLoadedState();
 
     // 清空舊角色的效果數據
     activePotionEffects.value = [];

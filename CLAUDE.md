@@ -129,6 +129,7 @@ npm run import:membership   # 僅導入會員方案
 npm run import:test-data    # 導入測試數據
 
 # 開發工具
+npm run test:env            # 驗證環境變數配置（推薦首次啟動前執行）
 npm run cleanup-ports       # 清理被佔用的端口（Windows）
 npm run kill-all-node       # 關閉所有 Node.js 進程（測試時很有用）
 npm run verify-config       # 驗證端口配置同步
@@ -148,6 +149,9 @@ npm run dev:frontend        # 僅啟動前端 (port 5174)
 # 構建
 npm run build:frontend      # 構建前端生產版本
 npm run build:backend       # 構建後端（如需要）
+
+# 開發工具
+npm run test:env            # 驗證環境變數配置（推薦首次啟動前執行）
 ```
 
 ## 技術棧
@@ -283,6 +287,7 @@ console.log(user.customClaims);
 ### 主應用文檔（chat-app）
 
 - **[chat-app/CLAUDE.md](chat-app/CLAUDE.md)** - 主應用完整開發指南 ⭐
+- **[chat-app/docs/ENVIRONMENT_VALIDATION.md](chat-app/docs/ENVIRONMENT_VALIDATION.md)** - 環境變數驗證系統 🔍
 - [chat-app/docs/firestore-collections.md](chat-app/docs/firestore-collections.md) - Firestore 資料庫架構
 - [chat-app/docs/firebase-emulator-setup.md](chat-app/docs/firebase-emulator-setup.md) - Firebase Emulator 設置指南
 - [chat-app/docs/IDEMPOTENCY.md](chat-app/docs/IDEMPOTENCY.md) - 冪等性系統實現指南

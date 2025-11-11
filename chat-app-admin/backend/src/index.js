@@ -1,4 +1,9 @@
 import "dotenv/config";
+import { validateEnvOrExit } from "./utils/validateEnv.js";
+
+// 🔍 驗證環境變數（應用啟動前）
+validateEnvOrExit();
+
 import express from "express";
 import cors from "cors";
 import { db, auth } from "./firebase/index.js";

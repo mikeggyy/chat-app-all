@@ -14,6 +14,11 @@ import {
   checkFeatureAccess,
   getUserFeatures,
 } from "./membership.service.js";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 
 const router = express.Router();
 
@@ -21,20 +26,18 @@ const router = express.Router();
  * 獲取用戶會員資訊
  * GET /api/membership/:userId
  */
-router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
+router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
   try {
     const { userId } = req.params;
     const membership = await getUserMembership(userId);
 
-    res.json({
-      success: true,
-      membership,
-    });
+    if (!membership) {
+      throw new ApiError("USER_NOT_FOUND", "找不到該用戶的會員資訊", { userId });
+    }
+
+    sendSuccess(res, { membership });
   } catch (error) {
-    res.status(error.message === "找不到用戶" ? 404 : 500).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -44,22 +47,24 @@ router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("use
  * Body: { tier: "vip" | "vvip", durationMonths?: number, autoRenew?: boolean, idempotencyKey: string }
  * 🔒 冪等性保護：防止重複升級和發放獎勵
  */
-router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
+router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { tier, durationMonths, autoRenew, idempotencyKey } = req.body;
 
+    // 驗證會員等級
     if (!tier || !["vip", "vvip"].includes(tier)) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供有效的會員等級（vip 或 vvip）",
+      return sendError(res, "VALIDATION_ERROR", "請提供有效的會員等級（vip 或 vvip）", {
+        field: "tier",
+        validValues: ["vip", "vvip"],
+        received: tier,
       });
     }
 
+    // 驗證冪等性鍵
     if (!idempotencyKey) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供 idempotencyKey（冪等性鍵）以防止重複升級",
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複升級", {
+        field: "idempotencyKey",
       });
     }
 
@@ -81,29 +86,17 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
         { ttl: 15 * 60 * 1000 } // 15 分鐘
       );
 
-      res.json({
-        success: true,
+      sendSuccess(res, {
         message: `成功升級為 ${tier.toUpperCase()}（開發模式）`,
         devMode: true,
         membership,
       });
     } else {
       // 正式環境：應整合支付系統
-      // TODO: 整合支付系統
-      // 1. 創建支付訂單
-      // 2. 等待支付完成
-      // 3. 驗證支付成功後才升級
-
-      return res.status(501).json({
-        success: false,
-        error: "支付系統尚未整合，請聯繫管理員",
-      });
+      return sendError(res, "NOT_IMPLEMENTED", "支付系統尚未整合，請聯繫管理員");
     }
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -112,23 +105,19 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
  * POST /api/membership/:userId/cancel
  * Body: { immediate?: boolean }
  */
-router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
+router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { immediate } = req.body;
 
     const membership = await cancelMembership(userId, immediate);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: immediate ? "已立即取消訂閱" : "將在到期後取消訂閱",
       membership,
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -137,7 +126,7 @@ router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwners
  * POST /api/membership/:userId/renew
  * Body: { durationMonths?: number }
  */
-router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
+router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { durationMonths } = req.body;
@@ -146,16 +135,12 @@ router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnersh
 
     const membership = await renewMembership(userId, durationMonths);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "續訂成功",
       membership,
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -163,22 +148,18 @@ router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnersh
  * 檢查功能權限
  * GET /api/membership/:userId/features/:featureName
  */
-router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
+router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
   try {
     const { userId, featureName } = req.params;
     const hasAccess = await checkFeatureAccess(userId, featureName);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       userId,
       featureName,
       hasAccess,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -186,20 +167,14 @@ router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth,
  * 獲取用戶所有功能權限
  * GET /api/membership/:userId/features
  */
-router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
+router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
   try {
     const { userId } = req.params;
     const features = await getUserFeatures(userId);
 
-    res.json({
-      success: true,
-      ...features,
-    });
+    sendSuccess(res, features);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 

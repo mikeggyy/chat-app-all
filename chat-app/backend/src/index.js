@@ -115,11 +115,15 @@ app.get("/health", (_, res) => {
 });
 
 // 緩存狀態監控端點
-app.get("/health/cache", (_, res) => {
+app.get("/health/cache", async (_, res) => {
   try {
     const characterCache = getCharacterCacheStats();
     const conversationCache = getConversationCacheStats();
     const userProfileCache = getUserCacheStats();
+
+    // 獲取冪等性快取統計
+    const { getIdempotencyStats } = await import("./utils/idempotency.js");
+    const idempotencyCache = getIdempotencyStats();
 
     res.json({
       status: "ok",
@@ -127,6 +131,13 @@ app.get("/health/cache", (_, res) => {
         characters: characterCache,
         conversations: conversationCache,
         userProfiles: userProfileCache,
+        idempotency: {
+          ...idempotencyCache,
+          autoCleanup: true,
+          cleanupInterval: "5 minutes",
+          ttl: "15 minutes",
+          maxSize: 10000,
+        },
       },
       timestamp: new Date().toISOString(),
     });
@@ -217,12 +228,23 @@ function setupMemoryCleanup() {
       const photoCleanup = photoLimitService.cleanupInactiveUsers(activeUserIds);
       logger.info(`[記憶體清理] 拍照限制清理完成`, photoCleanup);
 
-      // 4. 清理舊的交易記錄（保留 90 天）
+      // 4. 記錄冪等性快取統計（自動清理已在 idempotency.js 中啟動）
+      const { getIdempotencyStats } = await import("./utils/idempotency.js");
+      const idempotencyStats = getIdempotencyStats();
+      logger.info(`[記憶體清理] 冪等性快取統計`, {
+        total: idempotencyStats.total,
+        valid: idempotencyStats.valid,
+        expired: idempotencyStats.expired,
+        processing: idempotencyStats.processing,
+        note: "冪等性快取每 5 分鐘自動清理一次過期條目"
+      });
+
+      // 5. 清理舊的交易記錄（保留 90 天）
       // TODO: 實現 cleanupOldTransactions 函數
       // const transactionCleanup = cleanupOldTransactions(90);
       // logger.info(`[記憶體清理] 交易記錄清理完成`, transactionCleanup);
 
-      // 5. 記錄對話緩存統計（LRU 會自動管理，無需手動清理）
+      // 6. 記錄對話緩存統計（LRU 會自動管理，無需手動清理）
       const conversationCacheStats = getConversationCacheStats();
       logger.info(`[記憶體清理] 對話緩存統計`, conversationCacheStats);
 

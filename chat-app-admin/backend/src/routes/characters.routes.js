@@ -62,65 +62,98 @@ router.post("/", requireMinRole("admin"), async (req, res) => {
 /**
  * POST /api/characters/sync-chat-users
  * 同步所有角色的聊天用戶數量到 Firestore
+ *
+ * ⚠️ 高成本操作警告：
+ * - 此操作會逐個角色掃描對話文檔
+ * - 建議只在低流量時段執行
+ * - 對於大型數據庫，建議使用 Cloud Functions 定時任務
+ *
  * 🔒 權限：僅限 super_admin（批量修改所有角色數據，影響面廣）
  */
 router.post("/sync-chat-users", requireRole("super_admin"), async (req, res) => {
   try {
-    // 使用 collection group query 獲取所有用戶的 conversations 子集合
-    const conversationsSnapshot = await db.collectionGroup("conversations").get();
+    const { maxCharacters = 100, forceFullScan = false } = req.body;
 
-    // 統計每個角色的不重複用戶數量
-    const characterUserSets = new Map();
+    // 導入優化的統計服務
+    const { syncAllCharactersUserCount } = await import("../services/character/characterStats.service.js");
 
-    conversationsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      const characterId = data.characterId || data.conversationId;
-
-      // 從文檔路徑提取 userId: users/{userId}/conversations/{conversationId}
-      const userId = doc.ref.parent.parent?.id;
-
-      if (characterId && userId) {
-        if (!characterUserSets.has(characterId)) {
-          characterUserSets.set(characterId, new Set());
-        }
-        characterUserSets.get(characterId).add(userId);
-      }
+    // 執行批量同步（使用優化的逐個角色查詢）
+    const result = await syncAllCharactersUserCount({
+      maxCharacters,
+      forceFullScan
     });
 
-    // 批量更新 Firestore
-    let batch = db.batch();
-    let batchCount = 0;
-    let totalUpdated = 0;
+    const response = {
+      message: "同步完成",
+      totalCharacters: result.totalCharacters,
+      totalUpdated: result.totalUpdated,
+      warnings: result.warnings,
+      note: "已使用優化的查詢方式，逐個角色進行統計"
+    };
 
-    for (const [characterId, userSet] of characterUserSets.entries()) {
-      const charRef = db.collection("characters").doc(characterId);
-      batch.update(charRef, {
-        totalChatUsers: userSet.size,
-        updatedAt: new Date().toISOString(),
-      });
-      batchCount++;
-      totalUpdated++;
-
-      // Firestore batch 限制為 500 個操作
-      if (batchCount === 500) {
-        await batch.commit();
-        batch = db.batch();
-        batchCount = 0;
-      }
+    // 如果有警告，返回 207 Multi-Status
+    if (result.warnings.length > 0) {
+      return res.status(207).json(response);
     }
 
-    // 提交剩餘的批次操作
-    if (batchCount > 0) {
-      await batch.commit();
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ error: "同步失敗", message: error.message });
+  }
+});
+
+/**
+ * POST /api/characters/:characterId/sync-chat-users
+ * 同步單個角色的聊天用戶數量
+ * 使用優化的查詢，只掃描該角色的對話
+ *
+ * 🔒 權限：admin 以上
+ */
+router.post("/:characterId/sync-chat-users", requireMinRole("admin"), async (req, res) => {
+  try {
+    const { characterId } = req.params;
+
+    // 檢查角色是否存在
+    const characterDoc = await db.collection("characters").doc(characterId).get();
+    if (!characterDoc.exists) {
+      return res.status(404).json({ error: "角色不存在" });
     }
+
+    // 導入優化的統計服務
+    const { syncSingleCharacterUserCount } = await import("../services/character/characterStats.service.js");
+
+    // 同步單個角色
+    const result = await syncSingleCharacterUserCount(characterId);
 
     res.json({
       message: "同步完成",
-      totalCharacters: characterUserSets.size,
-      totalUpdated,
+      characterId,
+      userCount: result.userCount,
+      conversationCount: result.conversationCount,
+      note: "已使用優化的查詢方式，只掃描此角色的對話"
     });
   } catch (error) {
     res.status(500).json({ error: "同步失敗", message: error.message });
+  }
+});
+
+/**
+ * GET /api/characters/stats/overview
+ * 獲取系統統計概覽（低成本操作）
+ * 基於角色文檔中緩存的統計數據
+ *
+ * 🔒 權限：所有管理員
+ */
+router.get("/stats/overview", requireMinRole("moderator"), async (req, res) => {
+  try {
+    // 導入優化的統計服務
+    const { getSystemStatsOverview } = await import("../services/character/characterStats.service.js");
+
+    const stats = await getSystemStatsOverview();
+
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: "獲取統計概覽失敗", message: error.message });
   }
 });
 

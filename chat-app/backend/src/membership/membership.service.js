@@ -11,22 +11,42 @@ import { getFirestoreDb } from "../firebase/index.js";
 import { clearCache } from "../utils/firestoreCache.js";
 import logger from "../utils/logger.js";
 
-// 緩存會員配置（避免重複查詢 Firestore）
-const membershipConfigCache = new Map();
-let cacheExpiry = 0;
-const CACHE_TTL = 60 * 1000; // 1 分鐘緩存
+// ============================================
+// 會員配置快取系統（優化版）
+// ============================================
+// 使用 Map 儲存各個 tier 的配置和獨立過期時間
+const membershipConfigCache = new Map(); // tier -> { config, expiresAt }
+const CACHE_TTL = 5 * 60 * 1000; // 5 分鐘緩存（會員配置很少變動，延長緩存時間以提升效能）
 
 /**
- * 從 Firestore 獲取會員配置
+ * 清除會員配置快取
+ * @param {string} [tier] - 可選，指定要清除的會員等級。不提供則清除所有快取
+ */
+export const clearMembershipConfigCache = (tier = null) => {
+  if (tier) {
+    const deleted = membershipConfigCache.delete(tier);
+    if (deleted) {
+      logger.info(`[會員服務] 已清除會員配置快取: ${tier}`);
+    }
+  } else {
+    membershipConfigCache.clear();
+    logger.info(`[會員服務] 已清除所有會員配置快取`);
+  }
+};
+
+/**
+ * 從 Firestore 獲取會員配置（帶快取）
  * @param {string} tier - 會員等級 (free, vip, vvip)
  * @returns {Promise<Object>} 會員配置
  */
 const getMembershipConfigFromFirestore = async (tier) => {
   const now = Date.now();
 
-  // 檢查緩存
-  if (membershipConfigCache.has(tier) && now < cacheExpiry) {
-    return membershipConfigCache.get(tier);
+  // 檢查快取
+  const cached = membershipConfigCache.get(tier);
+  if (cached && now < cached.expiresAt) {
+    logger.debug(`[會員服務] 使用快取的會員配置: ${tier} (剩餘 ${Math.round((cached.expiresAt - now) / 1000)}秒)`);
+    return cached.config;
   }
 
   try {
@@ -35,9 +55,14 @@ const getMembershipConfigFromFirestore = async (tier) => {
 
     if (doc.exists) {
       const config = doc.data();
-      membershipConfigCache.set(tier, config);
-      cacheExpiry = now + CACHE_TTL;
-      logger.debug(`[會員服務] 從 Firestore 讀取會員配置: ${tier}`);
+
+      // 更新快取（每個 tier 獨立的過期時間）
+      membershipConfigCache.set(tier, {
+        config,
+        expiresAt: now + CACHE_TTL,
+      });
+
+      logger.debug(`[會員服務] 從 Firestore 讀取會員配置: ${tier}，已更新快取`);
       return config;
     }
   } catch (error) {
@@ -45,8 +70,16 @@ const getMembershipConfigFromFirestore = async (tier) => {
   }
 
   // 如果 Firestore 中沒有，使用代碼中的默認值
-  logger.debug(`[會員服務] 使用代碼中的會員配置: ${tier}`);
-  return MEMBERSHIP_TIERS[tier];
+  const fallbackConfig = MEMBERSHIP_TIERS[tier];
+
+  // 也將 fallback 放入快取，但使用較短的 TTL（1 分鐘）
+  membershipConfigCache.set(tier, {
+    config: fallbackConfig,
+    expiresAt: now + 60 * 1000,
+  });
+
+  logger.debug(`[會員服務] 使用代碼中的會員配置: ${tier}（fallback）`);
+  return fallbackConfig;
 };
 /**
  * 獲取用戶的完整會員資訊
@@ -459,4 +492,5 @@ export default {
   getUserFeatures,
   getExpiringMemberships,
   distributeMonthlyRewards,
+  clearMembershipConfigCache, // 新增：清除會員配置快取
 };

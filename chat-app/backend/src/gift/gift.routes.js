@@ -37,22 +37,24 @@ router.post("/send", requireFirebaseAuth, asyncHandler(async (req, res) => {
       });
     }
 
-    // 如果提供了請求ID，使用冪等性處理
-    if (requestId) {
-      const result = await handleIdempotentRequest(
-        requestId,
-        async () => {
-          return await sendGift(userId, characterId, giftId);
-        },
-        { ttl: 15 * 60 * 1000 } // 15分鐘
-      );
-
-      return res.status(200).json(result);
+    // ⚠️ 財務操作必須提供 requestId 實現冪等性保護
+    if (!requestId) {
+      return res.status(400).json({
+        error: "缺少必要參數：requestId（財務操作必須提供請求ID以防止重複扣款）",
+        code: "MISSING_REQUEST_ID",
+      });
     }
 
-    // 沒有請求ID，直接執行（向後兼容）
-    const result = await sendGift(userId, characterId, giftId);
-    res.status(200).json(result);
+    // 使用冪等性處理防止重複扣款
+    const result = await handleIdempotentRequest(
+      requestId,
+      async () => {
+        return await sendGift(userId, characterId, giftId);
+      },
+      { ttl: 15 * 60 * 1000 } // 15分鐘
+    );
+
+    return res.status(200).json(result);
   } catch (error) {
     logger.error("送禮物失敗:", error);
     res.status(400).json({

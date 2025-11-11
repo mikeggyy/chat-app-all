@@ -28,7 +28,7 @@ const popularOffset = ref(0);
 const popularHasMore = ref(true);
 const POPULAR_PAGE_SIZE = 20; // 每次加載 20 個
 
-// 虛擬滾動
+// 虛擬滾動（優化版）
 const {
   displayedCount: displayedRecordsCount,
   isLoadingMore: isLoadingMoreRecords,
@@ -39,7 +39,7 @@ const {
   initialCount: 5,
   incrementCount: 5,
   loadDelay: 300,
-  scrollThreshold: 200,
+  scrollThreshold: 500, // 優化：從 200px 提升到 500px，提前載入更多項目，減少快速滾動時的閃爍
 });
 
 // 獲取真實的最近對話列表
@@ -226,7 +226,7 @@ const PANEL_CONFIGS = {
     badgeLabel: "人氣排行",
     icon: FireIcon,
     iconKey: "fire",
-    heroImage: "/banner/ranking-hero.png",
+    heroImage: "/banner/ranking-hero.webp",
   },
 };
 

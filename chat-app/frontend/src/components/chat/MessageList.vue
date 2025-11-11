@@ -1,5 +1,5 @@
 <template>
-  <main ref="messageListRef" class="chat-body">
+  <main ref="messageListRef" class="chat-body" @scroll="handleScroll">
     <!-- 角色背景卡片 - 永久顯示 -->
     <article class="chat-profile">
       <span class="chat-profile__label">角色背景</span>
@@ -7,11 +7,23 @@
       <p>{{ partnerBackground }}</p>
     </article>
 
+    <!-- 加載更多舊消息指示器 -->
+    <div v-if="isLoadingMore" class="loading-more-indicator">
+      <div class="loading-spinner-small"></div>
+      <span>載入更多訊息...</span>
+    </div>
+
+    <!-- 已加載全部消息提示 -->
+    <div v-else-if="!hasMore && messages.length > initialMessageCount" class="all-loaded-indicator">
+      <span>已載入全部訊息</span>
+    </div>
+
     <!-- 消息列表 -->
     <section class="chat-thread">
       <Message
-        v-for="message in messages"
+        v-for="message in visibleMessages"
         :key="message.id"
+        v-memo="[message.id, message.text, message.imageUrl, message.video, playingVoiceMessageId === message.id]"
         :message="message"
         :is-playing="playingVoiceMessageId === message.id"
         @play-voice="$emit('play-voice', $event)"
@@ -37,8 +49,9 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted } from "vue";
+import { ref, computed, watch, nextTick, onMounted } from "vue";
 import Message from "./Message.vue";
+import { useChatVirtualScroll } from "../../composables/useChatVirtualScroll";
 
 // Props
 const props = defineProps({
@@ -67,8 +80,42 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(["play-voice", "image-click"]);
 
-// Refs
-const messageListRef = ref(null);
+// 虛擬滾動配置
+const initialMessageCount = 50; // 初始顯示 50 條消息
+const {
+  displayedCount,
+  isLoadingMore,
+  containerRef: messageListRef,
+  getVisibleMessages,
+  handleScroll: handleVirtualScroll,
+  hasMore: hasMoreMessages,
+  reset: resetVirtualScroll,
+} = useChatVirtualScroll({
+  initialCount: initialMessageCount,
+  incrementCount: 30,
+  scrollThreshold: 300,
+});
+
+/**
+ * 計算可見的消息（使用虛擬滾動）
+ */
+const visibleMessages = computed(() => {
+  return getVisibleMessages(props.messages);
+});
+
+/**
+ * 檢查是否還有更多舊消息可以加載
+ */
+const hasMore = computed(() => {
+  return hasMoreMessages(props.messages.length);
+});
+
+/**
+ * 處理滾動事件
+ */
+const handleScroll = (event) => {
+  handleVirtualScroll(event, props.messages.length);
+};
 
 /**
  * 滾動到底部
@@ -123,6 +170,7 @@ onMounted(() => {
 // 暴露方法給父組件
 defineExpose({
   scrollToBottom,
+  resetVirtualScroll,
 });
 </script>
 
@@ -188,10 +236,46 @@ defineExpose({
   color: rgba(226, 232, 240, 0.55);
 }
 
+/* 加載更多指示器 */
+.loading-more-indicator,
+.all-loaded-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.65);
+  text-align: center;
+}
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  border-top-color: rgba(148, 163, 184, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.all-loaded-indicator {
+  opacity: 0.5;
+}
+
 .chat-thread {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+
+  /* 性能優化：使用 contain 提示瀏覽器 */
+  contain: layout style paint;
 }
 
 /* 打字指示器樣式 */

@@ -128,6 +128,11 @@ const emit = defineEmits(['play-voice', 'image-click']);
   flex-direction: column;
   gap: 0.35rem;
 
+  /* 性能優化：使用 content-visibility 讓瀏覽器跳過渲染不在視口內的元素 */
+  content-visibility: auto;
+  /* 為 content-visibility 提供預估高度，避免滾動條跳動 */
+  contain-intrinsic-size: auto 100px;
+
   &--partner {
     background: rgba(148, 163, 184, 0.2);
   }

@@ -153,10 +153,11 @@ export const getCharacterById = (characterId) => {
  * @param {Object} [filter] - 過濾條件
  * @param {boolean} [filter.isPublic] - 是否只返回公開角色
  * @param {boolean} [filter.isActive] - 是否只返回活躍角色
+ * @param {string} [filter.status] - 角色狀態 ('active', 'inactive', 'draft')
  * @returns {Array<Object>} 角色列表
  *
  * @example
- * const publicCharacters = getAllCharacters({ isPublic: true });
+ * const publicCharacters = getAllCharacters({ isPublic: true, status: 'active' });
  */
 export const getAllCharacters = (filter = {}) => {
   if (!cacheInitialized) {
@@ -175,6 +176,10 @@ export const getAllCharacters = (filter = {}) => {
 
   if (filter.isActive !== undefined) {
     characters = characters.filter((c) => c.isActive === filter.isActive);
+  }
+
+  if (filter.status !== undefined) {
+    characters = characters.filter((c) => c.status === filter.status);
   }
 
   return characters;

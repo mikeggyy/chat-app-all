@@ -19,6 +19,11 @@ import {
   setCoinsBalance,
 } from "./coins.service.js";
 import { isTestAccount } from "../../../../shared/config/testAccounts.js";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../../shared/utils/errorFormatter.js";
 
 const router = express.Router();
 
@@ -27,20 +32,14 @@ const router = express.Router();
  * GET /api/coins/balance
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人餘額
  */
-router.get("/api/coins/balance", requireFirebaseAuth, async (req, res) => {
+router.get("/api/coins/balance", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const balance = await getCoinsBalance(userId);
 
-    res.json({
-      success: true,
-      ...balance,
-    });
+    sendSuccess(res, balance);
   } catch (error) {
-    res.status(404).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -51,15 +50,14 @@ router.get("/api/coins/balance", requireFirebaseAuth, async (req, res) => {
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
  * 🔒 冪等性保護：防止重複扣費
  */
-router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res) => {
+router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, idempotencyKey } = req.body;
 
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供 characterId",
+      return sendError(res, "VALIDATION_ERROR", "請提供 characterId", {
+        field: "characterId",
       });
     }
 
@@ -72,8 +70,7 @@ router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res
         { ttl: 15 * 60 * 1000 } // 15 分鐘
       );
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: "購買成功，正在生成照片",
         ...result,
       });
@@ -82,16 +79,12 @@ router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res
     // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseAiPhoto(userId, characterId);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "購買成功，正在生成照片",
       ...result,
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -102,15 +95,14 @@ router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
  * 🔒 冪等性保護：防止重複扣費
  */
-router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res) => {
+router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, idempotencyKey } = req.body;
 
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供 characterId",
+      return sendError(res, "VALIDATION_ERROR", "請提供 characterId", {
+        field: "characterId",
       });
     }
 
@@ -123,8 +115,7 @@ router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res
         { ttl: 30 * 60 * 1000 } // 30 分鐘（影片生成時間較長）
       );
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: "購買成功，正在生成影片",
         ...result,
       });
@@ -133,16 +124,12 @@ router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res
     // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseAiVideo(userId, characterId);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "購買成功，正在生成影片",
       ...result,
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -153,15 +140,14 @@ router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
  * 🔒 冪等性保護：防止重複扣費
  */
-router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (req, res) => {
+router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, idempotencyKey } = req.body;
 
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供 characterId",
+      return sendError(res, "VALIDATION_ERROR", "請提供 characterId", {
+        field: "characterId",
       });
     }
 
@@ -174,8 +160,7 @@ router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (re
         { ttl: 15 * 60 * 1000 } // 15 分鐘
       );
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: "購買成功，已解鎖無限對話",
         ...result,
       });
@@ -184,16 +169,12 @@ router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (re
     // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseUnlimitedChat(userId, characterId);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "購買成功，已解鎖無限對話",
       ...result,
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -202,21 +183,15 @@ router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (re
  * GET /api/coins/pricing/:featureId
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人價格
  */
-router.get("/api/coins/pricing/:featureId", requireFirebaseAuth, async (req, res) => {
+router.get("/api/coins/pricing/:featureId", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { featureId } = req.params;
     const pricing = await getFeaturePricing(userId, featureId);
 
-    res.json({
-      success: true,
-      ...pricing,
-    });
+    sendSuccess(res, pricing);
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -225,20 +200,14 @@ router.get("/api/coins/pricing/:featureId", requireFirebaseAuth, async (req, res
  * GET /api/coins/pricing
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人價格
  */
-router.get("/api/coins/pricing", requireFirebaseAuth, async (req, res) => {
+router.get("/api/coins/pricing", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const prices = await getAllFeaturePrices(userId);
 
-    res.json({
-      success: true,
-      ...prices,
-    });
+    sendSuccess(res, prices);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 

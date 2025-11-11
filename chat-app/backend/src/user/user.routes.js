@@ -19,7 +19,7 @@ import {
 } from "./assets.service.js";
 import { getUserConversations } from "./userConversations.service.js";
 import { requireFirebaseAuth } from "../auth/index.js";
-import { requireOwnership, asyncHandler, sendSuccess, sendError } from "../utils/routeHelpers.js";
+import { requireOwnership, asyncHandler } from "../utils/routeHelpers.js";
 import { requireAdmin } from "../middleware/adminAuth.middleware.js";
 import {
   getMatchesByIds,
@@ -28,6 +28,11 @@ import {
 import { getFirestoreDb } from "../firebase/index.js";
 import { FieldValue } from "firebase-admin/firestore";
 import logger from "../utils/logger.js";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 
 const shouldIncludeMatches = (query) => {
   const include = typeof query?.include === "string" ? query.include : "";
@@ -65,81 +70,91 @@ const buildFavoritesPayload = (user, includeMatches) => {
 export const userRouter = Router();
 
 // 獲取所有用戶列表 - 僅供管理員使用
-userRouter.get("/", requireFirebaseAuth, requireAdmin, asyncHandler(async (req, res) => {
-  const { limit, startAfter } = req.query;
+userRouter.get("/", requireFirebaseAuth, requireAdmin, asyncHandler(async (req, res, next) => {
+  try {
+    const { limit, startAfter } = req.query;
 
-  const result = await getAllUsers({
-    limit: limit ? parseInt(limit) : 100,
-    startAfter: startAfter || null,
-  });
+    const result = await getAllUsers({
+      limit: limit ? parseInt(limit) : 100,
+      startAfter: startAfter || null,
+    });
 
-  res.json(result);
+    sendSuccess(res, result);
+  } catch (error) {
+    next(error);
+  }
 }));
 
 // 獲取指定用戶資料 - 需要身份驗證且只能訪問自己的資料
-userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res) => {
-  let user = await getUserById(req.params.id);
+userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
+  try {
+    let user = await getUserById(req.params.id);
 
-  // 如果用戶不存在，為測試用戶自動創建基本記錄
-  if (!user) {
-    const newUser = {
-      id: req.params.id,
-      uid: req.params.id,
-      displayName: "測試使用者",
-      conversations: [],
-      favorites: [],
-      hasCompletedOnboarding: false,  // 明確設置預設值
-    };
-    await upsertUser(newUser);
-    user = await getUserById(req.params.id);
-
+    // 如果用戶不存在，為測試用戶自動創建基本記錄
     if (!user) {
-      res.status(404).json({ message: "找不到指定的使用者資料" });
-      return;
+      const newUser = {
+        id: req.params.id,
+        uid: req.params.id,
+        displayName: "測試使用者",
+        conversations: [],
+        favorites: [],
+        hasCompletedOnboarding: false,  // 明確設置預設值
+      };
+      await upsertUser(newUser);
+      user = await getUserById(req.params.id);
+
+      if (!user) {
+        throw new ApiError("USER_NOT_FOUND", "找不到指定的使用者資料", { userId: req.params.id });
+      }
     }
+
+    // ✅ 關鍵修復：經過 normalizeUser 規範化，確保返回完整且一致的數據格式
+    // 這樣可以：
+    // 1. 補全缺失的欄位（如 hasCompletedOnboarding, age, gender 等）
+    // 2. 確保 GET 和 POST 行為一致
+    // 3. 防止前端收到不完整的數據
+    const normalized = normalizeUser(user);
+
+    sendSuccess(res, normalized);
+  } catch (error) {
+    next(error);
   }
-
-  // ✅ 關鍵修復：經過 normalizeUser 規範化，確保返回完整且一致的數據格式
-  // 這樣可以：
-  // 1. 補全缺失的欄位（如 hasCompletedOnboarding, age, gender 等）
-  // 2. 確保 GET 和 POST 行為一致
-  // 3. 防止前端收到不完整的數據
-  const normalized = normalizeUser(user);
-
-  res.json(normalized);
 }));
 
-userRouter.post("/", requireFirebaseAuth, asyncHandler(async (req, res) => {
-  const firebaseUser = req.firebaseUser;
-  if (!firebaseUser?.uid) {
-    res.status(400).json({
-      message: "Firebase 使用者資訊不完整，無法建立資料。",
-    });
-    return;
+userRouter.post("/", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
+  try {
+    const firebaseUser = req.firebaseUser;
+    if (!firebaseUser?.uid) {
+      return sendError(res, "VALIDATION_ERROR", "Firebase 使用者資訊不完整，無法建立資料", {
+        field: "firebaseUser.uid",
+      });
+    }
+
+    const nowIso = new Date().toISOString();
+    const firebaseProviderId =
+      firebaseUser.firebase?.sign_in_provider ?? "google";
+
+    const payload = {
+      ...req.body,
+      id: firebaseUser.uid,
+      uid: firebaseUser.uid,
+      email: req.body?.email ?? firebaseUser.email ?? "",
+      displayName:
+        req.body?.displayName ?? firebaseUser.name ?? "Firebase 使用者",
+      photoURL:
+        req.body?.photoURL ?? firebaseUser.picture ?? "/avatars/defult-01.webp",
+      signInProvider: req.body?.signInProvider ?? firebaseProviderId,
+      lastLoginAt: req.body?.lastLoginAt ?? nowIso,
+      updatedAt: req.body?.updatedAt ?? nowIso,
+    };
+
+    delete payload.firebaseIdToken;
+
+    const user = await upsertUser(payload);
+    sendSuccess(res, user, { status: 201 });
+  } catch (error) {
+    next(error);
   }
-
-  const nowIso = new Date().toISOString();
-  const firebaseProviderId =
-    firebaseUser.firebase?.sign_in_provider ?? "google";
-
-  const payload = {
-    ...req.body,
-    id: firebaseUser.uid,
-    uid: firebaseUser.uid,
-    email: req.body?.email ?? firebaseUser.email ?? "",
-    displayName:
-      req.body?.displayName ?? firebaseUser.name ?? "Firebase 使用者",
-    photoURL:
-      req.body?.photoURL ?? firebaseUser.picture ?? "/avatars/defult-01.webp",
-    signInProvider: req.body?.signInProvider ?? firebaseProviderId,
-    lastLoginAt: req.body?.lastLoginAt ?? nowIso,
-    updatedAt: req.body?.updatedAt ?? nowIso,
-  };
-
-  delete payload.firebaseIdToken;
-
-  const user = await upsertUser(payload);
-  res.status(201).json(user);
 }));
 
 userRouter.patch(
@@ -159,69 +174,82 @@ userRouter.patch(
   "/:id/profile",
   requireFirebaseAuth,
   requireOwnership("id"),
-  asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const payload = req.body ?? {};
-    const patch = {};
+  asyncHandler(async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const payload = req.body ?? {};
+      const patch = {};
 
-    if (Object.prototype.hasOwnProperty.call(payload, "displayName")) {
-      patch.displayName = payload.displayName;
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, "gender")) {
-      patch.gender = payload.gender;
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, "age")) {
-      patch.age = payload.age;
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, "hasCompletedOnboarding")) {
-      patch.hasCompletedOnboarding = payload.hasCompletedOnboarding;
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, "defaultPrompt")) {
-      patch.defaultPrompt = payload.defaultPrompt;
-    }
+      if (Object.prototype.hasOwnProperty.call(payload, "displayName")) {
+        patch.displayName = payload.displayName;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "gender")) {
+        patch.gender = payload.gender;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "age")) {
+        patch.age = payload.age;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "hasCompletedOnboarding")) {
+        patch.hasCompletedOnboarding = payload.hasCompletedOnboarding;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, "defaultPrompt")) {
+        patch.defaultPrompt = payload.defaultPrompt;
+      }
 
-    if (Object.keys(patch).length === 0) {
-      return sendError(res, "未提供可更新的欄位", 400);
+      if (Object.keys(patch).length === 0) {
+        return sendError(res, "VALIDATION_ERROR", "未提供可更新的欄位", {
+          availableFields: ["displayName", "gender", "age", "hasCompletedOnboarding", "defaultPrompt"],
+        });
+      }
+
+      const user = await updateUserProfileFields(id, patch);
+
+      sendSuccess(res, user);
+    } catch (error) {
+      next(error);
     }
-
-    const user = await updateUserProfileFields(id, patch);
-
-    sendSuccess(res, user);
   })
 );
 
-userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res) => {
-  let user = await getUserById(req.params.id);
+userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
+  try {
+    let user = await getUserById(req.params.id);
 
-  // 如果用戶不存在，為測試用戶自動創建基本記錄
-  if (!user) {
-    const newUser = {
-      id: req.params.id,
-      uid: req.params.id,
-      displayName: "測試使用者",
-      conversations: [],
-      favorites: [],
-    };
-    await upsertUser(newUser);
-    user = await getUserById(req.params.id);
-
+    // 如果用戶不存在，為測試用戶自動創建基本記錄
     if (!user) {
-      res.status(404).json({ message: "找不到指定的使用者資料" });
-      return;
-    }
-  }
+      const newUser = {
+        id: req.params.id,
+        uid: req.params.id,
+        displayName: "測試使用者",
+        conversations: [],
+        favorites: [],
+      };
+      await upsertUser(newUser);
+      user = await getUserById(req.params.id);
 
-  const includeMatches = shouldIncludeMatches(req.query);
-  res.json(buildFavoritesPayload(user, includeMatches));
+      if (!user) {
+        throw new ApiError("USER_NOT_FOUND", "找不到指定的使用者資料", { userId: req.params.id });
+      }
+    }
+
+    const includeMatches = shouldIncludeMatches(req.query);
+    sendSuccess(res, buildFavoritesPayload(user, includeMatches));
+  } catch (error) {
+    next(error);
+  }
 }));
 
-userRouter.get("/:id/characters", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const characters = await listMatchesByCreator(id);
-  res.json({
-    characters,
-    total: characters.length,
-  });
+userRouter.get("/:id/characters", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const characters = await listMatchesByCreator(id);
+    sendSuccess(res, {
+      characters,
+      total: characters.length,
+    });
+  } catch (error) {
+    next(error);
+  }
 }));
 
 userRouter.post(
@@ -274,12 +302,12 @@ userRouter.delete(
   })
 );
 
-userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
-  const cursor = req.query.cursor || null;
-
+userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
   try {
+    const { id } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+    const cursor = req.query.cursor || null;
+
     // 從 Firestore 子集合獲取對話列表（支援分頁）
     const result = await getUserConversations(id, {
       limit,
@@ -338,7 +366,7 @@ userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id")
       };
     });
 
-    res.json({
+    sendSuccess(res, {
       conversations: enrichedConversations,
       total: enrichedConversations.length,
       nextCursor,
@@ -346,7 +374,8 @@ userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id")
     });
   } catch (error) {
     // 如果用戶不存在或出錯，返回空數組
-    res.json({
+    logger.warn(`獲取用戶對話失敗: ${error.message}`);
+    sendSuccess(res, {
       conversations: [],
       total: 0,
       nextCursor: null,
@@ -407,16 +436,22 @@ userRouter.post(
   "/:id/assets/add",
   requireFirebaseAuth,
   requireOwnership("id"),
-  asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { assetType, amount } = req.body;
+  asyncHandler(async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { assetType, amount } = req.body;
 
-    if (!assetType) {
-      return sendError(res, 400, "需要提供資產類型");
+      if (!assetType) {
+        return sendError(res, "VALIDATION_ERROR", "需要提供資產類型", {
+          field: "assetType",
+        });
+      }
+
+      const updatedAssets = await addUserAsset(id, assetType, amount || 1);
+      sendSuccess(res, updatedAssets);
+    } catch (error) {
+      next(error);
     }
-
-    const updatedAssets = await addUserAsset(id, assetType, amount || 1);
-    sendSuccess(res, updatedAssets);
   })
 );
 
@@ -429,22 +464,27 @@ userRouter.post(
   "/:id/assets/consume",
   requireFirebaseAuth,
   requireOwnership("id"),
-  asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { assetType, amount } = req.body;
-
-    if (!assetType) {
-      return sendError(res, 400, "需要提供資產類型");
-    }
-
+  asyncHandler(async (req, res, next) => {
     try {
+      const { id } = req.params;
+      const { assetType, amount } = req.body;
+
+      if (!assetType) {
+        return sendError(res, "VALIDATION_ERROR", "需要提供資產類型", {
+          field: "assetType",
+        });
+      }
+
       const updatedAssets = await consumeUserAsset(id, assetType, amount || 1);
       sendSuccess(res, updatedAssets);
     } catch (error) {
       if (error.message && error.message.includes("數量不足")) {
-        return sendError(res, 400, error.message);
+        return sendError(res, "INSUFFICIENT_ASSETS", error.message, {
+          assetType: req.body.assetType,
+          requested: req.body.amount || 1,
+        });
       }
-      throw error;
+      next(error);
     }
   })
 );
@@ -458,15 +498,22 @@ userRouter.put(
   "/:id/assets",
   requireFirebaseAuth,
   requireOwnership("id"),
-  asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { assets } = req.body;
+  asyncHandler(async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { assets } = req.body;
 
-    if (!assets || typeof assets !== "object") {
-      return sendError(res, 400, "需要提供有效的資產對象");
+      if (!assets || typeof assets !== "object") {
+        return sendError(res, "VALIDATION_ERROR", "需要提供有效的資產對象", {
+          field: "assets",
+          expectedType: "object",
+        });
+      }
+
+      const updatedAssets = await setUserAssets(id, assets);
+      sendSuccess(res, updatedAssets);
+    } catch (error) {
+      next(error);
     }
-
-    const updatedAssets = await setUserAssets(id, assets);
-    sendSuccess(res, updatedAssets);
   })
 );

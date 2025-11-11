@@ -2,7 +2,7 @@ import { aiMatches } from "./match.data.js";
 import { getFirestoreDb } from "../firebase/index.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 import logger from "../utils/logger.js";
-import { getCharacterById, characterExists } from "../services/character/characterCache.service.js";
+import { getCharacterById, getAllCharacters, characterExists } from "../services/character/characterCache.service.js";
 
 const cloneMatch = (match) => ({ ...match });
 
@@ -124,51 +124,45 @@ export const listMatchesForUser = async (user) => {
     Array.isArray(user?.conversations) ? user.conversations : []
   );
 
-  // 从 Firestore 获取所有活跃角色
-  let firestoreCharacters = [];
-  try {
-    const db = getFirestoreDb();
-    const snapshot = await db
-      .collection("characters")
-      .where("status", "==", "active")
-      .where("isPublic", "==", true)
-      .orderBy("createdAt", "desc")
-      .get();
+  // ✅ 優化：從緩存獲取活躍且公開的角色（取代 Firestore 直接查詢）
+  let allCharacters = [];
 
-    snapshot.forEach((doc) => {
-      firestoreCharacters.push({
-        ...doc.data(),
-        id: doc.id,
-      });
+  try {
+    // 從內存緩存讀取，速度極快且不產生 Firestore 讀取費用
+    allCharacters = getAllCharacters({
+      status: "active",
+      isPublic: true,
     });
 
-    if (process.env.NODE_ENV !== "test") {
-      logger.info(`[Match Service] Loaded ${firestoreCharacters.length} characters from Firestore`);
+    // 如果緩存返回空數組（可能是緩存未初始化），進入 Fallback
+    if (allCharacters.length === 0) {
+      if (process.env.NODE_ENV !== "test") {
+        logger.warn(`[Match Service] ⚠️ 緩存返回空數組，使用 Fallback`);
+      }
+
+      // 使用內存數組作為 Fallback
+      allCharacters = aiMatches.filter((char) => {
+        return char.status === "active" && char.isPublic === true;
+      });
+    } else {
+      if (process.env.NODE_ENV !== "test") {
+        logger.info(`[Match Service] ✅ 從緩存載入 ${allCharacters.length} 個角色（無 Firestore 讀取）`);
+      }
     }
   } catch (error) {
     if (process.env.NODE_ENV !== "test") {
-      logger.error("[Match Service] Failed to load characters from Firestore:", error);
+      logger.error("[Match Service] ❌ 從緩存載入角色失敗，嘗試 Fallback:", error);
     }
-    // Fallback 到内存数组
-    firestoreCharacters = [];
+
+    // Fallback: 如果發生錯誤，使用內存數組
+    allCharacters = aiMatches.filter((char) => {
+      return char.status === "active" && char.isPublic === true;
+    });
+
+    if (process.env.NODE_ENV !== "test") {
+      logger.warn(`[Match Service] ⚠️ 使用 Fallback，載入 ${allCharacters.length} 個角色`);
+    }
   }
-
-  // 合并 Firestore 角色和内存角色（去重）
-  const characterMap = new Map();
-
-  // 先加入 Firestore 角色
-  firestoreCharacters.forEach((char) => {
-    characterMap.set(char.id, char);
-  });
-
-  // 再加入内存角色（如果不存在）
-  aiMatches.forEach((char) => {
-    if (!characterMap.has(char.id)) {
-      characterMap.set(char.id, char);
-    }
-  });
-
-  const allCharacters = Array.from(characterMap.values());
 
   const decorated = allCharacters.map((match) => {
     const isFavorited = favoritesSet.has(match.id);

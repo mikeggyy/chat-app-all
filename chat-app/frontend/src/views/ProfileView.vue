@@ -10,34 +10,26 @@ import {
   watchEffect,
 } from "vue";
 import {
-  BoltIcon,
   PencilSquareIcon,
   Cog6ToothIcon,
-  WalletIcon,
 } from "@heroicons/vue/24/outline";
-import { ArrowRightIcon } from "@heroicons/vue/24/solid";
 import AvatarEditorModal from "../components/AvatarEditorModal.vue";
 import StatsModal from "../components/StatsModal.vue";
-import { useUserProfile } from "../composables/useUserProfile";
+import ProfileVIPCard from "../components/profile/ProfileVIPCard.vue";
+import ProfileAssets from "../components/profile/ProfileAssets.vue";
+import ProfileQuickActions from "../components/profile/ProfileQuickActions.vue";
+import { useProfileData } from "../composables/useProfileData";
 import { useRouter } from "vue-router";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth";
-import { useGuestGuard } from "../composables/useGuestGuard";
-import { useNotifications } from "../composables/useNotifications";
-import { useMembership } from "../composables/useMembership";
-import { useCoins } from "../composables/useCoins";
-import { useUnlockTickets } from "../composables/useUnlockTickets";
 import { clearTestSession } from "../services/testAuthSession";
-import { COIN_ICON_PATH } from "../config/assets";
 import {
   PROFILE_LIMITS,
   FALLBACK_USER,
   BUILTIN_AVATAR_OPTIONS,
-  QUICK_ACTIONS,
   QUICK_ACTION_ROUTES,
   GENDER_OPTIONS,
   ASSET_TYPE_MAP,
   CARD_CATEGORY_MAP,
-  DEFAULT_USER_ASSETS,
   generateAgeOptions,
   isValidGender,
   isValidAge,
@@ -45,11 +37,16 @@ import {
 
 const router = useRouter();
 const firebaseAuth = useFirebaseAuth();
-const { hasUnreadNotifications } = useNotifications();
-const { requireLogin, isGuest } = useGuestGuard();
 
-// VIP 系統 composables
+// 使用整合的 useProfileData composable
 const {
+  profile,
+  targetUserId,
+  displayedId,
+  loadUserProfile,
+  updateUserAvatar,
+  updateUserProfileDetails,
+  clearUserProfile,
   tier,
   tierName,
   isVIP,
@@ -58,59 +55,16 @@ const {
   formattedExpiryDate,
   daysUntilExpiry,
   isExpiringSoon,
-  loadMembership,
-} = useMembership();
-
-const { balance, formattedBalance, loadBalance } = useCoins();
-
-const { loadBalance: loadTicketsBalance } = useUnlockTickets();
-
-// 金幣圖標
-const isCoinIconAvailable = ref(true);
-
-const handleCoinIconError = () => {
-  if (isCoinIconAvailable.value) {
-    isCoinIconAvailable.value = false;
-  }
-};
-
-// 用戶資產
-const userAssets = ref({ ...DEFAULT_USER_ASSETS });
-
-const loadUserAssets = async (userId) => {
-  if (!userId) return;
-  try {
-    const { apiJson } = await import("../utils/api.js");
-    const data = await apiJson(
-      `/api/users/${encodeURIComponent(userId)}/assets`,
-      {
-        skipGlobalLoading: true,
-      }
-    );
-    // 只更新已定義的欄位，避免訪問未定義的屬性
-    if (data && typeof data === "object") {
-      userAssets.value = {
-        characterUnlockCards: data.characterUnlockCards ?? 0,
-        photoUnlockCards: data.photoUnlockCards ?? 0,
-        videoUnlockCards: data.videoUnlockCards ?? 0,
-        voiceUnlockCards: data.voiceUnlockCards ?? 0,
-        createCards: data.createCards ?? 0,
-        potions: data.potions ?? userAssets.value.potions,
-      };
-    }
-  } catch (err) {
-    if (import.meta.env.DEV) {
-    }
-  }
-};
-
-const {
-  user,
-  loadUserProfile,
-  updateUserAvatar,
-  updateUserProfileDetails,
-  clearUserProfile,
-} = useUserProfile();
+  balance,
+  formattedBalance,
+  hasUnreadNotifications,
+  requireLogin,
+  isGuest,
+  userAssets,
+  loadUserAssets,
+  initializeProfileData,
+  refreshProfileData,
+} = useProfileData();
 
 const handleQuickActionSelect = async (action) => {
   if (!action || typeof action !== "object") {
@@ -127,13 +81,6 @@ const handleQuickActionSelect = async (action) => {
     await router.push({ name: routeName });
   } catch (error) {}
 };
-
-const profile = computed(() => user.value ?? FALLBACK_USER);
-const targetUserId = computed(() => profile.value.id ?? FALLBACK_USER.id ?? "");
-
-const displayedId = computed(
-  () => profile.value.uid ?? profile.value.id ?? "尚未設定"
-);
 
 const avatarPreview = ref(FALLBACK_USER.photoURL);
 const isAvatarModalOpen = ref(false);
@@ -782,17 +729,13 @@ onMounted(async () => {
   const userId = targetUserId.value;
   void ensureProfileLoaded(userId);
 
-  // 載入 VIP 系統資料
+  // 使用整合的 initializeProfileData 載入所有資料
   if (userId) {
     try {
-      await Promise.all([
-        loadMembership(userId, { skipGlobalLoading: true }),
-        loadBalance(userId, { skipGlobalLoading: true }),
-        loadTicketsBalance(userId, { skipGlobalLoading: true }),
-        loadUserAssets(userId),
-      ]);
+      await initializeProfileData(userId);
     } catch (error) {
       if (import.meta.env.DEV) {
+        console.error("[ProfileView] 初始化資料失敗:", error);
       }
     }
   }
@@ -905,16 +848,18 @@ watch(
       <div class="profile-hero__overlay"></div>
 
       <header class="profile-hero__top">
-        <button
-          type="button"
-          class="vip-button"
-          :class="{ 'vip-button--active': isVIP || isVVIP }"
-          :aria-label="isVIP || isVVIP ? `當前會員: ${tierName}` : '開通 VIP'"
-          @click="handleQuickActionSelect({ key: 'membership' })"
-        >
-          <BoltIcon class="icon" aria-hidden="true" />
-          <span>{{ isVIP || isVVIP ? tierName : "開通VIP" }}</span>
-        </button>
+        <ProfileVIPCard
+          :tier="tier"
+          :tier-name="tierName"
+          :is-v-i-p="isVIP"
+          :is-v-v-i-p="isVVIP"
+          :is-paid-member="isPaidMember"
+          :formatted-expiry-date="formattedExpiryDate"
+          :days-until-expiry="daysUntilExpiry"
+          :is-expiring-soon="isExpiringSoon"
+          :is-guest="isGuest"
+          @upgrade-click="handleQuickActionSelect({ key: 'membership' })"
+        />
 
         <nav class="profile-hero__aux">
           <ul>
@@ -1017,59 +962,18 @@ watch(
         </div>
 
         <!-- 資產查看按鈕 -->
-        <button
-          v-if="!isGuest"
-          type="button"
-          class="stats-button"
-          @click="openStatsModal"
-        >
-          <img
-            v-if="isCoinIconAvailable"
-            :src="COIN_ICON_PATH"
-            alt=""
-            class="stats-button__icon stats-button__icon-image"
-            decoding="async"
-            @error="handleCoinIconError"
-          />
-          <WalletIcon
-            v-else
-            class="stats-button__icon stats-button__icon-fallback"
-            aria-hidden="true"
-          />
-          <div class="stats-button__content">
-            <span class="stats-button__value">{{ formattedBalance }}</span>
-            <span class="stats-button__label">金幣</span>
-          </div>
-          <ArrowRightIcon class="stats-button__arrow" aria-hidden="true" />
-        </button>
+        <ProfileAssets
+          :balance="balance"
+          :is-guest="isGuest"
+          @open-stats="openStatsModal"
+        />
       </div>
     </section>
 
-    <section class="quick-actions" aria-label="功能捷徑">
-      <ul>
-        <li
-          v-for="action in QUICK_ACTIONS"
-          :key="action.key"
-          class="quick-action"
-        >
-          <button
-            type="button"
-            class="quick-action__button"
-            @click="handleQuickActionSelect(action)"
-          >
-            <span class="quick-action__icon">
-              <component :is="action.icon" class="icon" aria-hidden="true" />
-              <span
-                v-if="action.key === 'notifications' && hasUnreadNotifications"
-                class="quick-action__badge"
-                aria-hidden="true"
-              ></span>
-            </span>
-            <span class="quick-action__label">{{ action.label }}</span>
-          </button>
-        </li>
-      </ul>
-    </section>
+    <ProfileQuickActions
+      :has-unread-notifications="hasUnreadNotifications"
+      @action-select="handleQuickActionSelect"
+    />
   </main>
   <Teleport to="body">
     <div

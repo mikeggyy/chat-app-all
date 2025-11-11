@@ -41,7 +41,8 @@ const {
 const { membership, loadMembership } = useMembership();
 const { requireLogin } = useGuestGuard();
 const { success, error: showError } = useToast();
-const { dialogState, showConfirm, handleConfirm, handleCancel } = usePurchaseConfirm();
+const { dialogState, showConfirm, handleConfirm, handleCancel } =
+  usePurchaseConfirm();
 
 const isCoinIconAvailable = ref(true);
 const isPurchasing = ref(false);
@@ -127,29 +128,31 @@ const coinItems = computed(() => {
 
 // Icon 映射表（根據 category 轉換為正確的 iconColor）
 const ICON_MAPPING = {
-  "character_unlock": { iconColor: "character" },
-  "photo_unlock": { iconColor: "photo" },
-  "video_unlock": { iconColor: "video" },
-  "voice_unlock": { iconColor: "voice" },
-  "create_character": { iconColor: "create" },
+  character_unlock: { iconColor: "character" },
+  photo_unlock: { iconColor: "photo" },
+  video_unlock: { iconColor: "video" },
+  voice_unlock: { iconColor: "voice" },
+  create_character: { iconColor: "create" },
 };
 
 // 資產卡片商品（從 API 加載）
 const assetCardItems = computed(() => {
   return assetPackages.value.map((pkg) => {
     // 從 category 或 baseId 中提取 iconColor
-    const mapping = ICON_MAPPING[pkg.category] || ICON_MAPPING[pkg.baseId] || {};
+    const mapping =
+      ICON_MAPPING[pkg.category] || ICON_MAPPING[pkg.baseId] || {};
 
     // 判斷 icon 是否為 emoji（簡單判斷：如果只有1-2個字符且不是英文，可能是 emoji）
     const iconValue = pkg.icon || null;
-    const isEmoji = iconValue && iconValue.length <= 2 && !/^[a-zA-Z]/.test(iconValue);
+    const isEmoji =
+      iconValue && iconValue.length <= 2 && !/^[a-zA-Z]/.test(iconValue);
 
     return {
       id: pkg.id || pkg.sku,
       category: pkg.category,
       name: pkg.displayName || pkg.name,
-      emoji: isEmoji ? iconValue : null,  // emoji 放到 emoji 屬性
-      icon: isEmoji ? null : iconValue,    // 組件名放到 icon 屬性
+      emoji: isEmoji ? iconValue : null, // emoji 放到 emoji 屬性
+      icon: isEmoji ? null : iconValue, // 組件名放到 icon 屬性
       iconColor: mapping.iconColor || pkg.iconColor || "character",
       price: pkg.unitPrice || pkg.finalPrice,
       quantity: pkg.quantity || 1,
@@ -162,8 +165,8 @@ const assetCardItems = computed(() => {
 
 // 藥水Icon映射表
 const POTION_ICON_MAPPING = {
-  "memory_boost": { iconColor: "memory" },
-  "brain_boost": { iconColor: "brain" },
+  memory_boost: { iconColor: "memory" },
+  brain_boost: { iconColor: "brain" },
 };
 
 // 道具商品（從 API 加載）
@@ -173,7 +176,8 @@ const potionItems = computed(() => {
 
     // 判斷 icon 是否為 emoji
     const iconValue = potion.icon || null;
-    const isEmoji = iconValue && iconValue.length <= 2 && !/^[a-zA-Z]/.test(iconValue);
+    const isEmoji =
+      iconValue && iconValue.length <= 2 && !/^[a-zA-Z]/.test(iconValue);
 
     return {
       id: potion.id,
@@ -181,8 +185,8 @@ const potionItems = computed(() => {
       name: potion.displayName || potion.name,
       description: potion.description,
       effect: potion.effect?.displayText || potion.effect,
-      emoji: isEmoji ? iconValue : null,  // emoji 放到 emoji 屬性
-      icon: isEmoji ? null : iconValue,    // 組件名放到 icon 屬性
+      emoji: isEmoji ? iconValue : null, // emoji 放到 emoji 屬性
+      icon: isEmoji ? null : iconValue, // 組件名放到 icon 屬性
       iconColor: mapping.iconColor || potion.iconColor || "memory",
       price: potion.unitPrice,
       quantity: potion.quantity || 1,
@@ -196,11 +200,7 @@ const potionItems = computed(() => {
 
 // 合併所有商品
 const allItems = computed(() => {
-  return [
-    ...coinItems.value,
-    ...assetCardItems.value,
-    ...potionItems.value,
-  ];
+  return [...coinItems.value, ...assetCardItems.value, ...potionItems.value];
 });
 
 // 過濾商品
@@ -271,10 +271,14 @@ const handlePurchaseCoin = async (pkg) => {
   }
 
   // 確認購買
-  const confirmMessage = `確定要購買 ${pkg.totalCoins || pkg.coins} 金幣嗎？\n價格：${pkg.unitPrice || pkg.price} 元${pkg.bonus > 0 ? `\n贈送：${pkg.bonus} 金幣` : ''}`;
+  const confirmMessage = `確定要購買 ${
+    pkg.totalCoins || pkg.coins
+  } 金幣嗎？\n價格：${pkg.unitPrice || pkg.price} 元${
+    pkg.bonus > 0 ? `\n贈送：${pkg.bonus} 金幣` : ""
+  }`;
   const confirmed = await showConfirm(confirmMessage, {
-    title: '確認購買金幣',
-    confirmText: '立即購買',
+    title: "確認購買金幣",
+    confirmText: "立即購買",
   });
 
   if (!confirmed) {
@@ -296,7 +300,6 @@ const handlePurchaseCoin = async (pkg) => {
   } catch (err) {
     const message = err?.message || "購買失敗，請稍後再試";
     showError(message);
-
   } finally {
     isPurchasing.value = false;
   }
@@ -331,10 +334,16 @@ const handlePurchaseItem = async (item) => {
 
   // 確認購買
   const itemName = item.fullName || item.name;
-  const confirmMessage = `確定要購買 ${itemName} 嗎？\n價格：${item.price} 金幣${item.originalPrice ? `\n原價：${item.originalPrice} 金幣 (${item.badge})` : ''}`;
+  const confirmMessage = `確定要購買 ${itemName} 嗎？\n價格：${
+    item.price
+  } 金幣${
+    item.originalPrice
+      ? `\n原價：${item.originalPrice} 金幣 (${item.badge})`
+      : ""
+  }`;
   const confirmed = await showConfirm(confirmMessage, {
-    title: '確認購買',
-    confirmText: '立即購買',
+    title: "確認購買",
+    confirmText: "立即購買",
   });
 
   if (!confirmed) {
@@ -348,9 +357,9 @@ const handlePurchaseItem = async (item) => {
     // 資產卡：構建為 category-quantity（例如 character-unlock-5）
     const sku = `${item.category}-${item.quantity || 1}`;
 
-    console.log('[購買資產] item:', item);
-    console.log('[購買資產] sku:', sku);
-    console.log('[購買資產] price:', item.price);
+    console.log("[購買資產] item:", item);
+    console.log("[購買資產] sku:", sku);
+    console.log("[購買資產] price:", item.price);
 
     // 呼叫資產購買 API（使用新版 SKU）
     const result = await apiJson("/api/assets/purchase", {
@@ -391,10 +400,16 @@ const handlePurchasePotion = async (item) => {
   }
 
   // 確認購買
-  const confirmMessage = `確定要購買 ${item.name} 嗎？\n價格：${item.price} 金幣${item.originalPrice ? `\n原價：${item.originalPrice} 金幣 (${item.badge})` : ''}\n效果：${item.effect}`;
+  const confirmMessage = `確定要購買 ${item.name} 嗎？\n價格：${
+    item.price
+  } 金幣${
+    item.originalPrice
+      ? `\n原價：${item.originalPrice} 金幣 (${item.badge})`
+      : ""
+  }\n效果：${item.effect}`;
   const confirmed = await showConfirm(confirmMessage, {
-    title: '確認購買道具',
-    confirmText: '立即購買',
+    title: "確認購買道具",
+    confirmText: "立即購買",
   });
 
   if (!confirmed) {
@@ -499,10 +514,7 @@ onMounted(async () => {
   // 加載所有商品數據
   isLoadingPackages.value = true;
   try {
-    await Promise.all([
-      loadAssetPackages(),
-      loadPotionPackages(),
-    ]);
+    await Promise.all([loadAssetPackages(), loadPotionPackages()]);
   } catch (err) {
     console.error("加載商品失敗:", err);
   } finally {
@@ -519,7 +531,6 @@ onMounted(async () => {
     } catch (err) {
       const message = err?.message || "載入資料失敗";
       showError(message);
-
     }
   }
 });
@@ -697,6 +708,7 @@ onMounted(async () => {
 <style scoped lang="scss">
 .shop-view {
   min-height: 100vh;
+  min-height: 100dvh;
   background: radial-gradient(
       circle at top,
       rgba(30, 64, 175, 0.35),
@@ -708,13 +720,13 @@ onMounted(async () => {
   padding-bottom: calc(var(--bottom-nav-offset, 90px) + 1.5rem);
   position: relative;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .shop-hero {
   position: relative;
-  padding: clamp(1.25rem, 4vw, 1.75rem) clamp(1rem, 4vw, 1.5rem)
-    clamp(1rem, 3vw, 1.5rem);
-  padding-bottom: clamp(1.5rem, 4vw, 2rem);
+  padding: 5vw;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -912,7 +924,8 @@ onMounted(async () => {
   position: relative;
   z-index: 1;
   overflow-y: auto;
-  height: 137vw;
+  flex: 1;
+  max-height: calc(85dvh - 200px);
 }
 
 .category-description {
@@ -1345,11 +1358,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
-  .shop-hero {
-    padding: clamp(1rem, 4vw, 1.5rem) clamp(0.85rem, 3.5vw, 1.25rem)
-      clamp(0.85rem, 2.5vw, 1.25rem);
-  }
-
   .shop-header {
     margin-bottom: 0.65rem;
   }

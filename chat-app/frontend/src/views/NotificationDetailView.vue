@@ -1,8 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { ChevronLeftIcon, BellIcon, ClockIcon } from '@heroicons/vue/24/outline';
-import { useNotifications } from '../composables/useNotifications';
+import { ref, computed, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import {
+  ChevronLeftIcon,
+  BellIcon,
+  ClockIcon,
+} from "@heroicons/vue/24/outline";
+import { useNotifications } from "../composables/useNotifications";
 
 const router = useRouter();
 const route = useRoute();
@@ -21,18 +25,18 @@ const formatDate = (dateString) => {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
   if (hours < 1) {
-    return '剛剛';
+    return "剛剛";
   } else if (hours < 24) {
     return `${hours}小時前`;
   } else if (days < 7) {
     return `${days}天前`;
   } else {
-    return date.toLocaleDateString('zh-TW', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("zh-TW", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
 };
@@ -42,12 +46,11 @@ const handleBack = () => {
 };
 
 const handleAction = (action) => {
-
   // 根據不同的操作類型執行相應的邏輯
-  if (action.label === '查看角色' || action.label === '查看訊息') {
+  if (action.label === "查看角色" || action.label === "查看訊息") {
     // 可以導航到相應頁面
-  } else if (action.label === '立即體驗') {
-    router.push({ name: 'character-create-gender' });
+  } else if (action.label === "立即體驗") {
+    router.push({ name: "character-create-gender" });
   }
 };
 
@@ -116,12 +119,19 @@ onMounted(() => {
       <h2 class="notification-detail-title">{{ notification.title }}</h2>
 
       <div class="notification-detail-body">
-        <p v-for="(paragraph, index) in notification.fullContent.split('\n')" :key="index" class="paragraph">
+        <p
+          v-for="(paragraph, index) in notification.fullContent.split('\n')"
+          :key="index"
+          class="paragraph"
+        >
           {{ paragraph }}
         </p>
       </div>
 
-      <footer v-if="notification.actions && notification.actions.length > 0" class="notification-detail-actions">
+      <footer
+        v-if="notification.actions && notification.actions.length > 0"
+        class="notification-detail-actions"
+      >
         <button
           v-for="action in notification.actions"
           :key="action.label"
@@ -140,6 +150,7 @@ onMounted(() => {
 .notification-detail-view {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #0f1016;
   color: #f8f9ff;
   display: flex;
@@ -257,6 +268,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  overflow-y: auto;
+  max-height: calc(98dvh - 73px);
 }
 
 .notification-detail-header-info {
@@ -274,7 +287,11 @@ onMounted(() => {
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(255, 77, 143, 0.2), rgba(255, 122, 184, 0.15));
+  background: linear-gradient(
+    135deg,
+    rgba(255, 77, 143, 0.2),
+    rgba(255, 122, 184, 0.15)
+  );
   border: 1px solid rgba(255, 77, 143, 0.3);
   flex-shrink: 0;
 

@@ -342,8 +342,16 @@
                   v-if="getCharacterPotionEffects(charId).length > 0"
                   size="small"
                   type="warning"
+                  style="margin-right: 5px"
                 >
                   藥水
+                </el-tag>
+                <el-tag
+                  v-if="getCharacterUnlockEffects(charId).length > 0"
+                  size="small"
+                  type="success"
+                >
+                  解鎖
                 </el-tag>
               </div>
             </template>
@@ -503,7 +511,7 @@
               </el-card>
 
               <!-- 藥水效果 -->
-              <el-card shadow="never">
+              <el-card shadow="never" style="margin-bottom: 15px">
                 <template #header>
                   <div
                     style="
@@ -578,6 +586,74 @@
                   </div>
                 </div>
               </el-card>
+
+              <!-- 角色解鎖效果 -->
+              <el-card shadow="never">
+                <template #header>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                    "
+                  >
+                    <span>🎫 角色解鎖效果</span>
+                  </div>
+                </template>
+
+                <div
+                  v-if="getCharacterUnlockEffects(charId).length === 0"
+                  style="text-align: center; color: #909399; padding: 20px"
+                >
+                  該角色無激活的解鎖效果
+                </div>
+
+                <div v-else>
+                  <div
+                    v-for="effect in getCharacterUnlockEffects(charId)"
+                    :key="effect.id"
+                    style="
+                      border: 1px solid #e4e7ed;
+                      border-radius: 4px;
+                      padding: 15px;
+                      margin-bottom: 10px;
+                    "
+                  >
+                    <el-descriptions :column="2" size="small" border>
+                      <el-descriptions-item label="解鎖類型">
+                        <el-tag type="success">
+                          角色解鎖卡
+                        </el-tag>
+                      </el-descriptions-item>
+                      <el-descriptions-item label="剩餘天數">
+                        <el-tag
+                          :type="
+                            effect.daysRemaining > 7
+                              ? 'success'
+                              : effect.daysRemaining > 3
+                              ? 'warning'
+                              : 'danger'
+                          "
+                        >
+                          {{ effect.daysRemaining }} 天
+                        </el-tag>
+                      </el-descriptions-item>
+                      <el-descriptions-item label="過期時間">
+                        {{ formatDate(effect.unlockUntil) }}
+                      </el-descriptions-item>
+                    </el-descriptions>
+                    <div style="margin-top: 10px; text-align: right">
+                      <el-button
+                        size="small"
+                        type="danger"
+                        @click="handleDeleteUnlockEffect(effect)"
+                      >
+                        刪除此效果
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </el-card>
             </div>
           </el-collapse-item>
         </el-collapse>
@@ -633,6 +709,9 @@ const resourceData = reactive({
       memoryBoost: 0,
       brainBoost: 0,
     },
+    activeEffects: [],
+  },
+  unlocks: {
     activeEffects: [],
   },
   wallet: {
@@ -762,6 +841,16 @@ function getCharacterPotionEffects(characterId) {
     return [];
   }
   return resourceData.potions.activeEffects.filter(
+    (effect) => effect.characterId === characterId
+  );
+}
+
+// 獲取特定角色的解鎖效果
+function getCharacterUnlockEffects(characterId) {
+  if (!resourceData.unlocks?.activeEffects) {
+    return [];
+  }
+  return resourceData.unlocks.activeEffects.filter(
     (effect) => effect.characterId === characterId
   );
 }
@@ -1092,6 +1181,13 @@ async function loadResourceData(userId) {
       };
     }
 
+    // 確保 unlocks 存在
+    if (!data.unlocks) {
+      data.unlocks = {
+        activeEffects: [],
+      };
+    }
+
     // 確保 globalUsage 存在
     if (!data.globalUsage) {
       data.globalUsage = {
@@ -1140,6 +1236,7 @@ async function loadResourceData(userId) {
     resourceData.conversation = data.conversation;
     resourceData.voice = data.voice;
     resourceData.potions = data.potions;
+    resourceData.unlocks = data.unlocks;
     resourceData.globalUsage = data.globalUsage;
 
     // 載入錢包和資產數據
@@ -1390,6 +1487,28 @@ async function handleDeletePotionEffect(effect) {
   } catch (error) {
     if (error !== "cancel") {
       ElMessage.error(error.response?.data?.error || "刪除藥水效果失敗");
+    }
+  }
+}
+
+// 刪除解鎖效果
+async function handleDeleteUnlockEffect(effect) {
+  try {
+    await ElMessageBox.confirm(`確定要刪除該角色解鎖效果嗎？`, "刪除確認", {
+      confirmButtonText: "確定",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+
+    await api.delete(
+      `/api/users/${resourceData.userId}/unlock-effects/${effect.characterId}`
+    );
+
+    ElMessage.success("解鎖效果已刪除");
+    await loadResourceData(resourceData.userId);
+  } catch (error) {
+    if (error !== "cancel") {
+      ElMessage.error(error.response?.data?.error || "刪除解鎖效果失敗");
     }
   }
 }

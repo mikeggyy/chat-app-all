@@ -162,7 +162,7 @@ characterCreationRouter.post(
     const flowId = req.params.flowId;
 
     try {
-      const currentFlow = getCreationFlow(flowId);
+      const currentFlow = await getCreationFlow(flowId);
       if (!currentFlow) {
         res
           .status(404)

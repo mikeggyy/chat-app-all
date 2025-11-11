@@ -51,14 +51,14 @@
             <div class="purchase-dialog-actions">
               <button
                 type="button"
-                class="purchase-dialog-btn purchase-dialog-btn-cancel"
+                class="btn-unified btn-cancel"
                 @click="handleCancel"
               >
                 <span>{{ cancelText }}</span>
               </button>
               <button
                 type="button"
-                class="purchase-dialog-btn purchase-dialog-btn-confirm"
+                class="btn-unified btn-confirm"
                 @click="handleConfirm"
               >
                 <span>{{ confirmText }}</span>
@@ -261,75 +261,6 @@ onUnmounted(() => {
 .purchase-dialog-actions {
   display: flex;
   gap: 0.75rem;
-}
-
-.purchase-dialog-btn {
-  flex: 1;
-  height: 52px;
-  font-size: 1rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.purchase-dialog-btn span {
-  position: relative;
-  z-index: 1;
-}
-
-.purchase-dialog-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.purchase-dialog-btn:hover::before {
-  opacity: 1;
-}
-
-.purchase-dialog-btn-cancel {
-  background: linear-gradient(180deg, #e5e7eb 0%, #d1d5db 100%);
-  color: #374151;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.05),
-    inset 0 1px 1px rgba(255, 255, 255, 0.8);
-}
-
-.purchase-dialog-btn-cancel:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.8);
-}
-
-.purchase-dialog-btn-cancel:active {
-  transform: translateY(0);
-}
-
-.purchase-dialog-btn-confirm {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow:
-    0 4px 14px rgba(102, 126, 234, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-}
-
-.purchase-dialog-btn-confirm:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 6px 20px rgba(102, 126, 234, 0.5),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-}
-
-.purchase-dialog-btn-confirm:active {
-  transform: translateY(0);
 }
 
 /* 動畫 */

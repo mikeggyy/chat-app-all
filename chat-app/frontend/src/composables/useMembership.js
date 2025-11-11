@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue';
 import { apiJson } from '../utils/api.js';
+import { generateIdempotencyKey } from '../utils/idempotency.js';
 
 // 會員資訊的全域狀態
 const membershipState = ref(null);
@@ -61,17 +62,28 @@ export function useMembership() {
     error.value = null;
 
     try {
+      // 生成冪等性鍵，防止重複升級
+      const idempotencyKey = generateIdempotencyKey();
+
       const data = await apiJson(`/api/membership/${encodeURIComponent(userId)}/upgrade`, {
         method: 'POST',
         body: {
-          targetTier,
+          tier: targetTier, // 後端參數名為 tier
+          idempotencyKey, // 添加冪等性鍵（必填）
+          durationMonths: options.durationMonths || 1,
+          autoRenew: options.autoRenew || false,
           paymentMethod: options.paymentMethod || 'credit_card',
           paymentId: options.paymentId,
         },
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
 
-      membershipState.value = data;
+      // 檢查是否為重複請求（來自緩存）
+      if (data._idempotent || data._cached) {
+        console.log('[會員升級] 檢測到重複請求，返回了緩存結果');
+      }
+
+      membershipState.value = data.membership || data;
       return data;
     } catch (err) {
       error.value = err?.message || '升級會員失敗';

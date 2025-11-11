@@ -24,58 +24,8 @@ const setStatus = (type, message) => {
   statusMessage.value = message;
 };
 
-const toIsoString = (value) => {
-  if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-  return date.toISOString();
-};
-
-const resolveLocale = (user) => {
-  if (user?.reloadUserInfo?.languageCode) {
-    return user.reloadUserInfo.languageCode;
-  }
-  if (user?.languageCode) {
-    return user.languageCode;
-  }
-  if (navigator?.language) {
-    return navigator.language;
-  }
-  return "zh-TW";
-};
-
-const buildUserRecord = (payload, provider) => {
-  const nowIso = new Date().toISOString();
-
-  return {
-    id: payload.id,
-    displayName: payload.displayName,
-    locale: payload.locale ?? "zh-TW",
-    createdAt: payload.createdAt ?? nowIso,
-    defaultPrompt:
-      payload.defaultPrompt ??
-      "喜歡與 AI 分享靈感與日常，請在對話時保留溫暖且專注的語氣。",
-    email: payload.email ?? "",
-    photoURL: payload.photoURL,
-    lastLoginAt: payload.lastLoginAt ?? nowIso,
-    phoneNumber: payload.phoneNumber ?? null,
-    notificationOptIn:
-      typeof payload.notificationOptIn === "boolean"
-        ? payload.notificationOptIn
-        : false,
-    signInProvider: provider,
-    updatedAt: payload.updatedAt ?? nowIso,
-    conversations: payload.conversations ?? [],
-    favorites: payload.favorites ?? [],
-    isGuest: payload.isGuest ?? false, // 遊客標記
-  };
-};
-
-const navigateToMatch = async () => {
-  await router.push({ name: "match" });
-};
+// ⚠️ 方案 A：LoginView 只負責 Firebase Auth，不再處理用戶創建和狀態同步
+// 所有用戶狀態同步由 authBootstrap.js 統一處理，避免重複請求和競態條件
 
 const mapFirebaseErrorMessage = (error) => {
   const code = error?.code ?? "";
@@ -119,67 +69,7 @@ const handleFirebaseAuthError = (error) => {
   setStatus("error", mapFirebaseErrorMessage(error));
 };
 
-const createGoogleUserPayload = async (credential) => {
-  const { user } = credential;
-  if (!user) {
-    throw new Error("Google 登入未取得使用者資料，請重新登入。");
-  }
-
-  const metadata = user.metadata ?? {};
-  const creationIso = toIsoString(metadata.creationTime);
-  const lastLoginIso = toIsoString(metadata.lastSignInTime);
-  const providerId =
-    credential.providerId ?? user.providerData?.[0]?.providerId ?? "google.com";
-  const provider =
-    providerId === "google.com" ? "google" : providerId ?? "google";
-
-  const baseUser = buildUserRecord(
-    {
-      id: user.uid,
-      displayName: user.displayName ?? user.email ?? "Google 使用者",
-      locale: resolveLocale(user),
-      createdAt: creationIso,
-      email: user.email ?? "",
-      photoURL: user.photoURL ?? "/avatars/defult-01.webp",
-      lastLoginAt: lastLoginIso,
-      phoneNumber: user.phoneNumber ?? null,
-      notificationOptIn: Boolean(user.emailVerified),
-      updatedAt: lastLoginIso ?? creationIso,
-    },
-    provider
-  );
-
-  const profile = {
-    ...baseUser,
-    uid: user.uid,
-    firebaseProviderId: providerId,
-  };
-
-  const idToken = await user.getIdToken();
-
-  return {
-    profile,
-    idToken,
-  };
-};
-
-const finalizeGoogleLogin = async (credential) => {
-  const { profile, idToken } = await createGoogleUserPayload(credential);
-  const savedUser = await apiJson("/api/users", {
-    method: "POST",
-    body: profile,
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-    },
-  });
-
-  clearTestSession();
-  resetGuestMessageCount(); // 清除遊客訊息計數
-  setUserProfile(savedUser);
-  setStatus("success", `歡迎回來，${savedUser.displayName}！`);
-  await navigateToMatch();
-};
-
+// ✅ 簡化的 Google 登入處理：只負責 Firebase Auth
 const handleGoogleLogin = async () => {
   if (isLoading.value) return;
   isLoading.value = true;
@@ -191,7 +81,6 @@ const handleGoogleLogin = async () => {
 
     if (outcome.redirected) {
       redirecting = true;
-
       setStatus("loading", "即將重新導向至 Google 登入頁面，請稍候...");
       return;
     }
@@ -200,9 +89,15 @@ const handleGoogleLogin = async () => {
       throw new Error("Google 登入未取得有效結果，請重新操作。");
     }
 
-    await finalizeGoogleLogin(outcome.result);
+    // ✅ 登入成功！authBootstrap 會自動處理：
+    // 1. onAuthStateChanged 偵測到登入
+    // 2. GET /api/users/:id (或 POST 創建新用戶)
+    // 3. setUserProfile(用戶資料)
+    // 4. Router Guard 根據 hasCompletedOnboarding 自動導航
+    clearTestSession();
+    resetGuestMessageCount();
+    setStatus("success", "登入成功！正在載入您的資料...");
   } catch (err) {
-
     handleFirebaseAuthError(err);
   } finally {
     if (!redirecting) {
@@ -211,6 +106,7 @@ const handleGoogleLogin = async () => {
   }
 };
 
+// ✅ 測試/遊客登入：不使用 Firebase Auth，需要手動處理
 const handleTestLogin = async () => {
   if (isLoading.value) return;
   isLoading.value = true;
@@ -220,20 +116,26 @@ const handleTestLogin = async () => {
     const data = await apiJson("/auth/test", {
       method: "POST",
     });
-    setStatus("success", `歡迎，${data.user.displayName}！`);
-    const testUser = buildUserRecord(
-      {
-        id: data.user.id,
-        displayName: data.user.displayName,
-        email: data.user.email,
-        locale: "zh-TW",
-        photoURL: "/avatars/defult-01.webp",
-        defaultPrompt: "我是測試帳號，請協助我快速驗證 AI 劇情與對話流程。",
-        notificationOptIn: false,
-        isGuest: true, // 標記為遊客賬號
-      },
-      "guest"
-    );
+
+    const nowIso = new Date().toISOString();
+    const testUser = {
+      id: data.user.id,
+      displayName: data.user.displayName,
+      email: data.user.email ?? "",
+      locale: "zh-TW",
+      photoURL: "/avatars/defult-01.webp",
+      defaultPrompt: "我是測試帳號，請協助我快速驗證 AI 劇情與對話流程。",
+      notificationOptIn: false,
+      signInProvider: "guest",
+      isGuest: true,
+      hasCompletedOnboarding: true, // 遊客跳過 onboarding
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      lastLoginAt: nowIso,
+      conversations: [],
+      favorites: [],
+    };
+
     const expiresInSeconds = Number(data.expiresIn);
     const expiresAt =
       Number.isFinite(expiresInSeconds) && expiresInSeconds > 0
@@ -247,10 +149,10 @@ const handleTestLogin = async () => {
       expiresAt,
     });
 
-
     // 遊客直接設定 profile，不從後端載入（避免覆蓋 isGuest 標記）
     setUserProfile(testUser);
-    await navigateToMatch();
+    setStatus("success", `歡迎，${testUser.displayName}！`);
+    await router.push({ name: "match" });
   } catch (err) {
     setStatus(
       "error",
@@ -261,24 +163,28 @@ const handleTestLogin = async () => {
   }
 };
 
+// ✅ 處理 Google 登入重定向結果
 onMounted(async () => {
   try {
-
     const redirectOutcome = await resolveRedirectResult();
 
     if (redirectOutcome?.result) {
-
+      // ✅ Google 登入重定向成功！
+      // authBootstrap 會自動處理後續流程：
+      // 1. onAuthStateChanged 偵測到登入
+      // 2. GET /api/users/:id (或 POST 創建新用戶)
+      // 3. setUserProfile(用戶資料)
+      // 4. Router Guard 根據 hasCompletedOnboarding 自動導航
       isLoading.value = true;
-      setStatus("loading", "正在完成 Google 登入...");
-      await finalizeGoogleLogin(redirectOutcome.result);
-    } else {
-
+      setStatus("loading", "登入成功！正在載入您的資料...");
+      clearTestSession();
+      resetGuestMessageCount();
     }
   } catch (error) {
-
     handleFirebaseAuthError(error);
   } finally {
-    isLoading.value = false;
+    // 注意：不在這裡設置 isLoading = false，讓它保持 loading 狀態
+    // 直到 authBootstrap 完成並導航到目標頁面
   }
 });
 
@@ -369,6 +275,7 @@ onMounted(async () => {
 .login-page {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;

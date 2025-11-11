@@ -6,6 +6,7 @@
 import express from "express";
 import logger from "../utils/logger.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
+import { handleIdempotentRequest } from "../utils/idempotency.js";
 import {
   getAvailablePotions,
   getUserActivePotions,
@@ -84,7 +85,9 @@ router.get("/active", requireFirebaseAuth, async (req, res) => {
 /**
  * 購買記憶增強藥水
  * POST /api/potions/purchase/memory-boost
+ * Body: { idempotencyKey }
  * 購買後加入庫存，使用時才需要選擇角色
+ * 🔒 冪等性保護：防止重複購買
  */
 router.post("/purchase/memory-boost", requireFirebaseAuth, async (req, res) => {
   try {
@@ -96,8 +99,22 @@ router.post("/purchase/memory-boost", requireFirebaseAuth, async (req, res) => {
       });
     }
 
-    const result = await purchaseMemoryBoost(userId);
+    const { idempotencyKey } = req.body;
 
+    // 冪等性保護
+    if (idempotencyKey) {
+      const requestId = `potion-memory:${userId}:${idempotencyKey}`;
+      const result = await handleIdempotentRequest(
+        requestId,
+        async () => await purchaseMemoryBoost(userId),
+        { ttl: 15 * 60 * 1000 } // 15 分鐘
+      );
+
+      return res.json(result);
+    }
+
+    // 向後兼容：沒有 idempotencyKey 的請求
+    const result = await purchaseMemoryBoost(userId);
     res.json(result);
   } catch (error) {
     logger.error("購買記憶增強藥水失敗:", error);
@@ -112,6 +129,8 @@ router.post("/purchase/memory-boost", requireFirebaseAuth, async (req, res) => {
 /**
  * 購買腦力激盪藥水
  * POST /api/potions/purchase/brain-boost
+ * Body: { idempotencyKey }
+ * 🔒 冪等性保護：防止重複購買
  */
 router.post("/purchase/brain-boost", requireFirebaseAuth, async (req, res) => {
   try {
@@ -123,8 +142,22 @@ router.post("/purchase/brain-boost", requireFirebaseAuth, async (req, res) => {
       });
     }
 
-    const result = await purchaseBrainBoost(userId);
+    const { idempotencyKey } = req.body;
 
+    // 冪等性保護
+    if (idempotencyKey) {
+      const requestId = `potion-brain:${userId}:${idempotencyKey}`;
+      const result = await handleIdempotentRequest(
+        requestId,
+        async () => await purchaseBrainBoost(userId),
+        { ttl: 15 * 60 * 1000 } // 15 分鐘
+      );
+
+      return res.json(result);
+    }
+
+    // 向後兼容：沒有 idempotencyKey 的請求
+    const result = await purchaseBrainBoost(userId);
     res.json(result);
   } catch (error) {
     logger.error("購買腦力激盪藥水失敗:", error);

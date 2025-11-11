@@ -25,34 +25,39 @@ const getUserPhotosRef = (userId) => {
 };
 
 /**
- * 保存照片到相簿
+ * 保存照片或影片到相簿
  * @param {string} userId - 用戶 ID
- * @param {Object} photoData - 照片數據
- * @returns {Promise<Object>} 保存的照片數據
+ * @param {Object} photoData - 照片/影片數據
+ * @returns {Promise<Object>} 保存的照片/影片數據
  */
 export const savePhotoToAlbum = async (userId, photoData) => {
   const {
     characterId,
     imageUrl,
+    videoUrl,
+    video, // { url, duration, resolution }
     text,
-    type = 'selfie', // 'selfie' | 'gift'
+    type = 'selfie', // 'selfie' | 'gift' | 'video'
     giftId = null,
     messageId = null,
     createdAt = new Date().toISOString(),
   } = photoData;
 
-  if (!userId || !characterId || !imageUrl) {
-    throw new Error("缺少必要參數：userId, characterId, imageUrl");
+  // 必須有 imageUrl 或 videoUrl/video
+  const hasImage = imageUrl && typeof imageUrl === 'string';
+  const hasVideo = (videoUrl && typeof videoUrl === 'string') || (video && video.url);
+
+  if (!userId || !characterId || (!hasImage && !hasVideo)) {
+    throw new Error("缺少必要參數：userId, characterId, imageUrl 或 videoUrl/video");
   }
 
   const photoId = createPhotoId();
   const photosRef = getUserPhotosRef(userId);
 
-  const photo = {
+  const item = {
     id: photoId,
     userId,
     characterId,
-    imageUrl,
     text: text || '',
     type,
     giftId,
@@ -61,18 +66,41 @@ export const savePhotoToAlbum = async (userId, photoData) => {
     updatedAt: FieldValue.serverTimestamp(),
   };
 
-  await photosRef.doc(photoId).set(photo);
+  // 添加圖片 URL（如果有）
+  if (hasImage) {
+    item.imageUrl = imageUrl;
+    item.mediaType = 'image';
+  }
 
-  logger.info(`照片已保存到相簿: userId=${userId}, characterId=${characterId}, type=${type}`);
+  // 添加影片數據（如果有）
+  if (hasVideo) {
+    if (video && video.url) {
+      item.videoUrl = video.url;
+      item.video = {
+        url: video.url,
+        duration: video.duration || null,
+        resolution: video.resolution || null,
+      };
+    } else if (videoUrl) {
+      item.videoUrl = videoUrl;
+      item.video = { url: videoUrl };
+    }
+    item.mediaType = 'video';
+  }
 
-  return photo;
+  await photosRef.doc(photoId).set(item);
+
+  const mediaTypeLabel = item.mediaType === 'video' ? '影片' : '照片';
+  logger.info(`${mediaTypeLabel}已保存到相簿: userId=${userId}, characterId=${characterId}, type=${type}`);
+
+  return item;
 };
 
 /**
  * 獲取用戶與特定角色的所有照片
  * @param {string} userId - 用戶 ID
  * @param {string} characterId - 角色 ID
- * @returns {Promise<Array>} 照片列表
+ * @returns {Promise<Object>} 包含照片列表和角色資訊的對象
  */
 export const getCharacterPhotos = async (userId, characterId) => {
   if (!userId || !characterId) {
@@ -90,7 +118,32 @@ export const getCharacterPhotos = async (userId, characterId) => {
     photos.push(doc.data());
   });
 
-  return photos;
+  // 嘗試從角色緩存獲取角色資訊
+  let character = null;
+  try {
+    const { getCharacterById } = await import("../services/character/characterCache.service.js");
+    character = getCharacterById(characterId);
+
+    // 如果從緩存找不到，嘗試直接從 Firestore 查詢（可能是用戶創建的角色）
+    if (!character) {
+      const db = getFirestoreDb();
+      const characterDoc = await db.collection("characters").doc(characterId).get();
+      if (characterDoc.exists) {
+        character = {
+          id: characterDoc.id,
+          ...characterDoc.data(),
+        };
+      }
+    }
+  } catch (error) {
+    logger.warn(`獲取角色資訊失敗 (characterId=${characterId}):`, error.message);
+    // 不拋出錯誤，繼續返回照片，只是沒有角色資訊
+  }
+
+  return {
+    photos,
+    character,
+  };
 };
 
 /**

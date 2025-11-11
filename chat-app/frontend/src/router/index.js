@@ -251,15 +251,21 @@ router.beforeEach((to, from, next) => {
 
   // 允許訪問登入頁、onboarding 頁和遊客升級頁
   const publicPages = ["login", "onboarding", "guest-upgrade"];
-  if (!publicPages.includes(to.name) && (!authenticated || !hasToken)) {
-    if (authenticated) {
-      clearUserProfile();
-    }
+
+  // ⚠️ 關鍵修復：只有在「沒有 token」時才導向 login
+  if (!publicPages.includes(to.name) && !hasToken) {
     next({ name: "login" });
     return;
   }
 
-  // 如果用戶已登入，檢查是否完成 onboarding
+  // 🔥 重要：如果有 token 但未認證（認證進行中），直接允許訪問
+  // 不要檢查 onboarding 狀態，因為用戶數據可能還沒載入完成
+  if (hasToken && !authenticated) {
+    next();
+    return;
+  }
+
+  // ✅ 只有在「已完全認證」時才檢查 onboarding 狀態
   if (authenticated && hasToken) {
     const currentUser = user.value;
     const hasCompletedOnboarding = currentUser?.hasCompletedOnboarding ?? false;
@@ -267,7 +273,9 @@ router.beforeEach((to, from, next) => {
 
     // 遊客用戶跳過 onboarding 檢查
     if (!isGuest) {
-      // 如果未完成 onboarding 且不在 onboarding 頁面，重定向到 onboarding
+      // ⚠️ 只在以下情況才重定向到 onboarding：
+      // 1. 用戶未完成 onboarding
+      // 2. 嘗試訪問的不是 login 或 onboarding 頁面
       if (!hasCompletedOnboarding && to.name !== "onboarding" && to.name !== "login") {
         next({ name: "onboarding" });
         return;
@@ -281,11 +289,9 @@ router.beforeEach((to, from, next) => {
 
       // 如果在登入頁面且已登入，重定向
       if (to.name === "login") {
-        // 如果未完成 onboarding，去 onboarding 頁
         if (!hasCompletedOnboarding) {
           next({ name: "onboarding" });
         } else {
-          // 已完成，去 match 頁
           next({ name: "match" });
         }
         return;
@@ -411,8 +417,10 @@ routingScope.run(() => {
           }
         }
       }
-    },
-    { immediate: true }
+    }
+    // ⚠️ 移除 immediate: true - 避免在認證狀態確定前執行錯誤的導向邏輯
+    // 原因：immediate: true 會在 watch 註冊時立即執行，此時 isAuthenticated 還是 false
+    // 導致在 authBootstrap.js 的 onAuthStateChanged 完成前就執行了錯誤的導向
   );
 
   onScopeDispose(() => {

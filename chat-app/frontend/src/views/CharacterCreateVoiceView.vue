@@ -359,7 +359,9 @@ const persistSummaryToSession = (summary) => {
   }
   try {
     window.sessionStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(summary));
-  } catch (error) {}
+  } catch (error) {
+    // 忽略：SessionStorage 可能已滿或被阻擋，不影響主功能
+  }
 };
 
 const toVoicePayload = (preset) => {
@@ -567,7 +569,9 @@ const loadSessionSummary = () => {
       selectedVoiceId.value = parsed.voice.id;
     }
     applyGenderDefault(parsed?.gender);
-  } catch (error) {}
+  } catch (error) {
+    // 忽略：SessionStorage 解析失敗，使用預設值
+  }
 };
 
 const initializeFlowState = async () => {
@@ -929,6 +933,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .voice {
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 24px 20px 32px;
   display: flex;
   flex-direction: column;
@@ -1076,7 +1081,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  height: 139vw;
+  flex: 1;
+  max-height: calc(100dvh - 300px);
   padding-top: 1rem;
 }
 

@@ -92,7 +92,7 @@
     <button
       type="button"
       class="chat-input__send chat-input__gift"
-      :disabled="isSendingGift || isRequestingSelfie"
+      :disabled="isSendingGift || isRequestingSelfie || isRequestingVideo"
       aria-label="傳送禮物"
       @click="$emit('gift-click')"
     >
@@ -105,8 +105,8 @@
         ref="mediaButtonRef"
         type="button"
         class="chat-input__send chat-input__media"
-        :class="{ 'is-loading': isRequestingSelfie }"
-        :disabled="isRequestingSelfie || isSendingGift"
+        :class="{ 'is-loading': isRequestingSelfie || isRequestingVideo }"
+        :disabled="isRequestingSelfie || isSendingGift || isRequestingVideo"
         :aria-expanded="isMediaMenuOpen ? 'true' : 'false'"
         aria-haspopup="menu"
         :aria-label="
@@ -195,6 +195,10 @@ const props = defineProps({
     default: false,
   },
   isRequestingSelfie: {
+    type: Boolean,
+    default: false,
+  },
+  isRequestingVideo: {
     type: Boolean,
     default: false,
   },

@@ -164,8 +164,10 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
   const conversation = await getConversationHistory(userId, characterId);
   const recentMessages = conversation.slice(-3); // 最近 3 條消息（從 6 條減少以節省成本）
 
-  // 構建圖片生成提示詞（Gemini 版本）
-  const prompt = buildGeminiPrompt(character, recentMessages);
+  // 🔥 構建圖片生成提示詞（Gemini 版本）- 從 Firestore 讀取模板和場景
+  const promptResult = await buildGeminiPrompt(character, recentMessages);
+  const prompt = promptResult.prompt;
+  const selectedScenario = promptResult.selectedScenario;
 
   try {
     // 使用 Gemini 2.5 Flash Image (Nano Banana) 生成圖片
@@ -173,6 +175,7 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
     const geminiResult = await generateGeminiImage(characterImageBase64, prompt, {
       styleName: "Disney Charactor", // 使用迪士尼風格
       aspectRatio: "2:3", // 2:3 比例（832x1248 或類似尺寸）
+      selectedScenario: selectedScenario, // 🔥 傳遞選中的場景給 Gemini
     });
 
     if (!geminiResult || !geminiResult.imageDataUrl) {
@@ -246,8 +249,9 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
         type: 'selfie',
         messageId: imageMessage.id,
         createdAt: imageMessage.createdAt,
+        scenario: selectedScenario, // 🔥 記錄使用的場景到 Firestore
       });
-      logger.info(`[相簿] 自拍照片已保存到相簿: userId=${userId}, characterId=${characterId}`);
+      logger.info(`[相簿] 自拍照片已保存到相簿: userId=${userId}, characterId=${characterId}` + (selectedScenario ? `, scenario: "${selectedScenario}"` : ""));
     } catch (albumError) {
       // 即使相簿保存失敗，也不影響主流程（照片已經在對話歷史中）
       logger.error("[相簿] 保存自拍照片到相簿失敗:", albumError);

@@ -31,6 +31,10 @@ const buildFallbackProfile = (firebaseUser) => {
     notificationOptIn: false,
     signInProvider:
       firebaseUser.providerData?.[0]?.providerId ?? "firebase-auth",
+    // ⚠️ 重要：不包含 hasCompletedOnboarding
+    // 讓後端的 upsertUser 自動處理：
+    // - 新用戶：使用預設值 false
+    // - 已存在的用戶：從 Firestore 讀取並保留現有值
   };
 };
 
@@ -123,40 +127,51 @@ export const ensureAuthState = () => {
         const fallbackProfile = buildFallbackProfile(firebaseUser);
 
         const syncProfile = async () => {
-          if (typeof navigator !== "undefined" && navigator.onLine === false) {
-            setUserProfile(fallbackProfile);
-            return;
-          }
+          // 檢查網路狀態
+          const isOffline = typeof navigator !== "undefined" && navigator.onLine === false;
 
           try {
+            // 嘗試從後端獲取現有用戶資料
             const existing = await apiJson(
               `/api/users/${encodeURIComponent(firebaseUser.uid)}`
             );
+            // ✅ 成功獲取後端數據，使用最新的完整資料
             setUserProfile(existing);
             return;
           } catch (error) {
             const notFound = error?.status === 404;
-            if (!notFound && !isNetworkError(error)) {
+            const networkError = isNetworkError(error);
+
+            // 如果不是 404 且不是網路錯誤，拋出異常
+            if (!notFound && !networkError) {
               throw error;
             }
-            if (isNetworkError(error)) {
-              setUserProfile(fallbackProfile);
+
+            // 網路錯誤或離線：無法確定用戶狀態，不設置錯誤的預設值
+            if (networkError || isOffline) {
+              // 不設置 fallbackProfile，保持未認證狀態
               return;
             }
-          }
 
-          try {
-            const idToken = await firebaseUser.getIdToken();
-            const created = await apiJson("/api/users", {
-              method: "POST",
-              body: fallbackProfile,
-              headers: {
-                Authorization: `Bearer ${idToken}`,
-              },
-            });
-            setUserProfile(created);
-          } catch (createError) {
-            setUserProfile(fallbackProfile);
+            // 404 錯誤：用戶不存在，嘗試創建新用戶
+            if (notFound) {
+              try {
+                const idToken = await firebaseUser.getIdToken();
+                const created = await apiJson("/api/users", {
+                  method: "POST",
+                  body: fallbackProfile,
+                  headers: {
+                    Authorization: `Bearer ${idToken}`,
+                  },
+                });
+                // ✅ 使用後端返回的新建用戶資料（包含所有正確的預設值）
+                setUserProfile(created);
+                return;
+              } catch (createError) {
+                // 創建失敗，不設置錯誤的 fallbackProfile
+                return;
+              }
+            }
           }
         };
 

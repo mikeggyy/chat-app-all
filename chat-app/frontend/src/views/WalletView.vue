@@ -234,6 +234,7 @@ onMounted(async () => {
 <style scoped>
 .wallet-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: radial-gradient(

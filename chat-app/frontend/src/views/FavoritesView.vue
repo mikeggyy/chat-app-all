@@ -56,8 +56,8 @@ const formatCount = (value) => {
 };
 
 const defaultPortrait =
-  fallbackMatches.find((match) => normalizeId(match?.portraitUrl))?.portraitUrl ??
-  "/ai-role/match-role-01.webp";
+  fallbackMatches.find((match) => normalizeId(match?.portraitUrl))
+    ?.portraitUrl ?? "/ai-role/match-role-01.webp";
 
 const availableMatchMap = computed(() => {
   const map = new Map();
@@ -111,10 +111,7 @@ const favoriteCards = computed(() => {
         null;
 
       const displayName =
-        match.display_name ??
-        match.displayName ??
-        match.name ??
-        "未命名角色";
+        match.display_name ?? match.displayName ?? match.name ?? "未命名角色";
 
       return {
         id,
@@ -171,8 +168,12 @@ const conversationCards = computed(() => {
             id: entry,
             displayName: match.display_name || match.name || "未知角色",
             portrait: match.portraitUrl || match.portrait || defaultPortrait,
-            totalFavoritesLabel: formatCount(match.totalFavorites || match.favorites || null),
-            totalChatUsersLabel: formatCount(match.totalChatUsers || match.totalConversations || null),
+            totalFavoritesLabel: formatCount(
+              match.totalFavorites || match.favorites || null
+            ),
+            totalChatUsersLabel: formatCount(
+              match.totalChatUsers || match.totalConversations || null
+            ),
             isMissing: false,
           };
         }
@@ -201,9 +202,17 @@ const conversationCards = computed(() => {
           return {
             id: identifier,
             displayName: character.display_name || character.name || "未知角色",
-            portrait: character.portraitUrl || character.portrait || character.avatar || defaultPortrait,
-            totalFavoritesLabel: formatCount(character.totalFavorites || character.favorites || null),
-            totalChatUsersLabel: formatCount(character.totalChatUsers || character.totalConversations || null),
+            portrait:
+              character.portraitUrl ||
+              character.portrait ||
+              character.avatar ||
+              defaultPortrait,
+            totalFavoritesLabel: formatCount(
+              character.totalFavorites || character.favorites || null
+            ),
+            totalChatUsersLabel: formatCount(
+              character.totalChatUsers || character.totalConversations || null
+            ),
             isMissing: false,
           };
         }
@@ -247,7 +256,9 @@ watch(
 
     try {
       const response = await apiJson(
-        `/api/users/${encodeURIComponent(nextUserId)}/favorites?include=matches`,
+        `/api/users/${encodeURIComponent(
+          nextUserId
+        )}/favorites?include=matches`,
         { skipGlobalLoading: true }
       );
 
@@ -334,7 +345,11 @@ const handleCardClick = (characterId) => {
 
     <main class="favorites-content" aria-live="polite">
       <!-- Chat Tab -->
-      <div v-if="isChatTab" :id="'favorites-chat'" class="favorites-tab-content">
+      <div
+        v-if="isChatTab"
+        :id="'favorites-chat'"
+        class="favorites-tab-content"
+      >
         <p v-if="isLoading" class="favorites-status" role="status">
           正在載入對話...
         </p>
@@ -387,7 +402,11 @@ const handleCardClick = (characterId) => {
                     <dd>{{ card.totalChatUsersLabel }}</dd>
                   </div>
                 </dl>
-                <p v-if="card.isMissing" class="favorite-card__note" role="note">
+                <p
+                  v-if="card.isMissing"
+                  class="favorite-card__note"
+                  role="note"
+                >
                   尚未提供此角色的完整資料。
                 </p>
               </div>
@@ -446,7 +465,11 @@ const handleCardClick = (characterId) => {
                     <dd>{{ card.totalChatUsersLabel }}</dd>
                   </div>
                 </dl>
-                <p v-if="card.isMissing" class="favorite-card__note" role="note">
+                <p
+                  v-if="card.isMissing"
+                  class="favorite-card__note"
+                  role="note"
+                >
                   尚未提供此角色的完整資料。
                 </p>
               </div>
@@ -461,6 +484,7 @@ const handleCardClick = (characterId) => {
 <style scoped>
 .favorites-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #110319 0%, #0a0211 45%, #160325 100%);
@@ -564,6 +588,8 @@ const handleCardClick = (characterId) => {
   padding: 1.25rem 1.25rem 2rem;
   display: flex;
   flex-direction: column;
+  max-height: calc(109dvh - 200px);
+  overflow-y: auto;
 }
 
 .favorites-tab-content {

@@ -41,7 +41,7 @@ export const MEMBERSHIP_TIERS = {
       dailyAdLimitPerCharacter: 0,
 
       // 解鎖票與卡片 - 遊客沒有
-      characterUnlockTickets: 0,
+      characterUnlockCards: 0,
       characterCreationCards: 0,
       photoUnlockCards: 0,
       videoUnlockCards: 0,
@@ -94,7 +94,7 @@ export const MEMBERSHIP_TIERS = {
       dailyAdLimitPerCharacter: 10,       // 每個角色每天最多看 10 次廣告
 
       // 解鎖票與卡片
-      characterUnlockTickets: 0,          // 開通時送的角色解鎖票（用於解鎖與角色 7 天無限對話）
+      characterUnlockCards: 0,            // 開通時送的角色解鎖卡（用於解鎖與角色 7 天無限對話）
       characterCreationCards: 0,          // 開通時送的創建角色卡（用於創建新角色）
       photoUnlockCards: 0,                // 開通時送的拍照解鎖卡
       videoUnlockCards: 0,                // 開通時送的影片解鎖卡
@@ -148,7 +148,7 @@ export const MEMBERSHIP_TIERS = {
       dailyAdLimitPerCharacter: 10,       // 每個角色每天最多看 10 次廣告
 
       // 解鎖票與卡片（開通時一次發放）
-      characterUnlockTickets: 10,         // 開通時送 10 張角色解鎖票（用於解鎖與角色 7 天無限對話）
+      characterUnlockCards: 10,           // 開通時送 10 張角色解鎖卡（用於解鎖與角色 7 天無限對話）
       characterCreationCards: 10,         // 開通時送 10 張創建角色卡（用於創建新角色）⭐
       photoUnlockCards: 20,               // 開通時送 20 張拍照解鎖卡
       videoUnlockCards: 3,                // 開通時送 3 張影片解鎖卡
@@ -204,7 +204,7 @@ export const MEMBERSHIP_TIERS = {
       dailyAdLimitPerCharacter: 10,       // 每個角色每天最多看 10 次廣告
 
       // 解鎖票與卡片（開通時一次發放）
-      characterUnlockTickets: 30,         // 開通時送 30 張角色解鎖票（用於解鎖與角色 7 天無限對話）
+      characterUnlockCards: 30,           // 開通時送 30 張角色解鎖卡（用於解鎖與角色 7 天無限對話）
       characterCreationCards: 30,         // 開通時送 30 張創建角色卡（用於創建新角色）⭐
       photoUnlockCards: 60,               // 開通時送 60 張拍照解鎖卡
       videoUnlockCards: 10,               // 開通時送 10 張影片解鎖卡

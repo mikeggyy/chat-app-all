@@ -31,6 +31,61 @@ export const TRANSACTION_STATUS = {
 };
 
 /**
+ * 創建交易記錄（在 Firestore Transaction 內使用）
+ * @param {Object} transaction - Firestore Transaction 對象
+ * @param {Object} data - 交易數據
+ * @returns {Object} 交易記錄參考和數據
+ */
+export const createTransactionInTx = (transaction, data) => {
+  const {
+    userId,
+    type,
+    amount,
+    description,
+    metadata = {},
+    balanceBefore,
+    balanceAfter,
+    status = TRANSACTION_STATUS.COMPLETED,
+  } = data;
+
+  // 驗證必要欄位
+  if (!userId || !type || amount === undefined || amount === null) {
+    throw new Error("交易記錄缺少必要欄位：userId, type, amount");
+  }
+
+  if (!Object.values(TRANSACTION_TYPES).includes(type)) {
+    throw new Error(`無效的交易類型：${type}`);
+  }
+
+  const db = getFirestoreDb();
+  const transactionRef = db.collection(TRANSACTIONS_COLLECTION).doc();
+
+  const transactionData = {
+    id: transactionRef.id,
+    userId,
+    type,
+    amount,
+    description: description || "",
+    metadata,
+    balanceBefore: balanceBefore || 0,
+    balanceAfter: balanceAfter || 0,
+    status,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+
+  // 在事務內創建交易記錄
+  transaction.set(transactionRef, transactionData);
+
+  logger.info(`[交易服務] 在事務內創建交易記錄: ${transactionRef.id}, 用戶: ${userId}, 類型: ${type}, 金額: ${amount}`);
+
+  return {
+    ref: transactionRef,
+    data: transactionData,
+  };
+};
+
+/**
  * 創建交易記錄
  * @param {Object} data - 交易數據
  * @returns {Promise<Object>} 交易記錄
@@ -326,6 +381,7 @@ export default {
   TRANSACTION_TYPES,
   TRANSACTION_STATUS,
   createTransaction,
+  createTransactionInTx,
   getUserTransactions,
   getTransaction,
   updateTransactionStatus,

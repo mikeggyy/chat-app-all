@@ -100,6 +100,10 @@ loveStory/
 # 開發
 npm run dev                 # 啟動所有服務 (主應用 + 管理後臺，共4個服務)
 npm run install:all         # 安裝所有子項目的依賴
+
+# 服務管理
+npm run cleanup-ports       # 清理特定端口
+npm run kill-all-node       # 關閉所有 Node.js 進程（測試時很有用）
 ```
 
 ### 主應用 (chat-app) 命令
@@ -126,6 +130,7 @@ npm run import:test-data    # 導入測試數據
 
 # 開發工具
 npm run cleanup-ports       # 清理被佔用的端口（Windows）
+npm run kill-all-node       # 關閉所有 Node.js 進程（測試時很有用）
 npm run verify-config       # 驗證端口配置同步
 npm run dev:guide           # 互動式開發指南
 ```

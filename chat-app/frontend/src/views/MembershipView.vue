@@ -263,7 +263,6 @@ const handleUpgrade = async (tier) => {
   } catch (error) {
     const message = error?.message || "升級失敗，請稍後再試";
     showError(message);
-
   } finally {
     isUpgrading.value = false;
   }
@@ -279,9 +278,7 @@ onMounted(async () => {
       if (currentTier.value === "vip" || currentTier.value === "vvip") {
         activeTierId.value = currentTier.value;
       }
-    } catch (error) {
-
-    }
+    } catch (error) {}
   }
 });
 </script>
@@ -459,6 +456,7 @@ onMounted(async () => {
 <style scoped>
 .membership-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(
@@ -613,7 +611,10 @@ onMounted(async () => {
   gap: 1.5rem;
   padding: 0 1.25rem;
   overflow-y: auto;
-  height: 39rem;
+  /* 使用 flex-1 讓它自動填充剩餘空間 */
+  flex: 1;
+  /* 或使用動態視口單位，減去 hero section 的高度 */
+  max-height: calc(100dvh - 280px);
 }
 
 /* Plan Card */

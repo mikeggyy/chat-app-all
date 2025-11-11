@@ -1425,8 +1425,8 @@ const openChat = (profile) => {
       linear-gradient(200deg, rgba(39, 18, 32, 0.1), rgba(13, 4, 10, 0.1));
     z-index: 1;
     pointer-events: none;
-    height: 29vw;
-    top: 40vw;
+    height: 120px;
+    top: 200px;
   }
 }
 

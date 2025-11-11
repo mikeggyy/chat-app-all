@@ -221,14 +221,14 @@ const emitClose = () => {
       <footer class="avatar-editor__footer">
         <button
           type="button"
-          class="avatar-editor__secondary"
+          class="btn-unified btn-cancel"
           @click="emitClose"
         >
           取消
         </button>
         <button
           type="button"
-          class="avatar-editor__primary"
+          class="btn-unified btn-confirm"
           :disabled="!canConfirm || props.saving"
           @click="confirmSelection"
         >
@@ -476,48 +476,6 @@ const emitClose = () => {
   gap: 0.75rem;
   padding: 1.25rem 1.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.avatar-editor__secondary,
-.avatar-editor__primary {
-  min-width: 110px;
-  border-radius: 999px;
-  padding: 0.55rem 1.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  border: none;
-  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
-}
-
-.avatar-editor__secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
-  box-shadow: 0 10px 24px rgba(8, 10, 24, 0.28);
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 32px rgba(8, 10, 24, 0.35);
-  }
-}
-
-.avatar-editor__primary {
-  background: linear-gradient(135deg, #ff4d8f, #ff7ab8);
-  color: #fff;
-  box-shadow: 0 16px 32px rgba(255, 77, 143, 0.38);
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 20px 40px rgba(255, 77, 143, 0.45);
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
 }
 
 .sr-only {

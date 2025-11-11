@@ -153,46 +153,64 @@ export const getEffectiveAIModel = async (userId, characterId, defaultModel) => 
  * @returns {Promise<object>} 購買結果
  */
 export const purchaseMemoryBoost = async (userId, options = {}) => {
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error("找不到用戶");
-  }
-
   const potion = POTION_CONFIG.MEMORY_BOOST;
 
   // 支持 SKU 多數量購買
   const quantity = options.quantity || 1;
   const unitPrice = options.unitPrice || potion.price;
 
-  // 檢查金幣餘額
-  const currentBalance = user.walletBalance || 0;
-  if (currentBalance < unitPrice) {
-    throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${unitPrice}`);
-  }
-
-  // 扣除金幣（直接更新 Firestore）
-  const newBalance = currentBalance - unitPrice;
-  await db.collection("users").doc(userId).update({
-    walletBalance: newBalance,
-    "wallet.balance": newBalance,
-    "wallet.updatedAt": new Date().toISOString(),
-    coins: newBalance,
-    updatedAt: new Date().toISOString(),
-  });
-
-  // 增加庫存（根據購買數量）
+  // ✅ 使用 Firestore Transaction 保證原子性
+  // 確保金幣扣除和庫存增加在同一事務中完成
+  const userRef = db.collection("users").doc(userId);
   const userLimitRef = getUserLimitRef(userId);
-  await userLimitRef.set(
-    {
-      potionInventory: {
-        memoryBoost: FieldValue.increment(quantity),
-      },
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
 
-  const { potionInventory } = await getUserPotionData(userId);
+  let newBalance;
+  let newInventoryCount;
+
+  await db.runTransaction(async (transaction) => {
+    // 1. 讀取用戶資料
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
+
+    const user = userDoc.data();
+    const currentBalance = user.walletBalance || 0;
+
+    // 2. 檢查金幣餘額
+    if (currentBalance < unitPrice) {
+      throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${unitPrice}`);
+    }
+
+    // 3. 讀取當前庫存
+    const limitDoc = await transaction.get(userLimitRef);
+    const limitData = limitDoc.exists ? limitDoc.data() : {};
+    const currentInventory = limitData.potionInventory?.memoryBoost || 0;
+
+    // 4. 計算新值
+    newBalance = currentBalance - unitPrice;
+    newInventoryCount = currentInventory + quantity;
+
+    // 5. ✅ 在同一事務中：扣除金幣 + 增加庫存
+    transaction.update(userRef, {
+      walletBalance: newBalance,
+      "wallet.balance": newBalance,
+      "wallet.updatedAt": new Date().toISOString(),
+      coins: newBalance,
+      updatedAt: new Date().toISOString(),
+    });
+
+    transaction.set(
+      userLimitRef,
+      {
+        potionInventory: {
+          memoryBoost: FieldValue.increment(quantity),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
 
   return {
     success: true,
@@ -200,7 +218,7 @@ export const purchaseMemoryBoost = async (userId, options = {}) => {
     cost: unitPrice,
     quantity,
     balance: newBalance,
-    newInventoryCount: potionInventory.memoryBoost,
+    newInventoryCount: newInventoryCount,
   };
 };
 
@@ -213,52 +231,71 @@ export const purchaseMemoryBoost = async (userId, options = {}) => {
  * @returns {Promise<object>} 購買結果
  */
 export const purchaseBrainBoost = async (userId, options = {}) => {
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error("找不到用戶");
-  }
-
   const potion = POTION_CONFIG.BRAIN_BOOST;
-
-  // 檢查會員等級限制
-  const userTier = user.membershipTier || "free";
-  if (potion.restrictedTiers && potion.restrictedTiers.includes(userTier)) {
-    throw new Error(potion.restrictedMessage || "您的會員等級不能購買此道具");
-  }
 
   // 支持 SKU 多數量購買
   const quantity = options.quantity || 1;
   const unitPrice = options.unitPrice || potion.price;
 
-  // 檢查金幣餘額
-  const currentBalance = user.walletBalance || 0;
-  if (currentBalance < unitPrice) {
-    throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${unitPrice}`);
-  }
-
-  // 扣除金幣（直接更新 Firestore）
-  const newBalance = currentBalance - unitPrice;
-  await db.collection("users").doc(userId).update({
-    walletBalance: newBalance,
-    "wallet.balance": newBalance,
-    "wallet.updatedAt": new Date().toISOString(),
-    coins: newBalance,
-    updatedAt: new Date().toISOString(),
-  });
-
-  // 增加庫存（根據購買數量）
+  // ✅ 使用 Firestore Transaction 保證原子性
+  // 確保金幣扣除和庫存增加在同一事務中完成
+  const userRef = db.collection("users").doc(userId);
   const userLimitRef = getUserLimitRef(userId);
-  await userLimitRef.set(
-    {
-      potionInventory: {
-        brainBoost: FieldValue.increment(quantity),
-      },
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
 
-  const { potionInventory } = await getUserPotionData(userId);
+  let newBalance;
+  let newInventoryCount;
+
+  await db.runTransaction(async (transaction) => {
+    // 1. 讀取用戶資料
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
+
+    const user = userDoc.data();
+
+    // 2. 檢查會員等級限制
+    const userTier = user.membershipTier || "free";
+    if (potion.restrictedTiers && potion.restrictedTiers.includes(userTier)) {
+      throw new Error(potion.restrictedMessage || "您的會員等級不能購買此道具");
+    }
+
+    const currentBalance = user.walletBalance || 0;
+
+    // 3. 檢查金幣餘額
+    if (currentBalance < unitPrice) {
+      throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${unitPrice}`);
+    }
+
+    // 4. 讀取當前庫存
+    const limitDoc = await transaction.get(userLimitRef);
+    const limitData = limitDoc.exists ? limitDoc.data() : {};
+    const currentInventory = limitData.potionInventory?.brainBoost || 0;
+
+    // 5. 計算新值
+    newBalance = currentBalance - unitPrice;
+    newInventoryCount = currentInventory + quantity;
+
+    // 6. ✅ 在同一事務中：扣除金幣 + 增加庫存
+    transaction.update(userRef, {
+      walletBalance: newBalance,
+      "wallet.balance": newBalance,
+      "wallet.updatedAt": new Date().toISOString(),
+      coins: newBalance,
+      updatedAt: new Date().toISOString(),
+    });
+
+    transaction.set(
+      userLimitRef,
+      {
+        potionInventory: {
+          brainBoost: FieldValue.increment(quantity),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
 
   return {
     success: true,
@@ -266,7 +303,7 @@ export const purchaseBrainBoost = async (userId, options = {}) => {
     cost: unitPrice,
     quantity,
     balance: newBalance,
-    newInventoryCount: potionInventory.brainBoost,
+    newInventoryCount: newInventoryCount,
   };
 };
 

@@ -1,12 +1,17 @@
 import OpenAI from "openai";
 import logger from "../utils/logger.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
+import { getAiServiceSettings } from "../services/aiSettings.service.js";
 
-const MAX_NAME_LENGTH = 8;
-const MAX_TAGLINE_LENGTH = 200;
-const MAX_HIDDEN_PROFILE_LENGTH = 200;
-const MAX_PROMPT_LENGTH = 50;
-const MAX_APPEARANCE_DESCRIPTION_LENGTH = 60;
+/**
+ * ❌ 已移除硬編碼常量
+ * ✅ 現在從 Firestore 的 ai_settings/global 讀取各 AI 魔術師的設定
+ */
+const MAX_NAME_LENGTH = 8; // 🔥 將從 characterPersona.maxNameLength 讀取
+const MAX_TAGLINE_LENGTH = 200; // 🔥 將從 characterPersona.maxTaglineLength 讀取
+const MAX_HIDDEN_PROFILE_LENGTH = 200; // 🔥 將從 characterPersona.maxHiddenProfileLength 讀取
+const MAX_PROMPT_LENGTH = 50; // 🔥 將從 characterPersona.maxPromptLength 讀取
+const MAX_APPEARANCE_DESCRIPTION_LENGTH = 60; // 🔥 將從 characterAppearance.maxAppearanceLength 讀取
 
 let cachedClient = null;
 
@@ -173,6 +178,9 @@ const sanitizePersonaField = (value, maxLength) => {
 };
 
 export const generateCharacterPersona = async ({ appearance, gender, styles, selectedImageUrl }) => {
+  // 🔥 從 Firestore 讀取角色設定生成（AI 魔術師 1）的設定
+  const personaConfig = await getAiServiceSettings("characterPersona");
+
   const client = getOpenAIClient();
   const hasImage = selectedImageUrl && typeof selectedImageUrl === "string";
 
@@ -220,10 +228,16 @@ export const generateCharacterPersona = async ({ appearance, gender, styles, sel
     ];
   }
 
+  logger.debug("[AI Wizard 1 - Persona] 使用設定:", {
+    model: personaConfig.model || "gpt-4o",
+    temperature: personaConfig.temperature || 0.8,
+    topP: personaConfig.topP || 0.95,
+  });
+
   const completion = await client.chat.completions.create({
-    model: hasImage ? "gpt-4o" : "gpt-4o-mini", // Vision API 需要 gpt-4o
-    temperature: 0.8,
-    top_p: 0.95,
+    model: personaConfig.model || (hasImage ? "gpt-4o" : "gpt-4o-mini"), // 🔥 從 Firestore 讀取
+    temperature: personaConfig.temperature || 0.8, // 🔥 從 Firestore 讀取
+    top_p: personaConfig.topP || 0.95, // 🔥 從 Firestore 讀取
     messages,
   });
 
@@ -236,11 +250,17 @@ export const generateCharacterPersona = async ({ appearance, gender, styles, sel
     throw error;
   }
 
+  // 🔥 使用 Firestore 的長度限制
+  const maxNameLength = personaConfig.maxNameLength || MAX_NAME_LENGTH;
+  const maxTaglineLength = personaConfig.maxTaglineLength || MAX_TAGLINE_LENGTH;
+  const maxHiddenProfileLength = personaConfig.maxHiddenProfileLength || MAX_HIDDEN_PROFILE_LENGTH;
+  const maxPromptLength = personaConfig.maxPromptLength || MAX_PROMPT_LENGTH;
+
   return {
-    name: sanitizePersonaField(parsed.name, MAX_NAME_LENGTH),
-    tagline: sanitizePersonaField(parsed.tagline, MAX_TAGLINE_LENGTH),
-    hiddenProfile: sanitizePersonaField(parsed.hiddenProfile, MAX_HIDDEN_PROFILE_LENGTH),
-    prompt: sanitizePersonaField(parsed.prompt, MAX_PROMPT_LENGTH),
+    name: sanitizePersonaField(parsed.name, maxNameLength),
+    tagline: sanitizePersonaField(parsed.tagline, maxTaglineLength),
+    hiddenProfile: sanitizePersonaField(parsed.hiddenProfile, maxHiddenProfileLength),
+    prompt: sanitizePersonaField(parsed.prompt, maxPromptLength),
   };
 };
 
@@ -280,8 +300,14 @@ ${hasReference && referenceInfo.focus === "scene" ? "- 場景氛圍" : ""}
 };
 
 export const generateAppearanceDescription = async ({ gender, styles, referenceInfo }) => {
+  // 🔥 從 Firestore 讀取形象描述生成（AI 魔術師 3）的設定
+  const appearanceConfig = await getAiServiceSettings("characterAppearance");
+
   const client = getOpenAIClient();
   const hasImage = referenceInfo && referenceInfo.image;
+
+  // 🔥 使用 Firestore 的長度限制
+  const maxAppearanceLength = appearanceConfig.maxAppearanceLength || MAX_APPEARANCE_DESCRIPTION_LENGTH;
 
   let messages;
 
@@ -302,7 +328,7 @@ export const generateAppearanceDescription = async ({ gender, styles, referenceI
 - Style Preference: ${stylesText}
 - Focus: ${focusText}
 
-**Task**: Create a brief visual description (maximum ${MAX_APPEARANCE_DESCRIPTION_LENGTH} characters) including:
+**Task**: Create a brief visual description (maximum ${maxAppearanceLength} characters) including:
 - Hairstyle and hair color
 - Facial features
 - Clothing style
@@ -310,7 +336,7 @@ ${referenceInfo.focus === "scene" ? "- Scene atmosphere" : ""}
 
 **Requirements**:
 - Write in Traditional Chinese
-- Maximum ${MAX_APPEARANCE_DESCRIPTION_LENGTH} characters (2-3 sentences)
+- Maximum ${maxAppearanceLength} characters (2-3 sentences)
 - Focus only on key visual elements
 - Be concise and factual
 - Describe appearance objectively, no personality judgments
@@ -318,7 +344,7 @@ ${referenceInfo.focus === "scene" ? "- Scene atmosphere" : ""}
 Example format (about 50 characters):
 "短髮、深色頭髮，穿著休閒服飾，現代風格設計。"
 
-Please provide only the description text, within ${MAX_APPEARANCE_DESCRIPTION_LENGTH} characters.`;
+Please provide only the description text, within ${maxAppearanceLength} characters.`;
 
     messages = [
       {
@@ -332,7 +358,8 @@ Please provide only the description text, within ${MAX_APPEARANCE_DESCRIPTION_LE
             type: "image_url",
             image_url: {
               url: referenceInfo.image,
-              detail: referenceInfo.focus === "face" ? "high" : "low"
+              // 🔥 使用 Firestore 的細節級別設定
+              detail: appearanceConfig.visionDetailLevel || (referenceInfo.focus === "face" ? "high" : "low")
             }
           },
           {
@@ -357,10 +384,17 @@ Please provide only the description text, within ${MAX_APPEARANCE_DESCRIPTION_LE
     ];
   }
 
+  logger.debug("[AI Wizard 3 - Appearance] 使用設定:", {
+    model: appearanceConfig.model || "gpt-4o",
+    temperature: appearanceConfig.temperature || 0.7,
+    topP: appearanceConfig.topP || 0.9,
+    maxAppearanceLength,
+  });
+
   const completion = await client.chat.completions.create({
-    model: hasImage ? "gpt-4o" : "gpt-4o-mini",  // Vision 需要使用 gpt-4o
-    temperature: 0.7,
-    top_p: 0.9,
+    model: appearanceConfig.model || (hasImage ? "gpt-4o" : "gpt-4o-mini"), // 🔥 從 Firestore 讀取
+    temperature: appearanceConfig.temperature || 0.7, // 🔥 從 Firestore 讀取
+    top_p: appearanceConfig.topP || 0.9, // 🔥 從 Firestore 讀取
     max_tokens: 300,
     messages,
   });
@@ -379,7 +413,7 @@ Please provide only the description text, within ${MAX_APPEARANCE_DESCRIPTION_LE
     description = description.slice(1, -1).trim();
   }
 
-  return sanitizePersonaField(description, MAX_APPEARANCE_DESCRIPTION_LENGTH);
+  return sanitizePersonaField(description, maxAppearanceLength);
 };
 
 const buildImageGenerationPrompt = ({ gender, description, styles, referenceInfo }) => {
@@ -446,20 +480,35 @@ export const generateCharacterImages = async ({
   flowId,
   userId,
 }) => {
+  // 🔥 從 Firestore 讀取角色圖片生成（AI 魔術師 2）的設定
+  const imageConfig = await getAiServiceSettings("characterImage");
+
   const client = getOpenAIClient();
   const prompt = buildImageGenerationPrompt({ gender, description, styles, referenceInfo });
 
+  // 🔥 使用 Firestore 設定的參數
+  const imageModel = imageConfig.model || "gpt-image-1-mini";
+  const imageSize = imageConfig.size || "1024x1536";
+  const imageQuality = quality || imageConfig.quality || "high";
+  const imageCount = count || imageConfig.count || 4;
+
   if (process.env.NODE_ENV !== "test") {
-    logger.info(`[Image Generation] Generating ${count} images with prompt:`, prompt);
+    logger.info(`[AI Wizard 2 - Image Generation] 使用設定:`, {
+      model: imageModel,
+      size: imageSize,
+      quality: imageQuality,
+      count: imageCount,
+    });
+    logger.info(`[Image Generation] Generating ${imageCount} images with prompt:`, prompt);
   }
 
   try {
     const response = await client.images.generate({
-      model: "gpt-image-1-mini",
+      model: imageModel, // 🔥 從 Firestore 讀取
       prompt,
-      size: "1024x1536", // 2:3 比例
-      quality, // "low", "medium", or "high"
-      n: count, // 生成數量
+      size: imageSize, // 🔥 從 Firestore 讀取
+      quality: imageQuality, // 🔥 從 Firestore 讀取
+      n: imageCount, // 🔥 從 Firestore 讀取
     });
 
     if (!response?.data || !Array.isArray(response.data)) {

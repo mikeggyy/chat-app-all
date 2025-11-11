@@ -112,7 +112,9 @@ const startRealtimeSync = () => {
       // 發生錯誤時，5 分鐘後嘗試重新初始化
       setTimeout(() => {
         logger.info("[CharacterCache] 🔄 嘗試重新初始化緩存...");
-        initializeCharactersCache().catch(console.error);
+        initializeCharactersCache().catch((error) => {
+          logger.error("角色快取初始化失敗:", error);
+        });
       }, 5 * 60 * 1000);
     }
   );

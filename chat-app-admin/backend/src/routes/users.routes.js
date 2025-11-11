@@ -16,8 +16,9 @@ const router = express.Router();
 /**
  * GET /api/users
  * 獲取用戶列表（從 Firebase Auth 和 Firestore 合併數據）
+ * 🔒 權限：moderator 以上
  */
-router.get("/", async (req, res) => {
+router.get("/", requireMinRole("moderator"), async (req, res) => {
   try {
     const { page = 1, limit = 20, search = "" } = req.query;
     const pageNum = parseInt(page);
@@ -67,145 +68,207 @@ router.get("/", async (req, res) => {
     const startIndex = (pageNum - 1) * limitNum;
     const paginatedUsers = allUsers.slice(startIndex, startIndex + limitNum);
 
-    // 合併 Firestore 數據
-    const usersWithData = await Promise.all(
-      paginatedUsers.map(async (authUser) => {
-        try {
-          const userDoc = await db.collection("users").doc(authUser.uid).get();
-          const userData = userDoc.exists ? userDoc.data() : {};
+    // ===== 🚀 優化：批量查詢（減少 N+1 問題）=====
+    // 收集所有用戶 ID
+    const userIds = paginatedUsers.map(u => u.uid);
 
-          // 獲取使用限制數據（對話次數、語音次數、拍照次數等）
-          const limitsDoc = await db.collection("usage_limits").doc(authUser.uid).get();
-          const limitsData = limitsDoc.exists ? limitsDoc.data() : {};
+    // 批量獲取 users 和 usage_limits 數據（並行執行，減少查詢次數）
+    // Firestore 限制：每次 'in' 查詢最多 30 個 ID，需要分批處理
+    const batchSize = 30;
+    const userDataMap = new Map();
+    const limitsDataMap = new Map();
 
-          // 計算總對話次數
-          let totalConversationCount = 0;
-          let conversationCharacters = 0;
-          if (limitsData.conversation) {
-            Object.values(limitsData.conversation).forEach(char => {
-              totalConversationCount += char.count || 0;
-            });
-            conversationCharacters = Object.keys(limitsData.conversation).length;
+    // 分批查詢
+    for (let i = 0; i < userIds.length; i += batchSize) {
+      const batchIds = userIds.slice(i, i + batchSize);
+
+      // 並行查詢這一批的 users 和 usage_limits
+      const [userDocs, limitsDocs] = await Promise.all([
+        db.collection("users").where("__name__", "in", batchIds).get(),
+        db.collection("usage_limits").where("__name__", "in", batchIds).get(),
+      ]);
+
+      // 建立 Map 以 O(1) 查找
+      userDocs.forEach(doc => userDataMap.set(doc.id, doc.data()));
+      limitsDocs.forEach(doc => limitsDataMap.set(doc.id, doc.data()));
+    }
+
+    // 內聯處理藥水數據的函數（避免重複查詢 usage_limits）
+    const processPotionsFromLimitsData = (limitsData) => {
+      const potionInventory = limitsData.potionInventory || {};
+      const inventory = {
+        memoryBoost: potionInventory.memoryBoost || 0,
+        brainBoost: potionInventory.brainBoost || 0,
+      };
+
+      const activePotionEffects = limitsData.activePotionEffects || {};
+      const now = new Date();
+      const activeEffects = [];
+      let activeMemoryBoostCount = 0;
+      let activeBrainBoostCount = 0;
+
+      for (const [effectId, effectData] of Object.entries(activePotionEffects)) {
+        const isActive = effectData.expiresAt && new Date(effectData.expiresAt) > now;
+
+        if (isActive) {
+          activeEffects.push({
+            id: effectId,
+            ...effectData,
+          });
+
+          if (effectData.potionType === "memory_boost") {
+            activeMemoryBoostCount++;
+          } else if (effectData.potionType === "brain_boost") {
+            activeBrainBoostCount++;
           }
-
-          // 計算總語音使用次數
-          let totalVoiceCount = 0;
-          let voiceCharacters = 0;
-          if (limitsData.voice) {
-            Object.values(limitsData.voice).forEach(char => {
-              totalVoiceCount += char.count || 0;
-            });
-            voiceCharacters = Object.keys(limitsData.voice).length;
-          }
-
-          // 獲取角色創建統計（使用 character_creation 或其他可能的字段名）
-          const characterCreationData = limitsData.character_creation || limitsData.characterCreation || {};
-
-          // 獲取藥水數據
-          const potions = await getUserPotions(authUser.uid);
-
-          return {
-            uid: authUser.uid,
-            email: authUser.email,
-            displayName: authUser.displayName || userData.displayName || "未設置",
-            emailVerified: authUser.emailVerified,
-            disabled: authUser.disabled,
-            createdAt: authUser.metadata.creationTime,
-            lastSignInTime: authUser.metadata.lastSignInTime,
-
-            // 基本資料
-            photoURL: userData.photoURL || authUser.photoURL,
-            gender: userData.gender || null,
-            locale: userData.locale || "zh-TW",
-
-            // 會員資訊
-            membershipTier: userData.membershipTier || "free",
-            membershipStatus: userData.membershipStatus || null,
-            membershipStartedAt: userData.membershipStartedAt || null,
-            membershipExpiresAt: userData.membershipExpiresAt || null,
-            membershipAutoRenew: userData.membershipAutoRenew || false,
-
-            // 錢包與資產（優先使用 walletBalance 頂層字段）
-            walletBalance: userData.walletBalance || userData.wallet?.balance || 0,
-            coins: userData.walletBalance || userData.wallet?.balance || userData.coins || 0,
-            assets: {
-              characterUnlockCards: userData.assets?.characterUnlockCards || 0,
-              photoUnlockCards: userData.assets?.photoUnlockCards || 0,
-              videoUnlockCards: userData.assets?.videoUnlockCards || 0,
-              voiceUnlockCards: userData.assets?.voiceUnlockCards || 0,
-              createCards: userData.assets?.createCards || 0,
-            },
-
-            // 藥水數據
-            potions,
-
-            // 使用統計（增強版）
-            usageStats: {
-              totalConversations: totalConversationCount,
-              conversationCharacters,
-              photosUsed: limitsData.photos?.count || 0,
-              photosLifetime: limitsData.photos?.lifetimeCount || 0,
-              totalVoiceUsed: totalVoiceCount,
-              voiceCharacters,
-              characterCreations: characterCreationData.count || 0,
-              characterCreationsLifetime: characterCreationData.lifetimeCount || 0,
-            },
-
-            // 詳細使用限制數據
-            usageLimits: {
-              photos: limitsData.photos || null,
-              conversation: limitsData.conversation || {},
-              voice: limitsData.voice || {},
-              characterCreation: characterCreationData,
-            },
-
-            // 其他
-            favorites: userData.favorites || [],
-            conversations: userData.conversations || [],
-            customClaims: authUser.customClaims || {},
-          };
-        } catch (error) {
-          return {
-            uid: authUser.uid,
-            email: authUser.email,
-            displayName: authUser.displayName || "未設置",
-            emailVerified: authUser.emailVerified,
-            disabled: authUser.disabled,
-            createdAt: authUser.metadata.creationTime,
-            lastSignInTime: authUser.metadata.lastSignInTime,
-            photoURL: null,
-            gender: null,
-            locale: "zh-TW",
-            membershipTier: "free",
-            membershipStatus: null,
-            membershipStartedAt: null,
-            membershipExpiresAt: null,
-            membershipAutoRenew: false,
-            coins: 0,
-            walletBalance: 0,
-            assets: {
-              characterUnlockCards: 0,
-              photoUnlockCards: 0,
-              videoUnlockCards: 0,
-              voiceUnlockCards: 0,
-              createCards: 0,
-            },
-            potions: {
-              inventory: { memoryBoost: 0, brainBoost: 0 },
-              activeEffects: [],
-              totalActive: { memoryBoost: 0, brainBoost: 0 },
-            },
-            usageStats: {
-              totalConversations: 0,
-              photosUsed: 0,
-            },
-            favorites: [],
-            conversations: [],
-            customClaims: authUser.customClaims || {},
-          };
         }
-      })
-    );
+      }
+
+      return {
+        inventory,
+        activeEffects,
+        totalActive: {
+          memoryBoost: activeMemoryBoostCount,
+          brainBoost: activeBrainBoostCount,
+        },
+      };
+    };
+
+    // 合併數據（無需額外查詢）
+    const usersWithData = paginatedUsers.map((authUser) => {
+      try {
+        const userData = userDataMap.get(authUser.uid) || {};
+        const limitsData = limitsDataMap.get(authUser.uid) || {};
+
+        // 計算總對話次數
+        let totalConversationCount = 0;
+        let conversationCharacters = 0;
+        if (limitsData.conversation) {
+          Object.values(limitsData.conversation).forEach(char => {
+            totalConversationCount += char.count || 0;
+          });
+          conversationCharacters = Object.keys(limitsData.conversation).length;
+        }
+
+        // 計算總語音使用次數
+        let totalVoiceCount = 0;
+        let voiceCharacters = 0;
+        if (limitsData.voice) {
+          Object.values(limitsData.voice).forEach(char => {
+            totalVoiceCount += char.count || 0;
+          });
+          voiceCharacters = Object.keys(limitsData.voice).length;
+        }
+
+        // 獲取角色創建統計
+        const characterCreationData = limitsData.character_creation || limitsData.characterCreation || {};
+
+        // 處理藥水數據（從已獲取的 limitsData 中提取，無需再次查詢）
+        const potions = processPotionsFromLimitsData(limitsData);
+
+        return {
+          uid: authUser.uid,
+          email: authUser.email,
+          displayName: authUser.displayName || userData.displayName || "未設置",
+          emailVerified: authUser.emailVerified,
+          disabled: authUser.disabled,
+          createdAt: authUser.metadata.creationTime,
+          lastSignInTime: authUser.metadata.lastSignInTime,
+
+          // 基本資料
+          photoURL: userData.photoURL || authUser.photoURL,
+          gender: userData.gender || null,
+          locale: userData.locale || "zh-TW",
+
+          // 會員資訊
+          membershipTier: userData.membershipTier || "free",
+          membershipStatus: userData.membershipStatus || null,
+          membershipStartedAt: userData.membershipStartedAt || null,
+          membershipExpiresAt: userData.membershipExpiresAt || null,
+          membershipAutoRenew: userData.membershipAutoRenew || false,
+
+          // 錢包與資產
+          walletBalance: userData.walletBalance || userData.wallet?.balance || 0,
+          coins: userData.walletBalance || userData.wallet?.balance || userData.coins || 0,
+          assets: {
+            characterUnlockCards: userData.assets?.characterUnlockCards || 0,
+            photoUnlockCards: userData.assets?.photoUnlockCards || 0,
+            videoUnlockCards: userData.assets?.videoUnlockCards || 0,
+            voiceUnlockCards: userData.assets?.voiceUnlockCards || 0,
+            createCards: userData.assets?.createCards || 0,
+          },
+
+          // 藥水數據
+          potions,
+
+          // 使用統計
+          usageStats: {
+            totalConversations: totalConversationCount,
+            conversationCharacters,
+            photosUsed: limitsData.photos?.count || 0,
+            photosLifetime: limitsData.photos?.lifetimeCount || 0,
+            totalVoiceUsed: totalVoiceCount,
+            voiceCharacters,
+            characterCreations: characterCreationData.count || 0,
+            characterCreationsLifetime: characterCreationData.lifetimeCount || 0,
+          },
+
+          // 詳細使用限制數據
+          usageLimits: {
+            photos: limitsData.photos || null,
+            conversation: limitsData.conversation || {},
+            voice: limitsData.voice || {},
+            characterCreation: characterCreationData,
+          },
+
+          // 其他
+          favorites: userData.favorites || [],
+          conversations: userData.conversations || [],
+          customClaims: authUser.customClaims || {},
+        };
+      } catch (error) {
+        // 單個用戶處理失敗，返回基本信息
+        console.error(`處理用戶數據失敗: ${authUser.uid}`, error);
+        return {
+          uid: authUser.uid,
+          email: authUser.email,
+          displayName: authUser.displayName || "未設置",
+          emailVerified: authUser.emailVerified,
+          disabled: authUser.disabled,
+          createdAt: authUser.metadata.creationTime,
+          lastSignInTime: authUser.metadata.lastSignInTime,
+          photoURL: null,
+          gender: null,
+          locale: "zh-TW",
+          membershipTier: "free",
+          membershipStatus: null,
+          membershipStartedAt: null,
+          membershipExpiresAt: null,
+          membershipAutoRenew: false,
+          coins: 0,
+          walletBalance: 0,
+          assets: {
+            characterUnlockCards: 0,
+            photoUnlockCards: 0,
+            videoUnlockCards: 0,
+            voiceUnlockCards: 0,
+            createCards: 0,
+          },
+          potions: {
+            inventory: { memoryBoost: 0, brainBoost: 0 },
+            activeEffects: [],
+            totalActive: { memoryBoost: 0, brainBoost: 0 },
+          },
+          usageStats: {
+            totalConversations: 0,
+            photosUsed: 0,
+          },
+          favorites: [],
+          conversations: [],
+          customClaims: authUser.customClaims || {},
+        };
+      }
+    });
 
     res.json({
       users: usersWithData,
@@ -221,8 +284,9 @@ router.get("/", async (req, res) => {
 /**
  * GET /api/users/:userId
  * 獲取單個用戶詳情
+ * 🔒 權限：moderator 以上
  */
-router.get("/:userId", async (req, res) => {
+router.get("/:userId", requireMinRole("moderator"), async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -538,8 +602,9 @@ router.post("/:userId/potions", requireMinRole("admin"), async (req, res) => {
 /**
  * GET /api/users/:userId/potions/details
  * 獲取用戶藥水詳細信息（從 usage_limits 集合）
+ * 🔒 權限：moderator 以上
  */
-router.get("/:userId/potions/details", async (req, res) => {
+router.get("/:userId/potions/details", requireMinRole("moderator"), async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -700,6 +765,46 @@ router.delete("/:userId/potion-effects/:effectId", requireMinRole("admin"), asyn
 });
 
 /**
+ * DELETE /api/users/:userId/unlock-effects/:characterId
+ * 刪除用戶的角色解鎖效果
+ * 🔒 權限：admin 以上
+ */
+router.delete("/:userId/unlock-effects/:characterId", requireMinRole("admin"), async (req, res) => {
+  try {
+    const { userId, characterId } = req.params;
+
+    // 驗證用戶是否存在
+    const userRecord = await auth.getUser(userId);
+    if (!userRecord) {
+      return res.status(404).json({ error: "用戶不存在" });
+    }
+
+    // 獲取 usage_limits 文檔
+    const usageLimitDoc = await db.collection("usage_limits").doc(userId).get();
+    if (!usageLimitDoc.exists) {
+      return res.status(404).json({ error: "找不到用戶使用限制數據" });
+    }
+
+    // 刪除 conversation[characterId].temporaryUnlockUntil
+    await db.collection("usage_limits").doc(userId).update({
+      [`conversation.${characterId}.temporaryUnlockUntil`]: FieldValue.delete(),
+    });
+
+    res.json({
+      success: true,
+      message: "角色解鎖效果已刪除",
+      userId,
+      characterId,
+    });
+  } catch (error) {
+    if (error.message === "用戶不存在" || error.message.includes("找不到")) {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: "刪除解鎖效果失敗", message: error.message });
+  }
+});
+
+/**
  * GET /api/users/:userId/resource-limits
  * 獲取用戶的所有資源限制（對話、語音、藥水）
  * 用於管理後台的統一資源管理界面
@@ -752,26 +857,33 @@ router.get("/:userId/resource-limits", requireMinRole("admin"), async (req, res)
       ...Object.values(activePotionEffects).map(e => e.characterId).filter(Boolean)
     ]);
 
-    // 2. 批量獲取角色信息
+    // ===== 🚀 優化：批量獲取角色信息（減少 N+1 問題）=====
     const charactersMap = new Map();
     if (allCharacterIds.size > 0) {
-      const characterPromises = Array.from(allCharacterIds).map(async (charId) => {
+      const characterIdArray = Array.from(allCharacterIds);
+      const batchSize = 30; // Firestore 'in' 查詢限制
+
+      // 分批查詢角色信息
+      for (let i = 0; i < characterIdArray.length; i += batchSize) {
+        const batchIds = characterIdArray.slice(i, i + batchSize);
+
         try {
-          const charDoc = await db.collection("characters").doc(charId).get();
-          if (charDoc.exists) {
-            const charData = charDoc.data();
-            charactersMap.set(charId, {
-              id: charDoc.id,
-              display_name: charData.display_name || charData.name || charDoc.id,
+          const charDocs = await db.collection("characters").where("__name__", "in", batchIds).get();
+
+          charDocs.forEach(doc => {
+            const charData = doc.data();
+            charactersMap.set(doc.id, {
+              id: doc.id,
+              display_name: charData.display_name || charData.name || doc.id,
               portraitUrl: charData.portraitUrl || charData.avatar || null,
               background: charData.background || null,
             });
-          }
+          });
         } catch (err) {
-          // 單個角色獲取失敗不影響整體
+          console.error('批量獲取角色信息失敗', err);
+          // 失敗時不影響整體流程
         }
-      });
-      await Promise.all(characterPromises);
+      }
     }
 
     // 3. 獲取對話限制數據（含角色信息）
@@ -840,6 +952,36 @@ router.get("/:userId/resource-limits", requireMinRole("admin"), async (req, res)
       }
     }
 
+    // 6. 獲取角色解鎖效果數據（從 conversation 欄位中的 temporaryUnlockUntil）
+    const activeUnlockEffects = [];
+    for (const [characterId, convData] of Object.entries(conversationData)) {
+      const temporaryUnlockUntil = convData.temporaryUnlockUntil
+        ? new Date(convData.temporaryUnlockUntil)
+        : null;
+
+      if (temporaryUnlockUntil && temporaryUnlockUntil > now) {
+        const character = charactersMap.get(characterId);
+        const characterName = character?.display_name || "未知角色";
+        const characterAvatar = character?.portraitUrl || null;
+
+        const daysRemaining = Math.ceil(
+          (temporaryUnlockUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        activeUnlockEffects.push({
+          id: `unlock-${characterId}`,
+          characterId,
+          characterName,
+          characterAvatar,
+          character: character || null,
+          unlockType: "character",
+          unlockUntil: temporaryUnlockUntil.toISOString(),
+          daysRemaining,
+          isActive: true,
+        });
+      }
+    }
+
     // 4. 獲取藥水庫存
     const potionInventory = usageLimitData.potionInventory || {};
 
@@ -865,6 +1007,9 @@ router.get("/:userId/resource-limits", requireMinRole("admin"), async (req, res)
             brainBoost: potionInventory.brainBoost || 0,
           },
           activeEffects,
+        },
+        unlocks: {
+          activeEffects: activeUnlockEffects,
         },
         globalUsage: {
           photosCount: photosData.count || 0,

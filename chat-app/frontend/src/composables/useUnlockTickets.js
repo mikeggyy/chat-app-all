@@ -1,11 +1,13 @@
 import { ref, computed } from 'vue';
 import { apiJson } from '../utils/api.js';
 
-// 解鎖卡狀態的全域管理
+// 解鎖卡狀態的全域管理（統一使用 Cards 命名，與共享配置一致）
 const ticketsState = ref({
-  characterUnlockTickets: 0,
+  characterUnlockCards: 0,
   photoUnlockCards: 0,
   videoUnlockCards: 0,
+  voiceUnlockCards: 0,
+  createCards: 0, // 角色創建卡
   usageHistory: [],
 });
 
@@ -35,9 +37,11 @@ export function useUnlockTickets() {
       });
 
       ticketsState.value = {
-        characterUnlockTickets: data.characterUnlockTickets || 0,
+        characterUnlockCards: data.characterUnlockCards || 0,
         photoUnlockCards: data.photoUnlockCards || 0,
         videoUnlockCards: data.videoUnlockCards || 0,
+        voiceUnlockCards: data.voiceUnlockCards || 0,
+        createCards: data.createCards || 0,
         usageHistory: data.usageHistory || [],
       };
 
@@ -79,7 +83,7 @@ export function useUnlockTickets() {
 
       // 更新本地餘額
       if (data.remainingTickets !== undefined) {
-        ticketsState.value.characterUnlockTickets = data.remainingTickets;
+        ticketsState.value.characterUnlockCards = data.remainingTickets;
       }
 
       return data;
@@ -230,9 +234,11 @@ export function useUnlockTickets() {
   };
 
   // Computed properties
-  const characterTickets = computed(() => ticketsState.value.characterUnlockTickets);
+  const characterTickets = computed(() => ticketsState.value.characterUnlockCards);
   const photoCards = computed(() => ticketsState.value.photoUnlockCards);
   const videoCards = computed(() => ticketsState.value.videoUnlockCards);
+  const voiceCards = computed(() => ticketsState.value.voiceUnlockCards);
+  const createCards = computed(() => ticketsState.value.createCards);
   const usageHistory = computed(() => ticketsState.value.usageHistory);
 
   // 是否有角色解鎖券
@@ -244,9 +250,15 @@ export function useUnlockTickets() {
   // 是否有視訊卡
   const hasVideoCards = computed(() => videoCards.value > 0);
 
+  // 是否有語音卡
+  const hasVoiceCards = computed(() => voiceCards.value > 0);
+
+  // 是否有創建卡
+  const hasCreateCards = computed(() => createCards.value > 0);
+
   // 總解鎖卡數量
   const totalTickets = computed(() => {
-    return characterTickets.value + photoCards.value + videoCards.value;
+    return characterTickets.value + photoCards.value + videoCards.value + voiceCards.value + createCards.value;
   });
 
   // 格式化解鎖卡數量
@@ -255,6 +267,8 @@ export function useUnlockTickets() {
       character: new Intl.NumberFormat('zh-TW').format(characterTickets.value),
       photo: new Intl.NumberFormat('zh-TW').format(photoCards.value),
       video: new Intl.NumberFormat('zh-TW').format(videoCards.value),
+      voice: new Intl.NumberFormat('zh-TW').format(voiceCards.value),
+      create: new Intl.NumberFormat('zh-TW').format(createCards.value),
       total: new Intl.NumberFormat('zh-TW').format(totalTickets.value),
     };
   });
@@ -277,10 +291,14 @@ export function useUnlockTickets() {
     characterTickets,
     photoCards,
     videoCards,
+    voiceCards,
+    createCards,
     usageHistory,
     hasCharacterTickets,
     hasPhotoCards,
     hasVideoCards,
+    hasVoiceCards,
+    hasCreateCards,
     totalTickets,
     formattedTickets,
   };

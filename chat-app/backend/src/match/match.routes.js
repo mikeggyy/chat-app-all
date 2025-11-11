@@ -39,7 +39,7 @@ matchRouter.get(
   "/all",
   asyncHandler(async (req, res) => {
     const userId = typeof req.query.userId === "string" ? req.query.userId : "";
-    const user = userId ? getUserById(userId) : null;
+    const user = userId ? await getUserById(userId) : null;
 
     const matches = await listMatchesForUser(user);
     // 直接返回陣列以保持向後兼容

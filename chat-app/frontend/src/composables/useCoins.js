@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue';
 import { apiJson } from '../utils/api.js';
+import { generateIdempotencyKey } from '../utils/idempotency.js';
 
 // 金幣狀態的全域管理
 const coinsState = ref({
@@ -116,10 +117,14 @@ export function useCoins() {
     error.value = null;
 
     try {
+      // 生成冪等性鍵，防止重複購買
+      const idempotencyKey = generateIdempotencyKey();
+
       const data = await apiJson('/api/coins/purchase/package', {
         method: 'POST',
         body: {
           packageId,
+          idempotencyKey, // 添加冪等性鍵（必填）
           paymentInfo: {
             method: options.paymentMethod || 'credit_card',
             paymentId: options.paymentId,
@@ -127,6 +132,11 @@ export function useCoins() {
         },
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
+
+      // 檢查是否為重複請求（來自緩存）
+      if (data._idempotent || data._cached) {
+        console.log('[購買金幣] 檢測到重複請求，返回了緩存結果');
+      }
 
       // 更新本地餘額
       if (data.newBalance !== undefined) {

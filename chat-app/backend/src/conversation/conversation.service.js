@@ -86,6 +86,25 @@ const normalizeMessagePayload = (payload = {}) => {
     logger.warn(`[對話服務] ⚠️ payload 中沒有 imageUrl 字段`);
   }
 
+  // 保留 video（如果存在）
+  if (payload.video && typeof payload.video === "object") {
+    const video = {};
+    if (typeof payload.video.url === "string" && payload.video.url.trim().length) {
+      video.url = payload.video.url.trim();
+    }
+    if (typeof payload.video.duration === "string") {
+      video.duration = payload.video.duration.trim();
+    }
+    if (typeof payload.video.resolution === "string") {
+      video.resolution = payload.video.resolution.trim();
+    }
+
+    if (video.url) {
+      result.video = video;
+      logger.info(`[對話服務] ✅ 訊息包含 video: ${video.url.substring(0, 50)}..., duration: ${video.duration || 'N/A'}`);
+    }
+  }
+
   return result;
 };
 

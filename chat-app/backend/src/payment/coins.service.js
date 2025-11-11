@@ -15,6 +15,7 @@ import {
 } from "../membership/unlockTickets.service.js";
 import {
   createTransaction,
+  createTransactionInTx,
   getUserTransactions,
   getUserTransactionStats,
   TRANSACTION_TYPES as TX_TYPES
@@ -120,92 +121,123 @@ export const getCoinsBalance = async (userId) => {
 };
 
 /**
- * 扣除金幣
+ * 扣除金幣（使用 Firestore Transaction 確保原子性）
  */
 export const deductCoins = async (userId, amount, description, metadata = {}) => {
   if (amount <= 0) {
     throw new Error("扣除金額必須大於 0");
   }
 
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error("找不到用戶");
-  }
+  const db = getFirestoreDb();
+  const userRef = db.collection("users").doc(userId);
 
-  const currentBalance = getWalletBalance(user);
+  let result = null;
 
-  if (currentBalance < amount) {
-    throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${amount}`);
-  }
+  await db.runTransaction(async (transaction) => {
+    // 1. 讀取用戶資料
+    const userDoc = await transaction.get(userRef);
 
-  const newBalance = currentBalance - amount;
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
 
-  // 更新用戶餘額
-  await upsertUser({
-    ...user,
-    ...createWalletUpdate(newBalance),
-    updatedAt: new Date().toISOString(),
+    const user = userDoc.data();
+    const currentBalance = getWalletBalance(user);
+
+    // 2. 檢查餘額是否足夠
+    if (currentBalance < amount) {
+      throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${amount}`);
+    }
+
+    const newBalance = currentBalance - amount;
+
+    // 3. 在同一事務中更新用戶餘額
+    const walletUpdate = createWalletUpdate(newBalance);
+    transaction.update(userRef, {
+      ...walletUpdate,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // 4. 在同一事務中創建交易記錄
+    createTransactionInTx(transaction, {
+      userId,
+      type: TRANSACTION_TYPES.SPEND,
+      amount: -amount,
+      description,
+      metadata,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    });
+
+    // 5. 設置返回結果
+    result = {
+      success: true,
+      previousBalance: currentBalance,
+      newBalance,
+      amount,
+    };
+
+    logger.info(`[金幣服務] 扣除金幣: 用戶 ${userId}, 金額 ${amount}, 餘額 ${currentBalance} → ${newBalance}`);
   });
 
-  // 記錄交易到 Firestore
-  await createTransaction({
-    userId,
-    type: TRANSACTION_TYPES.SPEND,
-    amount: -amount,
-    description,
-    metadata,
-    balanceBefore: currentBalance,
-    balanceAfter: newBalance,
-  });
-
-  return {
-    success: true,
-    previousBalance: currentBalance,
-    newBalance,
-    amount,
-  };
+  return result;
 };
 
 /**
- * 增加金幣
+ * 增加金幣（使用 Firestore Transaction 確保原子性）
  */
 export const addCoins = async (userId, amount, type, description, metadata = {}) => {
   if (amount <= 0) {
     throw new Error("增加金額必須大於 0");
   }
 
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error("找不到用戶");
-  }
+  const db = getFirestoreDb();
+  const userRef = db.collection("users").doc(userId);
 
-  const currentBalance = getWalletBalance(user);
-  const newBalance = currentBalance + amount;
+  let result = null;
 
-  // 更新用戶餘額
-  await upsertUser({
-    ...user,
-    ...createWalletUpdate(newBalance),
-    updatedAt: new Date().toISOString(),
+  await db.runTransaction(async (transaction) => {
+    // 1. 讀取用戶資料
+    const userDoc = await transaction.get(userRef);
+
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
+
+    const user = userDoc.data();
+    const currentBalance = getWalletBalance(user);
+    const newBalance = currentBalance + amount;
+
+    // 2. 在同一事務中更新用戶餘額
+    const walletUpdate = createWalletUpdate(newBalance);
+    transaction.update(userRef, {
+      ...walletUpdate,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // 3. 在同一事務中創建交易記錄
+    createTransactionInTx(transaction, {
+      userId,
+      type,
+      amount,
+      description,
+      metadata,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    });
+
+    // 4. 設置返回結果
+    result = {
+      success: true,
+      previousBalance: currentBalance,
+      newBalance,
+      amount,
+    };
+
+    logger.info(`[金幣服務] 增加金幣: 用戶 ${userId}, 金額 ${amount}, 餘額 ${currentBalance} → ${newBalance}`);
   });
 
-  // 記錄交易到 Firestore
-  await createTransaction({
-    userId,
-    type,
-    amount,
-    description,
-    metadata,
-    balanceBefore: currentBalance,
-    balanceAfter: newBalance,
-  });
-
-  return {
-    success: true,
-    previousBalance: currentBalance,
-    newBalance,
-    amount,
-  };
+  return result;
 };
 
 /**
@@ -339,7 +371,7 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
   const ticketBalance = await getTicketBalance(userId);
   const useTicket = options.useTicket !== false; // 預設使用解鎖票
 
-  if (useTicket && ticketBalance.characterUnlockTickets > 0) {
+  if (useTicket && ticketBalance.characterUnlockCards > 0) {
     // 使用角色解鎖票
     await useCharacterUnlockTicket(userId, characterId);
 
@@ -352,7 +384,7 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
       characterId,
       cost: 0,
       paymentMethod: "unlock_ticket",
-      remainingTickets: ticketBalance.characterUnlockTickets - 1,
+      remainingTickets: ticketBalance.characterUnlockCards - 1,
       permanent: true,
     };
   }
@@ -516,7 +548,7 @@ export const refundCoins = (userId, amount, reason) => {
 };
 
 /**
- * 設定金幣餘額（測試帳號專用）
+ * 設定金幣餘額（測試帳號專用，使用 Firestore Transaction 確保原子性）
  * 直接設定金幣數量，不考慮原有餘額
  */
 export const setCoinsBalance = async (userId, newBalance) => {
@@ -524,42 +556,57 @@ export const setCoinsBalance = async (userId, newBalance) => {
     throw new Error("金幣餘額不能為負數");
   }
 
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error("找不到用戶");
-  }
+  const db = getFirestoreDb();
+  const userRef = db.collection("users").doc(userId);
 
-  const currentBalance = getWalletBalance(user);
-  const difference = newBalance - currentBalance;
+  let result = null;
 
-  // 更新用戶餘額
-  await upsertUser({
-    ...user,
-    ...createWalletUpdate(newBalance),
-    updatedAt: new Date().toISOString(),
+  await db.runTransaction(async (transaction) => {
+    // 1. 讀取用戶資料
+    const userDoc = await transaction.get(userRef);
+
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
+
+    const user = userDoc.data();
+    const currentBalance = getWalletBalance(user);
+    const difference = newBalance - currentBalance;
+
+    // 2. 在同一事務中更新用戶餘額
+    const walletUpdate = createWalletUpdate(newBalance);
+    transaction.update(userRef, {
+      ...walletUpdate,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // 3. 記錄交易到 Firestore
+    const description = difference > 0
+      ? `測試帳號設定金幣 +${difference}`
+      : `測試帳號設定金幣 ${difference}`;
+
+    createTransactionInTx(transaction, {
+      userId,
+      type: TRANSACTION_TYPES.ADMIN,
+      amount: difference,
+      description,
+      metadata: { previousBalance: currentBalance },
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    });
+
+    // 4. 設置返回結果
+    result = {
+      success: true,
+      previousBalance: currentBalance,
+      newBalance,
+      difference,
+    };
+
+    logger.info(`[金幣服務] 設定金幣餘額: 用戶 ${userId}, 餘額 ${currentBalance} → ${newBalance}`);
   });
 
-  // 記錄交易到 Firestore
-  const description = difference > 0
-    ? `測試帳號設定金幣 +${difference}`
-    : `測試帳號設定金幣 ${difference}`;
-
-  await createTransaction({
-    userId,
-    type: TRANSACTION_TYPES.ADMIN,
-    amount: difference,
-    description,
-    metadata: { previousBalance: currentBalance },
-    balanceBefore: currentBalance,
-    balanceAfter: newBalance,
-  });
-
-  return {
-    success: true,
-    previousBalance: currentBalance,
-    newBalance,
-    difference,
-  };
+  return result;
 };
 
 /**

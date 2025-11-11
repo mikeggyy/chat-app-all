@@ -102,14 +102,14 @@ const handleOverlayClick = (event) => {
           <div class="potion-actions">
             <button
               type="button"
-              class="btn btn-secondary"
+              class="btn-unified btn-cancel"
               @click="handleClose"
             >
               取消
             </button>
             <button
               type="button"
-              class="btn btn-primary"
+              class="btn-unified btn-confirm"
               @click="handleConfirm"
             >
               確定使用
@@ -263,40 +263,6 @@ const handleOverlayClick = (event) => {
   display: flex;
   gap: 0.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.btn {
-  flex: 1;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 0.938rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: #f8f9ff;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
-  }
-
-  &-primary {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-    color: white;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
-    }
-
-    &:active {
-      transform: translateY(0);
-    }
-  }
 }
 
 .modal-enter-active,

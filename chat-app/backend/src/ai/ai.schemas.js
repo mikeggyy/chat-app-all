@@ -69,6 +69,7 @@ export const generateVideoSchema = {
     resolution: z.enum(["720p", "1080p"]).optional().default("720p"),
     aspectRatio: z.enum(["9:16", "16:9", "1:1"]).optional().default("9:16"),
     useVideoCard: z.boolean().optional(),
+    imageUrl: z.string().url().optional(), // 🎨 自定義圖片 URL（從相簿選擇）
   }),
 };
 

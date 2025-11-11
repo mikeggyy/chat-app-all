@@ -4,6 +4,9 @@
  */
 
 import { createLimitService, RESET_PERIOD } from "../services/baseLimitService.js";
+import { createModuleLogger } from "../utils/logger.js";
+
+const logger = createModuleLogger('CharacterCreationLimit');
 
 // 創建角色創建限制服務實例
 const characterCreationLimitService = createLimitService({
@@ -53,7 +56,7 @@ export const canCreateCharacter = async (userId) => {
         };
       }
     } catch (error) {
-      console.error("[角色創建限制] 獲取用戶資產失敗:", error);
+      logger.error("獲取用戶資產失敗:", error);
       // 如果 assets 系統失敗，繼續使用基礎檢查結果（安全降級）
     }
   }

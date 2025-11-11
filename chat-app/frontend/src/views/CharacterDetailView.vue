@@ -336,6 +336,7 @@ onMounted(() => {
 <style scoped lang="scss">
 .character-detail-view {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #0f1016;
   color: #f8f9ff;
   display: flex;
@@ -422,7 +423,8 @@ onMounted(() => {
   padding: 1.5rem 1rem;
   gap: 1.5rem;
   overflow-y: auto;
-  height: 196vw;
+  flex: 1;
+  max-height: calc(100dvh - 80px);
 }
 
 .detail-portrait {

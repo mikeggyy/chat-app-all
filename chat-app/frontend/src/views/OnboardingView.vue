@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useUserProfile } from "../composables/useUserProfile";
 import { useGlobalLoading } from "../composables/useGlobalLoading";
@@ -194,14 +194,25 @@ const handleSubmit = async () => {
   startLoading();
 
   try {
-    await updateUserProfileDetails({
+    const submitData = {
       gender: gender.value,
       age: age,
       hasCompletedOnboarding: true,
-    });
+    };
 
-    // 導向到首頁
-    await router.push({ name: "match" });
+    // 更新用戶資料
+    const result = await updateUserProfileDetails(submitData);
+
+    // 等待 Vue 響應式更新完成
+    await nextTick();
+
+    // 驗證狀態是否正確更新
+    if (user.value?.hasCompletedOnboarding !== true) {
+      throw new Error("用戶狀態更新失敗，請重試");
+    }
+
+    // 使用 replace 代替 push，避免循環導航
+    await router.replace({ name: "match" });
   } catch (error) {
     errorMessage.value = error.message || "更新失敗，請稍後再試";
     isSubmitting.value = false;
@@ -214,6 +225,7 @@ const handleSubmit = async () => {
 <style scoped>
 .onboarding-container {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;

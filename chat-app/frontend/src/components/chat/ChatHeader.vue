@@ -15,9 +15,17 @@
       <h1>{{ partnerName }}</h1>
       <!-- Buff 圖標 -->
       <div
-        v-if="activeMemoryBoost || activeBrainBoost"
+        v-if="activeMemoryBoost || activeBrainBoost || activeCharacterUnlock"
         class="chat-header__buffs"
       >
+        <span
+          v-if="activeCharacterUnlock"
+          class="buff-icon buff-icon--unlock"
+          :title="`角色已解鎖 - 剩餘 ${activeCharacterUnlock.remainingDays} 天`"
+          @click="handleBuffClick('unlock')"
+        >
+          🎫
+        </span>
         <span
           v-if="activeMemoryBoost"
           class="buff-icon"
@@ -68,6 +76,14 @@
         @click="handleMenuAction('info')"
       >
         角色資訊
+      </button>
+      <button
+        v-if="!isCharacterUnlocked"
+        type="button"
+        class="chat-header__menu-item chat-header__menu-item--unlock"
+        @click="handleMenuAction('unlock-character')"
+      >
+        🎫 解鎖角色
       </button>
       <button
         v-if="!activeMemoryBoost"
@@ -146,6 +162,18 @@ const props = defineProps({
   activeBrainBoost: {
     type: Object,
     default: null,
+  },
+  activeCharacterUnlock: {
+    type: Object,
+    default: null,
+  },
+  characterUnlockCards: {
+    type: Number,
+    default: 0,
+  },
+  isCharacterUnlocked: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -311,6 +339,15 @@ onBeforeUnmount(() => {
       background: rgba(248, 113, 113, 0.18);
     }
   }
+
+  &.chat-header__menu-item--unlock {
+    color: #4ade80;
+
+    &:hover:not(:disabled) {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.15);
+    }
+  }
 }
 
 // Buff 圖標
@@ -340,6 +377,15 @@ onBeforeUnmount(() => {
 
   &:active {
     transform: scale(0.95);
+  }
+
+  &--unlock {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+
+    &:hover {
+      background: rgba(34, 197, 94, 0.25);
+    }
   }
 }
 

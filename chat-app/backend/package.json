@@ -22,7 +22,12 @@
     "seed:potions": "node ./scripts/seed-potions-data.js",
     "normalize:characters": "node ./scripts/normalize-character-data.js",
     "diagnose:conversations": "node ./scripts/diagnoseConversations.js",
-    "cleanup:conversations": "node ./scripts/cleanupConversations.js"
+    "cleanup:conversations": "node ./scripts/cleanupConversations.js",
+    "test:ai-settings": "node src/scripts/test-ai-settings.js",
+    "video:hailuo": "node src/scripts/update-video-provider.js hailuo",
+    "video:veo": "node src/scripts/update-video-provider.js veo",
+    "video:replicate": "node src/scripts/update-video-provider.js replicate",
+    "init:image-settings": "node src/scripts/init-image-settings.js"
   },
   "keywords": [],
   "author": "",

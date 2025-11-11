@@ -322,12 +322,14 @@ export const finalizeCharacterCreation = async (flowId, currentUser, selectedIma
     portraitUrl = flow.appearance?.image || "";
   }
 
-  console.log('[finalizeCharacterCreation] 圖片 URL 選擇:', {
-    selectedImageUrl,
-    flowAppearanceImage: flow.appearance?.image,
-    generatedImagesCount: generatedImages.length,
-    finalPortraitUrl: portraitUrl
-  });
+  if (import.meta.env.DEV) {
+    console.log('[finalizeCharacterCreation] 圖片 URL 選擇:', {
+      selectedImageUrl,
+      flowAppearanceImage: flow.appearance?.image,
+      generatedImagesCount: generatedImages.length,
+      finalPortraitUrl: portraitUrl
+    });
+  }
 
   // 將 flow 資料轉換為 match 格式
   const matchData = {
@@ -363,7 +365,9 @@ export const finalizeCharacterCreation = async (flowId, currentUser, selectedIma
     try {
       await cleanupUnselectedImages(flowId, portraitUrl, generatedImages);
     } catch (error) {
-      console.warn("清理未選中圖片失敗:", error);
+      if (import.meta.env.DEV) {
+        console.warn("清理未選中圖片失敗:", error);
+      }
       // 不阻斷創建流程，只記錄警告
     }
   }

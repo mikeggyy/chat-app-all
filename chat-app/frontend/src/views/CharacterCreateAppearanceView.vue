@@ -116,8 +116,7 @@ const clearCreationState = ({ preserveGender = false } = {}) => {
       window.sessionStorage.removeItem("characterCreation.gender");
     }
     window.sessionStorage.removeItem("characterCreation.appearance");
-  } catch (error) {
-  }
+  } catch (error) {}
 };
 
 const saveAppearanceState = (partial) => {
@@ -134,8 +133,7 @@ const saveAppearanceState = (partial) => {
       "characterCreation.appearance",
       JSON.stringify(data)
     );
-  } catch (error) {
-  }
+  } catch (error) {}
 };
 
 const loadCharacterStyles = async () => {
@@ -183,18 +181,24 @@ const loadUserAssets = async () => {
   isLoadingAssets.value = true;
   try {
     // 獲取用戶資產（創建卡數量）
-    const assetsData = await apiJson(`/api/users/${encodeURIComponent(userId)}/assets`, {
-      skipGlobalLoading: true,
-    });
+    const assetsData = await apiJson(
+      `/api/users/${encodeURIComponent(userId)}/assets`,
+      {
+        skipGlobalLoading: true,
+      }
+    );
 
     if (assetsData) {
       userCreateCards.value = assetsData.createCards || 0;
     }
 
     // 獲取免費創建次數（從 limits API）
-    const limitsData = await apiJson(`/api/character-creation/limits/${encodeURIComponent(userId)}`, {
-      skipGlobalLoading: true,
-    });
+    const limitsData = await apiJson(
+      `/api/character-creation/limits/${encodeURIComponent(userId)}`,
+      {
+        skipGlobalLoading: true,
+      }
+    );
 
     if (limitsData) {
       freeCreationsRemaining.value = limitsData.remainingFreeCreations || 0;
@@ -217,16 +221,19 @@ onMounted(async () => {
 
   // 強制清理舊的風格選擇（版本控制）
   const STYLE_VERSION = "v2"; // 更新版本號會清除所有舊資料
-  const storedVersion = typeof window !== "undefined"
-    ? window.sessionStorage?.getItem("characterCreation.styleVersion")
-    : null;
+  const storedVersion =
+    typeof window !== "undefined"
+      ? window.sessionStorage?.getItem("characterCreation.styleVersion")
+      : null;
 
   if (storedVersion !== STYLE_VERSION) {
     // 清除舊的風格選擇
     appearanceForm.styles = [];
     if (typeof window !== "undefined" && window.sessionStorage) {
       try {
-        const stored = window.sessionStorage.getItem("characterCreation.appearance");
+        const stored = window.sessionStorage.getItem(
+          "characterCreation.appearance"
+        );
         if (stored) {
           const parsed = JSON.parse(stored);
           parsed.styles = [];
@@ -235,9 +242,11 @@ onMounted(async () => {
             JSON.stringify(parsed)
           );
         }
-        window.sessionStorage.setItem("characterCreation.styleVersion", STYLE_VERSION);
-      } catch (error) {
-      }
+        window.sessionStorage.setItem(
+          "characterCreation.styleVersion",
+          STYLE_VERSION
+        );
+      } catch (error) {}
     }
   }
 });
@@ -294,8 +303,7 @@ watchEffect(() => {
         referenceFocus.value = parsed.referenceFocus;
       }
     }
-  } catch (error) {
-  }
+  } catch (error) {}
 });
 
 watch(
@@ -325,8 +333,7 @@ watch(
 const handleClose = () => {
   const fallbackToProfile = () => {
     clearCreationState();
-    router.replace({ name: "profile" }).catch((error) => {
-    });
+    router.replace({ name: "profile" }).catch((error) => {});
   };
 
   if (typeof window === "undefined") {
@@ -360,7 +367,10 @@ const handleAIMagician = async () => {
     // 使用 sessionStorage 追蹤 AI 魔法師使用次數，不創建 flow
     // 只有在真正點擊「生成形象」時才創建 flow
     const sessionKey = `ai-magician-usage-${savedGender.value}`;
-    const currentUsage = parseInt(sessionStorage.getItem(sessionKey) || "0", 10);
+    const currentUsage = parseInt(
+      sessionStorage.getItem(sessionKey) || "0",
+      10
+    );
 
     // 檢查是否超過使用限制
     if (currentUsage >= AI_MAGICIAN_LIMIT) {
@@ -370,8 +380,8 @@ const handleAIMagician = async () => {
 
     const referenceInfo = referencePreview.value
       ? {
-          image: referencePreview.value,  // 傳遞 base64 圖片數據
-          focus: referenceFocus.value
+          image: referencePreview.value, // 傳遞 base64 圖片數據
+          focus: referenceFocus.value,
         }
       : null;
 
@@ -398,7 +408,11 @@ const handleAIMagician = async () => {
     aiMagicianUsageCount.value = newUsageCount;
 
     // 檢測拒絕訊息（同時包含 "抱歉" 和 "無法" 關鍵詞）
-    if (description && description.includes("抱歉") && description.includes("無法")) {
+    if (
+      description &&
+      description.includes("抱歉") &&
+      description.includes("無法")
+    ) {
       referenceError.value = description;
       return; // 不要填入 input
     }
@@ -409,9 +423,10 @@ const handleAIMagician = async () => {
     }
   } catch (error) {
     // 錯誤也顯示在 referenceError 而非 alert
-    referenceError.value = error instanceof Error && error.message
-      ? error.message
-      : "AI 魔法師生成失敗，請稍後再試";
+    referenceError.value =
+      error instanceof Error && error.message
+        ? error.message
+        : "AI 魔法師生成失敗，請稍後再試";
   } finally {
     isGeneratingDescription.value = false;
   }
@@ -576,15 +591,13 @@ const handleClosePurchaseModal = () => {
 const handleGoToShop = () => {
   // 導向商店購買創建角色卡
   showPurchaseModal.value = false;
-  router.push({ name: "shop" }).catch((error) => {
-  });
+  router.push({ name: "shop" }).catch((error) => {});
 };
 
 const handleGoToVIP = () => {
   // 導向 VIP 充值頁面
   showPurchaseModal.value = false;
-  router.push({ name: "membership" }).catch((error) => {
-  });
+  router.push({ name: "membership" }).catch((error) => {});
 };
 
 const confirmGenerate = async () => {
@@ -673,8 +686,7 @@ const confirmGenerate = async () => {
   }
 
   clearCreationState({ preserveGender: true });
-  router.push({ name: "character-create-generating" }).catch((error) => {
-  });
+  router.push({ name: "character-create-generating" }).catch((error) => {});
 };
 
 const cancelGenerate = () => {
@@ -823,7 +835,12 @@ const cancelGenerate = () => {
               }}</span>
             </button>
             <div class="appearance__ai-usage" v-if="!isGeneratingDescription">
-              <span :class="{ 'appearance__ai-usage--warning': aiMagicianRemainingUsage <= 1 }">
+              <span
+                :class="{
+                  'appearance__ai-usage--warning':
+                    aiMagicianRemainingUsage <= 1,
+                }"
+              >
                 剩餘 {{ aiMagicianRemainingUsage }}/{{ AI_MAGICIAN_LIMIT }} 次
               </span>
             </div>
@@ -998,7 +1015,9 @@ const cancelGenerate = () => {
             </button>
           </header>
           <div class="appearance__purchase-options">
-            <p class="appearance__purchase-subtitle">請選擇以下方式繼續創建角色：</p>
+            <p class="appearance__purchase-subtitle">
+              請選擇以下方式繼續創建角色：
+            </p>
             <button
               type="button"
               class="appearance__purchase-option"
@@ -1122,13 +1141,27 @@ const cancelGenerate = () => {
   --shadow-modal: 0 20px 50px rgba(4, 4, 10, 0.7);
 
   /* 漸變 */
-  --gradient-primary: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
-  --gradient-section-rose: linear-gradient(135deg, rgba(255, 47, 146, 0.2), rgba(255, 90, 188, 0.25));
-  --gradient-bg: radial-gradient(140% 140% at 50% -10%, rgba(255, 51, 151, 0.18), rgba(10, 10, 10, 0.94) 65%), #0b0b0b;
+  --gradient-primary: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    var(--color-primary-light) 100%
+  );
+  --gradient-section-rose: linear-gradient(
+    135deg,
+    rgba(255, 47, 146, 0.2),
+    rgba(255, 90, 188, 0.25)
+  );
+  --gradient-bg: radial-gradient(
+      140% 140% at 50% -10%,
+      rgba(255, 51, 151, 0.18),
+      rgba(10, 10, 10, 0.94) 65%
+    ),
+    #0b0b0b;
 }
 
 .appearance {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: var(--spacing-2xl) var(--spacing-xl) 32px;
@@ -1203,7 +1236,8 @@ const cancelGenerate = () => {
   flex-direction: column;
   gap: var(--spacing-xl);
   overflow-y: auto;
-  height: 173vw;
+  flex: 1;
+  max-height: calc(100dvh - 240px);
   padding-bottom: var(--spacing-2xl);
 }
 
@@ -1309,7 +1343,8 @@ const cancelGenerate = () => {
   color: var(--text-primary);
   font-size: 13px;
   letter-spacing: 0.04em;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition: background-color var(--transition-fast),
+    transform var(--transition-fast);
   cursor: pointer;
 }
 
@@ -1347,7 +1382,8 @@ const cancelGenerate = () => {
   background: var(--bg-overlay-option);
   border: 1px solid var(--bg-overlay-medium);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+  transition: border-color var(--transition-fast),
+    background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .appearance__reference-option:hover {
@@ -1460,7 +1496,8 @@ const cancelGenerate = () => {
   color: var(--color-white);
   font-size: 14px;
   letter-spacing: 0.04em;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+  transition: border-color var(--transition-fast),
+    background-color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
 }
 
@@ -1669,7 +1706,8 @@ const cancelGenerate = () => {
   color: var(--color-white);
   font-size: 14px;
   letter-spacing: 0.04em;
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  transition: background var(--transition-fast),
+    border-color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
 }
 
@@ -1718,7 +1756,8 @@ const cancelGenerate = () => {
   color: var(--color-white);
   text-align: left;
   scroll-snap-align: center;
-  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast),
+    transform var(--transition-fast), box-shadow var(--transition-fast);
   min-width: 8rem;
   gap: 0.5rem;
   padding: 0 0 0.5rem 0;
@@ -1765,6 +1804,12 @@ const cancelGenerate = () => {
   border-color: var(--color-primary);
   box-shadow: var(--shadow-primary);
   background: var(--color-primary-bg);
+}
+
+.appearance__footer {
+  margin-top: 2rem;
+  /* 使用 safe-area-inset-bottom 來防止被手機導覽列遮擋 */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .appearance__generate {
@@ -1870,7 +1915,8 @@ const cancelGenerate = () => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .appearance__confirm-close:hover {
@@ -1892,7 +1938,8 @@ const cancelGenerate = () => {
   letter-spacing: 0.06em;
   border: none;
   cursor: pointer;
-  transition: opacity var(--transition-fast), transform var(--transition-fast), background-color var(--transition-fast);
+  transition: opacity var(--transition-fast), transform var(--transition-fast),
+    background-color var(--transition-fast);
 }
 
 .appearance__confirm-action:hover {

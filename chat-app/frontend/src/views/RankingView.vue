@@ -732,6 +732,7 @@ watch(
 .ranking-screen {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: clamp(1.5rem, 4vw, 2.4rem) clamp(1rem, 6vw, 2.8rem)
     clamp(3.1rem, 8vw, 4.2rem);
   display: flex;

@@ -813,6 +813,7 @@ onBeforeUnmount(() => {
 
 .generating {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: 20px 18px 28px;
@@ -889,7 +890,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 0 8px;
-  height: 176vw;
+  flex: 1;
+  max-height: calc(100dvh - 200px);
 }
 
 .generating__glow {
@@ -1200,7 +1202,8 @@ onBeforeUnmount(() => {
   gap: 24px;
   margin-top: 12px;
   overflow-y: auto;
-  height: 180vw;
+  flex: 1;
+  max-height: calc(100dvh - 280px);
 }
 
 .generating__settings-hero {

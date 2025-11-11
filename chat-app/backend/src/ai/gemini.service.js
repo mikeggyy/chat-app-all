@@ -8,6 +8,7 @@ import sharp from "sharp";
 import fs from "fs";
 import path from "path";
 import logger from "../utils/logger.js";
+import { getAiServiceSettings } from "../services/aiSettings.service.js";
 
 /**
  * 獲取 Gemini AI 客戶端
@@ -52,10 +53,10 @@ const fileToGenerativePart = (imagePath) => {
 /**
  * 壓縮圖片為低質量 WebP 格式
  * @param {string} base64String - Base64 編碼的圖片（可含或不含 data URL 前綴）
- * @param {number} quality - WebP 質量 (1-100)，預設 30（降低以適應 Firestore 限制）
+ * @param {number} quality - WebP 質量 (1-100)，預設從 Firestore 讀取
  * @returns {Promise<string>} - 壓縮後的 Base64 字串（不含前綴）
  */
-const compressImageToWebP = async (base64String, quality = 30) => {
+const compressImageToWebP = async (base64String, quality = 40) => {
   try {
     // 移除 data:image/xxx;base64, 前綴（如果有）
     const base64Data = base64String.replace(/^data:image\/\w+;base64,/, "");
@@ -118,12 +119,15 @@ export const generateGeminiImage = async (characterImageBase64, prompt, options 
   }
 
   try {
+    // 🔥 從 Firestore 讀取圖片生成設定
+    const imageConfig = await getAiServiceSettings("imageGeneration");
+
     const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-image"
+      model: imageConfig.model || "gemini-2.5-flash-image"
     });
 
-    logger.info("[Gemini] 開始生成圖片");
+    logger.info("[Gemini] 開始生成圖片 (model: " + (imageConfig.model || "gemini-2.5-flash-image") + ")");
 
     // 準備參考圖片
     const referenceImage = base64ToGenerativePart(characterImageBase64);
@@ -133,10 +137,14 @@ export const generateGeminiImage = async (characterImageBase64, prompt, options 
     const stylePrompt = STYLE_PROMPTS[styleName] || STYLE_PROMPTS["Photographic (Default)"];
     const fullPrompt = `${prompt}\n\nStyle: ${stylePrompt}`;
 
+    // 🔥 使用 Firestore 中的 aspectRatio 設定
+    const aspectRatio = options.aspectRatio || imageConfig.aspectRatio || "2:3";
+
     logger.debug("[Gemini] 輸入參數:", {
       styleName: styleName,
-      aspectRatio: options.aspectRatio || "2:3",
+      aspectRatio: aspectRatio,
       promptLength: fullPrompt.length,
+      compressionQuality: imageConfig.compressionQuality || 40,
     });
 
     // 生成圖片（帶參考圖片保持角色一致性）
@@ -156,7 +164,7 @@ export const generateGeminiImage = async (characterImageBase64, prompt, options 
         // Gemini 2.5 Flash Image 支援的比例
         responseModalities: ["image"],
         imageConfig: {
-          aspectRatio: options.aspectRatio || "2:3"
+          aspectRatio: aspectRatio
         }
       }
     });
@@ -208,17 +216,19 @@ export const generateGeminiImage = async (characterImageBase64, prompt, options 
 
     logger.debug("[Gemini] 原始圖片大小:", Math.round(imageBase64.length / 1024), "KB");
 
-    // 壓縮圖片為 WebP 格式（質量 40）- 降低質量以節省儲存和傳輸成本
-    const compressedBase64 = await compressImageToWebP(imageBase64, 40);
+    // 🔥 使用 Firestore 設定的壓縮質量
+    const compressionQuality = imageConfig.compressionQuality || 40;
+    const compressedBase64 = await compressImageToWebP(imageBase64, compressionQuality);
 
     // 轉換為 data URL 格式
     const imageDataUrl = `data:image/webp;base64,${compressedBase64}`;
 
-    logger.info("[Gemini] 壓縮後大小:", Math.round(compressedBase64.length / 1024), "KB");
+    logger.info("[Gemini] 壓縮後大小:", Math.round(compressedBase64.length / 1024), "KB", `(quality: ${compressionQuality})`);
 
-    // 返回圖片和使用情況
+    // 返回圖片、使用情況、以及選擇的場景（如果有）
     return {
       imageDataUrl,
+      selectedScenario: options.selectedScenario || null, // 🔥 返回場景信息供記錄到 Firestore
       usageMetadata: usageMetadata || {
         promptTokenCount: 0,
         candidatesTokenCount: 0,
@@ -260,33 +270,65 @@ export const generateGeminiImage = async (characterImageBase64, prompt, options 
 };
 
 /**
- * 構建圖片生成提示詞（Gemini 版本）
- * 根據角色資料和最近對話構建詳細的場景描述
+ * ❌ 已移除硬編碼的 SELFIE_SCENARIOS 陣列
+ * ✅ 現在從 Firestore 的 ai_settings/global 讀取 imageGeneration.selfieScenarios
  */
-export const buildGeminiPrompt = (character, recentMessages = []) => {
-  // 基礎場景描述
-  let prompt = `A natural portrait photo. `;
 
-  // 添加角色背景信息
-  if (character.background) {
-    prompt += `Character context: ${character.background}. `;
-  }
+/**
+ * 構建圖片生成提示詞（Gemini 版本）
+ * 🔥 從 Firestore 讀取模板和場景列表，支援變數替換
+ * 根據角色資料和最近對話構建詳細的場景描述
+ *
+ * @param {object} character - 角色資料
+ * @param {array} recentMessages - 最近的對話記錄
+ * @returns {Promise<object>} - { prompt: string, selectedScenario: string|null }
+ */
+export const buildGeminiPrompt = async (character, recentMessages = []) => {
+  // 🔥 從 Firestore 讀取圖片生成設定
+  const imageConfig = await getAiServiceSettings("imageGeneration");
 
-  // 從最近對話中提取場景線索
+  // 使用 Firestore 中的模板
+  let template = imageConfig.imagePromptTemplate || `A natural portrait photo. Character context: {角色背景設定}. Current situation: {最近對話內容}. Scene: The character is {場景描述}. Natural expression, warm lighting, candid photography style. Natural pose and activity. High quality portrait photo. IMPORTANT: No text, no words, no letters, no signs with writing in the image. Pure visual photo only.`;
+
+  // 替換 {角色背景設定}
+  const characterBackground = character.background || "";
+  template = template.replace(/\{角色背景設定\}/g, characterBackground);
+
+  // 替換 {最近對話內容}
+  let conversationContext = "";
   if (recentMessages.length > 0) {
     const lastMessages = recentMessages.slice(-3);
-    const conversationContext = lastMessages
+    conversationContext = lastMessages
       .map(m => m.text || m.content)
       .filter(Boolean)
-      .join(" ");
+      .join(" ")
+      .substring(0, 200);
+  }
+  template = template.replace(/\{最近對話內容\}/g, conversationContext);
 
-    if (conversationContext.length > 0) {
-      prompt += `Current situation: ${conversationContext.substring(0, 200)}. `;
-    }
+  // 🎯 根據 scenarioSelectionChance 決定是否使用隨機場景
+  let selectedScenario = null;
+  const scenarioChance = imageConfig.scenarioSelectionChance ?? 0.7; // 預設 70%
+  const selfieScenarios = imageConfig.selfieScenarios || [];
+
+  if (selfieScenarios.length > 0 && Math.random() < scenarioChance) {
+    // 隨機選擇一個場景
+    const randomIndex = Math.floor(Math.random() * selfieScenarios.length);
+    selectedScenario = selfieScenarios[randomIndex];
+
+    logger.info(`[Gemini Prompt] 🎲 選擇隨機場景 (${randomIndex + 1}/${selfieScenarios.length}): "${selectedScenario}"`);
+  } else {
+    logger.info("[Gemini Prompt] 📝 不使用隨機場景 (根據 scenarioSelectionChance 或場景列表為空)");
   }
 
-  // 添加攝影風格描述
-  prompt += `Capture a natural moment in the current scene. The character can be doing any activity or in any pose that fits the context - sitting, standing, walking, relaxing, or engaging in daily activities. Natural expression, warm lighting, candid photography style. The setting can be anywhere fitting - indoors, outdoors, café, street, park, bedroom, or any comfortable space. No need to hold a phone or camera - just a natural portrait. `;
+  // 替換 {場景描述}
+  const sceneDescription = selectedScenario || "in a natural everyday setting";
+  template = template.replace(/\{場景描述\}/g, sceneDescription);
 
-  return prompt;
+  logger.debug("[Gemini Prompt] 生成的 prompt 長度:", template.length);
+
+  return {
+    prompt: template,
+    selectedScenario: selectedScenario // 🔥 返回選擇的場景供後續記錄
+  };
 };

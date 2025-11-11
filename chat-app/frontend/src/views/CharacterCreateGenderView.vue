@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { XMarkIcon } from "@heroicons/vue/24/outline";
 import { useGuestGuard } from "../composables/useGuestGuard";
 import { useUserProfile } from "../composables/useUserProfile";
+import { useUnlockTickets } from "../composables/useUnlockTickets";
 import { apiJson } from "../utils/api";
 import CharacterCreationLimitModal from "../components/CharacterCreationLimitModal.vue";
 import ResumeFlowModal from "../components/ResumeFlowModal.vue";
@@ -17,6 +18,7 @@ import {
 const router = useRouter();
 const { requireLogin } = useGuestGuard();
 const { user } = useUserProfile();
+const { loadBalance: loadTicketsBalance, createCards } = useUnlockTickets();
 
 const genderOptions = [
   {
@@ -47,7 +49,6 @@ const standardTotal = ref(null);
 const isTestAccount = ref(false);
 const membershipTier = ref("free");
 const showLimitModal = ref(false);
-const createCards = ref(0);
 const showResumeFlowModal = ref(false);
 const pendingFlow = ref(null);
 
@@ -62,17 +63,8 @@ const clearCreationState = () => {
   }
 };
 
-const loadUserAssets = async (userId) => {
-  if (!userId) return;
-  try {
-    const data = await apiJson(`/api/users/${userId}/assets`, {
-      skipGlobalLoading: true,
-    });
-    createCards.value = data.createCards || 0;
-  } catch (err) {
-
-  }
-};
+// 統一使用 useUnlockTickets 來獲取創建卡數量
+// createCards 已經從 useUnlockTickets 導入，無需再次獲取
 
 const checkAndResumeFlow = async () => {
   // 檢查是否有未完成的 flow
@@ -213,8 +205,8 @@ onMounted(async () => {
     } catch (error) {
     }
 
-    // 載入用戶資產（解鎖卡數量）
-    await loadUserAssets(userId);
+    // 載入用戶資產（解鎖卡數量）- 統一使用 useUnlockTickets
+    await loadTicketsBalance(userId, { skipGlobalLoading: true });
   }
 });
 
@@ -396,6 +388,7 @@ const handleClose = () => {
 <style scoped>
 .create-gender {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: 24px 20px 32px;

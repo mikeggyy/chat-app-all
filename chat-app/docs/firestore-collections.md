@@ -167,10 +167,10 @@
     dailyAdLimitPerCharacter: number,    // 每個角色每天最多看廣告次數
 
     // 解鎖票與卡片（開通時一次性發放）
-    characterUnlockTickets: number,      // 角色解鎖票數量
+    characterUnlockCards: number,        // 角色解鎖卡數量（用於解鎖與角色 7 天無限對話）
     characterCreationCards: number,      // 創建角色卡數量
-    photoUnlockCards: number,            // 拍照解鎖卡數量（VIP 開通送 10 張, VVIP 開通送 50 張）
-    videoUnlockCards: number,            // 影片解鎖卡數量（VIP 開通送 1 張, VVIP 開通送 5 張）
+    photoUnlockCards: number,            // 拍照解鎖卡數量（VIP 開通送 20 張, VVIP 開通送 60 張）
+    videoUnlockCards: number,            // 影片解鎖卡數量（VIP 開通送 3 張, VVIP 開通送 10 張）
 
     // AI 特殊功能
     aiPhotoGeneration: boolean,          // AI 拍照功能

@@ -21,7 +21,12 @@ const handleBack = () => {
 const handleCreateCharacter = async () => {
   try {
     await router.push({ name: "character-create-gender" });
-  } catch (error) {}
+  } catch (error) {
+    // 忽略：這是背景更新，失敗不影響主流程
+    if (import.meta.env.DEV) {
+      console.warn("[MyCharacters] 背景更新失敗:", error);
+    }
+  }
 };
 
 // Utility functions
@@ -332,11 +337,11 @@ onMounted(() => {
 <style scoped lang="scss">
 .my-characters-view {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #0f1016;
   color: #f8f9ff;
   display: flex;
   flex-direction: column;
-  padding-bottom: calc(var(--bottom-nav-offset, 90px) + 1.5rem);
 }
 
 .my-characters-header {
@@ -421,7 +426,8 @@ onMounted(() => {
 .my-characters-content {
   padding: 1.5rem 1.75rem;
   overflow-y: auto;
-  height: 195vw;
+  flex: 1;
+  max-height: calc(100dvh - 84px);
 }
 
 .my-characters-status {

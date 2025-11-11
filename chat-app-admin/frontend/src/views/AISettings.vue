@@ -223,7 +223,55 @@
               </div>
             </el-form-item>
 
-            <el-divider />
+            <el-divider>場景設定</el-divider>
+
+            <el-form-item label="場景選擇機率">
+              <div>
+                <el-slider
+                  v-model="settings.imageGeneration.scenarioSelectionChance"
+                  :min="0"
+                  :max="1"
+                  :step="0.05"
+                  :format-tooltip="(val) => `${(val * 100).toFixed(0)}%`"
+                  show-input
+                  :input-size="'small'"
+                />
+                <div class="help-text">
+                  生成自拍時使用隨機場景的機率（0-100%）。推薦值：70%
+                </div>
+              </div>
+            </el-form-item>
+
+            <el-form-item label="自拍場景列表">
+              <div>
+                <div class="scenarios-container">
+                  <el-tag
+                    v-for="(scenario, index) in settings.imageGeneration.selfieScenarios"
+                    :key="index"
+                    closable
+                    type="success"
+                    size="default"
+                    @close="removeScenario(index)"
+                    style="margin: 4px"
+                  >
+                    {{ scenario }}
+                  </el-tag>
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 10px">
+                  <el-input
+                    v-model="newScenario"
+                    placeholder="輸入新場景（英文），例如: at a coffee shop, reading a book"
+                    @keyup.enter="addScenario"
+                  />
+                  <el-button type="primary" @click="addScenario">新增場景</el-button>
+                </div>
+                <div class="help-text">
+                  自拍照片的隨機場景列表（英文描述）。每次生成時會隨機選擇一個場景。目前共 {{ settings.imageGeneration.selfieScenarios?.length || 0 }} 個場景。
+                </div>
+              </div>
+            </el-form-item>
+
+            <el-divider>提示詞模板</el-divider>
 
             <el-form-item label="圖片生成提示詞模板">
               <div>
@@ -257,103 +305,184 @@
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>角色影片生成 AI (Veo 3.0 Fast)</span>
+              <span>角色影片生成 AI
+                <el-tag v-if="settings.videoGeneration.provider === 'hailuo'" size="small" type="warning" style="margin-left: 8px">Hailuo 02</el-tag>
+                <el-tag v-else-if="settings.videoGeneration.provider === 'veo'" size="small" type="primary" style="margin-left: 8px">Veo 3.0</el-tag>
+                <el-tag v-else-if="settings.videoGeneration.provider === 'replicate'" size="small" type="info" style="margin-left: 8px">SVD</el-tag>
+              </span>
               <el-tag size="small" type="danger">影片</el-tag>
             </div>
           </template>
 
           <el-form :model="settings.videoGeneration" label-width="150px">
+            <!-- 提供者選擇 -->
+            <el-form-item label="影片提供者">
+              <div>
+                <el-select
+                  v-model="settings.videoGeneration.provider"
+                  placeholder="選擇提供者"
+                  @change="onProviderChange"
+                >
+                  <el-option label="Hailuo 02 (Minimax)" value="hailuo" />
+                  <el-option label="Veo 3.0 Fast (Google)" value="veo" />
+                  <el-option label="Stable Video Diffusion (Replicate)" value="replicate" />
+                </el-select>
+                <div class="help-text">選擇影片生成的 AI 提供者</div>
+              </div>
+            </el-form-item>
+
             <el-form-item label="模型">
               <div>
                 <el-input v-model="settings.videoGeneration.model" disabled />
-                <div class="help-text">使用 Google Veo 3.0 Fast 模型</div>
+                <div class="help-text">
+                  <span v-if="settings.videoGeneration.provider === 'hailuo'">Minimax Hailuo 02 模型</span>
+                  <span v-else-if="settings.videoGeneration.provider === 'veo'">Google Veo 3.0 Fast 模型</span>
+                  <span v-else-if="settings.videoGeneration.provider === 'replicate'">Stability AI SVD 模型</span>
+                </div>
               </div>
             </el-form-item>
 
-            <el-form-item label="影片長度">
-              <div>
+            <!-- Hailuo 02 參數 -->
+            <template v-if="settings.videoGeneration.provider === 'hailuo'">
+              <el-form-item label="影片長度">
+                <div>
+                  <div>
+                    <el-input-number
+                      v-model="settings.videoGeneration.durationSeconds"
+                      :min="2"
+                      :max="10"
+                      :step="1"
+                    />
+                    <span style="margin-left: 10px">秒</span>
+                  </div>
+                  <div class="help-text">影片時長（Hailuo 02 支援 2-10 秒）</div>
+                </div>
+              </el-form-item>
+
+              <el-form-item label="解析度">
+                <div>
+                  <el-select
+                    v-model="settings.videoGeneration.resolution"
+                    placeholder="選擇解析度"
+                  >
+                    <el-option label="512p" value="512p" />
+                    <el-option label="720p" value="720p" />
+                  </el-select>
+                  <div class="help-text">影片解析度（Hailuo 02 推薦 512p）</div>
+                </div>
+              </el-form-item>
+
+              <el-form-item label="強化提示詞">
+                <div>
+                  <el-switch v-model="settings.videoGeneration.enhancePrompt" />
+                  <div class="help-text">使用 Hailuo 內建的 prompt_optimizer</div>
+                </div>
+              </el-form-item>
+            </template>
+
+            <!-- Veo 3.0 參數 -->
+            <template v-if="settings.videoGeneration.provider === 'veo'">
+              <el-form-item label="影片長度">
+                <div>
+                  <div>
+                    <el-input-number
+                      v-model="settings.videoGeneration.durationSeconds"
+                      :min="2"
+                      :max="8"
+                      :step="1"
+                    />
+                    <span style="margin-left: 10px">秒</span>
+                  </div>
+                  <div class="help-text">
+                    影片時長（使用參考圖片時必須為 8 秒）
+                  </div>
+                </div>
+              </el-form-item>
+
+              <el-form-item label="解析度">
+                <div>
+                  <el-select
+                    v-model="settings.videoGeneration.resolution"
+                    placeholder="選擇解析度"
+                  >
+                    <el-option label="720p" value="720p" />
+                    <el-option label="1080p" value="1080p" />
+                  </el-select>
+                  <div class="help-text">影片解析度</div>
+                </div>
+              </el-form-item>
+
+              <el-form-item label="影片比例">
+                <div>
+                  <el-select
+                    v-model="settings.videoGeneration.aspectRatio"
+                    placeholder="選擇比例"
+                  >
+                    <el-option label="9:16 (垂直)" value="9:16" />
+                    <el-option label="16:9 (水平)" value="16:9" />
+                    <el-option label="1:1 (正方形)" value="1:1" />
+                  </el-select>
+                  <div class="help-text">影片寬高比（推薦 9:16 適合手機）</div>
+                </div>
+              </el-form-item>
+
+              <el-form-item label="生成數量">
                 <div>
                   <el-input-number
-                    v-model="settings.videoGeneration.durationSeconds"
-                    :min="2"
-                    :max="8"
+                    v-model="settings.videoGeneration.sampleCount"
+                    :min="1"
+                    :max="4"
                     :step="1"
                   />
-                  <span style="margin-left: 10px">秒</span>
+                  <div class="help-text">每次生成的影片數量（1-4）</div>
                 </div>
-                <div class="help-text">
-                  影片時長（使用參考圖片時必須為 8 秒）
+              </el-form-item>
+
+              <el-form-item label="壓縮質量">
+                <div>
+                  <el-select
+                    v-model="settings.videoGeneration.compressionQuality"
+                  >
+                    <el-option label="優化 (推薦)" value="optimized" />
+                    <el-option label="無損" value="lossless" />
+                  </el-select>
+                  <div class="help-text">影片壓縮質量</div>
                 </div>
-              </div>
-            </el-form-item>
+              </el-form-item>
 
-            <el-form-item label="解析度">
-              <div>
-                <el-select
-                  v-model="settings.videoGeneration.resolution"
-                  placeholder="選擇解析度"
-                >
-                  <el-option label="720p" value="720p" />
-                  <el-option label="1080p" value="1080p" />
-                </el-select>
-                <div class="help-text">影片解析度</div>
-              </div>
-            </el-form-item>
+              <el-form-item label="強化提示詞">
+                <div>
+                  <el-switch v-model="settings.videoGeneration.enhancePrompt" />
+                  <div class="help-text">使用 Gemini 自動優化提示詞</div>
+                </div>
+              </el-form-item>
 
-            <el-form-item label="影片比例">
-              <div>
-                <el-select
-                  v-model="settings.videoGeneration.aspectRatio"
-                  placeholder="選擇比例"
-                >
-                  <el-option label="9:16 (垂直)" value="9:16" />
-                  <el-option label="16:9 (水平)" value="16:9" />
-                  <el-option label="1:1 (正方形)" value="1:1" />
-                </el-select>
-                <div class="help-text">影片寬高比（推薦 9:16 適合手機）</div>
-              </div>
-            </el-form-item>
+              <el-form-item label="人物生成">
+                <div>
+                  <el-select v-model="settings.videoGeneration.personGeneration">
+                    <el-option label="允許成人人物" value="allow_adult" />
+                    <el-option label="不生成人物" value="dont_allow" />
+                  </el-select>
+                  <div class="help-text">人物生成策略</div>
+                </div>
+              </el-form-item>
+            </template>
 
-            <el-form-item label="生成數量">
-              <div>
-                <el-input-number
-                  v-model="settings.videoGeneration.sampleCount"
-                  :min="1"
-                  :max="4"
-                  :step="1"
-                />
-                <div class="help-text">每次生成的影片數量（1-4）</div>
-              </div>
-            </el-form-item>
+            <!-- Replicate SVD 無額外參數（不使用 prompt） -->
+            <template v-if="settings.videoGeneration.provider === 'replicate'">
+              <el-alert
+                type="info"
+                :closable="false"
+                style="margin-bottom: 20px"
+              >
+                <template #title>
+                  Stable Video Diffusion 不使用文字提示詞，僅基於參考圖片生成約 4 秒的影片。
+                </template>
+              </el-alert>
+            </template>
 
-            <el-form-item label="壓縮質量">
-              <div>
-                <el-select
-                  v-model="settings.videoGeneration.compressionQuality"
-                >
-                  <el-option label="優化 (推薦)" value="optimized" />
-                  <el-option label="無損" value="lossless" />
-                </el-select>
-                <div class="help-text">影片壓縮質量</div>
-              </div>
-            </el-form-item>
-
-            <el-form-item label="強化提示詞">
-              <div>
-                <el-switch v-model="settings.videoGeneration.enhancePrompt" />
-                <div class="help-text">使用 Gemini 自動優化提示詞</div>
-              </div>
-            </el-form-item>
-
-            <el-form-item label="人物生成">
-              <div>
-                <el-select v-model="settings.videoGeneration.personGeneration">
-                  <el-option label="允許成人人物" value="allow_adult" />
-                  <el-option label="不生成人物" value="dont_allow" />
-                </el-select>
-                <div class="help-text">人物生成策略</div>
-              </div>
-            </el-form-item>
+            <!-- 通用參數 -->
+            <el-divider>通用設定</el-divider>
 
             <el-form-item label="啟用重試">
               <div>
@@ -386,29 +515,34 @@
               </div>
             </el-form-item>
 
-            <el-form-item label="Video Prompt 模板">
-              <div>
-                <div class="editor-wrapper">
-                  <editor-content :editor="videoEditor" />
+            <!-- 提示詞模板（僅 Hailuo 和 Veo 需要） -->
+            <template v-if="settings.videoGeneration.provider !== 'replicate'">
+              <el-divider>提示詞模板</el-divider>
+
+              <el-form-item label="Video Prompt 模板">
+                <div>
+                  <div class="editor-wrapper">
+                    <editor-content :editor="videoEditor" />
+                  </div>
+                  <div class="help-text">
+                    點擊下方變數標籤可插入到編輯器中（變數無法被編輯，只能整個刪除）（注意：此模板使用英文撰寫）
+                  </div>
+                  <div class="variables-container">
+                    <el-tag
+                      v-for="variable in videoVariables"
+                      :key="variable.name"
+                      size="small"
+                      type="danger"
+                      effect="plain"
+                      class="variable-tag clickable"
+                      @click="insertVariable('video', variable.name)"
+                    >
+                      {{ variable.name }}
+                    </el-tag>
+                  </div>
                 </div>
-                <div class="help-text">
-                  點擊下方變數標籤可插入到編輯器中（變數無法被編輯，只能整個刪除）（注意：此模板使用英文撰寫）
-                </div>
-                <div class="variables-container">
-                  <el-tag
-                    v-for="variable in videoVariables"
-                    :key="variable.name"
-                    size="small"
-                    type="danger"
-                    effect="plain"
-                    class="variable-tag clickable"
-                    @click="insertVariable('video', variable.name)"
-                  >
-                    {{ variable.name }}
-                  </el-tag>
-                </div>
-              </div>
-            </el-form-item>
+              </el-form-item>
+            </template>
           </el-form>
         </el-card>
       </el-tab-pane>
@@ -816,6 +950,7 @@ const loading = ref(false);
 const saving = ref(false);
 const saved = ref(false);
 const activeTab = ref("chat");
+const newScenario = ref(""); // 用於添加新場景
 
 const settings = reactive({
   chat: {
@@ -837,14 +972,17 @@ const settings = reactive({
     aspectRatio: "2:3",
     compressionQuality: 40,
     imagePromptTemplate: "",
+    selfieScenarios: [], // 自拍場景列表
+    scenarioSelectionChance: 0.7, // 場景選擇機率（70%）
     description: "角色自拍照片生成 AI",
   },
   videoGeneration: {
-    model: "veo-3.0-fast-generate-001",
-    durationSeconds: 8,
-    resolution: "720p",
+    provider: "hailuo", // 預設使用 Hailuo 02
+    model: "minimax/hailuo-02",
+    durationSeconds: 10,
+    resolution: "512p",
     sampleCount: 1,
-    aspectRatio: "9:16",
+    aspectRatio: "16:9",
     compressionQuality: "optimized",
     enhancePrompt: true,
     personGeneration: "allow_adult",
@@ -1421,6 +1559,52 @@ const resetSettings = async () => {
   }
 };
 
+// 添加新場景
+const addScenario = () => {
+  if (newScenario.value.trim()) {
+    if (!settings.imageGeneration.selfieScenarios) {
+      settings.imageGeneration.selfieScenarios = [];
+    }
+    settings.imageGeneration.selfieScenarios.push(newScenario.value.trim());
+    newScenario.value = "";
+    ElMessage.success("場景已新增");
+  } else {
+    ElMessage.warning("請輸入場景描述");
+  }
+};
+
+// 移除場景
+const removeScenario = (index) => {
+  settings.imageGeneration.selfieScenarios.splice(index, 1);
+  ElMessage.success("場景已移除");
+};
+
+// 切換影片提供者時更新相關設定
+const onProviderChange = (provider) => {
+  if (provider === "hailuo") {
+    settings.videoGeneration.model = "minimax/hailuo-02";
+    settings.videoGeneration.durationSeconds = 10;
+    settings.videoGeneration.resolution = "512p";
+    settings.videoGeneration.aspectRatio = "16:9";
+    ElMessage.success("已切換至 Hailuo 02 (Minimax)");
+  } else if (provider === "veo") {
+    settings.videoGeneration.model = "veo-3.0-fast-generate-001";
+    settings.videoGeneration.durationSeconds = 8;
+    settings.videoGeneration.resolution = "720p";
+    settings.videoGeneration.aspectRatio = "9:16";
+    settings.videoGeneration.sampleCount = 1;
+    settings.videoGeneration.compressionQuality = "optimized";
+    settings.videoGeneration.personGeneration = "allow_adult";
+    ElMessage.success("已切換至 Veo 3.0 Fast (Google)");
+  } else if (provider === "replicate") {
+    settings.videoGeneration.model = "stability-ai/stable-video-diffusion";
+    settings.videoGeneration.durationSeconds = 4;
+    settings.videoGeneration.resolution = "576x1024";
+    settings.videoGeneration.aspectRatio = "9:16";
+    ElMessage.success("已切換至 Stable Video Diffusion (Replicate)");
+  }
+};
+
 onMounted(() => {
   loadSettings();
 });
@@ -1519,6 +1703,18 @@ h2 {
 .variable-tag.clickable:hover {
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 場景容器樣式 */
+.scenarios-container {
+  padding: 10px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  min-height: 100px;
+  background-color: #f5f7fa;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
 }
 
 /* TipTap 編輯器樣式 */

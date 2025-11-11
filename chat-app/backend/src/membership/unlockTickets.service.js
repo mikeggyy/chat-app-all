@@ -22,7 +22,7 @@ export const TICKET_TYPES = {
 const initUserTickets = (user) => {
   if (!user.unlockTickets) {
     user.unlockTickets = {
-      characterUnlockTickets: 0,
+      characterUnlockCards: 0,
       photoUnlockCards: 0,
       videoUnlockCards: 0,
       usageHistory: [],
@@ -57,11 +57,17 @@ export const getTicketBalance = async (userId) => {
     return 0;
   };
 
+  // ⚠️ 向後兼容：同時支持 characterUnlockCards（新）和 characterUnlockTickets（舊）
+  // 優先使用 Cards，如果找不到則嘗試 Tickets
+  const characterCards = getCardCount("characterUnlockCards") || getCardCount("characterUnlockTickets");
+
   return {
     userId,
-    characterUnlockTickets: getCardCount("characterUnlockTickets"),
+    characterUnlockCards: characterCards,
     photoUnlockCards: getCardCount("photoUnlockCards"),
     videoUnlockCards: getCardCount("videoUnlockCards"),
+    voiceUnlockCards: getCardCount("voiceUnlockCards"),
+    createCards: getCardCount("createCards"),
   };
 };
 
@@ -76,9 +82,13 @@ export const grantTickets = async (userId, ticketAmounts) => {
 
   const tickets = initUserTickets(user);
 
-  // 增加票數
+  // 增加票數（統一使用 Cards 命名）
+  if (ticketAmounts.characterUnlockCards) {
+    tickets.characterUnlockCards = (tickets.characterUnlockCards || 0) + ticketAmounts.characterUnlockCards;
+  }
+  // ⚠️ 向後兼容：如果傳入的是舊的 Tickets 命名，也能處理
   if (ticketAmounts.characterUnlockTickets) {
-    tickets.characterUnlockTickets = (tickets.characterUnlockTickets || 0) + ticketAmounts.characterUnlockTickets;
+    tickets.characterUnlockCards = (tickets.characterUnlockCards || 0) + ticketAmounts.characterUnlockTickets;
   }
   if (ticketAmounts.photoUnlockCards) {
     tickets.photoUnlockCards = (tickets.photoUnlockCards || 0) + ticketAmounts.photoUnlockCards;
@@ -129,7 +139,7 @@ export const grantTickets = async (userId, ticketAmounts) => {
     success: true,
     granted: ticketAmounts,
     newBalance: {
-      characterUnlockTickets: tickets.characterUnlockTickets,
+      characterUnlockCards: tickets.characterUnlockCards,
       photoUnlockCards: tickets.photoUnlockCards,
       videoUnlockCards: tickets.videoUnlockCards,
     },
@@ -145,37 +155,73 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
     throw new Error("找不到用戶");
   }
 
-  const tickets = initUserTickets(user);
+  // ⚠️ 向後兼容：檢查多個位置的角色解鎖卡餘額（支持 Cards 和 Tickets 兩種命名）
+  let currentCards = 0;
+  let storageLocation = null;
+  let storageKey = null;
 
-  // 檢查餘額
-  if ((tickets.characterUnlockTickets || 0) < 1) {
-    throw new Error("角色解鎖票不足");
+  // 優先順序：unlockTickets.characterUnlockCards > unlockTickets.characterUnlockTickets >
+  //          assets.characterUnlockCards > assets.characterUnlockTickets >
+  //          頂層 characterUnlockCards > 頂層 characterUnlockTickets
+  if (user?.unlockTickets?.characterUnlockCards !== undefined && user.unlockTickets.characterUnlockCards > 0) {
+    currentCards = user.unlockTickets.characterUnlockCards;
+    storageLocation = "unlockTickets";
+    storageKey = "characterUnlockCards";
+  } else if (user?.unlockTickets?.characterUnlockTickets !== undefined && user.unlockTickets.characterUnlockTickets > 0) {
+    currentCards = user.unlockTickets.characterUnlockTickets;
+    storageLocation = "unlockTickets";
+    storageKey = "characterUnlockTickets";
+  } else if (user?.assets?.characterUnlockCards !== undefined && user.assets.characterUnlockCards > 0) {
+    currentCards = user.assets.characterUnlockCards;
+    storageLocation = "assets";
+    storageKey = "characterUnlockCards";
+  } else if (user?.assets?.characterUnlockTickets !== undefined && user.assets.characterUnlockTickets > 0) {
+    currentCards = user.assets.characterUnlockTickets;
+    storageLocation = "assets";
+    storageKey = "characterUnlockTickets";
+  } else if (user?.characterUnlockCards !== undefined && user.characterUnlockCards > 0) {
+    currentCards = user.characterUnlockCards;
+    storageLocation = "root";
+    storageKey = "characterUnlockCards";
+  } else if (user?.characterUnlockTickets !== undefined && user.characterUnlockTickets > 0) {
+    currentCards = user.characterUnlockTickets;
+    storageLocation = "root";
+    storageKey = "characterUnlockTickets";
   }
 
-  // 扣除票數
-  tickets.characterUnlockTickets -= 1;
+  // 檢查餘額
+  if (currentCards < 1) {
+    throw new Error("角色解鎖票不足");
+  }
 
   // 計算解鎖到期時間（7 天後）
   const now = new Date();
   const unlockDays = 7;
   const unlockUntil = new Date(now.getTime() + unlockDays * 24 * 60 * 60 * 1000);
 
-  // 記錄使用歷史
-  tickets.usageHistory.push({
-    type: "use",
-    ticketType: TICKET_TYPES.CHARACTER,
-    characterId,
-    timestamp: now.toISOString(),
-    unlockDays,
-    unlockUntil: unlockUntil.toISOString(),
-  });
+  // 根據儲存位置扣除卡片
+  const updateData = { ...user, updatedAt: new Date().toISOString() };
+
+  if (storageLocation === "unlockTickets") {
+    const tickets = initUserTickets(user);
+    tickets[storageKey] = currentCards - 1;
+    tickets.usageHistory.push({
+      type: "use",
+      ticketType: TICKET_TYPES.CHARACTER,
+      characterId,
+      timestamp: now.toISOString(),
+      unlockDays,
+      unlockUntil: unlockUntil.toISOString(),
+    });
+    updateData.unlockTickets = tickets;
+  } else if (storageLocation === "assets") {
+    updateData.assets = { ...user.assets, [storageKey]: currentCards - 1 };
+  } else if (storageLocation === "root") {
+    updateData[storageKey] = currentCards - 1;
+  }
 
   // 更新用戶資料
-  await upsertUser({
-    ...user,
-    unlockTickets: tickets,
-    updatedAt: new Date().toISOString(),
-  });
+  await upsertUser(updateData);
 
   // 使用對話限制服務的 unlockPermanently 函數設置限時解鎖
   const { conversationLimitService } = await import("../conversation/conversationLimit.service.js");
@@ -184,7 +230,7 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
   return {
     success: true,
     characterId,
-    remaining: tickets.characterUnlockTickets,
+    remainingTickets: currentCards - 1,
     unlockDays,
     unlockUntil: unlockUntil.toISOString(),
     unlockUntilReadable: unlockUntil.toLocaleString('zh-TW'),
@@ -429,7 +475,7 @@ export const hasEnoughTickets = async (userId, ticketType, amount = 1) => {
 
   switch (ticketType) {
     case TICKET_TYPES.CHARACTER:
-      return balance.characterUnlockTickets >= amount;
+      return balance.characterUnlockCards >= amount;
     case TICKET_TYPES.PHOTO:
       return balance.photoUnlockCards >= amount;
     case TICKET_TYPES.VIDEO:
@@ -470,13 +516,62 @@ export const getUsageHistory = async (userId, options = {}) => {
   };
 };
 
-export default {
-  TICKET_TYPES,
-  getTicketBalance,
-  grantTickets,
-  useCharacterUnlockTicket,
-  usePhotoUnlockCard,
-  useVideoUnlockCard,
-  hasEnoughTickets,
-  getUsageHistory,
+/**
+ * 獲取用戶的活躍解鎖記錄
+ * 類似藥水效果，返回所有未過期的角色解鎖
+ */
+export const getActiveUnlocks = async (userId) => {
+  // 動態導入以避免循環依賴問題
+  const { getFirestoreDb } = await import("../firebase/index.js");
+  const loggerModule = await import("../utils/logger.js");
+  const logger = loggerModule.default;
+
+  const db = getFirestoreDb();
+  const now = new Date();
+
+  try {
+    // 從 usage_limits 獲取用戶的限制數據
+    const limitDoc = await db.collection('usage_limits').doc(userId).get();
+
+    if (!limitDoc.exists) {
+      return [];
+    }
+
+    const limitData = limitDoc.data();
+    const activeUnlocks = [];
+
+    // 檢查 conversation 字段中的角色解鎖記錄
+    if (limitData.conversation && typeof limitData.conversation === 'object') {
+      for (const [characterId, charData] of Object.entries(limitData.conversation)) {
+        // 跳過非對象類型的數據
+        if (typeof charData !== 'object' || !charData) continue;
+
+        // 檢查是否有限時解鎖記錄
+        if (charData.temporaryUnlockUntil) {
+          const unlockUntil = new Date(charData.temporaryUnlockUntil);
+
+          // 只返回未過期的解鎖記錄
+          if (unlockUntil > now) {
+            // 計算剩餘天數
+            const remainingMs = unlockUntil.getTime() - now.getTime();
+            const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+
+            activeUnlocks.push({
+              characterId,
+              unlockType: 'character',
+              unlockUntil: charData.temporaryUnlockUntil,
+              unlockUntilReadable: unlockUntil.toLocaleString('zh-TW'),
+              remainingDays,
+              activatedAt: charData.history?.[charData.history.length - 1]?.timestamp || charData.temporaryUnlockUntil,
+            });
+          }
+        }
+      }
+    }
+
+    return activeUnlocks;
+  } catch (error) {
+    logger.error('[getActiveUnlocks] 獲取活躍解鎖記錄失敗:', error);
+    return [];
+  }
 };

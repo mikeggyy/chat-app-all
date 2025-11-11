@@ -4,6 +4,7 @@
 
 import express from "express";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
+import { handleIdempotentRequest } from "../utils/idempotency.js";
 import {
   getCoinsBalance,
   purchaseAiPhoto,
@@ -46,13 +47,14 @@ router.get("/api/coins/balance", requireFirebaseAuth, async (req, res) => {
 /**
  * 購買 AI 拍照功能
  * POST /api/coins/purchase/ai-photo
- * Body: { characterId }
+ * Body: { characterId, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
+ * 🔒 冪等性保護：防止重複扣費
  */
 router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
-    const { characterId } = req.body;
+    const { characterId, idempotencyKey } = req.body;
 
     if (!characterId) {
       return res.status(400).json({
@@ -61,6 +63,23 @@ router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res
       });
     }
 
+    // 冪等性保護
+    if (idempotencyKey) {
+      const requestId = `ai-photo:${userId}:${characterId}:${idempotencyKey}`;
+      const result = await handleIdempotentRequest(
+        requestId,
+        async () => await purchaseAiPhoto(userId, characterId),
+        { ttl: 15 * 60 * 1000 } // 15 分鐘
+      );
+
+      return res.json({
+        success: true,
+        message: "購買成功，正在生成照片",
+        ...result,
+      });
+    }
+
+    // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseAiPhoto(userId, characterId);
 
     res.json({
@@ -79,13 +98,14 @@ router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res
 /**
  * 購買 AI 影片功能
  * POST /api/coins/purchase/ai-video
- * Body: { characterId }
+ * Body: { characterId, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
+ * 🔒 冪等性保護：防止重複扣費
  */
 router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
-    const { characterId } = req.body;
+    const { characterId, idempotencyKey } = req.body;
 
     if (!characterId) {
       return res.status(400).json({
@@ -94,6 +114,23 @@ router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res
       });
     }
 
+    // 冪等性保護
+    if (idempotencyKey) {
+      const requestId = `ai-video:${userId}:${characterId}:${idempotencyKey}`;
+      const result = await handleIdempotentRequest(
+        requestId,
+        async () => await purchaseAiVideo(userId, characterId),
+        { ttl: 30 * 60 * 1000 } // 30 分鐘（影片生成時間較長）
+      );
+
+      return res.json({
+        success: true,
+        message: "購買成功，正在生成影片",
+        ...result,
+      });
+    }
+
+    // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseAiVideo(userId, characterId);
 
     res.json({
@@ -112,13 +149,14 @@ router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res
 /**
  * 購買角色無限對話解鎖（使用角色解鎖票或金幣）
  * POST /api/coins/purchase/unlimited-chat
- * Body: { characterId, useTicket }
+ * Body: { characterId, useTicket, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
+ * 🔒 冪等性保護：防止重複扣費
  */
 router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
-    const { characterId } = req.body;
+    const { characterId, idempotencyKey } = req.body;
 
     if (!characterId) {
       return res.status(400).json({
@@ -127,6 +165,23 @@ router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (re
       });
     }
 
+    // 冪等性保護
+    if (idempotencyKey) {
+      const requestId = `unlock-chat:${userId}:${characterId}:${idempotencyKey}`;
+      const result = await handleIdempotentRequest(
+        requestId,
+        async () => await purchaseUnlimitedChat(userId, characterId),
+        { ttl: 15 * 60 * 1000 } // 15 分鐘
+      );
+
+      return res.json({
+        success: true,
+        message: "購買成功，已解鎖無限對話",
+        ...result,
+      });
+    }
+
+    // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseUnlimitedChat(userId, characterId);
 
     res.json({
@@ -198,7 +253,7 @@ router.get("/api/coins/transactions", requireFirebaseAuth, async (req, res) => {
     const userId = req.firebaseUser.uid;
     const { limit, offset } = req.query;
 
-    const history = getTransactionHistory(userId, {
+    const history = await getTransactionHistory(userId, {
       limit: limit ? parseInt(limit) : undefined,
       offset: offset ? parseInt(offset) : undefined,
     });
@@ -235,13 +290,14 @@ router.get("/api/coins/packages", async (req, res) => {
 /**
  * 購買金幣套餐（實際應整合支付系統）
  * POST /api/coins/purchase/package
- * Body: { packageId, paymentInfo }
+ * Body: { packageId, paymentInfo, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人購買金幣
+ * 🔒 冪等性保護：防止重複扣款和發放
  */
 router.post("/api/coins/purchase/package", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
-    const { packageId, paymentInfo } = req.body;
+    const { packageId, paymentInfo, idempotencyKey } = req.body;
 
     if (!packageId) {
       return res.status(400).json({
@@ -250,18 +306,49 @@ router.post("/api/coins/purchase/package", requireFirebaseAuth, async (req, res)
       });
     }
 
-    // TODO: 實際應用應先驗證支付成功
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        error: "請提供 idempotencyKey（冪等性鍵）以防止重複購買",
+      });
+    }
 
-    const result = await purchaseCoinPackage(userId, packageId, paymentInfo || {
-      method: "test",
-      timestamp: new Date().toISOString(),
-    });
+    // 檢查是否啟用開發模式繞過
+    const isDevBypassEnabled = process.env.ENABLE_DEV_PURCHASE_BYPASS === "true";
 
-    res.json({
-      success: true,
-      message: "購買成功",
-      ...result,
-    });
+    if (isDevBypassEnabled) {
+      // 開發模式：直接執行購買，不需要實際支付驗證
+      console.log(`[開發模式] 購買金幣套餐：userId=${userId}, packageId=${packageId}`);
+
+      // 冪等性保護
+      const requestId = `coin-package:${userId}:${packageId}:${idempotencyKey}`;
+      const result = await handleIdempotentRequest(
+        requestId,
+        async () => await purchaseCoinPackage(userId, packageId, paymentInfo || {
+          method: "dev_bypass",
+          timestamp: new Date().toISOString(),
+        }),
+        { ttl: 15 * 60 * 1000 } // 15 分鐘
+      );
+
+      res.json({
+        success: true,
+        message: "購買成功（開發模式）",
+        devMode: true,
+        ...result,
+      });
+    } else {
+      // 正式環境：應整合支付系統
+      // TODO: 實際應用應先驗證支付成功
+      // 1. 創建支付訂單
+      // 2. 等待支付完成
+      // 3. 驗證支付成功後才執行購買
+
+      return res.status(501).json({
+        success: false,
+        error: "支付系統尚未整合，請聯繫管理員",
+      });
+    }
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -273,13 +360,14 @@ router.post("/api/coins/purchase/package", requireFirebaseAuth, async (req, res)
 /**
  * 充值金幣（測試用，實際應整合支付系統）
  * POST /api/coins/recharge
- * Body: { amount }
+ * Body: { amount, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人充值金幣
+ * 🔒 冪等性保護：防止重複充值
  */
 router.post("/api/coins/recharge", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
-    const { amount } = req.body;
+    const { amount, idempotencyKey } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({
@@ -290,6 +378,26 @@ router.post("/api/coins/recharge", requireFirebaseAuth, async (req, res) => {
 
     // TODO: 實際應用應先驗證支付成功
 
+    // 冪等性保護
+    if (idempotencyKey) {
+      const requestId = `recharge:${userId}:${amount}:${idempotencyKey}`;
+      const result = await handleIdempotentRequest(
+        requestId,
+        async () => await rechargeCoins(userId, amount, {
+          method: "test",
+          timestamp: new Date().toISOString(),
+        }),
+        { ttl: 15 * 60 * 1000 } // 15 分鐘
+      );
+
+      return res.json({
+        success: true,
+        message: `成功充值 ${amount} 金幣`,
+        ...result,
+      });
+    }
+
+    // 向後兼容：沒有 idempotencyKey 的請求
     const result = await rechargeCoins(userId, amount, {
       method: "test",
       timestamp: new Date().toISOString(),

@@ -5,15 +5,17 @@
 
 import { db, FieldValue } from "../../firebase/index.js";
 import { deleteImages } from "../../storage/r2Storage.service.js";
+import logger from "../../utils/logger.js";
 
 /**
  * 刪除角色及其相關數據
  * 包括：
  * 1. 角色的肖像圖片 (portraitUrl)
  * 2. 所有用戶與該角色的對話照片
- * 3. 所有用戶與該角色的對話記錄
- * 4. 角色在 usage_limits 中的數據
- * 5. 角色文檔本身
+ * 3. 所有用戶與該角色的生成影片
+ * 4. 所有用戶與該角色的對話記錄
+ * 5. 角色在 usage_limits 中的數據
+ * 6. 角色文檔本身
  *
  * @param {string} characterId - 角色 ID
  * @returns {Promise<Object>} 刪除結果統計
@@ -28,6 +30,8 @@ export const deleteCharacter = async (characterId) => {
     portraitImageDeleted: false,
     photosDeleted: 0,
     photoImagesDeleted: 0,
+    videosDeleted: 0,
+    videoFilesDeleted: 0,
     conversationsDeleted: 0,
     usageLimitsUpdated: 0,
   };
@@ -118,7 +122,68 @@ export const deleteCharacter = async (characterId) => {
       // 繼續執行
     }
 
-    // 4. 刪除與該角色相關的對話記錄
+    // 4. 刪除與該角色相關的影片
+    // 查詢 generatedVideos 集合中所有該角色的影片
+    try {
+      const videosSnapshot = await db
+        .collection("generatedVideos")
+        .where("characterId", "==", characterId)
+        .get();
+
+      if (!videosSnapshot.empty) {
+        console.log(`[管理後台] 找到 ${videosSnapshot.size} 個與角色 ${characterId} 相關的影片`);
+
+        // 收集所有影片的 URL
+        const videoUrls = [];
+        videosSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data?.videoUrl) {
+            videoUrls.push(data.videoUrl);
+          }
+        });
+
+        // 先刪除 R2 上的影片文件
+        if (videoUrls.length > 0) {
+          try {
+            const r2DeleteResult = await deleteImages(videoUrls);
+            deletionStats.videoFilesDeleted = r2DeleteResult.success;
+            console.log(`[管理後台] R2 影片刪除: 成功 ${r2DeleteResult.success}，失敗 ${r2DeleteResult.failed}`);
+          } catch (error) {
+            console.error(`[管理後台] 刪除角色相關 R2 影片失敗:`, error);
+            // 繼續執行
+          }
+        }
+
+        // 再刪除 Firestore 記錄（批量刪除）
+        let batch = db.batch();
+        let batchCount = 0;
+
+        for (const doc of videosSnapshot.docs) {
+          batch.delete(doc.ref);
+          batchCount++;
+          deletionStats.videosDeleted++;
+
+          // Firestore batch 限制為 500 個操作
+          if (batchCount === 500) {
+            await batch.commit();
+            batch = db.batch();
+            batchCount = 0;
+          }
+        }
+
+        // 提交剩餘的批次
+        if (batchCount > 0) {
+          await batch.commit();
+        }
+
+        console.log(`[管理後台] 已刪除 ${deletionStats.videosDeleted} 個影片記錄`);
+      }
+    } catch (error) {
+      console.error(`[管理後台] 刪除角色相關影片失敗:`, error);
+      // 繼續執行
+    }
+
+    // 5. 刪除與該角色相關的對話記錄
     // conversations 文檔 ID 格式：userId::characterId
     // 需要掃描所有對話，找出文檔 ID 以 ::characterId 結尾的
     try {
@@ -155,7 +220,7 @@ export const deleteCharacter = async (characterId) => {
       // 繼續執行
     }
 
-    // 5. 刪除用戶子集合中的對話元數據（users/{userId}/conversations）
+    // 6. 刪除用戶子集合中的對話元數據（users/{userId}/conversations）
     // 使用 collectionGroup 查詢所有用戶的 conversations 子集合
     try {
       const userConversationsSnapshot = await db
@@ -191,7 +256,7 @@ export const deleteCharacter = async (characterId) => {
       // 繼續執行（可能這個集合不存在或沒有 characterId 字段）
     }
 
-    // 6. 從所有用戶的 usage_limits 中刪除與該角色相關的數據
+    // 7. 從所有用戶的 usage_limits 中刪除與該角色相關的數據
     // 需要掃描所有 usage_limits 文檔，移除 conversation[characterId] 和 voice[characterId]
     try {
       const usageLimitsSnapshot = await db.collection("usage_limits").get();
@@ -251,7 +316,7 @@ export const deleteCharacter = async (characterId) => {
       // 繼續執行
     }
 
-    // 7. 最後刪除角色文檔本身
+    // 8. 最後刪除角色文檔本身
     await db.collection("characters").doc(characterId).delete();
     deletionStats.characterDeleted = true;
     console.log(`[管理後台] 已刪除角色文檔: ${characterId}`);

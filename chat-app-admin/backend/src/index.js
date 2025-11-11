@@ -10,8 +10,36 @@ import { initializeCharactersCache } from "../../../chat-app/backend/src/service
 const app = express();
 const PORT = process.env.PORT || 4001;
 
-// 中間件
-app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+// 中間件 - CORS 配置
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ['http://localhost:5174'];
+
+// 生產環境必須設置 CORS_ORIGIN
+if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
+  console.error('❌ 生產環境必須設置 CORS_ORIGIN 環境變數');
+  process.exit(1);
+}
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // 允許沒有 origin 的請求（例如：Postman、curl）
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // 檢查是否在允許列表中
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS 錯誤：來源 ${origin} 不在允許列表中`));
+    }
+  },
+  credentials: true, // 允許攜帶憑證（Cookies）
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 

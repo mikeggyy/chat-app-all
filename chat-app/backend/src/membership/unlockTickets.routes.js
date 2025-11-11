@@ -12,6 +12,7 @@ import {
   useVideoUnlockCard,
   hasEnoughTickets,
   getUsageHistory,
+  getActiveUnlocks,
   TICKET_TYPES,
 } from "./unlockTickets.service.js";
 
@@ -36,6 +37,30 @@ router.get("/api/unlock-tickets/balance", requireFirebaseAuth, async (req, res) 
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+});
+
+/**
+ * 獲取用戶的活躍解鎖記錄（類似藥水效果）
+ * GET /api/unlock-tickets/active
+ * 🔒 安全增強：從認證 token 獲取 userId
+ */
+router.get("/api/unlock-tickets/active", requireFirebaseAuth, async (req, res) => {
+  try {
+    const userId = req.firebaseUser.uid;
+    const activeUnlocks = await getActiveUnlocks(userId);
+
+    res.json({
+      success: true,
+      unlocks: activeUnlocks,
+    });
+  } catch (error) {
+    logger.error("獲取活躍解鎖記錄失敗:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      unlocks: [],
     });
   }
 });
@@ -80,7 +105,7 @@ router.post("/api/unlock-tickets/use/character", requireFirebaseAuth, async (req
  * Body: { characterId }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人照片卡
  */
-router.post("/api/unlock-tickets/use/photo", requireFirebaseAuth, (req, res) => {
+router.post("/api/unlock-tickets/use/photo", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.body;
@@ -92,7 +117,7 @@ router.post("/api/unlock-tickets/use/photo", requireFirebaseAuth, (req, res) => 
       });
     }
 
-    const result = usePhotoUnlockCard(userId, characterId);
+    const result = await usePhotoUnlockCard(userId, characterId);
 
     res.json({
       success: true,
@@ -114,7 +139,7 @@ router.post("/api/unlock-tickets/use/photo", requireFirebaseAuth, (req, res) => 
  * Body: { characterId }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人影片卡
  */
-router.post("/api/unlock-tickets/use/video", requireFirebaseAuth, (req, res) => {
+router.post("/api/unlock-tickets/use/video", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.body;
@@ -126,7 +151,7 @@ router.post("/api/unlock-tickets/use/video", requireFirebaseAuth, (req, res) => 
       });
     }
 
-    const result = useVideoUnlockCard(userId, characterId);
+    const result = await useVideoUnlockCard(userId, characterId);
 
     res.json({
       success: true,
@@ -148,13 +173,13 @@ router.post("/api/unlock-tickets/use/video", requireFirebaseAuth, (req, res) => 
  * Query: ?amount=1
  * 🔒 安全增強：從認證 token 獲取 userId，防止查詢他人餘額
  */
-router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, (req, res) => {
+router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { ticketType } = req.params;
     const amount = parseInt(req.query.amount) || 1;
 
-    const hasEnough = hasEnoughTickets(userId, ticketType, amount);
+    const hasEnough = await hasEnoughTickets(userId, ticketType, amount);
 
     res.json({
       success: true,
@@ -178,13 +203,13 @@ router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, (req, r
  * Query: ?limit=50&offset=0
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人歷史
  */
-router.get("/api/unlock-tickets/history", requireFirebaseAuth, (req, res) => {
+router.get("/api/unlock-tickets/history", requireFirebaseAuth, async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
 
-    const history = getUsageHistory(userId, { limit, offset });
+    const history = await getUsageHistory(userId, { limit, offset });
 
     res.json({
       success: true,

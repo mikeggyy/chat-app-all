@@ -1,5 +1,6 @@
 import express from "express";
 import { db } from "../firebase/index.js";
+import { requireMinRole, requireRole } from "../middleware/admin.middleware.js";
 
 const router = express.Router();
 
@@ -53,7 +54,55 @@ const DEFAULT_AI_SETTINGS = {
     model: "gemini-2.5-flash-image",
     aspectRatio: "2:3",
     compressionQuality: 40,
-    imagePromptTemplate: `A natural portrait photo. Character context: {角色背景設定}. Current situation: {最近對話內容}. Capture a natural moment in the current scene. The character can be doing any activity or in any pose that fits the context - sitting, standing, walking, relaxing, or engaging in daily activities. Natural expression, warm lighting, candid photography style. The setting can be anywhere fitting - indoors, outdoors, café, street, park, bedroom, or any comfortable space. No need to hold a phone or camera - just a natural portrait.`,
+    imagePromptTemplate: `A natural portrait photo. Character context: {角色背景設定}. Current situation: {最近對話內容}. Scene: The character is {場景描述}. Natural expression, warm lighting, candid photography style. Natural pose and activity. High quality portrait photo. IMPORTANT: No text, no words, no letters, no signs with writing in the image. Pure visual photo only.`,
+    selfieScenarios: [
+      // 休閒活動
+      "browsing at a bookstore, looking at books",
+      "shopping at a trendy boutique, holding shopping bags",
+      "at a street food market, enjoying local snacks",
+      "visiting an art gallery, admiring artwork",
+      "at a movie theater entrance, excited for a film",
+
+      // 戶外場景
+      "walking in a botanical garden, surrounded by flowers",
+      "at a city park, sitting on a bench under trees",
+      "at the beach, enjoying the ocean view",
+      "hiking on a scenic mountain trail",
+      "visiting a zoo, watching animals",
+      "at an amusement park, having fun",
+      "strolling through a night market",
+
+      // 美食相關
+      "at a dessert café, enjoying sweet treats",
+      "at a ramen restaurant, about to eat",
+      "at a sushi bar, trying fresh sushi",
+      "having brunch at a cozy restaurant",
+      "at a bakery, choosing pastries",
+      "at an ice cream shop, holding a cone",
+
+      // 室內活動
+      "at a cozy library, reading peacefully",
+      "at a pottery studio, creating ceramics",
+      "at a yoga studio, relaxing after class",
+      "at a music store, browsing vinyl records",
+      "at home, cooking in the kitchen",
+      "working at a modern co-working space",
+
+      // 娛樂場所
+      "at a karaoke lounge, having fun with friends",
+      "at a game arcade, playing games",
+      "at a bowling alley, enjoying the atmosphere",
+      "at a photography exhibition",
+      "at a rooftop bar, enjoying city views",
+
+      // 日常生活
+      "at a farmers market, buying fresh produce",
+      "at a flower shop, surrounded by beautiful flowers",
+      "at a pet café, playing with cute animals",
+      "waiting at a train station, casual moment",
+      "at a convenience store, shopping casually"
+    ],
+    scenarioSelectionChance: 0.7, // 70% 機率使用隨機場景
     description: "角色自拍照片生成 AI",
   },
 
@@ -197,8 +246,9 @@ Example format (about 50 characters):
 /**
  * GET /api/ai-settings
  * 獲取 AI 設定
+ * 🔒 權限：admin 以上
  */
-router.get("/", async (req, res) => {
+router.get("/", requireMinRole("admin"), async (req, res) => {
   try {
     const doc = await db
       .collection(AI_SETTINGS_COLLECTION)
@@ -234,8 +284,9 @@ router.get("/", async (req, res) => {
 /**
  * PUT /api/ai-settings
  * 更新 AI 設定
+ * 🔒 權限：僅限 super_admin（AI 設定影響所有用戶，極度敏感）
  */
-router.put("/", async (req, res) => {
+router.put("/", requireRole("super_admin"), async (req, res) => {
   try {
     const settings = req.body;
 
@@ -274,8 +325,9 @@ router.put("/", async (req, res) => {
 /**
  * POST /api/ai-settings/reset
  * 重置 AI 設定為預設值
+ * 🔒 權限：僅限 super_admin（重置所有 AI 設定，極度危險）
  */
-router.post("/reset", async (req, res) => {
+router.post("/reset", requireRole("super_admin"), async (req, res) => {
   try {
     const settings = {
       ...DEFAULT_AI_SETTINGS,
@@ -306,8 +358,9 @@ router.post("/reset", async (req, res) => {
 /**
  * POST /api/ai-settings/test
  * 測試 AI 設定（驗證參數是否有效）
+ * 🔒 權限：admin 以上
  */
-router.post("/test", async (req, res) => {
+router.post("/test", requireMinRole("admin"), async (req, res) => {
   try {
     const { settingType } = req.body;
 

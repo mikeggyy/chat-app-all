@@ -362,7 +362,9 @@ aiRouter.post(
   async (req, res) => {
     // 🔒 安全增強：從認證 token 獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;
-    const { characterId, requestId, duration, resolution, aspectRatio, useVideoCard } = req.body;
+    const { characterId, requestId, duration, resolution, aspectRatio, useVideoCard, imageUrl } = req.body;
+
+    logger.info(`[Video API] 收到請求，imageUrl: ${imageUrl}`);
 
     try {
       // 檢查影片生成權限
@@ -392,11 +394,12 @@ aiRouter.post(
       const result = await withIdempotency(
         requestId,
         async () => {
-          // 生成影片
+          // 生成影片（支持自定義圖片 URL）
           const videoResult = await generateVideoForCharacter(userId, characterId, {
             duration: duration || "4s",
             resolution: resolution || "720p",
             aspectRatio: aspectRatio || "9:16",
+            imageUrl: imageUrl || null, // 🎨 自定義圖片 URL（從相簿選擇）
           });
 
           // ✅ 影片生成成功後才扣除影片卡或記錄使用次數

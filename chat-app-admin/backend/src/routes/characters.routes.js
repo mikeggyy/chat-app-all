@@ -62,9 +62,9 @@ router.post("/", requireMinRole("admin"), async (req, res) => {
 /**
  * POST /api/characters/sync-chat-users
  * 同步所有角色的聊天用戶數量到 Firestore
- * 🔒 權限：admin 以上
+ * 🔒 權限：僅限 super_admin（批量修改所有角色數據，影響面廣）
  */
-router.post("/sync-chat-users", requireMinRole("admin"), async (req, res) => {
+router.post("/sync-chat-users", requireRole("super_admin"), async (req, res) => {
   try {
     // 使用 collection group query 獲取所有用戶的 conversations 子集合
     const conversationsSnapshot = await db.collectionGroup("conversations").get();
@@ -127,9 +127,9 @@ router.post("/sync-chat-users", requireMinRole("admin"), async (req, res) => {
 /**
  * PATCH /api/characters/:characterId
  * 更新角色資訊
- * 🔒 權限：admin 以上
+ * 🔒 權限：僅限 super_admin（修改角色會影響所有與該角色互動的用戶）
  */
-router.patch("/:characterId", requireMinRole("admin"), async (req, res) => {
+router.patch("/:characterId", requireRole("super_admin"), async (req, res) => {
   try {
     const { characterId } = req.params;
     const updates = req.body;
@@ -212,6 +212,8 @@ router.delete("/:characterId", requireRole("super_admin"), async (req, res) => {
         portraitImageDeleted: deletionStats.portraitImageDeleted,
         photosDeleted: deletionStats.photosDeleted,
         photoImagesDeleted: deletionStats.photoImagesDeleted,
+        videosDeleted: deletionStats.videosDeleted,
+        videoFilesDeleted: deletionStats.videoFilesDeleted,
         conversationsDeleted: deletionStats.conversationsDeleted,
         usageLimitsUpdated: deletionStats.usageLimitsUpdated,
       },

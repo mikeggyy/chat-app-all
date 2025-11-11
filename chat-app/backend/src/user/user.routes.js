@@ -9,6 +9,7 @@ import {
   removeFavoriteForUser,
   addConversationForUser,
   removeConversationForUser,
+  normalizeUser,
 } from "./user.service.js";
 import {
   getUserAssets,
@@ -87,6 +88,7 @@ userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), asyncHandler
       displayName: "測試使用者",
       conversations: [],
       favorites: [],
+      hasCompletedOnboarding: false,  // 明確設置預設值
     };
     await upsertUser(newUser);
     user = await getUserById(req.params.id);
@@ -97,7 +99,14 @@ userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), asyncHandler
     }
   }
 
-  res.json(user);
+  // ✅ 關鍵修復：經過 normalizeUser 規範化，確保返回完整且一致的數據格式
+  // 這樣可以：
+  // 1. 補全缺失的欄位（如 hasCompletedOnboarding, age, gender 等）
+  // 2. 確保 GET 和 POST 行為一致
+  // 3. 防止前端收到不完整的數據
+  const normalized = normalizeUser(user);
+
+  res.json(normalized);
 }));
 
 userRouter.post("/", requireFirebaseAuth, asyncHandler(async (req, res) => {
@@ -152,7 +161,6 @@ userRouter.patch(
   requireOwnership("id"),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-
     const payload = req.body ?? {};
     const patch = {};
 
@@ -177,6 +185,7 @@ userRouter.patch(
     }
 
     const user = await updateUserProfileFields(id, patch);
+
     sendSuccess(res, user);
   })
 );

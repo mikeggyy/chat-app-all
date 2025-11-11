@@ -14,6 +14,7 @@
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "cleanup-ports": "node scripts/cleanup-ports.js",
+    "kill-all-node": "node ../scripts/kill-all-node.js",
     "wait-for-port": "node scripts/wait-for-port.js",
     "verify-config": "node scripts/verify-config.js",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ..",

@@ -51,21 +51,43 @@
         <p>{{ errorMessage }}</p>
       </div>
 
-      <!-- 照片網格（總是顯示，因為至少有預設照片） -->
+      <!-- 照片/影片網格（總是顯示，因為至少有預設照片） -->
       <div v-else class="photo-grid">
         <div
           v-for="photo in photos"
           :key="photo.id"
           class="photo-card"
-          :class="{ 'photo-card--selected': selectedIds.has(photo.id) }"
+          :class="{
+            'photo-card--selected': selectedIds.has(photo.id),
+            'photo-card--video': photo.mediaType === 'video',
+          }"
           @click="handlePhotoClick(photo)"
         >
+          <!-- 圖片 -->
           <img
+            v-if="photo.imageUrl"
             :src="photo.imageUrl"
             :alt="`${characterName}的照片`"
             class="photo-image"
             loading="lazy"
           />
+          <!-- 影片縮略圖（使用 video 標籤的第一幀） -->
+          <video
+            v-else-if="photo.videoUrl || photo.video?.url"
+            :src="photo.videoUrl || photo.video?.url"
+            class="photo-video"
+            preload="metadata"
+            muted
+          />
+          <!-- 影片播放圖標 -->
+          <div v-if="photo.mediaType === 'video'" class="video-play-overlay">
+            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            <span v-if="photo.video?.duration" class="video-duration">{{
+              photo.video.duration
+            }}</span>
+          </div>
           <!-- 編輯模式：選擇框（預設照片不顯示） -->
           <div v-if="isEditMode && !photo.isDefault" class="photo-checkbox">
             <div
@@ -141,12 +163,49 @@
     <!-- 圖片查看器 -->
     <Teleport to="body">
       <ImageViewerModal
-        v-if="viewingPhoto"
+        v-if="viewingPhoto && viewingPhoto.mediaType !== 'video'"
         :is-open="!!viewingPhoto"
         :image-url="viewingPhoto.imageUrl"
         :image-alt="`${characterName}的照片`"
         @close="viewingPhoto = null"
       />
+    </Teleport>
+
+    <!-- 影片查看器 -->
+    <Teleport to="body">
+      <div
+        v-if="viewingPhoto && viewingPhoto.mediaType === 'video'"
+        class="video-viewer-backdrop"
+        @click.self="viewingPhoto = null"
+      >
+        <div class="video-viewer-container">
+          <button
+            type="button"
+            class="video-viewer-close"
+            aria-label="關閉"
+            @click="viewingPhoto = null"
+          >
+            <XMarkIcon class="icon" />
+          </button>
+          <video
+            :src="viewingPhoto.videoUrl || viewingPhoto.video?.url"
+            class="video-viewer-player"
+            controls
+            autoplay
+            playsinline
+          >
+            您的瀏覽器不支持影片播放。
+          </video>
+          <div v-if="viewingPhoto.video" class="video-viewer-info">
+            <span v-if="viewingPhoto.video.duration" class="info-badge">{{
+              viewingPhoto.video.duration
+            }}</span>
+            <span v-if="viewingPhoto.video.resolution" class="info-badge">{{
+              viewingPhoto.video.resolution
+            }}</span>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -175,23 +234,45 @@ const { success, error: showError } = useToast();
 // 路由參數
 const characterId = computed(() => route.params.characterId);
 
-// 角色資訊
-const character = computed(() => {
-  return fallbackMatches.find((m) => m.id === characterId.value) || null;
-});
+// 角色資訊（從 API 獲取）
+const character = ref(null);
 
 const characterName = computed(() => {
-  return (
-    character.value?.display_name || character.value?.displayName || "未知角色"
-  );
+  if (character.value) {
+    return (
+      character.value.display_name ||
+      character.value.displayName ||
+      character.value.name ||
+      "未知角色"
+    );
+  }
+  // 嘗試從 fallbackMatches 查找（備用方案）
+  const fallbackChar = fallbackMatches.find((m) => m.id === characterId.value);
+  if (fallbackChar) {
+    return fallbackChar.display_name || fallbackChar.displayName || "未知角色";
+  }
+  return "未知角色";
 });
 
 const characterPortrait = computed(() => {
-  return (
-    character.value?.portraitUrl ||
-    character.value?.portrait ||
-    "/ai-role/match-role-01.webp"
-  );
+  if (character.value) {
+    return (
+      character.value.portraitUrl ||
+      character.value.portrait ||
+      character.value.image ||
+      "/ai-role/match-role-01.webp"
+    );
+  }
+  // 嘗試從 fallbackMatches 查找（備用方案）
+  const fallbackChar = fallbackMatches.find((m) => m.id === characterId.value);
+  if (fallbackChar) {
+    return (
+      fallbackChar.portraitUrl ||
+      fallbackChar.portrait ||
+      "/ai-role/match-role-01.webp"
+    );
+  }
+  return "/ai-role/match-role-01.webp";
 });
 
 // 照片資料
@@ -233,7 +314,13 @@ const loadPhotos = async () => {
       { skipGlobalLoading: true }
     );
 
+    // 提取照片和角色資訊
     const loadedPhotos = Array.isArray(response?.photos) ? response.photos : [];
+
+    // 設置角色資訊（如果 API 返回了）
+    if (response?.character) {
+      character.value = response.character;
+    }
 
     // 在開頭插入預設照片（角色立繪）
     const defaultPhoto = {
@@ -249,6 +336,7 @@ const loadPhotos = async () => {
   } catch (err) {
     errorMessage.value = "載入照片失敗，請稍後再試";
     if (import.meta.env.DEV) {
+      console.error("[PhotoGallery] 載入照片失敗:", err);
     }
   } finally {
     isLoading.value = false;
@@ -347,6 +435,7 @@ onMounted(() => {
 <style scoped>
 .photo-gallery-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #110319 0%, #0a0211 45%, #160325 100%);
@@ -415,7 +504,8 @@ onMounted(() => {
 .photo-gallery-content {
   padding: 1.5rem 1.25rem 2rem;
   overflow-y: auto;
-  height: 190vw;
+  flex: 1;
+  max-height: calc(100dvh - 114px);
 }
 
 .status-message {
@@ -475,6 +565,45 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.photo-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none; /* 防止點擊視頻元素時觸發播放 */
+}
+
+.video-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.play-icon {
+  width: 3rem;
+  height: 3rem;
+  color: #fff;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+}
+
+.video-duration {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
 }
 
 .photo-checkbox {
@@ -665,6 +794,81 @@ onMounted(() => {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+/* 影片查看器樣式 */
+.video-viewer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.95);
+  padding: 1rem;
+}
+
+.video-viewer-container {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.video-viewer-close {
+  position: absolute;
+  top: -3rem;
+  right: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.video-viewer-close .icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.video-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.video-viewer-player {
+  width: 100%;
+  max-height: 80vh;
+  border-radius: 16px;
+  background: #000;
+  object-fit: contain;
+}
+
+.video-viewer-info {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.info-badge {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.02em;
 }
 
 @media (min-width: 640px) {

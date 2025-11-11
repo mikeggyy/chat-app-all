@@ -1,6 +1,7 @@
 import { getUserById, upsertUser } from './user.service.js';
 import { getPotionInventory } from '../payment/potion.service.js';
 import { logAssetChange } from './assetAuditLog.service.js';
+import { getWalletBalance } from './walletHelpers.js';
 import logger from '../utils/logger.js';
 import { getFirestoreDb } from '../firebase/index.js';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -56,7 +57,7 @@ export const getUserAssets = async (userId) => {
       memoryBoost: memoryBoostCount,
       brainBoost: brainBoostCount,
     },
-    walletBalance: user.walletBalance || user.coins || 0,
+    walletBalance: getWalletBalance(user),
   };
 };
 

@@ -1,13 +1,15 @@
 import express from "express";
 import { db } from "../firebase/index.js";
+import { requireMinRole, requireRole } from "../middleware/admin.middleware.js";
 
 const router = express.Router();
 
 /**
  * GET /api/membership-tiers
  * 獲取所有會員等級配置
+ * 🔒 權限：moderator 以上
  */
-router.get("/", async (req, res) => {
+router.get("/", requireMinRole("moderator"), async (req, res) => {
   try {
     const tiersSnapshot = await db.collection("membership_tiers").get();
 
@@ -25,8 +27,9 @@ router.get("/", async (req, res) => {
 /**
  * GET /api/membership-tiers/:tierId
  * 獲取單個會員等級詳情
+ * 🔒 權限：moderator 以上
  */
-router.get("/:tierId", async (req, res) => {
+router.get("/:tierId", requireMinRole("moderator"), async (req, res) => {
   try {
     const { tierId } = req.params;
     const tierDoc = await db.collection("membership_tiers").doc(tierId).get();
@@ -44,8 +47,9 @@ router.get("/:tierId", async (req, res) => {
 /**
  * PATCH /api/membership-tiers/:tierId
  * 更新會員等級配置
+ * 🔒 權限：僅限 super_admin（定價策略影響營收，極度敏感）
  */
-router.patch("/:tierId", async (req, res) => {
+router.patch("/:tierId", requireRole("super_admin"), async (req, res) => {
   try {
     const { tierId } = req.params;
     const updates = req.body;

@@ -82,7 +82,7 @@ photoAlbumRouter.get(
 
 /**
  * GET /api/photos/:userId/character/:characterId
- * 獲取用戶與特定角色的所有照片
+ * 獲取用戶與特定角色的所有照片（包含角色基本資訊）
  */
 photoAlbumRouter.get(
   "/:userId/character/:characterId",
@@ -95,8 +95,8 @@ photoAlbumRouter.get(
       return sendError(res, "缺少必要參數：userId, characterId", 400);
     }
 
-    const photos = await getCharacterPhotos(userId, characterId);
-    sendSuccess(res, { photos });
+    const result = await getCharacterPhotos(userId, characterId);
+    sendSuccess(res, result);
   })
 );
 

@@ -1,13 +1,15 @@
 import express from "express";
 import { db } from "../firebase/index.js";
+import { requireMinRole } from "../middleware/admin.middleware.js";
 
 const router = express.Router();
 
 /**
  * GET /api/transactions
  * 獲取所有交易記錄（支援分頁和篩選）
+ * 🔒 權限：admin 以上（財務數據敏感）
  */
-router.get("/", async (req, res) => {
+router.get("/", requireMinRole("admin"), async (req, res) => {
   try {
     const {
       page = 1,
@@ -107,8 +109,9 @@ router.get("/", async (req, res) => {
 /**
  * GET /api/transactions/stats
  * 獲取交易統計資訊
+ * 🔒 權限：admin 以上（財務統計敏感）
  */
-router.get("/stats", async (req, res) => {
+router.get("/stats", requireMinRole("admin"), async (req, res) => {
   try {
     const snapshot = await db
       .collection("transactions")
@@ -174,8 +177,9 @@ router.get("/stats", async (req, res) => {
 /**
  * GET /api/transactions/:id
  * 獲取單一交易記錄詳情
+ * 🔒 權限：admin 以上（財務數據敏感）
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireMinRole("admin"), async (req, res) => {
   try {
     const { id } = req.params;
     const doc = await db.collection("transactions").doc(id).get();

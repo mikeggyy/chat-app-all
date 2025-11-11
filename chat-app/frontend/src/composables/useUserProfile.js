@@ -19,6 +19,28 @@ const normalizeUser = (payload = {}) => {
   const updatedAt = payload.updatedAt ?? createdAt;
   const lastLoginAt = payload.lastLoginAt ?? nowIso;
 
+  // 解析錢包餘額（向後兼容：支援讀取舊格式）
+  const walletBalance = payload.wallet?.balance
+    ?? payload.walletBalance
+    ?? payload.coins
+    ?? payload.balance
+    ?? 0;
+
+  const wallet = {
+    balance: walletBalance,
+    currency: payload.wallet?.currency ?? "TWD",
+    updatedAt: payload.wallet?.updatedAt ?? updatedAt,
+    ...(payload.wallet?.history ? { history: payload.wallet.history } : {}),
+  };
+
+  const assets = {
+    characterUnlockCards: payload.assets?.characterUnlockCards ?? 0,
+    photoUnlockCards: payload.assets?.photoUnlockCards ?? 0,
+    videoUnlockCards: payload.assets?.videoUnlockCards ?? 0,
+    voiceUnlockCards: payload.assets?.voiceUnlockCards ?? 0,
+    createCards: payload.assets?.createCards ?? 0,
+  };
+
   return {
     id,
     displayName: payload.displayName ?? generateRandomUserName(),
@@ -38,11 +60,25 @@ const normalizeUser = (payload = {}) => {
     updatedAt,
     conversations: normalizeArray(payload.conversations),
     favorites: normalizeArray(payload.favorites),
+
+    // 錢包系統欄位
+    wallet,
+
+    // 會員系統欄位
+    membershipTier: payload.membershipTier ?? "free",
+    membershipStatus: payload.membershipStatus ?? "active",
+    membershipStartedAt: payload.membershipStartedAt ?? null,
+    membershipExpiresAt: payload.membershipExpiresAt ?? null,
+    membershipAutoRenew: Boolean(payload.membershipAutoRenew),
+
+    // 資產系統欄位
+    assets,
   };
 };
 
 const cacheUserProfile = (payload) => {
   const profile = normalizeUser(payload);
+
   if (profile.id) {
     profileCache.set(profile.id, profile);
   }
@@ -167,7 +203,9 @@ const updateUserProfileDetails = async (patch = {}) => {
     }
   );
 
-  return cacheUserProfile(updated);
+  const cached = cacheUserProfile(updated);
+
+  return cached;
 };
 
 const addConversationHistory = async (conversationId) => {

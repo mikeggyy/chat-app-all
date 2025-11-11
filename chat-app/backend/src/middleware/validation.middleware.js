@@ -150,9 +150,14 @@ export const conversationSchemas = {
       // 單一訊息格式
       z.object({
         text: commonSchemas.messageText,
-        role: z.enum(["user", "partner"]).optional(),
+        role: z.enum(["user", "partner", "ai"]).optional(), // 支援 "ai" 角色（等同於 "partner"）
         id: z.string().optional(),
         imageUrl: z.string().optional(),
+        video: z.object({
+          url: z.string(),
+          duration: z.string().optional(),
+          resolution: z.string().optional(),
+        }).optional(), // 支援影片欄位
         createdAt: z.string().optional(),
       }),
       // 批量訊息格式
@@ -161,9 +166,14 @@ export const conversationSchemas = {
           .array(
             z.object({
               text: commonSchemas.messageText,
-              role: z.enum(["user", "partner"]),
+              role: z.enum(["user", "partner", "ai"]), // 支援 "ai" 角色
               id: z.string().optional(),
               imageUrl: z.string().optional(),
+              video: z.object({
+                url: z.string(),
+                duration: z.string().optional(),
+                resolution: z.string().optional(),
+              }).optional(), // 支援影片欄位
               createdAt: z.string().optional(),
             })
           )

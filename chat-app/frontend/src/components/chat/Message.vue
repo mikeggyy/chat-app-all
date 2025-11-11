@@ -46,6 +46,35 @@
       />
     </div>
 
+    <!-- 影片容器 -->
+    <div v-if="message.video" class="chat-bubble__video-container">
+      <!-- Loading 狀態 -->
+      <div
+        v-if="message.video === 'loading'"
+        class="chat-bubble__video-loading"
+      >
+        <div class="loading-spinner"></div>
+        <p class="loading-text">正在生成影片...</p>
+      </div>
+
+      <!-- 實際影片 -->
+      <template v-else-if="message.video.url">
+        <video
+          :src="message.video.url"
+          class="chat-bubble__video"
+          controls
+          preload="metadata"
+          playsinline
+        >
+          您的瀏覽器不支持影片播放。
+        </video>
+        <div v-if="message.video.duration || message.video.resolution" class="chat-bubble__video-info">
+          <span v-if="message.video.duration" class="video-info-badge">{{ message.video.duration }}</span>
+          <span v-if="message.video.resolution" class="video-info-badge">{{ message.video.resolution }}</span>
+        </div>
+      </template>
+    </div>
+
     <!-- 文字內容 -->
     <!-- 打字動畫效果（當 pending 且角色回覆且內容為 '...' 時） -->
     <p
@@ -127,6 +156,11 @@ const emit = defineEmits(['play-voice', 'image-click']);
   p {
     margin: 0;
   }
+}
+
+/* 為包含影片的消息增加寬度 */
+.chat-bubble:has(.chat-bubble__video-container) {
+  max-width: 90%;
 }
 
 .chat-bubble__typing-text {
@@ -310,5 +344,57 @@ const emit = defineEmits(['play-voice', 'image-click']);
   &:active {
     transform: scale(0.98);
   }
+}
+
+/* 影片容器樣式 */
+.chat-bubble__video-container {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+  position: relative;
+  aspect-ratio: 9 / 16; /* 垂直影片比例 */
+}
+
+.chat-bubble__video-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.chat-bubble__video {
+  width: 100%;
+  display: block;
+  background: #000;
+  aspect-ratio: 9 / 16; /* 垂直影片比例 */
+  object-fit: contain;
+}
+
+.chat-bubble__video-info {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.video-info-badge {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.02em;
 }
 </style>

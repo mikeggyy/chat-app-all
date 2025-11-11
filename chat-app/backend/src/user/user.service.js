@@ -132,7 +132,36 @@ const normalizeAssets = (payload) => {
   return assets;
 };
 
-const normalizeUser = (payload = {}) => {
+/**
+ * 規範化 unlockTickets 欄位，移除 undefined 值以符合 Firestore 要求
+ */
+const normalizeUnlockTickets = (payload) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const normalized = {};
+
+  // 只保留非 undefined 的值
+  if (payload.characterUnlockCards !== undefined) {
+    normalized.characterUnlockCards = toNonNegativeInteger(payload.characterUnlockCards) ?? 0;
+  }
+  if (payload.photoUnlockCards !== undefined) {
+    normalized.photoUnlockCards = toNonNegativeInteger(payload.photoUnlockCards) ?? 0;
+  }
+  if (payload.videoUnlockCards !== undefined) {
+    normalized.videoUnlockCards = toNonNegativeInteger(payload.videoUnlockCards) ?? 0;
+  }
+  if (payload.usageHistory !== undefined && Array.isArray(payload.usageHistory)) {
+    normalized.usageHistory = payload.usageHistory;
+  } else {
+    normalized.usageHistory = [];
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : null;
+};
+
+export const normalizeUser = (payload = {}) => {
   const nowIso = new Date().toISOString();
   const id = payload.id ?? "";
   const createdAt = payload.createdAt ?? nowIso;
@@ -148,7 +177,10 @@ const normalizeUser = (payload = {}) => {
   );
   const wallet = normalizeWallet(payload.wallet, walletBalance, updatedAt);
 
-  return {
+  // 規範化 unlockTickets（移除 undefined 值）
+  const unlockTickets = normalizeUnlockTickets(payload.unlockTickets);
+
+  const user = {
     id,
     displayName: payload.displayName ?? "未命名使用者",
     locale: payload.locale ?? "zh-TW",
@@ -180,10 +212,14 @@ const normalizeUser = (payload = {}) => {
 
     // 資產系統欄位
     assets: normalizeAssets(payload.assets),
-
-    // 解鎖票系統欄位（保留原始結構，不規範化）
-    unlockTickets: payload.unlockTickets || undefined,
   };
+
+  // 只在有效時才添加 unlockTickets 欄位（避免寫入 null 或 undefined）
+  if (unlockTickets) {
+    user.unlockTickets = unlockTickets;
+  }
+
+  return user;
 };
 
 export const upsertUser = async (payload = {}) => {
@@ -191,7 +227,21 @@ export const upsertUser = async (payload = {}) => {
     throw new Error("使用者資料缺少必要的 id 欄位");
   }
 
-  const user = normalizeUser(payload);
+  // ⚠️ 修復：如果 payload 中沒有 hasCompletedOnboarding，從 Firestore 讀取現有值
+  // 這樣可以避免在用戶登入時覆蓋已完成的 onboarding 狀態
+  let finalPayload = { ...payload };
+
+  if (!Object.prototype.hasOwnProperty.call(payload, "hasCompletedOnboarding")) {
+    // 嘗試從 Firestore 讀取現有用戶
+    const existing = await getUserById(payload.id);
+    if (existing && typeof existing.hasCompletedOnboarding === "boolean") {
+      // 保留現有的 hasCompletedOnboarding 值
+      finalPayload.hasCompletedOnboarding = existing.hasCompletedOnboarding;
+    }
+    // 如果是新用戶或現有用戶沒有此欄位，normalizeUser 會使用預設值 false
+  }
+
+  const user = normalizeUser(finalPayload);
   const db = getFirestoreDb();
   const userRef = db.collection(USERS_COLLECTION).doc(user.id);
 
@@ -356,7 +406,8 @@ export const updateUserProfileFields = async (id, updates = {}) => {
 
   await userRef.update(updateData);
 
-  const updatedUser = {
+  // 直接返回標準化的數據，避免 serverTimestamp 解析延遲問題
+  const updatedUser = normalizeUser({
     ...existing,
     displayName: nextDisplayName,
     gender: nextGender,
@@ -364,7 +415,7 @@ export const updateUserProfileFields = async (id, updates = {}) => {
     hasCompletedOnboarding: nextHasCompletedOnboarding,
     defaultPrompt: nextDefaultPrompt,
     updatedAt: new Date().toISOString(),
-  };
+  });
 
   // 刪除舊緩存，下次讀取時會重新緩存
   deleteCachedUserProfile(id);

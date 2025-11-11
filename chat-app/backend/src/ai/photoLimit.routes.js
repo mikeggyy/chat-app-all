@@ -97,7 +97,7 @@ photoLimitRouter.post(
     const { quantity, paymentInfo } = req.body;
 
     try {
-      const result = purchasePhotoCards(userId, quantity, paymentInfo);
+      const result = await purchasePhotoCards(userId, quantity, paymentInfo);
       sendSuccess(res, result);
     } catch (error) {
       const status = getLimitErrorStatus(error);

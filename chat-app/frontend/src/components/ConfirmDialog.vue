@@ -19,13 +19,13 @@
             <!-- 按鈕 -->
             <div class="dialog-footer">
               <button
-                class="dialog-button dialog-button-cancel"
+                class="btn-unified btn-cancel"
                 @click="handleCancel"
               >
                 {{ cancelText }}
               </button>
               <button
-                class="dialog-button dialog-button-confirm"
+                class="btn-unified btn-confirm"
                 @click="handleConfirm"
               >
                 {{ confirmText }}
@@ -160,44 +160,6 @@ defineExpose({
   display: flex;
   gap: 1rem;
   justify-content: center;
-}
-
-.dialog-button {
-  flex: 1;
-  max-width: 150px;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.dialog-button-cancel {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  backdrop-filter: blur(10px);
-}
-
-.dialog-button-cancel:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.dialog-button-confirm {
-  background: white;
-  color: #667eea;
-}
-
-.dialog-button-confirm:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
-}
-
-.dialog-button:active {
-  transform: translateY(0);
 }
 
 /* 動畫 */

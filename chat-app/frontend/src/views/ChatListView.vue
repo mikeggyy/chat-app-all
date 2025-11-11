@@ -1222,6 +1222,7 @@ const handleThreadSelect = (thread) => {
 .chat-list-page {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: clamp(1.6rem, 6vw, 2.2rem) clamp(1.1rem, 5vw, 2rem)
@@ -1448,10 +1449,8 @@ const handleThreadSelect = (thread) => {
 }
 
 .chat-thread-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-  height: 42rem;
+  max-height: calc(83dvh - 82px);
+  padding-bottom: 10px;
 }
 
 .chat-thread {
@@ -1459,6 +1458,7 @@ const handleThreadSelect = (thread) => {
   border-radius: 18px;
   overflow: hidden;
   touch-action: pan-y;
+  margin-bottom: 6px;
 }
 
 .chat-thread__content {

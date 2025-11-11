@@ -243,7 +243,7 @@ conversationRouter.delete(
       return sendError(res, "INVALID_REQUEST", "清除對話時需要提供 userId 與 characterId");
     }
 
-    clearConversationHistory(userId, characterId);
+    await clearConversationHistory(userId, characterId);
     sendSuccess(res, {
       message: "對話歷史已清除",
     });

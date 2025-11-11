@@ -91,6 +91,7 @@ const handleNotificationClick = (notification) => {
 .notifications-view {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   background: #0f1016;
   color: #f8f9ff;
   display: flex;

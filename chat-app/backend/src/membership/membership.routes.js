@@ -5,6 +5,7 @@
 import express from "express";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { requireOwnership } from "../utils/routeHelpers.js";
+import { handleIdempotentRequest } from "../utils/idempotency.js";
 import {
   getUserMembership,
   upgradeMembership,
@@ -40,12 +41,13 @@ router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("use
 /**
  * 升級會員
  * POST /api/membership/:userId/upgrade
- * Body: { tier: "vip" | "vvip", durationMonths?: number, autoRenew?: boolean }
+ * Body: { tier: "vip" | "vvip", durationMonths?: number, autoRenew?: boolean, idempotencyKey: string }
+ * 🔒 冪等性保護：防止重複升級和發放獎勵
  */
 router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId } = req.params;
-    const { tier, durationMonths, autoRenew } = req.body;
+    const { tier, durationMonths, autoRenew, idempotencyKey } = req.body;
 
     if (!tier || !["vip", "vvip"].includes(tier)) {
       return res.status(400).json({
@@ -54,21 +56,49 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
       });
     }
 
-    // TODO: 整合支付系統
-    // 1. 創建支付訂單
-    // 2. 等待支付完成
-    // 3. 驗證支付成功後才升級
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        error: "請提供 idempotencyKey（冪等性鍵）以防止重複升級",
+      });
+    }
 
-    const membership = await upgradeMembership(userId, tier, {
-      durationMonths,
-      autoRenew,
-    });
+    // 檢查是否啟用開發模式繞過
+    const isDevBypassEnabled = process.env.ENABLE_DEV_PURCHASE_BYPASS === "true";
 
-    res.json({
-      success: true,
-      message: `成功升級為 ${tier.toUpperCase()}`,
-      membership,
-    });
+    if (isDevBypassEnabled) {
+      // 開發模式：直接執行升級，不需要實際支付驗證
+      console.log(`[開發模式] 升級會員：userId=${userId}, tier=${tier}`);
+
+      // 冪等性保護
+      const requestId = `membership-upgrade:${userId}:${tier}:${idempotencyKey}`;
+      const membership = await handleIdempotentRequest(
+        requestId,
+        async () => await upgradeMembership(userId, tier, {
+          durationMonths,
+          autoRenew,
+        }),
+        { ttl: 15 * 60 * 1000 } // 15 分鐘
+      );
+
+      res.json({
+        success: true,
+        message: `成功升級為 ${tier.toUpperCase()}（開發模式）`,
+        devMode: true,
+        membership,
+      });
+    } else {
+      // 正式環境：應整合支付系統
+      // TODO: 整合支付系統
+      // 1. 創建支付訂單
+      // 2. 等待支付完成
+      // 3. 驗證支付成功後才升級
+
+      return res.status(501).json({
+        success: false,
+        error: "支付系統尚未整合，請聯繫管理員",
+      });
+    }
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -114,7 +144,7 @@ router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnersh
 
     // TODO: 整合支付系統
 
-    const membership = renewMembership(userId, durationMonths);
+    const membership = await renewMembership(userId, durationMonths);
 
     res.json({
       success: true,
@@ -136,7 +166,7 @@ router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnersh
 router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId, featureName } = req.params;
-    const hasAccess = checkFeatureAccess(userId, featureName);
+    const hasAccess = await checkFeatureAccess(userId, featureName);
 
     res.json({
       success: true,
@@ -159,7 +189,7 @@ router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth,
 router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwnership("userId"), async (req, res) => {
   try {
     const { userId } = req.params;
-    const features = getUserFeatures(userId);
+    const features = await getUserFeatures(userId);
 
     res.json({
       success: true,

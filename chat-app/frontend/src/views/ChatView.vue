@@ -25,6 +25,10 @@ import ImageViewerModal from "../components/ImageViewerModal.vue";
 import GiftSelectorModal from "../components/GiftSelectorModal.vue";
 import GiftAnimation from "../components/GiftAnimation.vue";
 import PotionConfirmModal from "../components/PotionConfirmModal.vue";
+import PotionLimitModal from "../components/PotionLimitModal.vue";
+import CharacterUnlockConfirmModal from "../components/CharacterUnlockConfirmModal.vue";
+import CharacterUnlockLimitModal from "../components/CharacterUnlockLimitModal.vue";
+import PhotoSelectorModal from "../components/chat/PhotoSelectorModal.vue";
 
 // Composables
 import { useUserProfile } from "../composables/useUserProfile";
@@ -41,6 +45,7 @@ import { useUnlockTickets } from "../composables/useUnlockTickets";
 import { useChatMessages } from "../composables/chat/useChatMessages";
 import { useSuggestions } from "../composables/chat/useSuggestions";
 import { useChatActions } from "../composables/chat/useChatActions";
+import { useModalManager } from "../composables/chat/useModalManager";
 
 // Utils
 import { fallbackMatches } from "../utils/matchFallback";
@@ -61,10 +66,10 @@ const route = useRoute();
 // Constants
 // ====================
 const MESSAGE_ID_PREFIXES = {
-  SELFIE_REQUEST: 'msg-selfie-request-',
-  VIDEO_REQUEST: 'msg-video-request-',
-  VIDEO_AI: 'msg-video-ai-',
-  FIRST: 'msg-first-',
+  SELFIE_REQUEST: "msg-selfie-request-",
+  VIDEO_REQUEST: "msg-video-request-",
+  VIDEO_AI: "msg-video-ai-",
+  FIRST: "msg-first-",
 };
 
 const VIDEO_REQUEST_MESSAGES = [
@@ -124,7 +129,15 @@ const {
 const { balance, loadBalance } = useCoins();
 
 // Unlock Tickets
-const { loadBalance: loadTicketsBalance } = useUnlockTickets();
+const {
+  loadBalance: loadTicketsBalance,
+  characterTickets,
+  hasCharacterTickets,
+  voiceCards,
+  photoCards,
+  videoCards,
+  createCards,
+} = useUnlockTickets();
 
 // Partner Data
 const partnerId = computed(() => route.params.id);
@@ -239,79 +252,51 @@ const draft = ref("");
 const messageListRef = ref(null);
 const messageInputRef = ref(null);
 
-// Modal States
-const showLimitModal = ref(false);
-const limitModalData = ref({
-  characterName: "",
-  remainingMessages: 0,
-  dailyAdLimit: 10,
-  adsWatchedToday: 0,
-  isUnlocked: false,
-  characterUnlockCards: 0,
-});
+// ====================
+// Modal Manager
+// ====================
+const {
+  modals,
+  showConversationLimit,
+  closeConversationLimit,
+  showVoiceLimit,
+  closeVoiceLimit,
+  showPhotoLimit,
+  closePhotoLimit,
+  showVideoLimit,
+  closeVideoLimit,
+  showPotionLimit,
+  closePotionLimit,
+  showUnlockLimit,
+  closeUnlockLimit,
+  showResetConfirm,
+  closeResetConfirm,
+  showPotionConfirm,
+  closePotionConfirm,
+  showUnlockConfirm,
+  closeUnlockConfirm,
+  showPhotoSelector,
+  closePhotoSelector,
+  showImageViewer,
+  closeImageViewer,
+  showCharacterInfo,
+  closeCharacterInfo,
+  showBuffDetails,
+  closeBuffDetails,
+  showGiftAnimation,
+  closeGiftAnimation,
+  setLoading,
+  update: updateModal,
+} = useModalManager();
 
-const showVoiceLimitModal = ref(false);
-const voiceLimitModalData = ref({
-  characterName: "",
-  usedVoices: 0,
-  totalVoices: 10,
-  dailyAdLimit: 10,
-  adsWatchedToday: 0,
-  voiceUnlockCards: 0,
-});
-const pendingVoiceMessage = ref(null); // ✅ 保存待播放的消息
-
-const showPhotoLimitModal = ref(false);
-const photoLimitModalData = ref({
-  used: 0,
-  remaining: 0,
-  total: 0,
-  standardTotal: null,
-  isTestAccount: false,
-  cards: 0,
-  tier: "free",
-  resetPeriod: "lifetime",
-});
-
-const showVideoLimitModal = ref(false);
-const videoLimitModalData = ref({
-  used: 0,
-  remaining: 0,
-  total: 0,
-  standardTotal: null,
-  isTestAccount: false,
-  cards: 0,
-  tier: "free",
-  resetPeriod: "lifetime",
-});
-
-const showImageViewer = ref(false);
-const viewerImageUrl = ref("");
-const viewerImageAlt = ref("");
-
-const showResetConfirm = ref(false);
-const isResettingConversation = ref(false);
-
-const showCharacterInfo = ref(false);
-
-// 禮物動畫狀態
-const showGiftAnimation = ref(false);
-const giftAnimationData = ref({
-  emoji: "🎁",
-  name: "禮物",
-});
-
-// Potion confirmation
-const showPotionConfirm = ref(false);
-const potionTypeToUse = ref(""); // 'memoryBoost' or 'brainBoost'
-const isUsingPotion = ref(false);
-
-// Buff details modal
-const showBuffDetails = ref(false);
-const buffTypeToView = ref("");
-
-// Active potion effects
+// Active potion effects (保留在外部，因為與 Potion Management 相關)
 const activePotionEffects = ref([]);
+
+// Active unlock effects (保留在外部，因為與 Unlock Management 相關)
+const activeUnlockEffects = ref([]);
+
+// 控制是否允許顯示解鎖效果（避免初始閃爍）
+const isUnlockDataLoaded = ref(false);
 
 // Computed: Active potion effects for current character
 const activeMemoryBoost = computed(() => {
@@ -330,43 +315,79 @@ const activeBrainBoost = computed(() => {
   );
 });
 
+// Computed: Active character unlock for current character
+const activeCharacterUnlock = computed(() => {
+  // 只有在數據加載完成後才返回結果，避免閃爍
+  if (!isUnlockDataLoaded.value) {
+    return null;
+  }
+
+  return activeUnlockEffects.value.find(
+    (unlock) =>
+      unlock.unlockType === "character" &&
+      unlock.characterId === partnerId.value
+  );
+});
+
+// Computed: Is character unlocked (based on active unlock)
+const isCharacterUnlocked = computed(() => {
+  // 在數據未加載時，預設視為"已解鎖"（從而隱藏解鎖按鈕，避免閃爍）
+  if (!isUnlockDataLoaded.value) {
+    return true;
+  }
+  return !!activeCharacterUnlock.value;
+});
+
 // Computed: Current buff details
 const currentBuffDetails = computed(() => {
-  if (!buffTypeToView.value) return null;
+  const buffType = modals.buffDetails.type;
+  if (!buffType) return null;
 
-  const effect = buffTypeToView.value === "memory"
-    ? activeMemoryBoost.value
-    : buffTypeToView.value === "brain"
-    ? activeBrainBoost.value
-    : null;
+  // Determine which effect to display
+  let effect = null;
+  let name = "";
+  let icon = "";
+  let description = "";
+
+  if (buffType === "memory") {
+    effect = activeMemoryBoost.value;
+    name = "記憶增強藥水";
+    icon = "🧠";
+    description = `${partnerDisplayName.value}的對話記憶上限增加 10,000 tokens`;
+  } else if (buffType === "brain") {
+    effect = activeBrainBoost.value;
+    name = "腦力激盪藥水";
+    icon = "⚡";
+    description = "AI 模型升級為最高階模型，提供更聰明的對話體驗";
+  } else if (buffType === "unlock") {
+    effect = activeCharacterUnlock.value;
+    name = "角色解鎖卡";
+    icon = "🎫";
+    description = `與「${partnerDisplayName.value}」暢聊無限次，無需消耗對話次數`;
+  }
 
   if (!effect) return null;
 
   // Calculate remaining time
   const now = new Date();
-  const expiresAt = new Date(effect.expiresAt);
+  const expiresAt = new Date(effect.expiresAt || effect.unlockUntil);
   const remainingMs = expiresAt - now;
   const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
 
   return {
-    name: buffTypeToView.value === "memory" ? "記憶增強藥水" : "腦力激盪藥水",
-    icon: buffTypeToView.value === "memory" ? "🧠" : "⚡",
-    description: buffTypeToView.value === "memory"
-      ? `${partnerDisplayName.value}的對話記憶上限增加 10,000 tokens`
-      : "AI 模型升級為最高階模型，提供更聰明的對話體驗",
-    activatedAt: new Date(effect.activatedAt).toLocaleString("zh-TW"),
-    expiresAt: new Date(effect.expiresAt).toLocaleString("zh-TW"),
+    name,
+    icon,
+    description,
+    activatedAt: new Date(effect.activatedAt || effect.unlockUntil).toLocaleString("zh-TW"),
+    expiresAt: expiresAt.toLocaleString("zh-TW"),
     remainingDays,
   };
 });
 
-// User Assets
-const userAssets = ref({
-  characterUnlockCards: 0,
-  potions: {
-    memoryBoost: 0,
-    brainBoost: 0,
-  },
+// User Assets (Potions only - other assets moved to useUnlockTickets)
+const userPotions = ref({
+  memoryBoost: 0,
+  brainBoost: 0,
 });
 
 // ====================
@@ -437,7 +458,7 @@ const rollbackUserMessage = async (userId, matchId, messageId) => {
  * @param {string} type - 限制類型 ('photo' 或 'video')
  * @returns {Object} Modal 數據對象
  */
-const createLimitModalData = (limitCheck, type = 'photo') => {
+const createLimitModalData = (limitCheck, type = "photo") => {
   const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
   return {
     used: limitCheck.used || 0,
@@ -469,15 +490,14 @@ const handleSendMessage = async (text) => {
   // Check conversation limit
   const limitCheck = await checkLimit(userId, matchId);
   if (!limitCheck.allowed) {
-    limitModalData.value = {
+    showConversationLimit({
       characterName: partnerDisplayName.value,
       remainingMessages: limitCheck.remaining || 0,
       dailyAdLimit: limitCheck.dailyAdLimit || 10,
       adsWatchedToday: limitCheck.adsWatchedToday || 0,
       isUnlocked: limitCheck.isUnlocked || false,
-      characterUnlockCards: userAssets.value.characterUnlockCards || 0,
-    };
-    showLimitModal.value = true;
+      characterUnlockCards: characterTickets.value || 0,
+    });
     return;
   }
 
@@ -524,30 +544,40 @@ const handleRequestSuggestions = async () => {
 const handleMenuAction = (action) => {
   switch (action) {
     case "reset":
-      showResetConfirm.value = true;
+      showResetConfirm();
       break;
     case "info":
-      showCharacterInfo.value = true;
+      showCharacterInfo();
+      break;
+    case "unlock-character":
+      // 檢查是否有解鎖卡
+      if (!hasCharacterTickets.value || characterTickets.value <= 0) {
+        // 顯示商城引導彈窗
+        showUnlockLimit();
+        return;
+      }
+      // 顯示確認彈窗
+      showUnlockConfirm();
       break;
     case "memory":
     case "memory-boost":
       // 檢查是否有藥水
-      if (userAssets.value.potions.memoryBoost <= 0) {
-        showError("您沒有記憶增強藥水");
+      if (userPotions.value.memoryBoost <= 0) {
+        // 顯示商城引導彈窗
+        showPotionLimit("memoryBoost");
         return;
       }
-      potionTypeToUse.value = "memoryBoost";
-      showPotionConfirm.value = true;
+      showPotionConfirm("memoryBoost");
       break;
     case "brain":
     case "brain-boost":
       // 檢查是否有藥水
-      if (userAssets.value.potions.brainBoost <= 0) {
-        showError("您沒有腦力激盪藥水");
+      if (userPotions.value.brainBoost <= 0) {
+        // 顯示商城引導彈窗
+        showPotionLimit("brainBoost");
         return;
       }
-      potionTypeToUse.value = "brainBoost";
-      showPotionConfirm.value = true;
+      showPotionConfirm("brainBoost");
       break;
     case "share":
       handleShare();
@@ -729,7 +759,7 @@ const confirmResetConversation = async () => {
   if (!userId || !matchId) return;
 
   try {
-    isResettingConversation.value = true;
+    setLoading('resetConfirm', true);
     await resetConversationApi(userId, matchId);
 
     // Clear pending messages
@@ -763,33 +793,28 @@ const confirmResetConversation = async () => {
       writeCachedHistory(userId, matchId, messages.value);
     }
 
-    showResetConfirm.value = false;
+    closeResetConfirm();
     success("對話已重置");
   } catch (error) {
     showError(error instanceof Error ? error.message : "重置對話失敗");
   } finally {
-    isResettingConversation.value = false;
+    setLoading('resetConfirm', false);
   }
 };
 
 const cancelResetConversation = () => {
-  showResetConfirm.value = false;
+  closeResetConfirm();
 };
 
 // ====================
 // Character Info
 // ====================
-const closeCharacterInfo = () => {
-  showCharacterInfo.value = false;
-};
+// closeCharacterInfo 由 useModalManager 提供
 
 // ====================
 // Potion Usage
 // ====================
-const handleClosePotionConfirm = () => {
-  showPotionConfirm.value = false;
-  potionTypeToUse.value = "";
-};
+// handleClosePotionConfirm 由 closePotionConfirm 替代
 
 const handleConfirmUsePotion = async () => {
   const userId = currentUserId.value;
@@ -798,10 +823,11 @@ const handleConfirmUsePotion = async () => {
     return;
   }
 
-  isUsingPotion.value = true;
+  const potionType = modals.potionConfirm.type;
+  setLoading('potionConfirm', true);
 
   try {
-    if (potionTypeToUse.value === "memoryBoost") {
+    if (potionType === "memoryBoost") {
       // 使用記憶增強藥水
       const result = await apiJson(`/api/potions/use/memory-boost`, {
         method: "POST",
@@ -812,11 +838,10 @@ const handleConfirmUsePotion = async () => {
 
       if (result.success) {
         success(`記憶增強藥水使用成功！效果將持續 ${result.duration} 天`);
-        // 重新載入用戶資產和活躍藥水效果
-        await loadUserAssets();
-        await loadActivePotions();
+        // 重新載入活躍藥水效果和藥水數量
+        await Promise.all([loadActivePotions(), loadPotions()]);
       }
-    } else if (potionTypeToUse.value === "brainBoost") {
+    } else if (potionType === "brainBoost") {
       // 使用腦力激盪藥水
       const result = await apiJson(`/api/potions/use/brain-boost`, {
         method: "POST",
@@ -827,17 +852,16 @@ const handleConfirmUsePotion = async () => {
 
       if (result.success) {
         success(`腦力激盪藥水使用成功！效果將持續 ${result.duration} 天`);
-        // 重新載入用戶資產和活躍藥水效果
-        await loadUserAssets();
-        await loadActivePotions();
+        // 重新載入活躍藥水效果和藥水數量
+        await Promise.all([loadActivePotions(), loadPotions()]);
       }
     }
 
-    handleClosePotionConfirm();
+    closePotionConfirm();
   } catch (error) {
     showError(error.message || "使用藥水失敗");
   } finally {
-    isUsingPotion.value = false;
+    setLoading('potionConfirm', false);
   }
 };
 
@@ -845,14 +869,10 @@ const handleConfirmUsePotion = async () => {
 // Buff Details
 // ====================
 const handleViewBuffDetails = (buffType) => {
-  buffTypeToView.value = buffType;
-  showBuffDetails.value = true;
+  showBuffDetails(buffType);
 };
 
-const handleCloseBuffDetails = () => {
-  showBuffDetails.value = false;
-  buffTypeToView.value = "";
-};
+// handleCloseBuffDetails 由 closeBuffDetails 替代
 
 // ====================
 // Voice Handler
@@ -861,10 +881,8 @@ const handlePlayVoice = async (message) => {
   if (!message) return;
 
   await playVoice(message, { loadVoiceStats, checkVoiceLimit }, (limitInfo) => {
-    // On limit exceeded
-    pendingVoiceMessage.value = message; // ✅ 保存待播放的消息
-    voiceLimitModalData.value = limitInfo;
-    showVoiceLimitModal.value = true;
+    // On limit exceeded - 保存待播放的消息並顯示限制彈窗
+    showVoiceLimit(limitInfo, message);
   });
 };
 
@@ -872,16 +890,10 @@ const handlePlayVoice = async (message) => {
 // Image Viewer
 // ====================
 const handleImageClick = ({ url, alt }) => {
-  viewerImageUrl.value = url;
-  viewerImageAlt.value = alt;
-  showImageViewer.value = true;
+  showImageViewer(url, alt);
 };
 
-const handleCloseImageViewer = () => {
-  showImageViewer.value = false;
-  viewerImageUrl.value = "";
-  viewerImageAlt.value = "";
-};
+// handleCloseImageViewer 由 closeImageViewer 替代
 
 // ====================
 // Selfie Handler
@@ -905,8 +917,7 @@ const handleRequestSelfie = async () => {
   // - cards > 0: 顯示「使用解鎖卡」按鈕
   // - cards = 0: 顯示「次數已達上限」及升級選項
   if (!limitCheck.allowed) {
-    photoLimitModalData.value = createLimitModalData(limitCheck, 'photo');
-    showPhotoLimitModal.value = true;
+    showPhotoLimit(createLimitModalData(limitCheck, "photo"));
     return;
   }
 
@@ -960,8 +971,7 @@ const handleRequestSelfie = async () => {
       { canGeneratePhoto, fetchPhotoStats },
       (limitInfo) => {
         // On limit exceeded
-        photoLimitModalData.value = limitInfo;
-        showPhotoLimitModal.value = true;
+        showPhotoLimit(limitInfo);
       },
       { usePhotoCard: false } // ✅ 此處僅在有免費額度時才被調用
     );
@@ -987,7 +997,7 @@ const isRequestingVideo = ref(false);
 
 // 生成影片的核心邏輯（可重用）
 const generateVideo = async (options = {}) => {
-  const { useVideoCard = false } = options;
+  const { useVideoCard = false, imageUrl = null } = options;
   const userId = currentUserId.value;
   const matchId = partner.value?.id;
 
@@ -1039,8 +1049,23 @@ const generateVideo = async (options = {}) => {
     // 更新緩存
     writeCachedHistory(userId, matchId, messages.value);
 
-    // 2. 生成影片
-    success("正在生成影片，請稍候（約需 30-60 秒）...");
+    // 2. 創建臨時影片消息顯示 loading
+    const tempVideoMessageId = `temp-video-${Date.now()}`;
+    const tempVideoMessage = {
+      id: tempVideoMessageId,
+      role: "ai",
+      text: "",
+      video: "loading", // ⭐ 關鍵：設為 'loading'
+      createdAt: new Date().toISOString(),
+      state: "pending",
+    };
+
+    messages.value.push(tempVideoMessage);
+    await nextTick();
+    messageListRef.value?.scrollToBottom();
+
+    // 3. 生成影片
+    success("角色正在錄製影片給你，稍等一下下哦～");
 
     const videoResult = await apiJson(`/api/ai/generate-video`, {
       method: "POST",
@@ -1055,15 +1080,22 @@ const generateVideo = async (options = {}) => {
         resolution: VIDEO_CONFIG.RESOLUTION,
         aspectRatio: VIDEO_CONFIG.ASPECT_RATIO,
         useVideoCard, // 告訴後端是否使用影片卡
+        imageUrl, // 🎨 自定義圖片 URL（從相簿選擇）
       },
+      skipGlobalLoading: true, // ✅ 允許用戶繼續聊天
     });
 
     // ✅ 驗證影片生成結果
     if (!videoResult || !videoResult.videoUrl) {
+      // 移除臨時消息
+      const tempIndex = messages.value.findIndex((m) => m.id === tempVideoMessageId);
+      if (tempIndex !== -1) {
+        messages.value.splice(tempIndex, 1);
+      }
       throw new Error("影片生成失敗：未返回有效的影片 URL");
     }
 
-    // 3. 創建包含影片的 AI 消息
+    // 4. 創建包含影片的 AI 消息
     const aiVideoMessage = {
       id: `${MESSAGE_ID_PREFIXES.VIDEO_AI}${Date.now()}`,
       role: "ai",
@@ -1080,8 +1112,13 @@ const generateVideo = async (options = {}) => {
     let aiMessageId = aiVideoMessage.id;
 
     try {
-      // 添加到消息列表
-      messages.value.push(aiVideoMessage);
+      // 替換臨時消息
+      const tempIndex = messages.value.findIndex((m) => m.id === tempVideoMessageId);
+      if (tempIndex !== -1) {
+        messages.value.splice(tempIndex, 1, aiVideoMessage);
+      } else {
+        messages.value.push(aiVideoMessage);
+      }
 
       // 保存影片消息到後端
       await apiJson(`/api/conversations/${userId}/${matchId}`, {
@@ -1105,7 +1142,7 @@ const generateVideo = async (options = {}) => {
       await nextTick();
       messageListRef.value?.scrollToBottom();
 
-      success("影片生成成功！");
+      success("影片錄好了！快來看看吧 ✨");
     } catch (saveError) {
       // ✅ 保存 AI 訊息失敗，撤回前端的 AI 訊息
       const aiMsgIndex = messages.value.findIndex((m) => m.id === aiMessageId);
@@ -1117,6 +1154,12 @@ const generateVideo = async (options = {}) => {
       throw new Error("保存影片訊息失敗");
     }
   } catch (error) {
+    // 移除臨時影片消息
+    const tempIndex = messages.value.findIndex((m) => m.video === "loading");
+    if (tempIndex !== -1) {
+      messages.value.splice(tempIndex, 1);
+    }
+
     showError(error instanceof Error ? error.message : "生成影片失敗");
 
     // 撤回用戶剛發送的訊息
@@ -1149,7 +1192,7 @@ const handleRequestVideo = async () => {
     // 獲取認證權杖
     const token = await firebaseAuth.getCurrentUserIdToken();
 
-    // 檢查影片生成權限
+    // 先檢查影片生成權限
     const limitCheck = await apiJson(`/api/ai/video/check/${userId}`, {
       method: "GET",
       headers: {
@@ -1158,22 +1201,48 @@ const handleRequestVideo = async () => {
       skipGlobalLoading: true,
     });
 
-    // ✅ 修復：當免費額度用完時，顯示彈窗讓用戶決定是否使用解鎖卡
-    // 彈窗會根據 cards 數量顯示不同按鈕：
-    // - cards > 0: 顯示「使用解鎖卡」按鈕
-    // - cards = 0: 顯示「次數已達上限」及升級選項
+    // 如果免費額度用完，顯示彈窗讓用戶決定是否使用解鎖卡
     if (!limitCheck.allowed) {
-      videoLimitModalData.value = createLimitModalData(limitCheck, 'video');
-      showVideoLimitModal.value = true;
+      showVideoLimit(createLimitModalData(limitCheck, "video"));
       return;
     }
 
-    // 生成影片
-    await generateVideo({ useVideoCard: false });
+    // ✅ 權限檢查通過，顯示照片選擇器
+    showPhotoSelector();
   } catch (error) {
     showError(error instanceof Error ? error.message : "檢查影片權限失敗");
   }
 };
+
+// 處理用戶選擇照片（從照片選擇器）
+const handlePhotoSelect = async (imageUrl) => {
+  try {
+    // 根據標記決定是否使用影片卡
+    const useCard = modals.photoSelector.useCard;
+
+    // 生成影片
+    await generateVideo({
+      useVideoCard: useCard,
+      imageUrl: imageUrl
+    });
+
+    // 成功後關閉選擇器
+    closePhotoSelector();
+
+    // ✅ 如果使用了影片卡，重新加載解鎖卡餘額
+    if (useCard) {
+      const userId = currentUserId.value;
+      if (userId) {
+        await loadTicketsBalance(userId);
+      }
+    }
+  } catch (error) {
+    showError(error instanceof Error ? error.message : "生成影片失敗");
+    closePhotoSelector();
+  }
+};
+
+// handleClosePhotoSelector 由 closePhotoSelector 替代
 
 // ====================
 // Gift Handlers
@@ -1195,22 +1264,17 @@ const handleSelectGift = async (giftData) => {
   // 獲取禮物資訊用於動畫
   const gift = getGiftById(giftData.giftId);
   if (gift) {
-    giftAnimationData.value = {
-      emoji: gift.emoji,
-      name: gift.name,
-    };
-
     // 立即顯示禮物動畫
-    showGiftAnimation.value = true;
+    showGiftAnimation(gift.emoji, gift.name);
 
     // 2秒後自動隱藏動畫
     setTimeout(() => {
-      showGiftAnimation.value = false;
+      closeGiftAnimation();
     }, 2000);
   }
 
   // 發送禮物（動畫已經在播放）
-  await sendGift(giftData, (giftMessage, replyMessage) => {
+  await sendGift(giftData, () => {
     // On success - 動畫已經在顯示，不需要再做處理
   });
 
@@ -1221,9 +1285,7 @@ const handleSelectGift = async (giftData) => {
 // ====================
 // Limit Modal Handlers
 // ====================
-const handleCloseLimitModal = () => {
-  showLimitModal.value = false;
-};
+// handleCloseLimitModal 由 closeConversationLimit 替代
 
 const handleWatchAd = async (adType) => {
   const userId = currentUserId.value;
@@ -1235,9 +1297,11 @@ const handleWatchAd = async (adType) => {
     if (adType === "conversation") {
       await unlockByAd(userId, matchId);
       const state = await getLimitState(userId, matchId);
-      limitModalData.value.remainingMessages = state.remaining || 0;
-      limitModalData.value.adsWatchedToday = state.adsWatchedToday || 0;
-      showLimitModal.value = false;
+      updateModal('conversationLimit', {
+        remainingMessages: state.remaining || 0,
+        adsWatchedToday: state.adsWatchedToday || 0,
+      });
+      closeConversationLimit();
       success("已解鎖 5 則訊息！");
     }
   } catch (error) {
@@ -1269,13 +1333,10 @@ const handleUseUnlockCard = async () => {
 
     if (result.success) {
       // 關閉模態框
-      showLimitModal.value = false;
+      closeConversationLimit();
 
-      // 重新加載用戶資產（更新解鎖卡數量）
-      await Promise.all([
-        loadUserAssets(),
-        loadTicketsBalance(userId),
-      ]);
+      // 重新加載解鎖卡數量
+      await loadTicketsBalance(userId);
 
       // 顯示解鎖成功訊息（包含到期時間）
       const unlockDays = result.unlockDays || 7;
@@ -1287,9 +1348,7 @@ const handleUseUnlockCard = async () => {
   }
 };
 
-const handleCloseVoiceLimitModal = () => {
-  showVoiceLimitModal.value = false;
-};
+// handleCloseVoiceLimitModal 由 closeVoiceLimit 替代
 
 const handleWatchVoiceAd = async () => {
   const userId = currentUserId.value;
@@ -1300,7 +1359,7 @@ const handleWatchVoiceAd = async () => {
   try {
     await unlockVoiceByAd(userId, matchId);
     await loadVoiceStats(userId);
-    showVoiceLimitModal.value = false;
+    closeVoiceLimit();
     success("已解鎖 5 次語音！");
   } catch (error) {
     showError(error instanceof Error ? error.message : "觀看廣告失敗");
@@ -1308,7 +1367,7 @@ const handleWatchVoiceAd = async () => {
 };
 
 const handleUseVoiceUnlockCard = async () => {
-  const message = pendingVoiceMessage.value;
+  const message = modals.voiceLimit.pending;
 
   if (!message) {
     showError("無法使用語音解鎖卡");
@@ -1317,7 +1376,7 @@ const handleUseVoiceUnlockCard = async () => {
 
   try {
     // 1. 關閉模態框
-    showVoiceLimitModal.value = false;
+    closeVoiceLimit();
 
     // 2. 使用解鎖卡選項播放語音
     // ✅ 正確做法：傳遞 useVoiceUnlockCard 選項給 TTS API
@@ -1333,15 +1392,9 @@ const handleUseVoiceUnlockCard = async () => {
       { useVoiceUnlockCard: true } // ✅ 使用解鎖卡選項
     );
 
-    // 3. 清空待播放消息
-    pendingVoiceMessage.value = null;
-
     if (playSuccess) {
       // 4. 重新加載語音統計和解鎖卡數據
-      await Promise.all([
-        loadVoiceStats(),
-        loadTicketsBalance(),
-      ]);
+      await Promise.all([loadVoiceStats(), loadTicketsBalance()]);
 
       success("語音解鎖卡使用成功！");
     }
@@ -1350,44 +1403,35 @@ const handleUseVoiceUnlockCard = async () => {
   }
 };
 
-const handleClosePhotoLimitModal = () => {
-  showPhotoLimitModal.value = false;
-};
+// handleClosePhotoLimitModal 由 closePhotoLimit 替代
 
 // ====================
 // Video Limit Modal Handlers
 // ====================
-const handleCloseVideoLimitModal = () => {
-  showVideoLimitModal.value = false;
-};
+// handleCloseVideoLimitModal 由 closeVideoLimit 替代
 
 const handleUseVideoUnlockCard = async () => {
   try {
     // 關閉模態框
-    showVideoLimitModal.value = false;
+    closeVideoLimit();
 
-    // 使用影片卡生成影片（後端會自動扣除影片卡）
-    await generateVideo({ useVideoCard: true });
-
-    // ✅ 重新加載解鎖卡餘額，確保前端顯示最新數據
-    const userId = currentUserId.value;
-    if (userId) {
-      await loadTicketsBalance(userId);
-    }
+    // ✅ 顯示照片選擇器，讓用戶選擇照片（標記需要使用影片卡）
+    // 實際的影片生成會在用戶選擇照片後（handlePhotoSelect）執行
+    showPhotoSelector(true); // true = useCard
   } catch (error) {
     showError(error instanceof Error ? error.message : "使用影片卡失敗");
   }
 };
 
 const handleUpgradeFromVideoModal = () => {
-  showVideoLimitModal.value = false;
+  closeVideoLimit();
   router.push("/membership");
 };
 
 const handleUsePhotoUnlockCard = async () => {
   try {
     // 關閉模態框
-    showPhotoLimitModal.value = false;
+    closePhotoLimit();
 
     // 使用照片卡生成照片
     const result = await requestSelfie(
@@ -1401,10 +1445,7 @@ const handleUsePhotoUnlockCard = async () => {
 
     // 成功後重新加載解鎖卡數據
     if (result) {
-      await Promise.all([
-        fetchPhotoStats(),
-        loadTicketsBalance(),
-      ]);
+      await Promise.all([fetchPhotoStats(), loadTicketsBalance()]);
 
       success("拍照解鎖卡使用成功！");
     }
@@ -1421,24 +1462,24 @@ const handleBack = () => {
 };
 
 // ====================
-// Load User Assets
+// Load Potions Only (卡片統一由 useUnlockTickets 管理)
 // ====================
-const loadUserAssets = async () => {
+const loadPotions = async () => {
   const userId = currentUserId.value;
   if (!userId) return;
 
   try {
-    const data = await apiJson(`/api/users/${encodeURIComponent(userId)}/assets`, {
-      skipGlobalLoading: true,
-    });
+    const data = await apiJson(
+      `/api/users/${encodeURIComponent(userId)}/assets`,
+      {
+        skipGlobalLoading: true,
+      }
+    );
 
-    if (data) {
-      userAssets.value = {
-        characterUnlockCards: data.characterUnlockCards || 0,
-        potions: {
-          memoryBoost: data.potions?.memoryBoost || 0,
-          brainBoost: data.potions?.brainBoost || 0,
-        },
+    if (data?.potions) {
+      userPotions.value = {
+        memoryBoost: data.potions.memoryBoost || 0,
+        brainBoost: data.potions.brainBoost || 0,
       };
     }
   } catch (error) {
@@ -1453,6 +1494,9 @@ const loadActivePotions = async () => {
   const userId = currentUserId.value;
   if (!userId) return;
 
+  // 先清空舊數據，避免閃爍
+  activePotionEffects.value = [];
+
   try {
     const data = await apiJson(`/api/potions/active`, {
       skipGlobalLoading: true,
@@ -1466,11 +1510,95 @@ const loadActivePotions = async () => {
   }
 };
 
+// ====================
+// Load Active Unlock Effects
+// ====================
+const loadActiveUnlocks = async () => {
+  const userId = currentUserId.value;
+  if (!userId) return;
+
+  // 先清空舊數據，避免閃爍
+  activeUnlockEffects.value = [];
+
+  try {
+    const data = await apiJson(`/api/unlock-tickets/active`, {
+      skipGlobalLoading: true,
+    });
+
+    if (data && data.unlocks) {
+      activeUnlockEffects.value = data.unlocks;
+    }
+  } catch (error) {
+    // Silent fail
+  } finally {
+    // 數據加載完成，允許顯示圖標
+    isUnlockDataLoaded.value = true;
+  }
+};
+
+// ====================
+// Character Unlock Handlers
+// ====================
+// handleCloseUnlockConfirm 由 closeUnlockConfirm 替代
+// handleCloseUnlockLimit 由 closeUnlockLimit 替代
+
+const handleConfirmUnlockCharacter = async () => {
+  const userId = currentUserId.value;
+  const matchId = partnerId.value;
+
+  if (!userId || !matchId) return;
+
+  setLoading('unlockConfirm', true);
+
+  try {
+    // 獲取認證權杖
+    const token = await firebaseAuth.getCurrentUserIdToken();
+
+    // 調用後端 API 使用解鎖卡
+    const result = await apiJson("/api/unlock-tickets/use/character", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: {
+        characterId: matchId,
+      },
+      skipGlobalLoading: true,
+    });
+
+    if (result.success) {
+      // 關閉模態框
+      closeUnlockConfirm();
+
+      // 重新加載解鎖卡餘額和活躍解鎖效果
+      await Promise.all([loadTicketsBalance(userId), loadActiveUnlocks()]);
+
+      // 顯示解鎖成功訊息
+      const unlockDays = result.unlockDays || 7;
+      const characterName = partnerDisplayName.value || "角色";
+      success(`解鎖成功！與「${characterName}」可暢聊 ${unlockDays} 天 🎉`);
+    }
+  } catch (error) {
+    showError(error instanceof Error ? error.message : "使用解鎖卡失敗");
+  } finally {
+    setLoading('unlockConfirm', false);
+  }
+};
+
 // Watch partnerId changes
 watch(partnerId, (newId) => {
   if (newId) {
+    // 立即隱藏解鎖圖標，避免顯示閃爍
+    isUnlockDataLoaded.value = false;
+
+    // 清空舊角色的效果數據
+    activePotionEffects.value = [];
+    activeUnlockEffects.value = [];
+
     loadPartner(newId);
   }
+}, {
+  flush: 'sync', // 同步執行，確保在 computed 重新計算前就清空數據
 });
 
 // ====================
@@ -1486,11 +1614,17 @@ onMounted(async () => {
     // Load partner data first
     await loadPartner(matchId);
 
-    // Load user assets (potions, unlock cards, etc.)
-    await loadUserAssets();
+    // Load unlock tickets (統一管道獲取所有卡片)
+    await loadTicketsBalance(userId, { skipGlobalLoading: true });
+
+    // Load potions
+    await loadPotions();
 
     // Load active potion effects
     await loadActivePotions();
+
+    // Load active unlock effects
+    await loadActiveUnlocks();
 
     // Load conversation history
     await loadHistory(userId, matchId);
@@ -1501,7 +1635,7 @@ onMounted(async () => {
     } catch (error) {
       // 靜默失敗，不影響用戶體驗
       if (import.meta.env.DEV) {
-        console.warn('記錄對話歷史失敗:', error);
+        console.warn("記錄對話歷史失敗:", error);
       }
     }
 
@@ -1569,13 +1703,16 @@ watch(
     <!-- Chat Header -->
     <ChatHeader
       :partner-name="partnerDisplayName"
-      :is-resetting-conversation="isResettingConversation"
+      :is-resetting-conversation="modals.resetConfirm.loading"
       :is-favorited="isFavorited"
       :is-favorite-mutating="isFavoriteMutating"
-      :memory-boost-count="userAssets.potions.memoryBoost"
-      :brain-boost-count="userAssets.potions.brainBoost"
+      :memory-boost-count="userPotions.memoryBoost"
+      :brain-boost-count="userPotions.brainBoost"
       :active-memory-boost="activeMemoryBoost"
       :active-brain-boost="activeBrainBoost"
+      :active-character-unlock="activeCharacterUnlock"
+      :character-unlock-cards="characterTickets"
+      :is-character-unlocked="isCharacterUnlocked"
       @back="handleBack"
       @menu-action="handleMenuAction"
       @toggle-favorite="toggleFavorite"
@@ -1604,6 +1741,7 @@ watch(
       :suggestion-error="suggestionError"
       :is-sending-gift="isSendingGift"
       :is-requesting-selfie="isRequestingSelfie"
+      :is-requesting-video="isRequestingVideo"
       :photo-remaining="photoRemaining"
       @send="handleSendMessage"
       @suggestion-click="handleSuggestionClick"
@@ -1613,10 +1751,29 @@ watch(
       @video-click="handleRequestVideo"
     />
 
+    <!-- 快速解鎖角色懸浮按鈕 -->
+    <button
+      v-if="!isCharacterUnlocked"
+      type="button"
+      class="unlock-fab"
+      :class="{ 'has-cards': hasCharacterTickets }"
+      :title="
+        hasCharacterTickets
+          ? `使用解鎖卡（擁有 ${characterTickets} 張）`
+          : '購買解鎖卡'
+      "
+      @click="handleMenuAction('unlock-character')"
+    >
+      <span class="unlock-fab__icon">🎫</span>
+      <span v-if="hasCharacterTickets" class="unlock-fab__count">{{
+        characterTickets
+      }}</span>
+    </button>
+
     <!-- Modals -->
     <Teleport to="body">
       <!-- Reset Confirmation -->
-      <div v-if="showResetConfirm" class="chat-confirm-backdrop">
+      <div v-if="modals.resetConfirm.show" class="chat-confirm-backdrop">
         <div
           class="chat-confirm-dialog"
           role="dialog"
@@ -1646,17 +1803,17 @@ watch(
             <button
               type="button"
               class="chat-confirm-btn is-danger"
-              :disabled="isResettingConversation"
+              :disabled="modals.resetConfirm.loading"
               @click="confirmResetConversation"
             >
-              {{ isResettingConversation ? "重置中…" : "確定重置" }}
+              {{ modals.resetConfirm.loading ? "重置中…" : "確定重置" }}
             </button>
           </footer>
         </div>
       </div>
 
       <!-- Character Info -->
-      <div v-if="showCharacterInfo" class="chat-confirm-backdrop">
+      <div v-if="modals.characterInfo.show" class="chat-confirm-backdrop">
         <div
           class="chat-confirm-dialog"
           role="dialog"
@@ -1680,16 +1837,48 @@ watch(
 
       <!-- Potion Confirmation Modal -->
       <PotionConfirmModal
-        :is-open="showPotionConfirm"
-        :potion-type="potionTypeToUse"
+        :is-open="modals.potionConfirm.show"
+        :potion-type="modals.potionConfirm.type"
         :character-name="partnerDisplayName"
-        :remaining-count="potionTypeToUse === 'memoryBoost' ? userAssets.potions.memoryBoost : userAssets.potions.brainBoost"
-        @close="handleClosePotionConfirm"
+        :remaining-count="
+          modals.potionConfirm.type === 'memoryBoost'
+            ? userPotions.memoryBoost
+            : userPotions.brainBoost
+        "
+        @close="closePotionConfirm"
         @confirm="handleConfirmUsePotion"
       />
 
+      <!-- Potion Limit Modal (No Potion Available) -->
+      <PotionLimitModal
+        :is-open="modals.potionLimit.show"
+        :potion-type="modals.potionLimit.type"
+        :character-name="partnerDisplayName"
+        @close="closePotionLimit"
+      />
+
+      <!-- Character Unlock Confirm Modal -->
+      <CharacterUnlockConfirmModal
+        :is-open="modals.unlockConfirm.show"
+        :character-name="partnerDisplayName"
+        :remaining-cards="characterTickets"
+        :is-using="modals.unlockConfirm.loading"
+        @close="closeUnlockConfirm"
+        @confirm="handleConfirmUnlockCharacter"
+      />
+
+      <!-- Character Unlock Limit Modal (No Card Available) -->
+      <CharacterUnlockLimitModal
+        :is-open="modals.unlockLimit.show"
+        :character-name="partnerDisplayName"
+        @close="closeUnlockLimit"
+      />
+
       <!-- Buff Details Modal -->
-      <div v-if="showBuffDetails && currentBuffDetails" class="chat-confirm-backdrop">
+      <div
+        v-if="modals.buffDetails.show && currentBuffDetails"
+        class="chat-confirm-backdrop"
+      >
         <div
           class="chat-confirm-dialog"
           role="dialog"
@@ -1698,32 +1887,42 @@ watch(
         >
           <header class="chat-confirm-header">
             <div class="buff-details-title">
-              <span class="buff-details-icon">{{ currentBuffDetails.icon }}</span>
+              <span class="buff-details-icon">{{
+                currentBuffDetails.icon
+              }}</span>
               <h2 id="buff-details-title">{{ currentBuffDetails.name }}</h2>
             </div>
             <button
               type="button"
               class="chat-confirm-close"
               aria-label="關閉"
-              @click="handleCloseBuffDetails"
+              @click="closeBuffDetails"
             >
               <XMarkIcon class="icon" aria-hidden="true" />
             </button>
           </header>
           <div class="buff-details-content">
-            <p class="buff-details-description">{{ currentBuffDetails.description }}</p>
+            <p class="buff-details-description">
+              {{ currentBuffDetails.description }}
+            </p>
             <div class="buff-details-info">
               <div class="detail-item">
                 <span class="detail-label">啟用時間：</span>
-                <span class="detail-value">{{ currentBuffDetails.activatedAt }}</span>
+                <span class="detail-value">{{
+                  currentBuffDetails.activatedAt
+                }}</span>
               </div>
               <div class="detail-item">
                 <span class="detail-label">到期時間：</span>
-                <span class="detail-value">{{ currentBuffDetails.expiresAt }}</span>
+                <span class="detail-value">{{
+                  currentBuffDetails.expiresAt
+                }}</span>
               </div>
               <div class="detail-item">
                 <span class="detail-label">剩餘時間：</span>
-                <span class="detail-value is-highlight">{{ currentBuffDetails.remainingDays }} 天</span>
+                <span class="detail-value is-highlight"
+                  >{{ currentBuffDetails.remainingDays }} 天</span
+                >
               </div>
             </div>
           </div>
@@ -1731,7 +1930,7 @@ watch(
             <button
               type="button"
               class="chat-confirm-btn is-primary"
-              @click="handleCloseBuffDetails"
+              @click="closeBuffDetails"
             >
               確定
             </button>
@@ -1742,66 +1941,76 @@ watch(
 
     <!-- Limit Modals -->
     <ConversationLimitModal
-      :is-open="showLimitModal"
-      :character-name="limitModalData.characterName"
-      :remaining-messages="limitModalData.remainingMessages"
-      :daily-ad-limit="limitModalData.dailyAdLimit"
-      :ads-watched-today="limitModalData.adsWatchedToday"
-      :is-unlocked="limitModalData.isUnlocked"
-      :character-unlock-cards="limitModalData.characterUnlockCards"
-      @close="handleCloseLimitModal"
+      :is-open="modals.conversationLimit.show"
+      :character-name="modals.conversationLimit.data.characterName"
+      :remaining-messages="modals.conversationLimit.data.remainingMessages"
+      :daily-ad-limit="modals.conversationLimit.data.dailyAdLimit"
+      :ads-watched-today="modals.conversationLimit.data.adsWatchedToday"
+      :is-unlocked="modals.conversationLimit.data.isUnlocked"
+      :character-unlock-cards="characterTickets"
+      @close="closeConversationLimit"
       @watch-ad="handleWatchAd"
       @use-unlock-card="handleUseUnlockCard"
     />
 
     <VoiceLimitModal
-      :is-open="showVoiceLimitModal"
-      :character-name="voiceLimitModalData.characterName"
-      :used-voices="voiceLimitModalData.usedVoices"
-      :total-voices="voiceLimitModalData.totalVoices"
-      :daily-ad-limit="voiceLimitModalData.dailyAdLimit"
-      :ads-watched-today="voiceLimitModalData.adsWatchedToday"
-      :voice-unlock-cards="voiceLimitModalData.voiceUnlockCards || 0"
-      @close="handleCloseVoiceLimitModal"
+      :is-open="modals.voiceLimit.show"
+      :character-name="modals.voiceLimit.data.characterName"
+      :used-voices="modals.voiceLimit.data.usedVoices"
+      :total-voices="modals.voiceLimit.data.totalVoices"
+      :daily-ad-limit="modals.voiceLimit.data.dailyAdLimit"
+      :ads-watched-today="modals.voiceLimit.data.adsWatchedToday"
+      :voice-unlock-cards="voiceCards"
+      @close="closeVoiceLimit"
       @watch-ad="handleWatchVoiceAd"
       @use-unlock-card="handleUseVoiceUnlockCard"
     />
 
     <PhotoLimitModal
-      :is-open="showPhotoLimitModal"
-      :used="photoLimitModalData.used"
-      :remaining="photoLimitModalData.remaining"
-      :total="photoLimitModalData.total"
-      :standard-total="photoLimitModalData.standardTotal"
-      :is-test-account="photoLimitModalData.isTestAccount"
-      :cards="photoLimitModalData.cards"
-      :tier="photoLimitModalData.tier"
-      :reset-period="photoLimitModalData.resetPeriod"
-      @close="handleClosePhotoLimitModal"
+      :is-open="modals.photoLimit.show"
+      :used="modals.photoLimit.data.used"
+      :remaining="modals.photoLimit.data.remaining"
+      :total="modals.photoLimit.data.total"
+      :standard-total="modals.photoLimit.data.standardTotal"
+      :is-test-account="modals.photoLimit.data.isTestAccount"
+      :cards="modals.photoLimit.data.cards"
+      :tier="modals.photoLimit.data.tier"
+      :reset-period="modals.photoLimit.data.resetPeriod"
+      :photo-unlock-cards="photoCards"
+      @close="closePhotoLimit"
       @use-unlock-card="handleUsePhotoUnlockCard"
       @upgrade-membership="handleUpgradeFromVideoModal"
     />
 
     <VideoLimitModal
-      :is-open="showVideoLimitModal"
-      :used="videoLimitModalData.used"
-      :remaining="videoLimitModalData.remaining"
-      :total="videoLimitModalData.total"
-      :standard-total="videoLimitModalData.standardTotal"
-      :is-test-account="videoLimitModalData.isTestAccount"
-      :cards="videoLimitModalData.cards"
-      :tier="videoLimitModalData.tier"
-      :reset-period="videoLimitModalData.resetPeriod"
-      @close="handleCloseVideoLimitModal"
+      :is-open="modals.videoLimit.show"
+      :used="modals.videoLimit.data.used"
+      :remaining="modals.videoLimit.data.remaining"
+      :total="modals.videoLimit.data.total"
+      :standard-total="modals.videoLimit.data.standardTotal"
+      :is-test-account="modals.videoLimit.data.isTestAccount"
+      :cards="modals.videoLimit.data.cards"
+      :tier="modals.videoLimit.data.tier"
+      :reset-period="modals.videoLimit.data.resetPeriod"
+      :video-unlock-cards="videoCards"
+      @close="closeVideoLimit"
       @use-unlock-card="handleUseVideoUnlockCard"
       @upgrade-membership="handleUpgradeFromVideoModal"
     />
 
+    <PhotoSelectorModal
+      :is-open="modals.photoSelector.show"
+      :character-id="partnerId"
+      :character-photo-url="partner?.photoUrl || partner?.avatarUrl || partner?.imageUrl || partner?.portraitUrl || ''"
+      @close="closePhotoSelector"
+      @select="handlePhotoSelect"
+    />
+
     <ImageViewerModal
-      :is-open="showImageViewer"
-      :image-url="viewerImageUrl"
-      :image-alt="viewerImageAlt"
-      @close="handleCloseImageViewer"
+      :is-open="modals.imageViewer.show"
+      :image-url="modals.imageViewer.url"
+      :image-alt="modals.imageViewer.alt"
+      @close="closeImageViewer"
     />
 
     <GiftSelectorModal
@@ -1815,9 +2024,9 @@ watch(
 
     <!-- Gift Animation -->
     <GiftAnimation
-      :show="showGiftAnimation"
-      :gift-emoji="giftAnimationData.emoji"
-      :gift-name="giftAnimationData.name"
+      :show="modals.giftAnimation.show"
+      :gift-emoji="modals.giftAnimation.emoji"
+      :gift-name="modals.giftAnimation.name"
     />
   </div>
 </template>
@@ -1830,6 +2039,7 @@ watch(
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background-size: cover;
   background-position: center;
@@ -2031,6 +2241,178 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
+}
+
+/* ===================
+   快速解鎖角色懸浮按鈕
+   =================== */
+.unlock-fab {
+  position: fixed;
+  top: 140px;
+  right: 1.5rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 1000;
+  overflow: visible;
+
+  // 旋轉光環（外圈）- 預設就顯示
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      rgba(34, 197, 94, 0.6) 90deg,
+      transparent 180deg,
+      rgba(34, 197, 94, 0.6) 270deg,
+      transparent 360deg
+    );
+    animation: rotate 3s linear infinite;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+  }
+
+  // 發光光暈（中圈）- 預設就顯示
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(34, 197, 94, 0.4) 0%,
+      transparent 70%
+    );
+    animation: pulse-glow 2s ease-in-out infinite;
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+  }
+
+  // 按鈕本身也有脈動動畫
+  animation: pulse-shadow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  // icon 預設就閃爍
+  &__icon {
+    font-size: 1.75rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    position: relative;
+    z-index: 1;
+    animation: sparkle 3s ease-in-out infinite;
+  }
+
+  &:hover {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 12px 32px rgba(34, 197, 94, 0.5);
+
+    &::before,
+    &::after {
+      opacity: 1;
+    }
+  }
+
+  &:active {
+    transform: translateY(-2px) scale(1.02);
+  }
+
+  &__count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #0f1016;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+    animation: bounce-subtle 2s ease-in-out infinite;
+  }
+
+  // 有卡時增強效果
+  &.has-cards {
+    &::before,
+    &::after {
+      opacity: 1;
+    }
+  }
+}
+
+// 旋轉動畫
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// 脈動陰影
+@keyframes pulse-shadow {
+  0%,
+  100% {
+    box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    box-shadow: 0 12px 40px rgba(34, 197, 94, 0.8),
+      0 0 30px rgba(34, 197, 94, 0.5);
+  }
+}
+
+// 光暈脈動
+@keyframes pulse-glow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.6;
+  }
+}
+
+// 閃爍效果
+@keyframes sparkle {
+  0%,
+  100% {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) brightness(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8))
+      drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) brightness(1.3);
+  }
+}
+
+// 徽章彈跳
+@keyframes bounce-subtle {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.05);
+  }
 }
 
 /* ===================

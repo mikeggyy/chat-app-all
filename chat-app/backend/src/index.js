@@ -33,6 +33,7 @@ import { characterStylesRouter } from "./characterStyles/characterStyles.routes.
 import assetPurchaseRouter from "./user/assetPurchase.routes.js";
 import assetPackagesRouter from "./user/assetPackages.routes.js";
 import shopRouter from "./shop/shop.routes.js";
+import aiSettingsRouter from "./ai/aiSettings.routes.js";
 import { cleanupInactiveUsers, getAllUsers } from "./user/user.service.js";
 import { conversationLimitService } from "./conversation/conversationLimit.service.js";
 import { voiceLimitService } from "./ai/voiceLimit.service.js";
@@ -83,6 +84,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api/users", userRouter);
 app.use("/api/conversations", conversationRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api/ai-settings", aiSettingsRouter); // 🔥 AI 設定管理 API
 app.use("/match", matchRouter);
 app.use("/api/match", matchRouter); // API 別名，方便前端使用
 app.use("/api/characters", matchRouter); // API 別名，方便前端使用

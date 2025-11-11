@@ -5,9 +5,11 @@
 
 import express from "express";
 import { getFirestoreDb } from "../firebase/index.js";
+import { createModuleLogger } from "../utils/logger.js";
 
 const router = express.Router();
 const db = getFirestoreDb();
+const logger = createModuleLogger('Shop');
 
 /**
  * GET /api/shop/products
@@ -48,7 +50,7 @@ router.get("/api/shop/products", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('❌ 獲取商品失敗:', error);
+    logger.error('獲取商品失敗:', error);
     res.status(500).json({
       success: false,
       error: error.message || '獲取商品失敗',
@@ -90,7 +92,7 @@ router.get("/api/shop/products/:collection/:id", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ 獲取商品詳情失敗:', error);
+    logger.error('獲取商品詳情失敗:', error);
     res.status(500).json({
       success: false,
       error: error.message || '獲取商品詳情失敗',
@@ -154,7 +156,7 @@ router.get("/api/shop/categories", async (req, res) => {
       categories,
     });
   } catch (error) {
-    console.error('❌ 獲取分類失敗:', error);
+    logger.error('獲取分類失敗:', error);
     res.status(500).json({
       success: false,
       error: error.message || '獲取分類失敗',

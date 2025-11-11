@@ -134,7 +134,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  margin-top: 23rem;
+  margin-top: 18rem;
   /* 自定義滾動條 */
   &::-webkit-scrollbar {
     width: 8px;

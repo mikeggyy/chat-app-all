@@ -229,12 +229,12 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
     }
 
     // 發放解鎖票（拍照卡數量 = 會員贈送 + 免費用戶剩餘次數）
-    if (features.characterUnlockTickets || features.photoUnlockCards || features.videoUnlockCards) {
+    if (features.characterUnlockCards || features.photoUnlockCards || features.videoUnlockCards) {
       try {
         const photoCardsToGrant = (features.photoUnlockCards || 0) + bonusPhotoCards;
 
         await grantTickets(userId, {
-          characterUnlockTickets: features.characterUnlockTickets || 0,
+          characterUnlockCards: features.characterUnlockCards || 0,
           photoUnlockCards: photoCardsToGrant,
           videoUnlockCards: features.videoUnlockCards || 0,
         });

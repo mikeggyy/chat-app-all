@@ -810,102 +810,94 @@ router.patch('/:userId/profile',
 
 ---
 
-### 17. 🔄 AI 服務重試機制
+### 17. ✅ AI 服務重試機制
 
-**文件**: `chat-app/backend/src/ai/ai.service.js`
+**問題**: OpenAI API 調用沒有重試機制，臨時錯誤會直接導致對話失敗，且已消耗的對話次數不會返還
 
-首先創建重試工具：
+**修復**: 已完成
+- 文件: `chat-app/backend/src/ai/ai.service.js`
+- 為 `requestOpenAIReply` 添加重試機制（最多 3 次，延遲 1s/2s/4s）
+- 為 `requestOpenAISuggestions` 添加重試機制（最多 2 次）
+- 只重試臨時性錯誤：5xx、429 速率限制、網絡錯誤（ETIMEDOUT、ECONNRESET 等）
+- 使用指數退避策略，避免給服務器帶來壓力
+- 添加補償機制：AI 請求失敗後自動返還對話次數
 
-**文件**: `chat-app/backend/src/utils/retryWithBackoff.js`
+**重試工具**: `chat-app/backend/src/utils/retryWithBackoff.js`（已存在，`retryWithExponentialBackoff` 函數）
 
-```javascript
-/**
- * 帶退避的重試機制
- */
-export const retryWithBackoff = async (fn, options = {}) => {
-  const {
-    maxRetries = 3,
-    initialDelay = 1000,
-    maxDelay = 10000,
-    backoffFactor = 2,
-    shouldRetry = () => true,
-  } = options;
-
-  let lastError;
-  let delay = initialDelay;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error;
-
-      // 檢查是否應該重試
-      if (attempt === maxRetries || !shouldRetry(error)) {
-        throw error;
-      }
-
-      // 等待後重試
-      await new Promise(resolve => setTimeout(resolve, delay));
-      delay = Math.min(delay * backoffFactor, maxDelay);
-    }
-  }
-
-  throw lastError;
-};
-```
-
-然後修改 AI 服務：
-
+**實現**:
 ```javascript
 // ai/ai.service.js
-import { retryWithBackoff } from '../utils/retryWithBackoff.js';
-import conversationLimitService from '../services/limitService/conversationLimit.service.js';
+import { retryWithExponentialBackoff } from '../utils/retryWithBackoff.js';
 
 const requestOpenAIReply = async (character, history, latestUserMessage, userId, characterId, user = null) => {
-  const client = getOpenAIClient();
-  const messages = await mapHistoryToChatMessages(history, latestUserMessage, userId, characterId);
+  // ... 準備工作
 
   try {
-    // ✅ 添加重試機制 (最多 3 次)
-    const completion = await retryWithBackoff(
-      async () => await client.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages,
-        max_tokens: 500,
-        temperature: 0.9,
-      }),
+    // ✅ 使用重試機制調用 OpenAI API（最多 3 次嘗試）
+    const completion = await retryWithExponentialBackoff(
+      async () => {
+        return await client.chat.completions.create({
+          model: aiModel,
+          temperature: chatConfig.temperature || 0.7,
+          top_p: chatConfig.topP || 0.9,
+          max_tokens: maxResponseTokens,
+          messages: [...],
+        });
+      },
       {
         maxRetries: 3,
-        initialDelay: 1000,
+        baseDelay: 1000,
         maxDelay: 5000,
         shouldRetry: (error) => {
-          // 只重試臨時錯誤
-          return error.status >= 500 || error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET';
-        }
+          // 只重試臨時性錯誤
+          if (error.status >= 500) return true;  // 5xx 服務器錯誤
+          if (error.status === 429) return true;  // 速率限制
+          const networkErrors = ["ETIMEDOUT", "ECONNRESET", "ENOTFOUND", "ECONNREFUSED"];
+          if (networkErrors.includes(error.code)) return true;  // 網絡錯誤
+          return false;  // 其他錯誤不重試（4xx 客戶端錯誤等）
+        },
+        onRetry: (error, attempt, delay) => {
+          logger.warn(
+            `[AI 服務] OpenAI 請求失敗 (嘗試 ${attempt + 1}/3)，` +
+            `${Math.round(delay / 1000)} 秒後重試。錯誤: ${error.message}`
+          );
+        },
       }
     );
 
-    return completion?.choices?.[0]?.message?.content?.trim() ?? null;
-  } catch (error) {
-    logger.error(`OpenAI 請求失敗（已重試 3 次）:`, error);
+    const reply = completion?.choices?.[0]?.message?.content?.trim() ?? "";
+    return reply.length ? reply : null;
 
-    // ✅ 補償機制：返還對話次數
+  } catch (error) {
+    logger.error(`[AI 服務] OpenAI 請求失敗（已重試 3 次）:`, {
+      error: error.message,
+      status: error.status,
+      code: error.code,
+      userId,
+      characterId,
+    });
+
+    // ✅ 補償機制：AI 請求失敗時，返還對話次數
     try {
-      await conversationLimitService.decrementUse(userId, characterId, {
-        reason: 'ai_request_failed',
+      const conversationLimitService = await import("../services/limitService/conversationLimit.service.js");
+      await conversationLimitService.default.decrementUse(userId, characterId, {
+        reason: "ai_request_failed",
         error: error.message,
-        idempotencyKey: `rollback_${userId}_${characterId}_${Date.now()}`
+        timestamp: new Date().toISOString(),
       });
-      logger.info(`已返還用戶 ${userId} 的對話次數`);
+      logger.info(`[AI 服務] 已返還用戶 ${userId} 對 ${characterId} 的對話次數`);
     } catch (rollbackError) {
-      logger.error('返還對話次數失敗:', rollbackError);
+      logger.error("[AI 服務] 返還對話次數失敗:", rollbackError);
     }
 
-    throw error;
+    throw error;  // 重新拋出錯誤，讓調用方處理
   }
 };
+
+// requestOpenAISuggestions 同樣實現（maxRetries: 2，較不重要）
 ```
+
+**影響範圍**: 提升系統穩定性，臨時錯誤不會導致對話次數浪費
 
 ---
 

@@ -16,6 +16,7 @@ import { MEMBERSHIP_TIERS } from "../membership/membership.config.js";
 import { getExtraMemoryTokens, getEffectiveAIModel } from "../payment/potion.service.js";
 import { generateSpeechWithGoogle } from "./googleTts.service.js";
 import { getAiServiceSettings } from "../services/aiSettings.service.js";
+import { retryWithExponentialBackoff } from "../utils/retryWithBackoff.js";
 
 import logger from "../utils/logger.js";
 
@@ -433,54 +434,137 @@ const requestOpenAIReply = async (character, history, latestUserMessage, userId,
     maxTokens: maxResponseTokens,
   });
 
-  const completion = await client.chat.completions.create({
-    model: aiModel,
-    temperature: chatConfig.temperature || 0.7, // 🔥 從 Firestore 讀取
-    top_p: chatConfig.topP || 0.9, // 🔥 從 Firestore 讀取
-    max_tokens: maxResponseTokens,
-    messages: [
-      {
-        role: "system",
-        content: buildSystemPrompt(character, user, chatConfig), // 傳入 chatConfig，避免重複查詢
+  try {
+    // ✅ 使用重試機制調用 OpenAI API（最多 3 次嘗試）
+    const completion = await retryWithExponentialBackoff(
+      async () => {
+        return await client.chat.completions.create({
+          model: aiModel,
+          temperature: chatConfig.temperature || 0.7,
+          top_p: chatConfig.topP || 0.9,
+          max_tokens: maxResponseTokens,
+          messages: [
+            {
+              role: "system",
+              content: buildSystemPrompt(character, user, chatConfig),
+            },
+            ...messages,
+          ],
+        });
       },
-      ...messages,
-    ],
-  });
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        maxDelay: 5000,
+        shouldRetry: (error) => {
+          // 只重試臨時性錯誤
+          // 5xx 服務器錯誤
+          if (error.status >= 500) return true;
+          // 429 速率限制
+          if (error.status === 429) return true;
+          // 網絡錯誤
+          const networkErrors = ["ETIMEDOUT", "ECONNRESET", "ENOTFOUND", "ECONNREFUSED"];
+          if (networkErrors.includes(error.code)) return true;
+          // 其他錯誤不重試（4xx 客戶端錯誤等）
+          return false;
+        },
+        onRetry: (error, attempt, delay) => {
+          logger.warn(
+            `[AI 服務] OpenAI 請求失敗 (嘗試 ${attempt + 1}/3)，` +
+            `${Math.round(delay / 1000)} 秒後重試。錯誤: ${error.message}`
+          );
+        },
+      }
+    );
 
-  const reply =
-    completion?.choices?.[0]?.message?.content?.trim() ?? "";
-  return reply.length ? reply : null;
+    const reply = completion?.choices?.[0]?.message?.content?.trim() ?? "";
+    return reply.length ? reply : null;
+
+  } catch (error) {
+    logger.error(`[AI 服務] OpenAI 請求失敗（已重試 3 次）:`, {
+      error: error.message,
+      status: error.status,
+      code: error.code,
+      userId,
+      characterId,
+    });
+
+    // ✅ 補償機制：AI 請求失敗時，返還對話次數
+    // 注意：這裡不直接導入 conversationLimit.service，而是在需要時動態導入，避免循環依賴
+    try {
+      const conversationLimitService = await import("../services/limitService/conversationLimit.service.js");
+
+      // 返還對話次數（減少使用次數，實際上是增加剩餘次數）
+      await conversationLimitService.default.decrementUse(userId, characterId, {
+        reason: "ai_request_failed",
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.info(`[AI 服務] 已返還用戶 ${userId} 對 ${characterId} 的對話次數`);
+    } catch (rollbackError) {
+      logger.error("[AI 服務] 返還對話次數失敗:", rollbackError);
+      // 不阻塞主流程，記錄錯誤即可
+    }
+
+    // 重新拋出錯誤，讓調用方處理
+    throw error;
+  }
 };
 
 const requestOpenAISuggestions = async (character, history) => {
   const client = getOpenAIClient();
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.6,
-    top_p: 0.9,
-    messages: [
-      { role: "system", content: buildSuggestionSystemPrompt(character) },
-      { role: "user", content: buildSuggestionUserPrompt(history) },
-    ],
-  });
-
-  const content =
-    completion?.choices?.[0]?.message?.content ?? "";
-  const jsonText = extractJsonPayload(content);
-  if (!jsonText) {
-    return [];
-  }
 
   try {
-    const parsed = JSON.parse(jsonText);
-    return normalizeSuggestionList(parsed);
-  } catch (error) {
-    if (process.env.NODE_ENV !== "test") {
-      logger.warn(
-        "解析 OpenAI 建議回覆時發生錯誤:",
-        error instanceof Error ? error.message : error
-      );
+    // ✅ 使用重試機制調用 OpenAI API（建議生成較不重要，重試次數少一些）
+    const completion = await retryWithExponentialBackoff(
+      async () => {
+        return await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.6,
+          top_p: 0.9,
+          messages: [
+            { role: "system", content: buildSuggestionSystemPrompt(character) },
+            { role: "user", content: buildSuggestionUserPrompt(history) },
+          ],
+        });
+      },
+      {
+        maxRetries: 2, // 建議生成較不重要，只重試 2 次
+        baseDelay: 1000,
+        maxDelay: 3000,
+        shouldRetry: (error) => {
+          // 只重試臨時性錯誤
+          if (error.status >= 500) return true;
+          if (error.status === 429) return true;
+          const networkErrors = ["ETIMEDOUT", "ECONNRESET"];
+          if (networkErrors.includes(error.code)) return true;
+          return false;
+        },
+      }
+    );
+
+    const content = completion?.choices?.[0]?.message?.content ?? "";
+    const jsonText = extractJsonPayload(content);
+    if (!jsonText) {
+      return [];
     }
+
+    try {
+      const parsed = JSON.parse(jsonText);
+      return normalizeSuggestionList(parsed);
+    } catch (error) {
+      if (process.env.NODE_ENV !== "test") {
+        logger.warn(
+          "解析 OpenAI 建議回覆時發生錯誤:",
+          error instanceof Error ? error.message : error
+        );
+      }
+      return [];
+    }
+  } catch (error) {
+    // 建議生成失敗不是致命錯誤，返回空數組即可
+    logger.warn("[AI 服務] 建議生成失敗（已重試 2 次）:", error.message);
     return [];
   }
 };

@@ -1012,18 +1012,17 @@ const requestOpenAIReply = async (character, history, latestUserMessage, userId,
       characterId,
     });
 
-    // ✅ 補償機制：AI 請求失敗時，返還對話次數
-    try {
-      const conversationLimitService = await import("../services/limitService/conversationLimit.service.js");
-      await conversationLimitService.default.decrementUse(userId, characterId, {
-        reason: "ai_request_failed",
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      });
-      logger.info(`[AI 服務] 已返還用戶 ${userId} 對 ${characterId} 的對話次數`);
-    } catch (rollbackError) {
-      logger.error("[AI 服務] 返還對話次數失敗:", rollbackError);
-    }
+    // ⚠️ 注意：不需要補償機制
+    // 原因：對話次數的記錄（recordMessage）發生在 AI 成功後（見 ai.routes.js）
+    // 如果 AI 失敗，recordMessage 不會被調用，所以對話次數根本沒有增加
+    // 因此不需要執行補償（decrementUse）來返還對話次數
+    //
+    // ⚠️ 重要邏輯說明：
+    // 在 ai.routes.js 中，流程是這樣的：
+    // 1. 調用 createAiReplyForConversation（呼叫 requestOpenAIReply）
+    // 2. 如果 AI 請求成功，才調用 recordMessage 記錄對話次數
+    // 3. 如果 AI 請求失敗，recordMessage 不會被調用
+    // 因此：AI 失敗時對話次數未被記錄，無需返還
 
     throw error;  // 重新拋出錯誤，讓調用方處理
   }
@@ -1280,6 +1279,128 @@ exports.monitorAbnormalTransactions = functions.firestore
 - [LIMIT_SYSTEM_EXPLAINED.md](LIMIT_SYSTEM_EXPLAINED.md) - 限制系統說明
 - [SECURITY_AUDIT_FIXES.md](SECURITY_AUDIT_FIXES.md) - 安全審計記錄
 - [Firestore Transactions](https://firebase.google.com/docs/firestore/manage-data/transactions) - Firebase 官方文檔
+
+---
+
+## 🔍 關鍵邏輯審查發現
+
+### AI 服務補償機制邏輯錯誤（已修復）
+
+**發現時間**: 2025-01-XX（Issue 17 實現後的邏輯審查）
+
+**嚴重程度**: 🔴 高危 - 可能導致用戶獲得免費對話次數
+
+#### 問題描述
+
+在實現 Issue 17（AI 服務重試機制）時，最初設計了一個補償機制：當 OpenAI API 請求失敗時，調用 `decrementUse()` 返還用戶的對話次數。這個設計看似合理，但實際上存在**嚴重的邏輯錯誤**。
+
+#### 根本原因分析
+
+通過審查 `ai.routes.js` 中的實際流程，發現對話次數的記錄時機如下：
+
+```javascript
+// ai.routes.js (POST /api/ai/conversation/:characterId)
+router.post("/api/ai/conversation/:characterId", async (req, res) => {
+  // ... 驗證和準備工作
+
+  const result = await withIdempotency(requestId, async () => {
+    // 1. 調用 AI 服務生成回覆
+    const { message, history } = await createAiReplyForConversation(...);
+
+    // 2. 只有在 AI 成功後才記錄對話次數
+    if (!shouldSkipLimit) {
+      await recordMessage(userId, characterId);  // ← 關鍵：這裡才扣除次數
+    }
+
+    return { message, messages: history };
+  });
+
+  res.json({ success: true, ...result });
+});
+```
+
+**關鍵發現**：
+1. `recordMessage()` **只在 AI 請求成功後才被調用**
+2. 如果 `createAiReplyForConversation()` 拋出錯誤（AI 請求失敗），`recordMessage()` 根本不會執行
+3. 因此，AI 失敗時對話次數**從未被扣除**，無需返還
+
+#### 錯誤補償機制的後果
+
+如果保留錯誤的補償機制（`decrementUse()`），會導致：
+
+```javascript
+// 錯誤的流程：
+// 1. 用戶有 10 次對話次數
+// 2. 發起對話請求
+// 3. AI 請求失敗（OpenAI 服務暫時故障）
+// 4. recordMessage() 未被調用，對話次數仍為 10 次
+// 5. 錯誤的補償機制執行 decrementUse()，對話次數變為 11 次
+// 6. 用戶獲得了免費的對話次數！
+```
+
+**影響範圍**：
+- 用戶可以通過觸發 AI 失敗（例如在網絡不穩定時重複請求）來獲得無限對話次數
+- 嚴重違反業務邏輯，影響營收和資源使用
+
+#### 修復方案
+
+**移除補償機制**，並添加詳細註釋說明原因：
+
+```javascript
+// ai.service.js - requestOpenAIReply 函數
+catch (error) {
+  logger.error(`[AI 服務] OpenAI 請求失敗（已重試 3 次）:`, {
+    error: error.message,
+    status: error.status,
+    code: error.code,
+    userId,
+    characterId,
+  });
+
+  // ⚠️ 注意：不需要補償機制
+  // 原因：對話次數的記錄（recordMessage）發生在 AI 成功後（見 ai.routes.js）
+  // 如果 AI 失敗，recordMessage 不會被調用，所以對話次數根本沒有增加
+  // 因此不需要執行補償（decrementUse）來返還對話次數
+
+  throw error;
+}
+```
+
+#### 教訓和最佳實踐
+
+1. **理解完整流程**：在設計補償機制前，必須完整理解業務流程的每個步驟
+2. **追蹤狀態變更**：清楚地記錄狀態變更的時機（何時扣除、何時返還）
+3. **代碼審查的重要性**：邏輯審查能發現看似合理但實際錯誤的設計
+4. **添加詳細註釋**：在關鍵決策點（如為何不需要補償）添加詳細說明
+
+#### 驗證方法
+
+**測試場景**：模擬 AI 服務失敗
+
+```javascript
+// 測試腳本
+describe('AI 服務失敗時的對話次數處理', () => {
+  it('AI 失敗時不應扣除對話次數', async () => {
+    const initialLimit = await getConversationLimit(userId, characterId);
+
+    try {
+      // 模擬 OpenAI API 失敗
+      await sendMessage(userId, characterId, "測試消息");
+    } catch (error) {
+      // 預期會失敗
+    }
+
+    const finalLimit = await getConversationLimit(userId, characterId);
+
+    // 驗證：對話次數應該不變
+    expect(finalLimit).toBe(initialLimit);
+  });
+});
+```
+
+**提交記錄**：
+- Commit: `9dfcb58`
+- 標題: `fix(ai): 移除錯誤的補償機制 - AI 失敗時無需返還對話次數`
 
 ---
 

@@ -5,7 +5,6 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
-  watch,
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -14,6 +13,7 @@ import ChatHeader from "../components/chat/ChatHeader.vue";
 import MessageList from "../components/chat/MessageList.vue";
 import MessageInput from "../components/chat/MessageInput.vue";
 import ChatModals from "../components/chat/ChatModals.vue";
+import UnlockFab from "../components/chat/UnlockFab.vue";
 
 // Composables
 import { useUserProfile } from "../composables/useUserProfile";
@@ -42,42 +42,25 @@ import { useFavoriteManagement } from "../composables/chat/useFavoriteManagement
 import { useShareFunctionality } from "../composables/chat/useShareFunctionality";
 import { useConversationReset } from "../composables/chat/useConversationReset";
 import { usePhotoVideoHandler } from "../composables/chat/usePhotoVideoHandler";
+import { usePartner } from "../composables/chat/usePartner";
+import { useMenuActions } from "../composables/chat/useMenuActions";
+import { useChatInitialization } from "../composables/chat/useChatInitialization";
+import { useEventHandlers } from "../composables/chat/useEventHandlers";
+import { useChatWatchers } from "../composables/chat/useChatWatchers";
 
 // Utils
-import { fallbackMatches } from "../utils/matchFallback";
-import { isGuestUser } from "../../../../shared/config/testAccounts";
-import { apiJson } from "../utils/api";
 import { appendCachedHistory } from "../utils/conversationCache";
-import { logger } from "@/utils/logger";
-import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service";
+import {
+  rollbackUserMessage as rollbackUserMessageHelper,
+  createLimitModalData as createLimitModalDataHelper,
+  getConversationContext as getConversationContextHelper,
+} from "../utils/chat/chatHelpers";
+
+// Config
+import { MESSAGE_ID_PREFIXES, VIDEO_REQUEST_MESSAGES, VIDEO_CONFIG, AI_VIDEO_RESPONSE_TEXT } from "../config/chat/constants";
 
 const router = useRouter();
 const route = useRoute();
-
-// ====================
-// Constants
-// ====================
-const MESSAGE_ID_PREFIXES = {
-  SELFIE_REQUEST: "msg-selfie-request-",
-  VIDEO_REQUEST: "msg-video-request-",
-  VIDEO_AI: "msg-video-ai-",
-  FIRST: "msg-first-",
-};
-
-const VIDEO_REQUEST_MESSAGES = [
-  "能給我看一段你的影片嗎？",
-  "想看看你的影片！",
-  "可以拍一段影片給我看嗎？",
-  "期待看到你的影片！",
-];
-
-const VIDEO_CONFIG = {
-  DURATION: "4s",
-  RESOLUTION: "720p",
-  ASPECT_RATIO: "9:16",
-};
-
-const AI_VIDEO_RESPONSE_TEXT = "這是我為你準備的影片！";
 
 // ====================
 // User & Auth
@@ -130,59 +113,18 @@ const {
   createCards,
 } = useUnlockTickets();
 
-// Partner Data
+// Partner Data (使用 usePartner composable)
 const partnerId = computed(() => route.params.id);
-const partner = ref(null);
+const {
+  partner,
+  partnerDisplayName,
+  partnerBackground,
+  backgroundStyle,
+  loadPartner,
+} = usePartner({ partnerId });
 
 // Chat Page Ref (用於截圖)
 const chatPageRef = ref(null);
-
-// 从 API 加载角色数据（使用緩存）
-const loadPartner = async (characterId) => {
-  if (!characterId) {
-    partner.value = null;
-    return;
-  }
-
-  try {
-    // 使用 API 緩存服務，10 分鐘緩存
-    const character = await apiCache.fetch(
-      cacheKeys.character(characterId),
-      async () => {
-        const response = await apiJson(
-          `/match/${encodeURIComponent(characterId)}`,
-          {
-            skipGlobalLoading: true,
-          }
-        );
-        return response?.character || null;
-      },
-      cacheTTL.CHARACTER
-    );
-
-    partner.value = character;
-  } catch (error) {
-    logger.error('載入角色失敗:', error);
-    // Fallback 到内存数组
-    partner.value = fallbackMatches.find((m) => m.id === characterId) || null;
-  }
-};
-
-const partnerDisplayName = computed(() => {
-  return partner.value?.display_name || "未知角色";
-});
-
-const partnerBackground = computed(() => {
-  return partner.value?.background || "";
-});
-
-// Background Style
-const backgroundStyle = computed(() => {
-  if (!partner.value?.portraitUrl) return {};
-  return {
-    backgroundImage: `url(${partner.value.portraitUrl})`,
-  };
-});
 
 // Current User ID
 const currentUserId = computed(() => user.value?.id || "");
@@ -519,10 +461,10 @@ const {
 // Conversation Context
 // ====================
 const getConversationContext = () => {
-  return {
-    matchId: partner.value?.id ?? "",
-    currentUserId: currentUserId.value ?? "",
-  };
+  return getConversationContextHelper({
+    matchId: partner.value?.id,
+    currentUserId: currentUserId.value,
+  });
 };
 
 // ====================
@@ -531,65 +473,25 @@ const getConversationContext = () => {
 
 /**
  * 撤回用戶消息（從後端和前端同時刪除）
- * @param {string} userId - 用戶 ID
- * @param {string} matchId - 角色 ID
- * @param {string} messageId - 消息 ID
- * @returns {Promise<boolean>} - 是否成功撤回
+ * 使用抽取的 helper 函數
  */
 const rollbackUserMessage = async (userId, matchId, messageId) => {
-  if (!userId || !matchId || !messageId) {
-    return false;
-  }
-
-  try {
-    const token = await firebaseAuth.getCurrentUserIdToken();
-
-    // ✅ 先從後端 Firestore 刪除
-    await apiJson(`/api/conversations/${userId}/${matchId}/messages`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: {
-        messageIds: [messageId],
-      },
-      skipGlobalLoading: true,
-    });
-
-    // ✅ 成功後才從前端訊息列表中刪除
-    const msgIndex = messages.value.findIndex((m) => m.id === messageId);
-    if (msgIndex !== -1) {
-      messages.value.splice(msgIndex, 1);
-    }
-
-    // ✅ 更新緩存
-    writeCachedHistory(userId, matchId, messages.value);
-
-    return true;
-  } catch (error) {
-    showError("撤回訊息失敗，請重新整理頁面");
-    return false;
-  }
+  return rollbackUserMessageHelper({
+    userId,
+    matchId,
+    messageId,
+    firebaseAuth,
+    messages,
+    showError,
+  });
 };
 
 /**
  * 創建限制 Modal 的數據結構
- * @param {Object} limitCheck - 限制檢查結果
- * @param {string} type - 限制類型 ('photo' 或 'video')
- * @returns {Object} Modal 數據對象
+ * 使用抽取的 helper 函數
  */
 const createLimitModalData = (limitCheck, type = "photo") => {
-  const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
-  return {
-    used: limitCheck.used || 0,
-    remaining: limitCheck.remaining || 0,
-    total: limitCheck.total || 0,
-    standardTotal: limitCheck[`standard${capitalizedType}sLimit`] || null,
-    isTestAccount: limitCheck.isTestAccount || false,
-    cards: limitCheck[`${type}Cards`] || 0,
-    tier: limitCheck.tier || "free",
-    resetPeriod: limitCheck.resetPeriod || "lifetime",
-  };
+  return createLimitModalDataHelper(limitCheck, type);
 };
 
 // ====================
@@ -645,268 +547,85 @@ const handleSendMessage = async (text) => {
 };
 
 // ====================
-// Suggestion Handlers
+// Event Handlers (使用 useEventHandlers composable)
 // ====================
-const handleSuggestionClick = async (suggestion) => {
-  // 直接送出建議訊息
-  if (suggestion && suggestion.trim()) {
-    await handleSendMessage(suggestion.trim());
-  }
-};
-
-const handleRequestSuggestions = async () => {
-  await loadSuggestions();
-};
-
-// ====================
-// Menu Action Handler
-// ====================
-const handleMenuAction = (action) => {
-  switch (action) {
-    case "reset":
-      showResetConfirm();
-      break;
-    case "info":
-      showCharacterInfo();
-      break;
-    case "unlock-character":
-      // 檢查是否有解鎖卡
-      if (!hasCharacterTickets.value || characterTickets.value <= 0) {
-        // 顯示商城引導彈窗
-        showUnlockLimit();
-        return;
-      }
-      // 顯示確認彈窗
-      showUnlockConfirm();
-      break;
-    case "memory":
-    case "memory-boost":
-      // 檢查是否有藥水
-      if (userPotions.value.memoryBoost <= 0) {
-        // 顯示商城引導彈窗
-        showPotionLimit("memoryBoost");
-        return;
-      }
-      showPotionConfirm("memoryBoost");
-      break;
-    case "brain":
-    case "brain-boost":
-      // 檢查是否有藥水
-      if (userPotions.value.brainBoost <= 0) {
-        // 顯示商城引導彈窗
-        showPotionLimit("brainBoost");
-        return;
-      }
-      showPotionConfirm("brainBoost");
-      break;
-    case "share":
-      handleShare();
-      break;
-  }
-};
-
-// ====================
-// Share Handler
-// ====================
-// handleShare 由 useShareFunctionality 提供
-// downloadScreenshot 由 useShareFunctionality 內部處理
-
-// ====================
-// Favorite Handler
-// ====================
-// toggleFavorite 由 useFavoriteManagement 提供
-
-// ====================
-// Reset Conversation
-// ====================
-// confirmResetConversation 由 useConversationReset 提供
-// cancelResetConversation 由 useConversationReset 提供
-
-// ====================
-// Character Info
-// ====================
-// closeCharacterInfo 由 useModalManager 提供
-
-// ====================
-// Potion Usage
-// ====================
-// handleClosePotionConfirm 由 closePotionConfirm 替代
-// handleConfirmUsePotion 由 confirmUsePotion (來自 usePotionManagement) 替代
-
-// ====================
-// Buff Details
-// ====================
-const handleViewBuffDetails = (buffType) => {
-  showBuffDetails(buffType);
-};
-
-// handleCloseBuffDetails 由 closeBuffDetails 替代
-
-// ====================
-// Voice Handler
-// ====================
-// handlePlayVoice 由 useVoiceManagement 提供
-
-// ====================
-// Image Viewer
-// ====================
-const handleImageClick = ({ url, alt }) => {
-  showImageViewer(url, alt);
-};
-
-// handleCloseImageViewer 由 closeImageViewer 替代
-
-// ====================
-// Selfie Handler
-// ====================
-// handleRequestSelfie 由 useSelfieGeneration 提供
-// handlePhotoSelect 由 usePhotoVideoHandler 提供
-
-// handleClosePhotoSelector 由 closePhotoSelector 替代
-
-// ====================
-// Gift Handlers
-// ====================
-// handleOpenGiftSelector 由 useGiftManagement 提供
-// handleSelectGift 由 useGiftManagement 提供
-
-// ====================
-// Limit Modal Handlers
-// ====================
-// handleCloseLimitModal 由 closeConversationLimit 替代
-// handleWatchAd 由 useConversationLimitActions 提供
-// handleUseUnlockCard 由 useConversationLimitActions 提供
-
-// handleCloseVoiceLimitModal 由 closeVoiceLimit 替代
-
-// 包裝函數：觀看語音廣告（從 template 調用）
-const handleWatchVoiceAd = async () => {
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-  await watchVoiceAd(userId, matchId);
-};
-
-// handleUseVoiceUnlockCard 由 useVoiceManagement 提供（直接使用）
-
-// handleClosePhotoLimitModal 由 closePhotoLimit 替代
-
-// ====================
-// Video Limit Modal Handlers
-// ====================
-// handleCloseVideoLimitModal 由 closeVideoLimit 替代
-// handleUseVideoUnlockCard 由 usePhotoVideoHandler 提供
-// handleUpgradeFromVideoModal 由 usePhotoVideoHandler 提供
-
-// handleUsePhotoUnlockCard 由 useSelfieGeneration 提供
-
-// ====================
-// Navigation
-// ====================
-const handleBack = () => {
-  router.back();
-};
-
-// ====================
-// Character Unlock Handlers
-// ====================
-// handleCloseUnlockConfirm 由 closeUnlockConfirm 替代
-// handleCloseUnlockLimit 由 closeUnlockLimit 替代
-// loadActiveUnlocks 由 useCharacterUnlock 提供
-// handleConfirmUnlockCharacter 由 useCharacterUnlock 提供
-
-// Watch partnerId changes
-watch(partnerId, (newId) => {
-  if (newId) {
-    // 立即隱藏解鎖圖標，避免顯示閃爍
-    resetUnlockDataLoadedState();
-
-    // 清空舊角色的效果數據
-    activePotionEffects.value = [];
-    activeUnlockEffects.value = [];
-
-    loadPartner(newId);
-  }
-}, {
-  flush: 'sync', // 同步執行，確保在 computed 重新計算前就清空數據
+const {
+  handleImageClick,
+  handleViewBuffDetails,
+  handleBack,
+  handleWatchVoiceAd,
+  handleSuggestionClick,
+  handleRequestSuggestions,
+} = useEventHandlers({
+  showImageViewer,
+  showBuffDetails,
+  router,
+  watchVoiceAd,
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partner.value?.id,
+  loadSuggestions,
+  handleSendMessage,
 });
 
 // ====================
-// Initialization
+// Menu Action Handler (使用 useMenuActions composable)
 // ====================
+const { handleMenuAction } = useMenuActions({
+  modals: {
+    showResetConfirm,
+    showCharacterInfo,
+    showUnlockLimit,
+    showUnlockConfirm,
+    showPotionLimit,
+    showPotionConfirm,
+  },
+  userPotions,
+  unlockTickets: {
+    hasCharacterTickets: computed(() => hasCharacterTickets.value),
+    characterTickets: computed(() => characterTickets.value),
+  },
+  handleShare,
+});
+
+// ====================
+// Watchers (使用 useChatWatchers composable)
+// ====================
+useChatWatchers({
+  partnerId,
+  messages,
+  resetUnlockDataLoadedState,
+  loadPartner,
+  invalidateSuggestions,
+  activePotionEffects,
+  activeUnlockEffects,
+});
+
+// ====================
+// Initialization (使用 useChatInitialization composable)
+// ====================
+const { initializeChat } = useChatInitialization({
+  // Getters
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partnerId.value,
+  getPartner: () => partner.value,
+  getMessages: () => messages.value,
+  getMessageListRef: () => messageListRef.value,
+
+  // Loaders
+  loadPartner,
+  loadTicketsBalance,
+  loadPotions,
+  loadActivePotions,
+  loadActiveUnlocks,
+  loadHistory,
+  addConversationHistory,
+  loadVoiceStats,
+  fetchPhotoStats,
+  loadBalance,
+});
+
 onMounted(async () => {
-  const userId = currentUserId.value;
-  const matchId = partnerId.value;
-
-  if (!userId || !matchId) return;
-
-  try {
-    // Load partner data first
-    await loadPartner(matchId);
-
-    // Load unlock tickets (統一管道獲取所有卡片)
-    await loadTicketsBalance(userId, { skipGlobalLoading: true });
-
-    // Load potions
-    await loadPotions();
-
-    // Load active potion effects
-    await loadActivePotions();
-
-    // Load active unlock effects
-    await loadActiveUnlocks();
-
-    // Load conversation history
-    await loadHistory(userId, matchId);
-
-    // 記錄對話歷史（靜默失敗，不影響聊天功能）
-    try {
-      await addConversationHistory(matchId);
-    } catch (error) {
-      // 靜默失敗，不影響用戶體驗
-      if (import.meta.env.DEV) {
-        logger.warn("記錄對話歷史失敗:", error);
-      }
-    }
-
-    // 檢查是否需要添加角色的第一句話
-    // 條件：沒有消息，或者第一條消息不是角色的 first_message
-    const needsFirstMessage =
-      partner.value?.first_message &&
-      (messages.value.length === 0 ||
-        messages.value[0]?.text !== partner.value.first_message.trim());
-
-    if (needsFirstMessage) {
-      const firstMessage = {
-        id: `${MESSAGE_ID_PREFIXES.FIRST}${Date.now()}`,
-        role: "partner",
-        text: partner.value.first_message.trim(),
-        createdAt: new Date().toISOString(),
-      };
-
-      // 添加到消息列表開頭
-      messages.value.unshift(firstMessage);
-
-      // 保存到緩存（完整歷史）
-      writeCachedHistory(userId, matchId, messages.value);
-    }
-
-    // Load voice stats
-    if (!isGuestUser(userId)) {
-      await loadVoiceStats(userId, { skipGlobalLoading: true });
-    }
-
-    // Load photo stats
-    await fetchPhotoStats();
-
-    // Load balance
-    await loadBalance(userId, { skipGlobalLoading: true });
-
-    // Scroll to bottom
-    await nextTick();
-    messageListRef.value?.scrollToBottom(false);
-  } catch (error) {
-    // Silent fail
-  }
+  await initializeChat();
 });
 
 // ====================
@@ -915,16 +634,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   cleanupMessages();
 });
-
-// ====================
-// Watch message changes to invalidate suggestions
-// ====================
-watch(
-  () => messages.value.length,
-  () => {
-    invalidateSuggestions();
-  }
-);
 </script>
 
 <template>
@@ -981,23 +690,12 @@ watch(
     />
 
     <!-- 快速解鎖角色懸浮按鈕 -->
-    <button
-      v-if="!isCharacterUnlocked"
-      type="button"
-      class="unlock-fab"
-      :class="{ 'has-cards': hasCharacterTickets }"
-      :title="
-        hasCharacterTickets
-          ? `使用解鎖卡（擁有 ${characterTickets} 張）`
-          : '購買解鎖卡'
-      "
-      @click="handleMenuAction('unlock-character')"
-    >
-      <span class="unlock-fab__icon">🎫</span>
-      <span v-if="hasCharacterTickets" class="unlock-fab__count">{{
-        characterTickets
-      }}</span>
-    </button>
+    <UnlockFab
+      :is-character-unlocked="isCharacterUnlocked"
+      :has-character-tickets="hasCharacterTickets"
+      :character-tickets="characterTickets"
+      @unlock-action="handleMenuAction('unlock-character')"
+    />
 
     <!-- All Modals -->
     <ChatModals
@@ -1061,177 +759,5 @@ watch(
   background-position: center;
   background-attachment: fixed;
   position: relative;
-}
-
-/* ===================
-   快速解鎖角色懸浮按鈕
-   =================== */
-.unlock-fab {
-  position: fixed;
-  top: 140px;
-  right: 1.5rem;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: none;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: white;
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  z-index: 1000;
-  overflow: visible;
-
-  // 旋轉光環（外圈）- 預設就顯示
-  &::before {
-    content: "";
-    position: absolute;
-    inset: -8px;
-    border-radius: 50%;
-    background: conic-gradient(
-      from 0deg,
-      transparent 0deg,
-      rgba(34, 197, 94, 0.6) 90deg,
-      transparent 180deg,
-      rgba(34, 197, 94, 0.6) 270deg,
-      transparent 360deg
-    );
-    animation: rotate 3s linear infinite;
-    opacity: 0.7;
-    transition: opacity 0.3s ease;
-  }
-
-  // 發光光暈（中圈）- 預設就顯示
-  &::after {
-    content: "";
-    position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      rgba(34, 197, 94, 0.4) 0%,
-      transparent 70%
-    );
-    animation: pulse-glow 2s ease-in-out infinite;
-    opacity: 0.5;
-    transition: opacity 0.3s ease;
-  }
-
-  // 按鈕本身也有脈動動畫
-  animation: pulse-shadow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-
-  // icon 預設就閃爍
-  &__icon {
-    font-size: 1.75rem;
-    line-height: 1;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-    position: relative;
-    z-index: 1;
-    animation: sparkle 3s ease-in-out infinite;
-  }
-
-  &:hover {
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 12px 32px rgba(34, 197, 94, 0.5);
-
-    &::before,
-    &::after {
-      opacity: 1;
-    }
-  }
-
-  &:active {
-    transform: translateY(-2px) scale(1.02);
-  }
-
-  &__count {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    min-width: 22px;
-    height: 22px;
-    padding: 0 6px;
-    border-radius: 11px;
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #0f1016;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    z-index: 2;
-    animation: bounce-subtle 2s ease-in-out infinite;
-  }
-
-  // 有卡時增強效果
-  &.has-cards {
-    &::before,
-    &::after {
-      opacity: 1;
-    }
-  }
-}
-
-// 旋轉動畫
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-// 脈動陰影
-@keyframes pulse-shadow {
-  0%,
-  100% {
-    box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
-  }
-  50% {
-    box-shadow: 0 12px 40px rgba(34, 197, 94, 0.8),
-      0 0 30px rgba(34, 197, 94, 0.5);
-  }
-}
-
-// 光暈脈動
-@keyframes pulse-glow {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.3;
-  }
-  50% {
-    transform: scale(1.3);
-    opacity: 0.6;
-  }
-}
-
-// 閃爍效果
-@keyframes sparkle {
-  0%,
-  100% {
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) brightness(1);
-  }
-  50% {
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8))
-      drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) brightness(1.3);
-  }
-}
-
-// 徽章彈跳
-@keyframes bounce-subtle {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-2px) scale(1.05);
-  }
 }
 </style>

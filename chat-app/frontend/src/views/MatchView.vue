@@ -179,6 +179,13 @@ watch(
       favorites.favoriteRequestState.lastUserId = '';
       favorites.syncFavoriteSet([]);
       await matchData.loadMatches();
+
+      // 檢查競態條件：如果加載期間用戶已登入，忽略遊客數據
+      if (user.value?.id) {
+        logger.warn('遊客加載期間已登入，等待登入數據載入');
+        return;
+      }
+
       carousel.initialize();
       return;
     }

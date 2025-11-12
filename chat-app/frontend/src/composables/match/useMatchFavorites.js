@@ -197,6 +197,7 @@ export function useMatchFavorites(options = {}) {
     }
 
     favoriteMutating.value = true;
+    const requestUserId = currentProfile.id; // 保存請求時的用戶 ID
     const wasFavorited = favoriteIds.value.has(matchId);
     const previousSet = new Set(favoriteIds.value);
     const optimisticSet = new Set(previousSet);
@@ -226,21 +227,44 @@ export function useMatchFavorites(options = {}) {
         skipGlobalLoading: true,
       });
 
+      // 檢查競態條件：如果請求完成時用戶已切換，忽略響應數據
+      if (user?.value?.id !== requestUserId) {
+        logger.warn('用戶已切換，忽略過期的收藏更新');
+        // 不回滾，保持當前用戶的狀態（可能已被 watch 更新為新用戶的收藏）
+        return false;
+      }
+
       const favoritesList = Array.isArray(response?.favorites)
         ? response.favorites
         : [];
 
       favoriteIds.value = new Set(favoritesList);
+
+      // 使用最新的用戶資料，並保護回調執行
       if (onUpdateProfile) {
-        onUpdateProfile({
-          ...currentProfile,
-          favorites: favoritesList,
-        });
+        try {
+          const latestProfile = user?.value;
+          if (latestProfile?.id === requestUserId) {
+            onUpdateProfile({
+              ...latestProfile,
+              favorites: favoritesList,
+            });
+          }
+        } catch (callbackError) {
+          logger.warn('更新用戶資料回調失敗:', callbackError);
+          // 不中斷主流程，繼續返回成功
+        }
       }
 
       return true;
     } catch (requestError) {
-      // 錯誤時回滾
+      // 檢查競態條件：如果請求失敗時用戶已切換，不回滾
+      if (user?.value?.id !== requestUserId) {
+        logger.warn('用戶已切換，忽略過期的收藏更新錯誤');
+        return false;
+      }
+
+      // 錯誤時回滾（僅當用戶未切換時）
       favoriteIds.value = previousSet;
       favoriteError.value =
         requestError instanceof Error

@@ -119,11 +119,12 @@ const getUserMembershipConfig = async (userId) => {
 };
 
 /**
- * 🔥 從 Firestore 讀取系統提示詞模板並進行變數替換
+ * 🔥 從配置中讀取系統提示詞模板並進行變數替換
+ * @param {object} character - 角色資料
+ * @param {object} user - 用戶資料
+ * @param {object} chatConfig - 聊天配置（從外部傳入，避免重複查詢）
  */
-const buildSystemPrompt = async (character, user = null) => {
-  // 🔥 從 Firestore 讀取聊天設定
-  const chatConfig = await getAiServiceSettings("chat");
+const buildSystemPrompt = (character, user = null, chatConfig = {}) => {
 
   // 使用 Firestore 中的模板（如果沒有則使用預設模板）
   let template = chatConfig.systemPromptTemplate || `你是一位虛構角色「{角色名稱}」，性別為{性別}，負責以情感陪伴的方式與使用者對話。
@@ -438,7 +439,7 @@ const requestOpenAIReply = async (character, history, latestUserMessage, userId,
     messages: [
       {
         role: "system",
-        content: await buildSystemPrompt(character, user), // 🔥 使用 await
+        content: buildSystemPrompt(character, user, chatConfig), // 傳入 chatConfig，避免重複查詢
       },
       ...messages,
     ],

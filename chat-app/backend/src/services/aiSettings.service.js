@@ -17,8 +17,15 @@ const AI_SETTINGS_DOC_ID = "global";
 let cachedSettings = null;
 let lastFetchTime = 0;
 
-// 緩存有效期：5 分鐘（毫秒）
-const CACHE_TTL = 5 * 60 * 1000;
+// 緩存有效期：10 分鐘（毫秒）
+const CACHE_TTL = 10 * 60 * 1000;
+
+// 緩存統計（用於監控性能）
+let cacheStats = {
+  hits: 0,    // 緩存命中次數
+  misses: 0,  // 緩存未命中次數
+  lastResetTime: Date.now(),
+};
 
 /**
  * 預設 AI 設定（與後台管理系統的 DEFAULT_AI_SETTINGS 保持一致）
@@ -267,9 +274,19 @@ export const getAiSettings = async (forceRefresh = false) => {
 
   // 檢查緩存是否有效
   if (!forceRefresh && cachedSettings && (now - lastFetchTime < CACHE_TTL)) {
-    logger.debug("[AI Settings] 使用緩存的 AI 設定");
+    cacheStats.hits++;
+    const hitRate = ((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100).toFixed(2);
+    logger.debug("[AI Settings] 使用緩存的 AI 設定", {
+      cacheAge: `${Math.floor((now - lastFetchTime) / 1000)}秒`,
+      hitRate: `${hitRate}%`,
+      totalHits: cacheStats.hits,
+      totalMisses: cacheStats.misses,
+    });
     return cachedSettings;
   }
+
+  // 緩存未命中
+  cacheStats.misses++;
 
   try {
     logger.info("[AI Settings] 從 Firestore 讀取 AI 設定...");
@@ -290,7 +307,15 @@ export const getAiSettings = async (forceRefresh = false) => {
     cachedSettings = settings;
     lastFetchTime = now;
 
-    logger.info("[AI Settings] AI 設定載入成功");
+    const hitRate = cacheStats.hits + cacheStats.misses > 0
+      ? ((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100).toFixed(2)
+      : "0.00";
+
+    logger.info("[AI Settings] AI 設定載入成功（從 Firestore 讀取）", {
+      cacheHitRate: `${hitRate}%`,
+      totalHits: cacheStats.hits,
+      totalMisses: cacheStats.misses,
+    });
     logger.debug("[AI Settings] 設定快照:", {
       chatModel: settings.chat?.model,
       ttsModel: settings.tts?.model,
@@ -346,4 +371,40 @@ export const getAiServiceSettings = async (serviceName) => {
  */
 export const getDefaultAiSettings = () => {
   return { ...DEFAULT_AI_SETTINGS };
+};
+
+/**
+ * 獲取緩存統計信息（用於監控和調試）
+ * @returns {object} - 緩存統計信息
+ */
+export const getCacheStats = () => {
+  const total = cacheStats.hits + cacheStats.misses;
+  const hitRate = total > 0
+    ? ((cacheStats.hits / total) * 100).toFixed(2)
+    : "0.00";
+  const uptime = Math.floor((Date.now() - cacheStats.lastResetTime) / 1000);
+
+  return {
+    hits: cacheStats.hits,
+    misses: cacheStats.misses,
+    total,
+    hitRate: `${hitRate}%`,
+    uptime: `${uptime}秒`,
+    cacheAge: lastFetchTime > 0
+      ? `${Math.floor((Date.now() - lastFetchTime) / 1000)}秒`
+      : "未載入",
+    cacheTTL: `${CACHE_TTL / 1000}秒`,
+  };
+};
+
+/**
+ * 重置緩存統計（用於測試或重新開始監控）
+ */
+export const resetCacheStats = () => {
+  cacheStats = {
+    hits: 0,
+    misses: 0,
+    lastResetTime: Date.now(),
+  };
+  logger.info("[AI Settings] 緩存統計已重置");
 };

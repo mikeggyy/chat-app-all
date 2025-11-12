@@ -190,47 +190,69 @@ export const deletePhotos = async (userId, photoIds) => {
   const photosRef = getUserPhotosRef(userId);
   const db = getFirestoreDb();
 
-  // 先獲取照片文檔，以便獲取 imageUrl 用於刪除遠端儲存的圖片
-  const photoUrls = [];
-  const photoDocsPromises = photoIds.map(photoId => photosRef.doc(photoId).get());
-  const photoDocs = await Promise.all(photoDocsPromises);
+  // ✅ 優化：使用批量查詢代替 N 次單獨查詢，避免 N+1 問題
+  // Firestore 'in' 查詢最多支援 30 個 ID，需要分批處理
+  const mediaUrls = new Set(); // 使用 Set 自動去重 URL
+  const existingPhotoIds = new Set(); // 追踪實際存在的照片 ID
+  const BATCH_SIZE = 30;
 
-  photoDocs.forEach(doc => {
-    if (doc.exists) {
+  for (let i = 0; i < photoIds.length; i += BATCH_SIZE) {
+    const batchIds = photoIds.slice(i, i + BATCH_SIZE);
+
+    // 使用 where('__name__', 'in', ...) 批量查詢文檔
+    const snapshot = await photosRef.where('__name__', 'in', batchIds).get();
+
+    snapshot.forEach(doc => {
+      // 記錄存在的照片 ID
+      existingPhotoIds.add(doc.id);
+
+      // 收集所有媒體 URL 用於後續刪除遠端儲存（自動去重）
       const data = doc.data();
       if (data?.imageUrl) {
-        photoUrls.push(data.imageUrl);
+        mediaUrls.add(data.imageUrl);
       }
-    }
-  });
-
-  // 使用 batch 批量刪除 Firestore 記錄
-  const batch = db.batch();
-  let deletedCount = 0;
-
-  for (const photoId of photoIds) {
-    const photoDoc = photosRef.doc(photoId);
-    batch.delete(photoDoc);
-    deletedCount++;
+      // ✅ 同時收集影片 URL（如果存在）
+      if (data?.videoUrl) {
+        mediaUrls.add(data.videoUrl);
+      }
+    });
   }
 
-  await batch.commit();
+  // 使用 batch 批量刪除 Firestore 記錄（只刪除存在的照片）
+  // Firestore batch 最多支援 500 個操作，需要分批處理
+  const MAX_BATCH_OPS = 500;
+  const photoIdArray = Array.from(existingPhotoIds);
+  let deletedCount = 0;
+
+  for (let i = 0; i < photoIdArray.length; i += MAX_BATCH_OPS) {
+    const batch = db.batch();
+    const batchSlice = photoIdArray.slice(i, i + MAX_BATCH_OPS);
+
+    batchSlice.forEach((photoId) => {
+      const photoDoc = photosRef.doc(photoId);
+      batch.delete(photoDoc);
+      deletedCount++;
+    });
+
+    await batch.commit();
+  }
 
   logger.info(`已刪除 ${deletedCount} 張照片記錄: userId=${userId}`);
 
-  // 刪除遠端儲存的圖片文件（R2）
-  if (photoUrls.length > 0) {
+  // 刪除遠端儲存的媒體文件（圖片和影片）
+  if (mediaUrls.size > 0) {
     try {
       const { deleteImage } = await import("../firebase/storage.service.js");
 
+      const urlArray = Array.from(mediaUrls);
       const deleteResults = await Promise.allSettled(
-        photoUrls.map(async (url) => {
+        urlArray.map(async (url) => {
           try {
             await deleteImage(url);
-            logger.info(`[照片清理] 成功刪除遠端圖片: ${url}`);
+            logger.info(`[照片清理] 成功刪除遠端媒體: ${url}`);
             return { url, success: true };
           } catch (error) {
-            logger.error(`[照片清理] 刪除遠端圖片失敗: ${url}`, error);
+            logger.error(`[照片清理] 刪除遠端媒體失敗: ${url}`, error);
             return { url, success: false, error: error.message };
           }
         })
@@ -239,9 +261,9 @@ export const deletePhotos = async (userId, photoIds) => {
       const successCount = deleteResults.filter(r => r.status === "fulfilled" && r.value.success).length;
       const failCount = deleteResults.length - successCount;
 
-      logger.info(`[照片清理] 遠端圖片刪除完成: 成功 ${successCount} 個，失敗 ${failCount} 個`);
+      logger.info(`[照片清理] 遠端媒體刪除完成: 成功 ${successCount} 個，失敗 ${failCount} 個`);
     } catch (error) {
-      logger.error(`[照片清理] 刪除遠端圖片時發生錯誤:`, error);
+      logger.error(`[照片清理] 刪除遠端媒體時發生錯誤:`, error);
       // 不拋出錯誤，因為 Firestore 記錄已經刪除，這只是清理遠端儲存
     }
   }
@@ -271,40 +293,52 @@ export const deleteCharacterPhotos = async (userId, characterId) => {
     return { deleted: 0 };
   }
 
-  // 收集所有照片的 imageUrl
-  const photoUrls = [];
+  // 收集所有媒體 URL（圖片和影片），使用 Set 自動去重
+  const mediaUrls = new Set();
   snapshot.forEach((doc) => {
     const data = doc.data();
     if (data?.imageUrl) {
-      photoUrls.push(data.imageUrl);
+      mediaUrls.add(data.imageUrl);
+    }
+    // ✅ 同時收集影片 URL（如果存在）
+    if (data?.videoUrl) {
+      mediaUrls.add(data.videoUrl);
     }
   });
 
   // 刪除 Firestore 記錄
+  // Firestore batch 最多支援 500 個操作，需要分批處理
   const db = getFirestoreDb();
-  const batch = db.batch();
+  const MAX_BATCH_OPS = 500;
+  const docs = snapshot.docs;
 
-  snapshot.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
+  for (let i = 0; i < docs.length; i += MAX_BATCH_OPS) {
+    const batch = db.batch();
+    const batchSlice = docs.slice(i, i + MAX_BATCH_OPS);
 
-  await batch.commit();
+    batchSlice.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+  }
 
   logger.info(`已刪除角色所有照片記錄: userId=${userId}, characterId=${characterId}, count=${snapshot.size}`);
 
-  // 刪除遠端儲存的圖片文件（R2）
-  if (photoUrls.length > 0) {
+  // 刪除遠端儲存的媒體文件（圖片和影片）
+  if (mediaUrls.size > 0) {
     try {
       const { deleteImage } = await import("../firebase/storage.service.js");
 
+      const urlArray = Array.from(mediaUrls);
       const deleteResults = await Promise.allSettled(
-        photoUrls.map(async (url) => {
+        urlArray.map(async (url) => {
           try {
             await deleteImage(url);
-            logger.info(`[照片清理] 成功刪除遠端圖片: ${url}`);
+            logger.info(`[照片清理] 成功刪除遠端媒體: ${url}`);
             return { url, success: true };
           } catch (error) {
-            logger.error(`[照片清理] 刪除遠端圖片失敗: ${url}`, error);
+            logger.error(`[照片清理] 刪除遠端媒體失敗: ${url}`, error);
             return { url, success: false, error: error.message };
           }
         })
@@ -313,9 +347,9 @@ export const deleteCharacterPhotos = async (userId, characterId) => {
       const successCount = deleteResults.filter(r => r.status === "fulfilled" && r.value.success).length;
       const failCount = deleteResults.length - successCount;
 
-      logger.info(`[照片清理] 角色照片遠端刪除完成: 成功 ${successCount} 個，失敗 ${failCount} 個`);
+      logger.info(`[照片清理] 角色媒體遠端刪除完成: 成功 ${successCount} 個，失敗 ${failCount} 個`);
     } catch (error) {
-      logger.error(`[照片清理] 刪除角色照片遠端儲存時發生錯誤:`, error);
+      logger.error(`[照片清理] 刪除角色媒體遠端儲存時發生錯誤:`, error);
       // 不拋出錯誤，因為 Firestore 記錄已經刪除，這只是清理遠端儲存
     }
   }

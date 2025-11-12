@@ -353,11 +353,18 @@ const generateVideoWithHailuo = async (userId, characterId, character, options =
     const recentMessages = (conversationDoc.data()?.messages || []).slice(-5);
 
     // 🔥 使用模板生成提示詞（從 Firestore 讀取）
-    const prompt = options.prompt || buildVideoPromptFromTemplate(
+    let prompt = options.prompt || buildVideoPromptFromTemplate(
       videoConfig.videoPromptTemplate,
       character,
       recentMessages
     );
+
+    // ✅ 限制提示詞長度（防止超長提示詞增加成本）
+    const MAX_VIDEO_PROMPT_LENGTH = 500;
+    if (prompt.length > MAX_VIDEO_PROMPT_LENGTH) {
+      logger.warn(`[Hailuo] 提示詞過長 (${prompt.length} 字符)，已截斷至 ${MAX_VIDEO_PROMPT_LENGTH} 字符`);
+      prompt = prompt.substring(0, MAX_VIDEO_PROMPT_LENGTH);
+    }
 
     // 獲取圖片 URL（優先使用自定義圖片，否則使用角色預設圖片）
     let imageUrl = options.imageUrl || null;
@@ -544,11 +551,18 @@ const generateVideoWithVeo = async (userId, characterId, character, options = {}
     const recentMessages = (conversationData.messages || []).slice(-5);
 
     // 🔥 使用模板生成提示詞（從 Firestore 讀取）
-    const prompt = options.prompt || buildVideoPromptFromTemplate(
+    let prompt = options.prompt || buildVideoPromptFromTemplate(
       videoConfig.videoPromptTemplate,
       character,
       recentMessages
     );
+
+    // ✅ 限制提示詞長度（防止超長提示詞增加成本）
+    const MAX_VIDEO_PROMPT_LENGTH = 500;
+    if (prompt.length > MAX_VIDEO_PROMPT_LENGTH) {
+      logger.warn(`[Veo] 提示詞過長 (${prompt.length} 字符)，已截斷至 ${MAX_VIDEO_PROMPT_LENGTH} 字符`);
+      prompt = prompt.substring(0, MAX_VIDEO_PROMPT_LENGTH);
+    }
 
     logger.info("[Veo] 開始生成影片:", {
       userId,

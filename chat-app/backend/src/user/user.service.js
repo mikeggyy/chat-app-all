@@ -133,32 +133,19 @@ const normalizeAssets = (payload) => {
 };
 
 /**
- * 規範化 unlockTickets 欄位，移除 undefined 值以符合 Firestore 要求
+ * 規範化 unlockTickets 欄位（✅ 只保留 usageHistory，不處理資產卡片）
  */
 const normalizeUnlockTickets = (payload) => {
   if (!payload || typeof payload !== 'object') {
     return null;
   }
 
-  const normalized = {};
+  // ✅ unlockTickets 只用於審計記錄，只保留 usageHistory
+  const usageHistory = Array.isArray(payload.usageHistory) ? payload.usageHistory : [];
 
-  // 只保留非 undefined 的值
-  if (payload.characterUnlockCards !== undefined) {
-    normalized.characterUnlockCards = toNonNegativeInteger(payload.characterUnlockCards) ?? 0;
-  }
-  if (payload.photoUnlockCards !== undefined) {
-    normalized.photoUnlockCards = toNonNegativeInteger(payload.photoUnlockCards) ?? 0;
-  }
-  if (payload.videoUnlockCards !== undefined) {
-    normalized.videoUnlockCards = toNonNegativeInteger(payload.videoUnlockCards) ?? 0;
-  }
-  if (payload.usageHistory !== undefined && Array.isArray(payload.usageHistory)) {
-    normalized.usageHistory = payload.usageHistory;
-  } else {
-    normalized.usageHistory = [];
-  }
-
-  return Object.keys(normalized).length > 0 ? normalized : null;
+  return {
+    usageHistory
+  };
 };
 
 export const normalizeUser = (payload = {}) => {

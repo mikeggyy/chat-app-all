@@ -18,7 +18,7 @@ export const conversationLimitService = createLimitService({
       : membershipConfig.features.messagesPerCharacter;
   },
   testAccountLimitKey: "CONVERSATIONS_PER_CHARACTER",
-  resetPeriod: RESET_PERIOD.NONE, // 不自動重置（按角色終生限制）
+  resetPeriod: RESET_PERIOD.DAILY, // ✅ 改為每日重置（提升用戶體驗）
   perCharacter: true, // 按角色追蹤
   allowGuest: true, // 遊客可以對話（但不受限制）
   fieldName: "conversation", // Firestore 欄位名稱

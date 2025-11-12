@@ -5,6 +5,7 @@
 
 import express from "express";
 import { refreshAiSettings, getAiSettings } from "../services/aiSettings.service.js";
+import { standardRateLimiter } from "../middleware/rateLimiterConfig.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
@@ -39,8 +40,9 @@ router.get("/", async (req, res) => {
  * 使用場景：
  * - 管理員在管理後台更新 AI 設定後
  * - 需要立即生效而不等待緩存過期（5 分鐘）
+ * ✅ 速率限制：30次/分鐘（管理操作）
  */
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", standardRateLimiter, async (req, res) => {
   try {
     logger.info("[AI Settings API] 收到手動刷新緩存請求");
 

@@ -5,6 +5,7 @@
 
 import express from "express";
 import { getFirestoreDb } from "../firebase/index.js";
+import { relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
@@ -12,8 +13,9 @@ const router = express.Router();
 /**
  * 獲取所有解鎖卡套餐
  * GET /api/assets/packages
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
-router.get("/api/assets/packages", async (req, res) => {
+router.get("/api/assets/packages", relaxedRateLimiter, async (req, res) => {
   try {
     const db = getFirestoreDb();
     const snapshot = await db
@@ -50,8 +52,9 @@ router.get("/api/assets/packages", async (req, res) => {
 /**
  * 獲取所有藥水商品
  * GET /api/potions/packages
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
-router.get("/api/potions/packages", async (req, res) => {
+router.get("/api/potions/packages", relaxedRateLimiter, async (req, res) => {
   try {
     const db = getFirestoreDb();
     const snapshot = await db

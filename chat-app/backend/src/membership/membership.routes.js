@@ -103,13 +103,21 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
           devMode: true,
           membership,
         });
-      } catch (validationError) {
-        // 驗證失敗（生產環境或非測試帳號）
-        logger.error(`[安全] 開發模式繞過驗證失敗: ${validationError.message}`);
-        return sendError(res, "FORBIDDEN", validationError.message);
-      } catch (upgradeError) {
-        // ✅ 詳細的錯誤處理：檢查是否為部分成功
-        logger.error(`[會員服務] 升級失敗 - 用戶: ${userId}, 目標等級: ${tier}`, upgradeError);
+      } catch (error) {
+        // 檢查是否為驗證錯誤（validateDevModeBypass 拋出的錯誤）
+        if (error.message && (
+          error.message.includes('開發模式繞過未啟用') ||
+          error.message.includes('生產環境不允許') ||
+          error.message.includes('只有測試帳號') ||
+          error.message.includes('IP 未授權')
+        )) {
+          // 驗證失敗（生產環境或非測試帳號）
+          logger.error(`[安全] 開發模式繞過驗證失敗: ${error.message}`);
+          return sendError(res, "FORBIDDEN", error.message);
+        }
+
+        // 升級失敗 - 詳細的錯誤處理
+        logger.error(`[會員服務] 升級失敗 - 用戶: ${userId}, 目標等級: ${tier}`, error);
 
         try {
           // 檢查用戶當前狀態
@@ -134,7 +142,7 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
         }
 
         // 正常的失敗情況：Transaction 回滾，所有操作未生效
-        throw upgradeError;
+        throw error;
       }
     } else {
       // 正式環境：應整合支付系統

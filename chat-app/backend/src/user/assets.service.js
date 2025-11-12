@@ -27,24 +27,9 @@ export const getUserAssets = async (userId) => {
   const memoryBoostCount = potionInventory.memoryBoost || 0;
   const brainBoostCount = potionInventory.brainBoost || 0;
 
-  // 統一從主文檔讀取卡片類資產
-  // 向後兼容：優先從 assets，其次 unlockTickets，最後頂層
+  // ✅ 統一從 assets 讀取卡片類資產
   const getCardCount = (cardType) => {
-    if (user?.assets?.[cardType] !== undefined) {
-      return user.assets[cardType] || 0;
-    }
-
-    if (user?.unlockTickets?.[cardType] !== undefined) {
-      logger.debug(`[getUserAssets] ${cardType} 從舊位置 unlockTickets 讀取: ${user.unlockTickets[cardType]}`);
-      return user.unlockTickets[cardType] || 0;
-    }
-
-    if (user?.[cardType] !== undefined) {
-      logger.debug(`[getUserAssets] ${cardType} 從舊位置頂層讀取: ${user[cardType]}`);
-      return user[cardType] || 0;
-    }
-
-    return 0;
+    return user?.assets?.[cardType] || 0;
   };
 
   return {

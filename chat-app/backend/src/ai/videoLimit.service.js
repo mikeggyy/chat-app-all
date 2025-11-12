@@ -57,20 +57,8 @@ const getVideoUnlockCards = async (userId) => {
     const user = await getUserById(userId);
 
     // 優先順序：
-    // 1. unlockTickets.videoUnlockCards（新系統）
-    // 2. assets.videoUnlockCards（舊系統）
-    // 3. videoUnlockCards（頂層，最舊的結構）
-    if (user?.unlockTickets?.videoUnlockCards !== undefined && user.unlockTickets.videoUnlockCards > 0) {
-      return user.unlockTickets.videoUnlockCards;
-    }
-    if (user?.assets?.videoUnlockCards !== undefined && user.assets.videoUnlockCards > 0) {
-      return user.assets.videoUnlockCards;
-    }
-    if (user?.videoUnlockCards !== undefined && user.videoUnlockCards > 0) {
-      return user.videoUnlockCards;
-    }
-
-    return 0;
+    // ✅ 統一從 assets 讀取
+    return user?.assets?.videoUnlockCards || 0;
   } catch (error) {
     return 0;
   }
@@ -78,6 +66,14 @@ const getVideoUnlockCards = async (userId) => {
 
 /**
  * 檢查是否可以生成影片（整合 unlockTickets 影片卡）
+ *
+ * ✅ 安全性說明：
+ * - allowed: 基於基礎會員額度（不包括卡片）
+ * - allowedWithCard: 如果基礎額度用完，但有卡片可用
+ * - 前端應該：
+ *   1. 如果 allowed=true，可以直接生成（不傳 useVideoUnlockCard）
+ *   2. 如果 allowed=false 但 allowedWithCard=true，提示用戶使用卡片
+ *   3. 如果兩者都是 false，提示用戶購買卡片或升級會員
  */
 export const canGenerateVideo = async (userId) => {
   // 1. 獲取基礎限制檢查結果
@@ -96,6 +92,9 @@ export const canGenerateVideo = async (userId) => {
   const baseRemaining = Math.max(0, baseQuota - result.used);
   const isAllowedByBaseQuota = baseRemaining > 0;
 
+  // ✅ 新增：明確告訴前端是否可以使用卡片生成
+  const allowedWithCard = !isAllowedByBaseQuota && videoCards > 0;
+
   // 5. 添加 resetPeriod 到結果中
   const resetPeriod = getResetPeriod(result.tier);
 
@@ -103,12 +102,13 @@ export const canGenerateVideo = async (userId) => {
     ...result,
     // ⚠️ 覆蓋 allowed：只基於基礎會員額度，不包括任何卡片
     allowed: isAllowedByBaseQuota,
+    allowedWithCard, // ✅ 新增：是否可以使用卡片生成
     remaining: baseRemaining, // 也要更新 remaining（只顯示基礎剩餘）
     videoCards, // 添加影片卡數量供前端判斷
     resetPeriod,
     standardVideosLimit: stats.standardLimit, // 用於顯示的標準限制
     isTestAccount: stats.isTestAccount || false,
-    canGenerate: isAllowedByBaseQuota, // 只基於基礎額度
+    canGenerate: isAllowedByBaseQuota || allowedWithCard, // ✅ 改進：可以用基礎額度或卡片生成
     canPurchaseCard: !isAllowedByBaseQuota && videoCards === 0, // 沒有基礎額度且沒有卡時才提示購買
   };
 

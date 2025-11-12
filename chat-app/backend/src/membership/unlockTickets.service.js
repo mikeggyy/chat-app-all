@@ -131,27 +131,8 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
 
     const user = userDoc.data();
 
-    // 2. 檢查多個位置的角色解鎖卡餘額（✅ 優先級：assets > unlockTickets > root）
-    let currentCards = 0;
-
-    // ✅ 優先級 1：新位置 assets（推薦）
-    if (user?.assets?.characterUnlockCards > 0) {
-      currentCards = user.assets.characterUnlockCards;
-    } else if (user?.assets?.characterUnlockTickets > 0) {
-      currentCards = user.assets.characterUnlockTickets;
-    }
-    // ✅ 優先級 2：過渡位置 unlockTickets
-    else if (user?.unlockTickets?.characterUnlockCards > 0) {
-      currentCards = user.unlockTickets.characterUnlockCards;
-    } else if (user?.unlockTickets?.characterUnlockTickets > 0) {
-      currentCards = user.unlockTickets.characterUnlockTickets;
-    }
-    // ✅ 優先級 3：舊位置 root（頂層字段）
-    else if (user?.characterUnlockCards > 0) {
-      currentCards = user.characterUnlockCards;
-    } else if (user?.characterUnlockTickets > 0) {
-      currentCards = user.characterUnlockTickets;
-    }
+    // 2. 讀取角色解鎖卡餘額（✅ 統一從 assets 讀取）
+    const currentCards = user?.assets?.characterUnlockCards || user?.assets?.characterUnlockTickets || 0;
 
     // 3. 檢查餘額
     if (currentCards < 1) {
@@ -253,40 +234,19 @@ export const usePhotoUnlockCard = async (userId) => {
 
     const user = userDoc.data();
 
-    // 檢查多個位置的照片卡餘額
-    let currentCards = 0;
-    let storageLocation = null;
-
-    if (user?.unlockTickets?.photoUnlockCards > 0) {
-      currentCards = user.unlockTickets.photoUnlockCards;
-      storageLocation = "unlockTickets";
-    } else if (user?.assets?.photoUnlockCards > 0) {
-      currentCards = user.assets.photoUnlockCards;
-      storageLocation = "assets";
-    } else if (user?.photoUnlockCards > 0) {
-      currentCards = user.photoUnlockCards;
-      storageLocation = "root";
-    }
+    // 讀取照片卡餘額（✅ 統一從 assets 讀取）
+    const currentCards = user?.assets?.photoUnlockCards || 0;
 
     // 檢查餘額
     if (currentCards < 1) {
       throw new Error("拍照解鎖卡不足");
     }
 
-    // 扣除卡片
+    // ✅ 統一寫入 assets
     const updateData = {
+      "assets.photoUnlockCards": currentCards - 1,
       updatedAt: FieldValue.serverTimestamp(),
     };
-
-    if (storageLocation === "unlockTickets") {
-      const tickets = user.unlockTickets || {};
-      tickets.photoUnlockCards = currentCards - 1;
-      updateData.unlockTickets = tickets;
-    } else if (storageLocation === "assets") {
-      updateData["assets.photoUnlockCards"] = currentCards - 1;
-    } else if (storageLocation === "root") {
-      updateData.photoUnlockCards = currentCards - 1;
-    }
 
     transaction.update(userRef, updateData);
 
@@ -320,40 +280,19 @@ export const useVideoUnlockCard = async (userId) => {
 
     const user = userDoc.data();
 
-    // 檢查多個位置的影片卡餘額
-    let currentCards = 0;
-    let storageLocation = null;
-
-    if (user?.unlockTickets?.videoUnlockCards > 0) {
-      currentCards = user.unlockTickets.videoUnlockCards;
-      storageLocation = "unlockTickets";
-    } else if (user?.assets?.videoUnlockCards > 0) {
-      currentCards = user.assets.videoUnlockCards;
-      storageLocation = "assets";
-    } else if (user?.videoUnlockCards > 0) {
-      currentCards = user.videoUnlockCards;
-      storageLocation = "root";
-    }
+    // 讀取影片卡餘額（✅ 統一從 assets 讀取）
+    const currentCards = user?.assets?.videoUnlockCards || 0;
 
     // 檢查餘額
     if (currentCards < 1) {
       throw new Error("影片解鎖卡不足");
     }
 
-    // 扣除卡片
+    // ✅ 統一寫入 assets
     const updateData = {
+      "assets.videoUnlockCards": currentCards - 1,
       updatedAt: FieldValue.serverTimestamp(),
     };
-
-    if (storageLocation === "unlockTickets") {
-      const tickets = user.unlockTickets || {};
-      tickets.videoUnlockCards = currentCards - 1;
-      updateData.unlockTickets = tickets;
-    } else if (storageLocation === "assets") {
-      updateData["assets.videoUnlockCards"] = currentCards - 1;
-    } else if (storageLocation === "root") {
-      updateData.videoUnlockCards = currentCards - 1;
-    }
 
     transaction.update(userRef, updateData);
 
@@ -404,23 +343,11 @@ export const getTicketBalance = async (userId, ticketType) => {
       break;
 
     case TICKET_TYPES.VIDEO:
-      if (user?.unlockTickets?.videoUnlockCards > 0) {
-        balance = user.unlockTickets.videoUnlockCards;
-      } else if (user?.assets?.videoUnlockCards > 0) {
-        balance = user.assets.videoUnlockCards;
-      } else if (user?.videoUnlockCards > 0) {
-        balance = user.videoUnlockCards;
-      }
+      balance = user?.assets?.videoUnlockCards || 0;
       break;
 
     case TICKET_TYPES.VOICE:
-      if (user?.unlockTickets?.voiceUnlockCards > 0) {
-        balance = user.unlockTickets.voiceUnlockCards;
-      } else if (user?.assets?.voiceUnlockCards > 0) {
-        balance = user.assets.voiceUnlockCards;
-      } else if (user?.voiceUnlockCards > 0) {
-        balance = user.voiceUnlockCards;
-      }
+      balance = user?.assets?.voiceUnlockCards || 0;
       break;
 
     default:
@@ -465,21 +392,8 @@ export const getVoiceUnlockCards = async (userId) => {
     throw new Error("找不到用戶");
   }
 
-  // 優先順序：
-  // 1. unlockTickets.voiceUnlockCards（新系統）
-  // 2. assets.voiceUnlockCards（舊系統）
-  // 3. voiceUnlockCards（頂層，最舊的結構）
-  if (user?.unlockTickets?.voiceUnlockCards !== undefined && user.unlockTickets.voiceUnlockCards > 0) {
-    return user.unlockTickets.voiceUnlockCards;
-  }
-  if (user?.assets?.voiceUnlockCards !== undefined && user.assets.voiceUnlockCards > 0) {
-    return user.assets.voiceUnlockCards;
-  }
-  if (user?.voiceUnlockCards !== undefined && user.voiceUnlockCards > 0) {
-    return user.voiceUnlockCards;
-  }
-
-  return 0;
+  // ✅ 統一從 assets 讀取
+  return user?.assets?.voiceUnlockCards || 0;
 };
 
 /**
@@ -502,48 +416,19 @@ export const useVoiceUnlockCard = async (userId, characterId) => {
 
     const user = userDoc.data();
 
-    // 2. 檢查多個位置的語音卡餘額
-    let currentCards = 0;
-    let storageLocation = null;
-    let storageKey = null;
-
-    if (user?.unlockTickets?.voiceUnlockCards > 0) {
-      currentCards = user.unlockTickets.voiceUnlockCards;
-      storageLocation = "unlockTickets";
-      storageKey = "voiceUnlockCards";
-    } else if (user?.assets?.voiceUnlockCards > 0) {
-      currentCards = user.assets.voiceUnlockCards;
-      storageLocation = "assets";
-      storageKey = "voiceUnlockCards";
-    } else if (user?.voiceUnlockCards > 0) {
-      currentCards = user.voiceUnlockCards;
-      storageLocation = "root";
-      storageKey = "voiceUnlockCards";
-    }
+    // 2. 讀取語音卡餘額（✅ 統一從 assets 讀取）
+    const currentCards = user?.assets?.voiceUnlockCards || 0;
 
     // 3. 檢查餘額
     if (currentCards < 1) {
       throw new Error("語音解鎖卡不足");
     }
 
-    // 4. 準備更新數據
-    const updateData = {};
-
-    if (storageLocation === "unlockTickets") {
-      updateData[`unlockTickets.${storageKey}`] = FieldValue.increment(-1);
-      updateData["unlockTickets.usageHistory"] = FieldValue.arrayUnion({
-        type: "use",
-        ticketType: "voice_unlock_card",
-        characterId,
-        timestamp: new Date().toISOString(),
-      });
-    } else if (storageLocation === "assets") {
-      updateData[`assets.${storageKey}`] = FieldValue.increment(-1);
-    } else if (storageLocation === "root") {
-      updateData[storageKey] = FieldValue.increment(-1);
-    }
-
-    updateData.updatedAt = FieldValue.serverTimestamp();
+    // 4. ✅ 統一寫入 assets
+    const updateData = {
+      "assets.voiceUnlockCards": currentCards - 1,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
 
     // 5. 在 Transaction 內更新
     transaction.update(userRef, updateData);
@@ -553,7 +438,6 @@ export const useVoiceUnlockCard = async (userId, characterId) => {
       success: true,
       characterId,
       remaining: currentCards - 1,
-      storageLocation,
     };
   });
 

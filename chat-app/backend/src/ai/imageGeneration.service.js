@@ -100,9 +100,22 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
           throw new Error(`下載失敗: ${response.status} ${response.statusText}`);
         }
 
+        // ✅ 檢查圖片大小（防止超大圖片）
+        const contentLength = response.headers.get('content-length');
+        const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+        if (contentLength && parseInt(contentLength) > MAX_IMAGE_SIZE) {
+          throw new Error(`角色圖片過大 (${Math.round(parseInt(contentLength) / 1024 / 1024)} MB)，請使用小於 5MB 的圖片`);
+        }
+
         // 獲取圖片數據
         const arrayBuffer = await response.arrayBuffer();
         imageBuffer = Buffer.from(arrayBuffer);
+
+        // ✅ 再次檢查實際下載的圖片大小
+        if (imageBuffer.length > MAX_IMAGE_SIZE) {
+          logger.error(`[圖片生成] 角色圖片過大: ${Math.round(imageBuffer.length / 1024 / 1024)} MB`);
+          throw new Error(`角色圖片過大 (${Math.round(imageBuffer.length / 1024 / 1024)} MB)，請使用小於 5MB 的圖片`);
+        }
 
         // 從 Content-Type 或 URL 獲取圖片格式
         const contentType = response.headers.get("content-type");
@@ -162,7 +175,11 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
 
   // 獲取對話歷史以了解情境（減少消息數量以降低 token 成本）
   const conversation = await getConversationHistory(userId, characterId);
-  const recentMessages = conversation.slice(-3); // 最近 3 條消息（從 6 條減少以節省成本）
+  const MAX_MESSAGE_LENGTH = 200; // ✅ 限制每條消息最多 200 字符
+  const recentMessages = conversation.slice(-3).map(msg => ({
+    ...msg,
+    text: (msg.text || '').substring(0, MAX_MESSAGE_LENGTH) // ✅ 截斷過長的消息
+  })); // 最近 3 條消息（從 6 條減少以節省成本）
 
   // 🔥 構建圖片生成提示詞（Gemini 版本）- 從 Firestore 讀取模板和場景
   const promptResult = await buildGeminiPrompt(character, recentMessages);

@@ -89,6 +89,101 @@
 
 ---
 
+## [未發布] - 2025-11-13 (下午)
+
+### 🔒 商業邏輯增強與成本控制
+
+#### 高危修復 (P0)
+- **修復會員過期檢查繞過風險** (`backend/src/utils/membershipUtils.js`)
+  - ✅ 付費會員必須有有效的 `membershipExpiresAt` 時間戳
+  - ✅ 驗證過期時間格式有效性
+  - ✅ 無效或缺失時自動降級為免費會員
+  - 防止會員權限繞過漏洞
+
+- **實現完整退款流程** (`backend/src/payment/coins.service.js`)
+  - ✅ 使用 Firestore Transaction 確保原子性
+  - ✅ 退款金幣 + 回滾已消耗的資產（解鎖券、藥水等）
+  - ✅ 7 天退款期限檢查（可配置）
+  - ✅ 防止重複退款（狀態檢查）
+  - ✅ 完整的交易記錄追蹤
+
+#### 中危修復 (P1)
+- **增強照片/影片卡片消耗邏輯** (`backend/src/ai/photoLimit.service.js`, `videoLimit.service.js`)
+  - ✅ 新增 `allowedWithCard` 欄位，明確告知前端是否可使用卡片
+  - ✅ `allowed` 僅基於基礎會員額度（不包括卡片）
+  - ✅ `canGenerate = allowed || allowedWithCard`（改進總體判斷邏輯）
+  - 防止前端混淆，提升用戶體驗
+
+- **調整對話/語音限制為每日重置** (`backend/src/conversation/conversationLimit.service.js`, `backend/src/ai/voiceLimit.service.js`)
+  - ✅ 從終生限制（`RESET_PERIOD.NONE`）改為每日重置（`RESET_PERIOD.DAILY`）
+  - 提升免費用戶體驗，更符合用戶預期
+
+#### 成本控制 (P1)
+- **增加圖片生成請求大小限制** (`backend/src/ai/imageGeneration.service.js`)
+  - ✅ 圖片大小限制：5MB（防止過大圖片消耗過多 token）
+  - ✅ 對話訊息截斷：每條訊息最多 200 字符
+  - 減少 Gemini API 成本，防止超額費用
+
+- **增加影片提示詞長度限制** (`backend/src/ai/videoGeneration.service.js`)
+  - ✅ Hailuo 和 Veo 提示詞限制：500 字符
+  - 防止過長提示詞導致的高額 API 費用
+
+#### 新功能：API 成本監控系統
+- **全局 API 成本監控** (`backend/src/services/apiCostMonitoring.service.js` - 新增)
+  - ✅ 記錄所有 AI API 調用（OpenAI、Gemini、Replicate、Veo 等）
+  - ✅ 實時成本計算（基於最新定價）
+  - ✅ 每日/每月成本聚合統計
+  - ✅ 按服務、模型、用戶分類統計
+  - ✅ 支援查詢任意時間範圍的成本數據
+
+- **每日成本預警** (`backend/src/services/apiCostMonitoring.service.js`)
+  - ✅ 每日成本預警閾值：$10（警告）、$50（嚴重）
+  - ✅ 每月成本預警閾值：$100（警告）、$500（嚴重）
+  - ✅ 超過閾值自動記錄到 Firestore `cost_alerts` 集合
+  - ✅ 可配置的環境變數（`.env.example`）
+
+- **整合成本監控到現有 API** (`backend/src/ai/ai.service.js`)
+  - ✅ GPT 對話 API 自動記錄成本（input/output tokens）
+  - ✅ 非阻塞式記錄（不影響主業務流程）
+  - 為未來擴展到所有 AI API 奠定基礎
+
+#### 數據庫優化
+- **Firestore 索引優化** (`firestore.indexes.json`)
+  - ✅ 新增 `api_calls` 集合索引（5 個複合索引）
+    - `userId + timestamp`（按用戶查詢成本）
+    - `service + timestamp`（按服務查詢成本）
+    - `date + service`（每日統計）
+  - ✅ 新增 `api_cost_stats` 集合索引（1 個）
+  - ✅ 新增 `cost_alerts` 集合索引（1 個）
+  - 確保成本查詢高效執行
+
+#### 配置更新
+- **環境變數配置** (`backend/.env.example`)
+  - ✅ 新增 API 成本監控設定區塊
+  - `DAILY_COST_WARNING`、`DAILY_COST_CRITICAL`
+  - `MONTHLY_COST_WARNING`、`MONTHLY_COST_CRITICAL`
+
+#### 統計數據
+- **修復文件**: 6 個
+- **新增文件**: 1 個（apiCostMonitoring.service.js）
+- **新增代碼**: ~800 行（成本監控系統 + 修復）
+- **優化**: Firestore 索引 +7 個
+
+#### 影響範圍
+- **會員系統**: 更嚴格的過期檢查，提升安全性
+- **資產系統**: 卡片消耗邏輯更清晰，防止前端混淆
+- **限制系統**: 對話/語音改為每日重置，提升用戶體驗
+- **退款系統**: 完整的退款流程，支援資產回滾
+- **成本控制**: 圖片/影片生成增加大小/長度限制，減少意外高額費用
+- **監控系統**: 全新的 API 成本監控和預警機制，實時掌握支出
+
+#### 待完成任務
+- [ ] 測試所有新功能（會員過期、退款流程、限制重置、成本監控）
+- [ ] 管理後台整合（語音次數編輯功能確認）
+- [ ] 部署 Firestore 索引：`firebase deploy --only firestore:indexes`
+
+---
+
 ## 版本說明
 
 本專案採用語義化版本（Semantic Versioning）：

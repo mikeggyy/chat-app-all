@@ -10,6 +10,7 @@ import {
   ApiError,
 } from "../../../shared/utils/errorFormatter.js";
 import { getFirestoreDb } from "../firebase/index.js";
+import { relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 import { createModuleLogger } from "../utils/logger.js";
 
 const router = express.Router();
@@ -19,8 +20,9 @@ const logger = createModuleLogger('Shop');
 /**
  * GET /api/shop/products
  * 獲取所有商品（解鎖卡、道具）
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
-router.get("/api/shop/products", async (req, res, next) => {
+router.get("/api/shop/products", relaxedRateLimiter, async (req, res, next) => {
   try {
     const { category } = req.query;
 
@@ -62,8 +64,9 @@ router.get("/api/shop/products", async (req, res, next) => {
 /**
  * GET /api/shop/products/:collection/:id
  * 獲取單一商品詳情
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
-router.get("/api/shop/products/:collection/:id", async (req, res, next) => {
+router.get("/api/shop/products/:collection/:id", relaxedRateLimiter, async (req, res, next) => {
   try {
     const { collection, id } = req.params;
 
@@ -100,8 +103,9 @@ router.get("/api/shop/products/:collection/:id", async (req, res, next) => {
 /**
  * GET /api/shop/categories
  * 獲取商城分類資訊
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
-router.get("/api/shop/categories", async (req, res, next) => {
+router.get("/api/shop/categories", relaxedRateLimiter, async (req, res, next) => {
   try {
     const categories = [
       {

@@ -44,8 +44,23 @@ export const getUserTier = async (userId, options = {}) => {
   const tier = user.membershipTier || "free";
 
   // 檢查會員是否過期
-  if (tier !== "free" && user.membershipExpiresAt) {
-    if (new Date(user.membershipExpiresAt) < new Date()) {
+  if (tier !== "free" && tier !== "guest") {
+    // ✅ 付費會員必須有有效的過期時間
+    if (!user.membershipExpiresAt) {
+      console.warn(`[會員檢查] 付費會員 ${userId} 缺少過期時間，自動降級為免費會員`);
+      return "free";
+    }
+
+    const expiresAt = new Date(user.membershipExpiresAt);
+
+    // ✅ 驗證過期時間格式
+    if (isNaN(expiresAt.getTime())) {
+      console.warn(`[會員檢查] 付費會員 ${userId} 的過期時間格式無效，自動降級為免費會員`);
+      return "free";
+    }
+
+    // ✅ 檢查是否過期
+    if (expiresAt < new Date()) {
       return "free"; // 會員已過期，降為免費會員
     }
   }

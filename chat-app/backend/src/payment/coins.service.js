@@ -418,7 +418,8 @@ export const purchaseCoinPackage = async (userId, packageId, paymentInfo = {}) =
 };
 
 /**
- * 退款（管理員功能）
+ * 簡易退款（僅退還金幣，不回滾資產）
+ * @deprecated 請使用 refundPurchase 以獲得完整的退款流程
  */
 export const refundCoins = (userId, amount, reason) => {
   return addCoins(
@@ -428,6 +429,158 @@ export const refundCoins = (userId, amount, reason) => {
     `退款：${reason}`,
     { reason }
   );
+};
+
+/**
+ * 完整退款流程（推薦）
+ * ✅ 功能包括：
+ * - 查詢原交易並驗證
+ * - 檢查是否已退款
+ * - 檢查退款時間限制（7天內）
+ * - 退還金幣
+ * - 回滾已消耗的資產（如果有）
+ * - 更新原交易狀態
+ * - 創建退款交易記錄
+ *
+ * @param {string} userId - 用戶 ID
+ * @param {string} transactionId - 原交易 ID
+ * @param {string} reason - 退款原因
+ * @param {Object} options - 選項
+ * @param {number} options.refundDaysLimit - 退款期限（天數），默認 7 天
+ * @param {boolean} options.forceRefund - 是否強制退款（跳過時間檢查），默認 false
+ * @returns {Promise<Object>} 退款結果
+ */
+export const refundPurchase = async (userId, transactionId, reason, options = {}) => {
+  const { refundDaysLimit = 7, forceRefund = false } = options;
+  const db = getFirestoreDb();
+
+  return await db.runTransaction(async (transaction) => {
+    // 1. 查詢原交易
+    const txRef = db.collection("transactions").doc(transactionId);
+    const txDoc = await transaction.get(txRef);
+
+    if (!txDoc.exists) {
+      throw new Error("找不到原交易記錄");
+    }
+
+    const originalTx = txDoc.data();
+
+    // 2. 驗證交易所屬用戶
+    if (originalTx.userId !== userId) {
+      throw new Error("交易記錄與用戶不符");
+    }
+
+    // 3. 檢查是否已退款
+    if (originalTx.status === "refunded") {
+      throw new Error(`該交易已於 ${new Date(originalTx.refundedAt?.toDate?.() || originalTx.refundedAt).toLocaleString()} 退款`);
+    }
+
+    // 4. 檢查退款時間限制
+    if (!forceRefund) {
+      const txTime = originalTx.createdAt?.toDate?.() || new Date(originalTx.createdAt);
+      const now = new Date();
+      const daysDiff = (now - txTime) / (1000 * 60 * 60 * 24);
+
+      if (daysDiff > refundDaysLimit) {
+        throw new Error(`超過退款期限（${refundDaysLimit}天），當前已過 ${Math.floor(daysDiff)} 天`);
+      }
+    }
+
+    // 5. 檢查原交易類型（只有扣款交易可退款）
+    const refundableTypes = [
+      TRANSACTION_TYPES.PURCHASE,
+      TRANSACTION_TYPES.GIFT,
+      TRANSACTION_TYPES.UNLOCK,
+      TRANSACTION_TYPES.DEDUCT,
+    ];
+
+    if (!refundableTypes.includes(originalTx.type)) {
+      throw new Error(`該交易類型（${originalTx.type}）不支持退款`);
+    }
+
+    // 6. 讀取用戶資料
+    const userRef = db.collection("users").doc(userId);
+    const userDoc = await transaction.get(userRef);
+
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
+
+    const user = userDoc.data();
+    const currentBalance = getWalletBalance(user);
+
+    // 7. 退還金幣
+    const refundAmount = Math.abs(originalTx.amount);
+    const newBalance = currentBalance + refundAmount;
+
+    transaction.update(userRef, {
+      ...createWalletUpdate(newBalance),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 8. 回滾資產（如果有）
+    const assetType = originalTx.metadata?.assetType;
+    const quantity = originalTx.metadata?.quantity || 1;
+
+    if (assetType) {
+      const currentAssets = user.assets || {};
+      const currentQuantity = currentAssets[assetType] || 0;
+
+      // ⚠️ 檢查用戶是否還有足夠的資產可以扣除
+      if (currentQuantity < quantity) {
+        logger.warn(`[退款] 用戶 ${userId} 的 ${assetType} 不足，無法完全回滾（需要 ${quantity}，當前 ${currentQuantity}）`);
+        // 決策：部分回滾或拒絕退款
+        // 這裡選擇部分回滾（扣除當前所有資產）
+        transaction.update(userRef, {
+          [`assets.${assetType}`]: 0,
+        });
+      } else {
+        // 完整回滾
+        transaction.update(userRef, {
+          [`assets.${assetType}`]: currentQuantity - quantity,
+        });
+      }
+    }
+
+    // 9. 更新原交易狀態
+    transaction.update(txRef, {
+      status: "refunded",
+      refundedAt: FieldValue.serverTimestamp(),
+      refundReason: reason,
+    });
+
+    // 10. 創建退款交易記錄
+    const refundTxRef = db.collection("transactions").doc();
+    transaction.set(refundTxRef, {
+      id: refundTxRef.id,
+      userId,
+      type: TRANSACTION_TYPES.REFUND,
+      amount: refundAmount,
+      description: `退款：${reason}`,
+      metadata: {
+        originalTransactionId: transactionId,
+        reason,
+        refundedAsset: assetType ? { type: assetType, quantity } : null,
+      },
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      status: "completed",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      refundAmount,
+      newBalance,
+      refundedAsset: assetType ? { type: assetType, quantity } : null,
+      originalTransaction: {
+        id: transactionId,
+        amount: originalTx.amount,
+        type: originalTx.type,
+        createdAt: originalTx.createdAt,
+      },
+    };
+  });
 };
 
 /**

@@ -521,6 +521,24 @@ const requestOpenAIReply = async (character, history, latestUserMessage, userId,
 
     const reply = completion?.choices?.[0]?.message?.content?.trim() ?? "";
 
+    // ✅ 記錄 API 成本監控
+    if (completion?.usage) {
+      const { recordApiCall } = await import("../services/apiCostMonitoring.service.js");
+      recordApiCall({
+        service: 'openai',
+        model: aiModel,
+        operation: 'chat',
+        userId,
+        usage: {
+          inputTokens: completion.usage.prompt_tokens || 0,
+          outputTokens: completion.usage.completion_tokens || 0,
+        },
+        metadata: { characterId },
+      }).catch((err) => {
+        logger.error(`[成本監控] 記錄失敗（不影響對話）:`, err);
+      });
+    }
+
     // 🔒 P2-3: 記錄模型使用情況（如果使用了 Brain Boost 藥水）
     const usedBrainBoost = await hasBrainBoost(userId, characterId);
     if (usedBrainBoost && completion?.usage) {

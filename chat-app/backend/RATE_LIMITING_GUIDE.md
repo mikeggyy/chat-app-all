@@ -67,26 +67,6 @@ router.post('/api/coins/purchase/package',
   }
 );
 
-// ✅ 購買 AI 拍照功能
-router.post('/api/coins/purchase/ai-photo',
-  requireFirebaseAuth,
-  purchaseRateLimiter, // 添加這行
-  validateRequest(coinSchemas.purchaseAiPhoto),
-  async (req, res, next) => {
-    // 處理邏輯
-  }
-);
-
-// ✅ 購買 AI 影片功能
-router.post('/api/coins/purchase/ai-video',
-  requireFirebaseAuth,
-  purchaseRateLimiter, // 添加這行
-  validateRequest(coinSchemas.purchaseAiVideo),
-  async (req, res, next) => {
-    // 處理邏輯
-  }
-);
-
 // ✅ 獲取餘額（讀取操作，使用寬鬆限制）
 router.get('/api/coins/balance',
   requireFirebaseAuth,

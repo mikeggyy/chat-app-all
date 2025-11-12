@@ -11,6 +11,7 @@ import {
   deletePhotos,
   getPhotoStats,
 } from "./photoAlbum.service.js";
+import { standardRateLimiter } from "../middleware/rateLimiterConfig.js";
 import logger from "../utils/logger.js";
 import fetch from "node-fetch";
 
@@ -127,11 +128,13 @@ photoAlbumRouter.get(
 /**
  * DELETE /api/photos/:userId
  * 刪除指定照片
+ * ✅ 速率限制：30次/分鐘（刪除操作）
  */
 photoAlbumRouter.delete(
   "/:userId",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  standardRateLimiter,
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { photoIds } = req.body;

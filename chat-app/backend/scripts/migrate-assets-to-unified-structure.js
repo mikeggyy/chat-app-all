@@ -16,6 +16,15 @@
  * --cleanup    清理舊數據（需要先執行遷移）
  */
 
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+// Load environment variables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, "../.env") });
+
 import { getFirestoreDb } from "../src/firebase/index.js";
 import logger from "../src/utils/logger.js";
 
@@ -161,12 +170,28 @@ async function cleanupOldData(userId) {
   const db = getFirestoreDb();
   const userRef = db.collection('users').doc(userId);
 
+  // 先讀取用戶數據，保留 usageHistory
+  const userDoc = await userRef.get();
+  const userData = userDoc.data();
+
   const updates = {
     updatedAt: new Date().toISOString()
   };
 
-  // 清理過渡位置
-  updates.unlockTickets = null;
+  // 清理過渡位置的資產欄位，但保留 usageHistory
+  if (userData.unlockTickets) {
+    const usageHistory = userData.unlockTickets.usageHistory || [];
+
+    // 如果有 usageHistory，只保留它；否則刪除整個 unlockTickets
+    if (usageHistory.length > 0) {
+      // 直接設置為只包含 usageHistory 的物件，移除所有資產欄位
+      updates.unlockTickets = { usageHistory };
+      logger.info(`[清理] 保留用戶 ${userId} 的 ${usageHistory.length} 條 usageHistory 記錄`);
+    } else {
+      // 沒有 usageHistory，直接刪除整個 unlockTickets
+      updates.unlockTickets = null;
+    }
+  }
 
   // 清理舊位置（頂層字段）
   for (const assetType of ASSET_TYPES) {

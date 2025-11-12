@@ -1,4 +1,5 @@
 import { apiJson } from "./api.js";
+import { generateIdempotencyKey } from "./idempotency.js";
 
 const encodeSegment = (value) => encodeURIComponent(value ?? "");
 
@@ -94,6 +95,10 @@ export const requestAiReply = async (
   if (options.skipLimitCheck === true) {
     body.skipLimitCheck = true;
   }
+
+  // 🎯 添加冪等性保護：生成唯一的請求 ID
+  // 防止網絡重試導致重複扣除對話次數
+  body.requestId = generateIdempotencyKey();
 
   const response = await apiJson(
     `/api/ai/conversations/${encodeSegment(userId)}/${encodeSegment(

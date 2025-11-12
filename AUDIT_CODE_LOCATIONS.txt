@@ -1,0 +1,210 @@
+AI 聊天應用商業邏輯審查 - 代碼位置詳細清單
+=========================================================
+
+【高危問題1】對話消費與限制檢查的時序漏洞
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\ai\ai.routes.js (行131)
+  -> recordMessage(userId, characterId) 調用位置
+
+- D:\project\chat-app-all\chat-app\backend\src\conversation\conversationLimit.service.js (行44-46)
+  -> export const recordMessage = async (userId, characterId)
+
+- D:\project\chat-app-all\chat-app\backend\src\services\baseLimitService.js
+  -> 限制記錄的核心實現
+
+檢查項目:
+1. conversationLimit.service.js 中 recordMessage() 是否有冪等性檢查?
+2. recordMessage() 是否與其他操作在 Transaction 中執行?
+3. 網絡中斷時重試是否會導致計數重複?
+
+當前代碼狀態:
+❌ 沒有冪等性保護
+❌ 沒有 Transaction 保護
+
+
+【高危問題2】廣告解鎖次數與基礎限制計數混亂
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\services\limitService\limitReset.js
+  -> 第 72-98 行: checkAndResetAdUnlocks() 函數
+  -> 第 10-14 行: RESET_PERIOD 定義
+
+- D:\project\chat-app-all\chat-app\backend\src\services\limitService\limitTracking.js
+  -> 第 59-83 行: checkCanUse() 函數
+  -> 第 114-125 行: unlockByAd() 函數
+
+- D:\project\chat-app-all\chat-app\backend\src\conversation\conversationLimit.service.js
+  -> 第 51-57 行: unlockByAd() 調用
+
+檢查項目:
+1. unlocked 字段的重置時機是否與 count 同步?
+2. 廣告解鎖是否有過期時間檢查?
+3. 用戶是否可以每日重複觀看廣告獲得解鎖?
+
+當前代碼狀態:
+❌ unlocked 每日重置，count 月度/終生重置（混亂）
+❌ 沒有過期時間檢查（adUnlockExpireAt 字段缺失）
+
+
+【高危問題3】金幣扣費與資產消費的不同步風險
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\payment\coins.service.js
+  -> 第 246-300 行: purchaseAiPhoto() 函數
+  -> 第 305-359 行: purchaseAiVideo() 函數
+  -> 第 364-422 行: purchaseUnlimitedChat() 函數
+
+- D:\project\chat-app-all\chat-app\backend\src\payment\coins.routes.js
+  -> 第 60-96 行: POST /api/coins/purchase/ai-photo 路由
+  -> 第 99-143 行: POST /api/coins/purchase/ai-video 路由
+  -> 第 146-187 行: POST /api/coins/purchase/unlimited-chat 路由
+
+- D:\project\chat-app-all\chat-app\backend\src\membership\unlockTickets.service.js
+  -> usePhotoUnlockCard(), useVideoUnlockCard() 實現
+
+檢查項目:
+1. purchaseAiPhoto() 是否有冪等性保護?
+2. 卡片消費與金幣扣費是否在同一 Transaction 中?
+3. 網絡中斷時重試是否會導致雙重消費?
+
+當前代碼狀態:
+✅ coins.routes.js 中有冪等性保護 (handleIdempotentRequest)
+❌ 但卡片消費與金幣扣費可能在不同 Transaction 中
+
+
+【中危問題4】會員升級時獎勵發放的不完整回滾
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\membership\membership.service.js
+  -> 第 189-387 行: upgradeMembership() 函數
+  -> 第 241-256 行: 獎勵計算邏輯 (Transaction 外)
+  -> 第 258-379 行: 獎勵發放邏輯 (Transaction 內)
+
+檢查項目:
+1. 拍照卡計算是否在 Transaction 內?
+2. 升級操作是否有冪等性保護?
+3. Transaction 失敗時是否能正確回滾?
+
+當前代碼狀態:
+⚠️ 計算在 Transaction 外，發放在 Transaction 內（分離）
+❌ 沒有冪等性保護
+
+
+【中危問題5】限制查詢的日期邊界條件缺陷
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\services\limitService\limitReset.js
+  -> 第 32-40 行: 日期比較邏輯
+  -> 第 72-98 行: 廣告重置邏輯
+
+檢查項目:
+1. 是否考慮用戶時區?
+2. 日期計算是否基於 UTC?
+3. 重置時機是否符合用戶預期?
+
+當前代碼狀態:
+❌ 使用 UTC 時間，未考慮時區
+❌ toISOString().split("T")[0] 使用 UTC 日期
+
+
+【中危問題6】交易記錄統計中的金額符號不一致
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\payment\transaction.service.js
+  -> 第 260-324 行: getUserTransactionStats() 函數
+  -> 第 307-321 行: 金額統計邏輯
+
+檢查項目:
+1. SPEND 和 REFUND 的金額符號是否一致?
+2. 統計計算是否使用 Math.abs()?
+
+當前代碼狀態:
+⚠️ SPEND 用 Math.abs(), REFUND 直接使用（不一致）
+
+
+【中危問題7】解鎖票卡片消費的邊界條件
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\membership\unlockTickets.service.js
+  -> usePhotoUnlockCard() 實現
+  -> useVideoUnlockCard() 實現
+  -> useCharacterUnlockTicket() 實現
+
+檢查項目:
+1. 卡片消費是否使用 Transaction?
+2. 併發請求是否會導致多次消費?
+3. 卡片餘額是否可能變為負數?
+
+當前代碼狀態:
+⚠️ 需要檢查 unlockTickets.service.js 的具體實現
+
+
+【中危問題8】冪等性鍵的重複使用漏洞
+================================================================================
+
+相關文件:
+- D:\project\chat-app-all\chat-app\backend\src\utils\idempotency.js
+  -> 第 31-34 行: DEFAULT_CONFIG (TTL 設置)
+  -> 第 116-180 行: handleIdempotentRequest() 函數
+  -> 第 132-142 行: 本地緩存檢查 (5分鐘過期)
+  -> 第 156-180 行: Firestore 檢查 (24小時過期)
+
+使用冪等性的路由:
+- D:\project\chat-app-all\chat-app\backend\src\gift\gift.routes.js
+  -> 第 54-60 行: POST /api/gifts/send
+
+- D:\project\chat-app-all\chat-app\backend\src\payment\coins.routes.js
+  -> 第 83-86 行: POST /api/coins/purchase/ai-photo
+
+- D:\project\chat-app-all\chat-app\backend\src\payment\potion.routes.js
+  -> 第 109-112 行: POST /api/potions/purchase/memory-boost
+
+檢查項目:
+1. localCacheTtl (5分鐘) 和 ttl (24小時) 是否同步?
+2. 購買類操作的 TTL 是否足夠長?
+
+當前代碼狀態:
+❌ TTL 不同步: localCacheTtl 5分鐘，ttl 24小時
+
+
+================================================================================
+測試驗證檢查清單
+================================================================================
+
+對話消費測試:
+[ ] 重複發送同一消息不應重複扣費
+[ ] 對話限制計數正確
+[ ] 網絡重試不導致計數混亂
+
+廣告解鎖測試:
+[ ] 每日廣告解鎖次數有上限
+[ ] 24小時後廣告解鎖自動過期
+[ ] 不能通過重複觀看廣告無限解鎖
+
+資產消費測試:
+[ ] 卡片消費與金幣扣費同步
+[ ] 網絡中斷重試不導致雙重消費
+[ ] 卡片計數不會變為負數
+
+會員升級測試:
+[ ] 升級獎勵只發放一次
+[ ] 重試升級不重複發放獎勵
+[ ] 升級前後對話操作不影響獎勵計算
+
+時區測試:
+[ ] 不同時區用戶的限制重置時機正確
+[ ] 日期邊界上的重置正確
+
+冪等性測試:
+[ ] 購買操作 24 小時內重試返回相同結果
+[ ] 7 天內購買不會重複執行
+
+================================================================================

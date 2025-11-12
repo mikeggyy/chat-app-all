@@ -1,5 +1,6 @@
 /**
  * 禮物系統路由
+ * ✅ 包含速率限制保護
  */
 
 import express from "express";
@@ -14,6 +15,7 @@ import { sendGift, getUserGiftHistory, getCharacterGiftStats, getGiftPricing } f
 import { processGiftResponse } from "./giftResponse.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { requireFirebaseAuth } from "../auth/index.js";
+import { giftRateLimiter, standardRateLimiter } from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 
@@ -21,8 +23,9 @@ const router = express.Router();
  * POST /api/gifts/send
  * 送禮物給角色（支持冪等性）
  * ⚠️ 安全修復：userId 從認證 token 獲取，不從請求體讀取
+ * ✅ 速率限制：15 次/分鐘，防止刷禮物
  */
-router.post("/send", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
+router.post("/send", requireFirebaseAuth, giftRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     // 從認證信息獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;

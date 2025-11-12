@@ -1,5 +1,6 @@
 /**
  * 金幣系統 API 路由
+ * ✅ 包含速率限制保護
  */
 
 import express from "express";
@@ -27,6 +28,7 @@ import {
 } from "../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { validateRequest, coinSchemas } from "../middleware/validation.middleware.js";
+import { purchaseRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 

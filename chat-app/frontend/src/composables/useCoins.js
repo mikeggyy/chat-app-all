@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import { apiJson } from '../utils/api.js';
 import { generateIdempotencyKey } from '../utils/idempotency.js';
 import { logger } from '../utils/logger';
+import { coinQueue } from '../utils/requestQueue.js';
 
 // 金幣狀態的全域管理
 const coinsState = ref({
@@ -114,43 +115,53 @@ export function useCoins() {
       throw new Error('需要提供套餐 ID');
     }
 
-    isLoading.value = true;
-    error.value = null;
+    // ✅ 修復: 使用請求隊列確保購買操作順序執行，避免並發衝突
+    return await coinQueue.enqueue(async () => {
+      isLoading.value = true;
+      error.value = null;
 
-    try {
-      // 生成冪等性鍵，防止重複購買
-      const idempotencyKey = generateIdempotencyKey();
+      try {
+        // 生成冪等性鍵，防止重複購買
+        const idempotencyKey = generateIdempotencyKey();
 
-      const data = await apiJson('/api/coins/purchase/package', {
-        method: 'POST',
-        body: {
-          packageId,
-          idempotencyKey, // 添加冪等性鍵（必填）
-          paymentInfo: {
-            method: options.paymentMethod || 'credit_card',
-            paymentId: options.paymentId,
+        const data = await apiJson('/api/coins/purchase/package', {
+          method: 'POST',
+          body: {
+            packageId,
+            idempotencyKey, // 添加冪等性鍵（必填）
+            paymentInfo: {
+              method: options.paymentMethod || 'credit_card',
+              paymentId: options.paymentId,
+            },
           },
-        },
-        skipGlobalLoading: options.skipGlobalLoading ?? false,
-      });
+          skipGlobalLoading: options.skipGlobalLoading ?? false,
+        });
 
-      // 檢查是否為重複請求（來自緩存）
-      if (data._idempotent || data._cached) {
-        logger.log('[購買金幣] 檢測到重複請求，返回了緩存結果');
+        // 檢查是否為重複請求（來自緩存）
+        if (data._idempotent || data._cached) {
+          logger.log('[購買金幣] 檢測到重複請求，返回了緩存結果');
+        }
+
+        // ✅ 修復: 使用增量更新或確保順序更新，避免並發覆蓋問題
+        // 優先使用增量信息，如果沒有則使用絕對值
+        if (data.coinsAdded !== undefined) {
+          // 增量更新（更安全）
+          coinsState.value.balance += data.coinsAdded;
+          logger.log(`[金幣] 增量更新: +${data.coinsAdded}, 新餘額: ${coinsState.value.balance}`);
+        } else if (data.newBalance !== undefined) {
+          // 絕對值更新（作為後備）
+          coinsState.value.balance = data.newBalance;
+          logger.log(`[金幣] 絕對值更新: ${data.newBalance}`);
+        }
+
+        return data;
+      } catch (err) {
+        error.value = err?.message || '購買金幣套餐失敗';
+        throw err;
+      } finally {
+        isLoading.value = false;
       }
-
-      // 更新本地餘額
-      if (data.newBalance !== undefined) {
-        coinsState.value.balance = data.newBalance;
-      }
-
-      return data;
-    } catch (err) {
-      error.value = err?.message || '購買金幣套餐失敗';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
+    });
   };
 
   /**

@@ -24,6 +24,7 @@ import {
 import { apiJson } from "../utils/api.js";
 import { fallbackMatches } from "../utils/matchFallback.js";
 import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service.js";
+import LazyImage from "../components/common/LazyImage.vue";
 
 const router = useRouter();
 
@@ -609,9 +610,12 @@ watch(
         >
           <div class="podium-rank">2</div>
           <div class="avatar-wrap">
-            <img
+            <LazyImage
               :src="podiumByRank.second.avatar"
               :alt="`${podiumByRank.second.name} 頭像`"
+              :root-margin="'200px'"
+              :threshold="0"
+              image-class="podium-avatar"
             />
           </div>
           <p class="podium-name">{{ podiumByRank.second.name }}</p>
@@ -639,9 +643,12 @@ watch(
         >
           <div class="podium-rank">1</div>
           <div class="avatar-wrap">
-            <img
+            <LazyImage
               :src="podiumByRank.first.avatar"
               :alt="`${podiumByRank.first.name} 頭像`"
+              :root-margin="'200px'"
+              :threshold="0"
+              image-class="podium-avatar"
             />
           </div>
           <p class="podium-name">{{ podiumByRank.first.name }}</p>
@@ -669,9 +676,12 @@ watch(
         >
           <div class="podium-rank">3</div>
           <div class="avatar-wrap">
-            <img
+            <LazyImage
               :src="podiumByRank.third.avatar"
               :alt="`${podiumByRank.third.name} 頭像`"
+              :root-margin="'200px'"
+              :threshold="0"
+              image-class="podium-avatar"
             />
           </div>
           <p class="podium-name">{{ podiumByRank.third.name }}</p>
@@ -729,7 +739,13 @@ watch(
             <span>{{ entry.rank }}</span>
           </div>
           <div class="item-avatar">
-            <img :src="entry.avatar" :alt="`${entry.name} 頭像`" />
+            <LazyImage
+              :src="entry.avatar"
+              :alt="`${entry.name} 頭像`"
+              :root-margin="'50px'"
+              :threshold="0"
+              image-class="ranking-avatar"
+            />
           </div>
           <div class="item-body">
             <p class="item-name">{{ entry.name }}</p>
@@ -1126,7 +1142,16 @@ watch(
   z-index: -1;
 }
 
-.avatar-wrap img {
+.avatar-wrap {
+  .lazy-image {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+  }
+}
+
+.avatar-wrap img,
+.avatar-wrap .podium-avatar {
   width: 100%;
   height: 100%;
   border-radius: inherit;
@@ -1134,7 +1159,8 @@ watch(
   border: 2px solid rgba(255, 255, 255, 0.8);
 }
 
-.podium-first .avatar-wrap img {
+.podium-first .avatar-wrap img,
+.podium-first .avatar-wrap .podium-avatar {
   border-width: 3px;
 }
 
@@ -1334,7 +1360,16 @@ watch(
   overflow: hidden;
 }
 
-.item-avatar img {
+.item-avatar {
+  .lazy-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+  }
+}
+
+.item-avatar img,
+.item-avatar .ranking-avatar {
   width: 100%;
   height: 100%;
   border-radius: 50%;

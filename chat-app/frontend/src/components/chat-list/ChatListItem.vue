@@ -20,7 +20,13 @@
       }"
     >
       <div class="chat-thread__avatar">
-        <img :src="thread.portrait" :alt="`${thread.displayName} 的頭像`" />
+        <LazyImage
+          :src="thread.portrait"
+          :alt="`${thread.displayName} 的頭像`"
+          :root-margin="'100px'"
+          :threshold="0"
+          image-class="chat-avatar"
+        />
       </div>
       <div class="chat-thread__body">
         <header class="chat-thread__header">
@@ -109,6 +115,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
+import LazyImage from '../common/LazyImage.vue';
 
 const props = defineProps({
   thread: {
@@ -275,7 +282,14 @@ defineExpose({
   background: var(--bg-secondary, #f3f4f6);
 }
 
-.chat-thread__avatar img {
+.chat-thread__avatar .lazy-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.chat-thread__avatar img,
+.chat-thread__avatar .chat-avatar {
   width: 100%;
   height: 100%;
   object-fit: cover;

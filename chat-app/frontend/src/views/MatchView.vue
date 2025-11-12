@@ -21,6 +21,7 @@ import { useUserProfile } from "../composables/useUserProfile";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth";
 import { useGuestGuard } from "../composables/useGuestGuard";
 import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service";
+import LazyImage from "../components/common/LazyImage.vue";
 
 const router = useRouter();
 const { user, loadUserProfile, setUserProfile } = useUserProfile();
@@ -709,7 +710,13 @@ onBeforeUnmount(() => {
           :key="`bg-${item.key}`"
           class="background-slide"
         >
-          <img :src="item.data?.portraitUrl" alt="" aria-hidden="true" />
+          <LazyImage
+            :src="item.data?.portraitUrl || ''"
+            alt=""
+            :root-margin="'100px'"
+            :threshold="0"
+            image-class="character-portrait"
+          />
           <div class="gradient"></div>
         </div>
       </div>
@@ -853,7 +860,15 @@ onBeforeUnmount(() => {
         flex: 0 0 100%;
         height: 100%;
 
-        img {
+        // 支持原生 img 和 LazyImage 組件
+        img,
+        .lazy-image {
+          width: 100%;
+          height: 100%;
+        }
+
+        img,
+        .character-portrait {
           width: 100%;
           height: 100%;
           object-fit: cover;

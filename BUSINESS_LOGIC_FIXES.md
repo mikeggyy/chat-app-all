@@ -371,32 +371,69 @@ export const purchaseAssetPackage = async (userId, sku) => {
 
 ---
 
-### 9. 🔄 前端消息發送重試機制
+### 9. ✅ 前端消息發送重試機制
 
 **問題**: 消息發送失敗後沒有重試，永遠停留在"發送中"狀態
 
-**修復計畫**:
+**修復**: 已完成
+- 文件: `chat-app/frontend/src/composables/chat/useChatMessages.js`
+- 添加自動重試機制（最多 3 次）
+- 重試延遲遞增：2秒 → 5秒 → 10秒
+- 消息狀態管理：pending → retrying → failed
+- 添加 `retryFailedMessage` 方法支援手動重試
+- 記錄重試次數和錯誤信息
+
+**實現**:
 ```javascript
 // chat-app/frontend/src/composables/chat/useChatMessages.js
-const sendMessage = async (text) => {
-  // ...
+const syncMessageAndGetReply = async (userId, charId, text, userMessageId, retryCount = 0) => {
+  const MAX_RETRIES = 3; // 最多重試 3 次
+  const RETRY_DELAYS = [2000, 5000, 10000]; // 重試延遲：2秒、5秒、10秒
+
   try {
-    await syncMessageAndGetReply(userId, charId, trimmedText, messageId);
+    // ... 發送消息邏輯
+    const result = await appendConversationMessages(userId, charId, [{ role: 'user', text }], { token });
+
+    // 成功：更新狀態為 sent
+    messages.value[userMsgIndex] = {
+      ...messages.value[userMsgIndex],
+      state: 'sent',
+      retryCount: undefined,
+    };
+
   } catch (error) {
-    // 標記消息為失敗狀態
-    const msgIndex = messages.value.findIndex(m => m.id === messageId);
-    if (msgIndex >= 0) {
-      messages.value[msgIndex].state = 'failed';
-      messages.value[msgIndex].error = error.message;
+    console.error(`消息發送失敗 (嘗試 ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
+
+    const shouldRetry = retryCount < MAX_RETRIES;
+
+    // 更新消息狀態
+    messages.value[userMsgIndex] = {
+      ...messages.value[userMsgIndex],
+      state: shouldRetry ? 'retrying' : 'failed',
+      retryCount: retryCount + 1,
+      error: error instanceof Error ? error.message : '發送失敗',
+    };
+
+    // 自動重試
+    if (shouldRetry) {
+      const delay = RETRY_DELAYS[retryCount] || 10000;
+      setTimeout(() => {
+        syncMessageAndGetReply(userId, charId, text, userMessageId, retryCount + 1);
+      }, delay);
     }
+  }
+};
 
-    // 提供重試按鈕
-    showRetryOption(messageId, async () => {
-      messages.value[msgIndex].state = 'pending';
-      return await syncMessageAndGetReply(userId, charId, trimmedText, messageId);
-    });
+// 手動重試方法
+const retryFailedMessage = async (messageId) => {
+  const failedMsg = messages.value.find(m => m.id === messageId);
+  if (failedMsg && failedMsg.state === 'failed') {
+    // 重置狀態並重新發送
+    failedMsg.state = 'pending';
+    failedMsg.retryCount = 0;
+    failedMsg.error = undefined;
 
-    throw error;
+    await syncMessageAndGetReply(userId, charId, failedMsg.text, messageId, 0);
   }
 };
 ```

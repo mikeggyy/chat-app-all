@@ -165,9 +165,13 @@ export function useChatMessages(partnerId) {
   };
 
   /**
-   * 同步消息並獲取 AI 回覆
+   * 同步消息並獲取 AI 回覆（帶重試機制）
+   * @param {number} retryCount - 當前重試次數（內部使用）
    */
-  const syncMessageAndGetReply = async (userId, charId, text, userMessageId) => {
+  const syncMessageAndGetReply = async (userId, charId, text, userMessageId, retryCount = 0) => {
+    const MAX_RETRIES = 3; // 最多重試 3 次
+    const RETRY_DELAYS = [2000, 5000, 10000]; // 重試延遲：2秒、5秒、10秒
+
     try {
       isReplying.value = true;
 
@@ -179,12 +183,13 @@ export function useChatMessages(partnerId) {
         { role: 'user', text },
       ], { token });
 
-      // 2. 移除待同步標記
+      // 2. 移除待同步標記，設置為已發送
       const userMsgIndex = messages.value.findIndex(m => m.id === userMessageId);
       if (userMsgIndex >= 0) {
         messages.value[userMsgIndex] = {
           ...messages.value[userMsgIndex],
           state: 'sent',
+          retryCount: undefined, // 清除重試計數
         };
       }
 
@@ -200,7 +205,35 @@ export function useChatMessages(partnerId) {
       await requestReply(userId, charId);
 
     } catch (error) {
-      throw error;
+      console.error(`[useChatMessages] 消息發送失敗 (嘗試 ${retryCount + 1}/${MAX_RETRIES + 1}):`, error);
+
+      // ✅ 更新消息狀態為重試中或失敗
+      const userMsgIndex = messages.value.findIndex(m => m.id === userMessageId);
+      if (userMsgIndex >= 0) {
+        const shouldRetry = retryCount < MAX_RETRIES;
+
+        messages.value[userMsgIndex] = {
+          ...messages.value[userMsgIndex],
+          state: shouldRetry ? 'retrying' : 'failed',
+          retryCount: retryCount + 1,
+          error: error instanceof Error ? error.message : '發送失敗',
+        };
+
+        // ✅ 如果還有重試機會，延遲後自動重試
+        if (shouldRetry) {
+          const delay = RETRY_DELAYS[retryCount] || 10000;
+          console.log(`[useChatMessages] ${delay / 1000}秒後將自動重試...`);
+
+          setTimeout(() => {
+            console.log(`[useChatMessages] 開始第 ${retryCount + 2} 次嘗試...`);
+            syncMessageAndGetReply(userId, charId, text, userMessageId, retryCount + 1);
+          }, delay);
+        } else {
+          console.error('[useChatMessages] 已達最大重試次數，消息發送失敗');
+        }
+      }
+
+      // 不再往外拋出錯誤，避免阻塞後續操作
     } finally {
       isReplying.value = false;
     }
@@ -364,6 +397,53 @@ export function useChatMessages(partnerId) {
     }
   };
 
+  /**
+   * 手動重試失敗的消息
+   * @param {string} messageId - 失敗消息的 ID
+   */
+  const retryFailedMessage = async (messageId) => {
+    const userId = currentUserId.value;
+    const charId = currentPartnerId.value;
+
+    if (!userId || !charId) {
+      console.error('[useChatMessages] 無法重試：缺少 userId 或 charId');
+      return;
+    }
+
+    // 查找失敗的消息
+    const failedMsgIndex = messages.value.findIndex(m => m.id === messageId);
+    if (failedMsgIndex < 0) {
+      console.error('[useChatMessages] 找不到要重試的消息');
+      return;
+    }
+
+    const failedMsg = messages.value[failedMsgIndex];
+    if (failedMsg.state !== 'failed' && failedMsg.state !== 'retrying') {
+      console.warn('[useChatMessages] 消息狀態不是 failed 或 retrying，無需重試');
+      return;
+    }
+
+    console.log(`[useChatMessages] 手動重試消息: ${messageId}`);
+
+    // 重置消息狀態為 pending，清除錯誤信息
+    messages.value[failedMsgIndex] = {
+      ...failedMsg,
+      state: 'pending',
+      retryCount: 0,
+      error: undefined,
+    };
+
+    // 重新添加到待同步隊列
+    enqueuePendingMessages(userId, charId, [messages.value[failedMsgIndex]]);
+
+    // 重新發送（從頭開始，retryCount = 0）
+    try {
+      await syncMessageAndGetReply(userId, charId, failedMsg.text, messageId, 0);
+    } catch (error) {
+      console.error('[useChatMessages] 手動重試失敗:', error);
+    }
+  };
+
   return {
     // 狀態
     messages,
@@ -375,6 +455,7 @@ export function useChatMessages(partnerId) {
     loadHistory,
     sendMessage,
     requestReply,
+    retryFailedMessage, // ✅ 新增：手動重試方法
     resetConversation,
     cleanup,
   };

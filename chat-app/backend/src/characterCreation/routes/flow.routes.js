@@ -14,6 +14,7 @@ import {
   recordCreationCharge,
 } from "../characterCreation.service.js";
 import { trimString } from "../characterCreation.helpers.js";
+import { standardRateLimiter, purchaseRateLimiter } from "../../middleware/rateLimiterConfig.js";
 
 const flowRouter = Router();
 
@@ -21,6 +22,7 @@ const flowRouter = Router();
 flowRouter.post(
   "/flows",
   requireFirebaseAuth,
+  standardRateLimiter, // 創建操作，限制 30次/分鐘
   validateRequest(characterCreationSchemas.createFlow),
   async (req, res, next) => {
     try {
@@ -78,6 +80,7 @@ flowRouter.get(
 flowRouter.patch(
   "/flows/:flowId",
   requireFirebaseAuth,
+  standardRateLimiter, // 更新操作，限制 30次/分鐘
   validateRequest(characterCreationSchemas.updateFlow),
   async (req, res, next) => {
     try {
@@ -110,6 +113,7 @@ flowRouter.patch(
 flowRouter.post(
   "/flows/:flowId/steps/:stepId",
   requireFirebaseAuth,
+  standardRateLimiter, // 更新操作，限制 30次/分鐘
   validateRequest(characterCreationSchemas.updateStep),
   async (req, res, next) => {
     try {
@@ -161,6 +165,7 @@ flowRouter.post(
 flowRouter.post(
   "/flows/:flowId/charges",
   requireFirebaseAuth,
+  purchaseRateLimiter, // 收費操作，使用購買限制（10次/分鐘）
   validateRequest(characterCreationSchemas.recordCharge),
   async (req, res, next) => {
     try {
@@ -204,6 +209,7 @@ flowRouter.post(
 flowRouter.post(
   "/flows/:flowId/cleanup-images",
   requireFirebaseAuth,
+  standardRateLimiter, // 清理操作，限制 30次/分鐘
   validateRequest(characterCreationSchemas.cleanupImages),
   async (req, res, next) => {
     try {
@@ -296,6 +302,7 @@ flowRouter.post(
 flowRouter.post(
   "/flows/:flowId/cancel",
   requireFirebaseAuth,
+  standardRateLimiter, // 取消操作，限制 30次/分鐘
   validateRequest(characterCreationSchemas.cancelFlow),
   async (req, res, next) => {
     try {

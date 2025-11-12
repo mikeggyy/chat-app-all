@@ -2,6 +2,7 @@
  * 解鎖券 API 路由 - 修復版本
  * 修復內容：
  * ✅ 添加冪等性保護（使用 requestId）
+ * ✅ 添加速率限制保護
  */
 
 import express from "express";
@@ -22,6 +23,7 @@ import {
 } from "./unlockTickets.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { IDEMPOTENCY_TTL } from "../config/limits.js"; // ✅ P2-2: 使用集中配置的 TTL
+import { purchaseRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 
@@ -30,10 +32,12 @@ const router = express.Router();
  * POST /api/unlock-tickets/use/character
  * Body: { characterId, requestId }
  * ✅ 修復：添加冪等性保護
+ * ✅ 速率限制：10次/分鐘
  */
 router.post(
   "/api/unlock-tickets/use/character",
   requireFirebaseAuth,
+  purchaseRateLimiter, // 解鎖券使用操作，限制 10次/分鐘
   requireParams(["characterId", "requestId"], "body"),
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
@@ -65,10 +69,12 @@ router.post(
  * POST /api/unlock-tickets/use/photo
  * Body: { requestId }
  * ✅ 修復：添加冪等性保護
+ * ✅ 速率限制：10次/分鐘
  */
 router.post(
   "/api/unlock-tickets/use/photo",
   requireFirebaseAuth,
+  purchaseRateLimiter, // 解鎖卡使用操作，限制 10次/分鐘
   requireParams(["requestId"], "body"),
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
@@ -96,10 +102,12 @@ router.post(
  * POST /api/unlock-tickets/use/video
  * Body: { requestId }
  * ✅ 修復：添加冪等性保護
+ * ✅ 速率限制：10次/分鐘
  */
 router.post(
   "/api/unlock-tickets/use/video",
   requireFirebaseAuth,
+  purchaseRateLimiter, // 解鎖卡使用操作，限制 10次/分鐘
   requireParams(["requestId"], "body"),
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
@@ -125,10 +133,12 @@ router.post(
 /**
  * 獲取解鎖券餘額
  * GET /api/unlock-tickets/balance/:ticketType
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
 router.get(
   "/api/unlock-tickets/balance/:ticketType",
   requireFirebaseAuth,
+  relaxedRateLimiter, // 讀取操作，限制 60次/分鐘
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
     const { ticketType } = req.params;
@@ -146,10 +156,12 @@ router.get(
 /**
  * 獲取所有解鎖券餘額
  * GET /api/unlock-tickets/balances
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
 router.get(
   "/api/unlock-tickets/balances",
   requireFirebaseAuth,
+  relaxedRateLimiter, // 讀取操作，限制 60次/分鐘
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
     const balances = await getAllTicketBalances(userId);

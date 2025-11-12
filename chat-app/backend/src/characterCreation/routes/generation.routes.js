@@ -21,7 +21,7 @@ const generationRouter = Router();
 generationRouter.post(
   "/flows/:flowId/generate",
   requireFirebaseAuth,
-  standardRateLimiter,
+  veryStrictRateLimiter, // AI 生成操作，使用最嚴格限制（5次/分鐘）
   validateRequest(characterCreationSchemas.generateVoice),
   async (req, res, next) => {
     const userId = req.firebaseUser.uid;
@@ -124,7 +124,7 @@ generationRouter.post(
 generationRouter.post(
   "/flows/:flowId/ai-magician",
   requireFirebaseAuth,
-  standardRateLimiter,
+  veryStrictRateLimiter, // AI Vision 調用，使用最嚴格限制（5次/分鐘）
   validateRequest(characterCreationSchemas.aiMagician),
   async (req, res, next) => {
     const userId = req.firebaseUser.uid;
@@ -182,7 +182,7 @@ generationRouter.post(
 generationRouter.post(
   "/ai-description",
   requireFirebaseAuth,
-  standardRateLimiter,
+  veryStrictRateLimiter, // AI 調用，使用最嚴格限制（5次/分鐘）
   validateRequest(characterCreationSchemas.aiDescription),
   async (req, res, next) => {
     try {
@@ -215,7 +215,7 @@ generationRouter.post(
 generationRouter.post(
   "/flows/:flowId/ai-description",
   requireFirebaseAuth,
-  standardRateLimiter,
+  veryStrictRateLimiter, // AI 調用，使用最嚴格限制（5次/分鐘）
   validateRequest(characterCreationSchemas.aiDescriptionWithFlow),
   async (req, res, next) => {
     const userId = req.firebaseUser.uid;

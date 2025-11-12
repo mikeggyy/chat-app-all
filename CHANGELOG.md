@@ -38,6 +38,57 @@
 
 ---
 
+## [未發布] - 2025-11-13
+
+### 🔒 安全性和商業邏輯增強 (2025-11-12/13)
+
+#### 高危修復
+- **冪等性系統改用 Firestore** - 防止多服務器環境下的重複扣款，使用 Firestore Transaction 確保原子性
+- **會員升級獎勵原子性** - 使用 Firestore Transaction 確保獎勵發放的原子性，防止部分成功
+- **藥水購買會員檢查** - 移到 Transaction 內部，防止 TOCTOU（檢查時間到使用時間）問題
+- **前端金幣餘額並發保護** - 使用請求隊列序列化購買操作，防止競態條件
+
+#### 安全功能新增
+- **日誌脫敏系統** - 自動過濾密碼、Token、Email、手機等 10+ 種敏感信息類型
+- **速率限制配置** - 8 種分級速率限制器（從 5次/分到 60次/分），防止 API 濫用
+- **統一錯誤碼系統** - 8 大類別（驗證、認證、授權、資源等），80+ 標準錯誤碼
+
+#### 性能優化
+- **N+1 查詢優化** - photoAlbum.service.js 批量查詢，減少 90-96% Firestore 讀取次數
+- **前端競態條件修復** - MatchView 和 useMatchFavorites 樂觀更新保護
+
+#### 統計數據
+- **完成度**: 95.2% (20/21 issues)
+- **高危問題**: 5/5 ✅ 全部修復
+- **中危問題**: 8/8 ✅ 全部修復
+- **新增代碼**: ~3000+ 行
+- **Firestore 讀取減少**: 90-96%
+
+### 🧹 文檔清理 (2025-11-13)
+
+#### 清理項目
+- **刪除** 9 個臨時審計/驗證文件 (~100K) - 中間產物，信息已整合
+- **歸檔** 7 個重要修復記錄到 `docs/archived/audit-reports-2025-11/`
+  - `business-logic/BUSINESS_LOGIC_FIXES.md` (51K) - 最重要的修復記錄
+  - `OPTIMIZATION_SUMMARY.md` (13K) - 完整優化總結
+  - 前端修復記錄 (3 個文件，46K)
+  - 後端優化記錄 (3 個文件，35K)
+- **新增** `docs/archived/audit-reports-2025-11/README.md` - 審計工作總覽
+- **新增** `chat-app/backend/scripts/legacy/README.md` - Legacy 腳本說明文檔
+
+#### 根目錄清理效果
+- 文件數量：21 個 → 4 個永久文檔（-81%）
+- 文件大小：~350K → ~50K（-85%）
+- 代碼庫清晰度：⭐⭐ → ⭐⭐⭐⭐⭐
+
+### 🔗 相關文檔
+- [2025-11 審計報告總覽](docs/archived/audit-reports-2025-11/README.md)
+- [商業邏輯修復詳細記錄](docs/archived/audit-reports-2025-11/business-logic/BUSINESS_LOGIC_FIXES.md)
+- [優化工作總結](docs/archived/audit-reports-2025-11/OPTIMIZATION_SUMMARY.md)
+- [Legacy 腳本說明](chat-app/backend/scripts/legacy/README.md)
+
+---
+
 ## 版本說明
 
 本專案採用語義化版本（Semantic Versioning）：
@@ -66,4 +117,4 @@
 
 ---
 
-**最後更新**: 2025-01-12
+**最後更新**: 2025-11-13

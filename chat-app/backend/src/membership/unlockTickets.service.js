@@ -81,9 +81,15 @@ export const grantTickets = async (userId, ticketAmounts) => {
       reason: "membership_activation",
     });
 
-    // 4. 在 Transaction 內更新
+    // 4. 在 Transaction 內更新（統一使用 assets 對象）
     transaction.update(userRef, {
-      unlockTickets: tickets,
+      // ✅ 統一寫入新位置：assets
+      'assets.characterUnlockCards': tickets.characterUnlockCards || 0,
+      'assets.photoUnlockCards': tickets.photoUnlockCards || 0,
+      'assets.videoUnlockCards': tickets.videoUnlockCards || 0,
+      'assets.voiceUnlockCards': tickets.voiceUnlockCards || 0,
+      // ⚠️ 保留 unlockTickets 用於歷史記錄（不再用於查詢餘額）
+      'unlockTickets.usageHistory': tickets.usageHistory,
       updatedAt: FieldValue.serverTimestamp(),
     });
 
@@ -125,35 +131,26 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
 
     const user = userDoc.data();
 
-    // 2. 檢查多個位置的角色解鎖卡餘額
+    // 2. 檢查多個位置的角色解鎖卡餘額（✅ 優先級：assets > unlockTickets > root）
     let currentCards = 0;
-    let storageLocation = null;
-    let storageKey = null;
 
-    if (user?.unlockTickets?.characterUnlockCards > 0) {
-      currentCards = user.unlockTickets.characterUnlockCards;
-      storageLocation = "unlockTickets";
-      storageKey = "characterUnlockCards";
-    } else if (user?.unlockTickets?.characterUnlockTickets > 0) {
-      currentCards = user.unlockTickets.characterUnlockTickets;
-      storageLocation = "unlockTickets";
-      storageKey = "characterUnlockTickets";
-    } else if (user?.assets?.characterUnlockCards > 0) {
+    // ✅ 優先級 1：新位置 assets（推薦）
+    if (user?.assets?.characterUnlockCards > 0) {
       currentCards = user.assets.characterUnlockCards;
-      storageLocation = "assets";
-      storageKey = "characterUnlockCards";
     } else if (user?.assets?.characterUnlockTickets > 0) {
       currentCards = user.assets.characterUnlockTickets;
-      storageLocation = "assets";
-      storageKey = "characterUnlockTickets";
-    } else if (user?.characterUnlockCards > 0) {
+    }
+    // ✅ 優先級 2：過渡位置 unlockTickets
+    else if (user?.unlockTickets?.characterUnlockCards > 0) {
+      currentCards = user.unlockTickets.characterUnlockCards;
+    } else if (user?.unlockTickets?.characterUnlockTickets > 0) {
+      currentCards = user.unlockTickets.characterUnlockTickets;
+    }
+    // ✅ 優先級 3：舊位置 root（頂層字段）
+    else if (user?.characterUnlockCards > 0) {
       currentCards = user.characterUnlockCards;
-      storageLocation = "root";
-      storageKey = "characterUnlockCards";
     } else if (user?.characterUnlockTickets > 0) {
       currentCards = user.characterUnlockTickets;
-      storageLocation = "root";
-      storageKey = "characterUnlockTickets";
     }
 
     // 3. 檢查餘額
@@ -166,39 +163,25 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
     const unlockDays = 7;
     const unlockUntil = new Date(now.getTime() + unlockDays * 24 * 60 * 60 * 1000);
 
-    // 5. 根據儲存位置扣除卡片（在 Transaction 內）
+    // 5. ✅ 統一寫入新位置 assets（不論從哪裡讀取）
     const updateData = {
+      'assets.characterUnlockCards': currentCards - 1,
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    if (storageLocation === "unlockTickets") {
-      // 初始化 unlockTickets（如果不存在）
-      const tickets = user.unlockTickets || {
-        characterUnlockCards: 0,
-        photoUnlockCards: 0,
-        videoUnlockCards: 0,
-        voiceUnlockCards: 0,
-        usageHistory: [],
-      };
+    // 6. 記錄使用歷史到 unlockTickets（僅用於審計，不用於查詢餘額）
+    const usageHistory = user?.unlockTickets?.usageHistory || [];
+    usageHistory.push({
+      type: "use",
+      ticketType: TICKET_TYPES.CHARACTER,
+      characterId,
+      timestamp: new Date().toISOString(),
+      unlockDays,
+      unlockUntil: unlockUntil.toISOString(),
+    });
+    updateData['unlockTickets.usageHistory'] = usageHistory;
 
-      tickets[storageKey] = currentCards - 1;
-      tickets.usageHistory.push({
-        type: "use",
-        ticketType: TICKET_TYPES.CHARACTER,
-        characterId,
-        timestamp: FieldValue.serverTimestamp(),
-        unlockDays,
-        unlockUntil: unlockUntil.toISOString(),
-      });
-
-      updateData.unlockTickets = tickets;
-    } else if (storageLocation === "assets") {
-      updateData[`assets.${storageKey}`] = currentCards - 1;
-    } else if (storageLocation === "root") {
-      updateData[storageKey] = currentCards - 1;
-    }
-
-    // 6. 更新用戶資料（在 Transaction 內）
+    // 7. 更新用戶資料（在 Transaction 內）
     transaction.update(userRef, updateData);
 
     // 7. 設置解鎖限制（在 Transaction 內）

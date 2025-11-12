@@ -9,8 +9,6 @@ import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { validateDevModeBypass } from "../utils/devModeHelper.js";
 import {
   getCoinsBalance,
-  purchaseAiPhoto,
-  purchaseAiVideo,
   purchaseUnlimitedChat,
   getFeaturePricing,
   getAllFeaturePrices,
@@ -48,96 +46,6 @@ router.get(
     const balance = await getCoinsBalance(userId);
 
     sendSuccess(res, balance);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * 購買 AI 拍照功能
- * POST /api/coins/purchase/ai-photo
- * Body: { characterId, idempotencyKey }
- * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
- * 🔒 冪等性保護：防止重複扣費（必須提供 idempotencyKey）
- */
-router.post(
-  "/api/coins/purchase/ai-photo",
-  requireFirebaseAuth,
-  validateRequest(coinSchemas.purchaseAiPhoto),
-  async (req, res, next) => {
-  try {
-    const userId = req.firebaseUser.uid;
-    const { characterId, idempotencyKey } = req.body;
-
-    if (!characterId) {
-      return sendError(res, "VALIDATION_ERROR", "請提供 characterId", {
-        field: "characterId",
-      });
-    }
-
-    if (!idempotencyKey) {
-      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
-        field: "idempotencyKey",
-      });
-    }
-
-    // 冪等性保護（必須）
-    const requestId = `ai-photo:${userId}:${characterId}:${idempotencyKey}`;
-    const result = await handleIdempotentRequest(
-      requestId,
-      async () => await purchaseAiPhoto(userId, characterId),
-      { ttl: IDEMPOTENCY_TTL.IMAGE_GENERATION } // 15 分鐘
-    );
-
-    sendSuccess(res, {
-      message: "購買成功，正在生成照片",
-      ...result,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * 購買 AI 影片功能
- * POST /api/coins/purchase/ai-video
- * Body: { characterId, idempotencyKey }
- * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
- * 🔒 冪等性保護：防止重複扣費（必須提供 idempotencyKey）
- */
-router.post(
-  "/api/coins/purchase/ai-video",
-  requireFirebaseAuth,
-  validateRequest(coinSchemas.purchaseAiVideo),
-  async (req, res, next) => {
-  try {
-    const userId = req.firebaseUser.uid;
-    const { characterId, idempotencyKey } = req.body;
-
-    if (!characterId) {
-      return sendError(res, "VALIDATION_ERROR", "請提供 characterId", {
-        field: "characterId",
-      });
-    }
-
-    if (!idempotencyKey) {
-      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
-        field: "idempotencyKey",
-      });
-    }
-
-    // 冪等性保護（必須）
-    const requestId = `ai-video:${userId}:${characterId}:${idempotencyKey}`;
-    const result = await handleIdempotentRequest(
-      requestId,
-      async () => await purchaseAiVideo(userId, characterId),
-      { ttl: IDEMPOTENCY_TTL.VIDEO_GENERATION } // 30 分鐘（影片生成時間較長）
-    );
-
-    sendSuccess(res, {
-      message: "購買成功，正在生成影片",
-      ...result,
-    });
   } catch (error) {
     next(error);
   }

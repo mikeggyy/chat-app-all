@@ -401,22 +401,6 @@ export const coinSchemas = {
     // 無參數
   },
 
-  // 購買 AI 拍照
-  purchaseAiPhoto: {
-    body: z.object({
-      characterId: commonSchemas.characterId,
-      idempotencyKey: commonSchemas.idempotencyKey,
-    }),
-  },
-
-  // 購買 AI 影片
-  purchaseAiVideo: {
-    body: z.object({
-      characterId: commonSchemas.characterId,
-      idempotencyKey: commonSchemas.idempotencyKey,
-    }),
-  },
-
   // 購買無限對話
   purchaseUnlimitedChat: {
     body: z.object({

@@ -9,6 +9,7 @@ import { getWalletBalance, createWalletUpdate } from "../user/walletHelpers.js";
 import { MEMBERSHIP_TIERS, hasFeatureAccess } from "./membership.config.js";
 import { grantTickets } from "./unlockTickets.service.js";
 import { addCoins, TRANSACTION_TYPES } from "../payment/coins.service.js";
+import { createTransactionInTx } from "../payment/transaction.service.js";
 import { getFirestoreDb } from "../firebase/index.js";
 import { clearCache } from "../utils/firestoreCache.js";
 import logger from "../utils/logger.js";
@@ -646,6 +647,7 @@ export const checkAndDowngradeExpiredMemberships = async () => {
 
 /**
  * 發放每月會員獎勵（定時任務）
+ * ✅ 使用 Firestore Transaction 確保原子性
  */
 export const distributeMonthlyRewards = async (userId) => {
   const user = await getUserById(userId);
@@ -662,32 +664,62 @@ export const distributeMonthlyRewards = async (userId) => {
   const monthlyBonus = tierConfig.features.monthlyCoinsBonus || 0;
 
   if (monthlyBonus > 0) {
-    // 發放金幣獎勵
-    const currentBalance = user.walletBalance || 0;
-    const newBalance = currentBalance + monthlyBonus;
+    // ✅ 使用 Firestore Transaction 確保原子性
+    const db = getFirestoreDb();
+    const userRef = db.collection("users").doc(userId);
+    let result = null;
 
-    await upsertUser({
-      ...user,
-      walletBalance: newBalance,
-      wallet: {
-        ...user.wallet,
-        balance: newBalance,
+    await db.runTransaction(async (transaction) => {
+      // 1. 讀取用戶資料
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists) {
+        throw new Error(`找不到用戶: ${userId}`);
+      }
+
+      const userData = userDoc.data();
+      const currentBalance = getWalletBalance(userData);
+      const newBalance = currentBalance + monthlyBonus;
+
+      // 2. 在同一事務中更新用戶餘額
+      const walletUpdate = createWalletUpdate(newBalance);
+      transaction.update(userRef, {
+        ...walletUpdate,
         updatedAt: new Date().toISOString(),
-      },
-      updatedAt: new Date().toISOString(),
+      });
+
+      // 3. 在同一事務中創建交易記錄
+      createTransactionInTx(transaction, {
+        userId,
+        type: TRANSACTION_TYPES.REWARD,
+        amount: monthlyBonus,
+        description: `每月會員獎勵 - ${membership.tier.toUpperCase()}`,
+        metadata: {
+          tier: membership.tier,
+          rewardType: "monthly_bonus",
+        },
+        balanceBefore: currentBalance,
+        balanceAfter: newBalance,
+      });
+
+      // 4. 設置返回結果
+      result = {
+        userId,
+        tier: membership.tier,
+        coinsAwarded: monthlyBonus,
+        previousBalance: currentBalance,
+        newBalance,
+      };
+
+      logger.info(
+        `[會員服務] 發放每月獎勵成功 - 用戶: ${userId}, 等級: ${membership.tier}, 金幣: ${monthlyBonus}, 餘額 ${currentBalance} → ${newBalance}`
+      );
     });
 
-    // ✅ 清除用戶資料緩存（錢包餘額已更新）
+    // ✅ Transaction 成功後清除用戶資料緩存
     deleteCachedUserProfile(userId);
 
-    logger.info(`[會員服務] 發放每月獎勵成功 - 用戶: ${userId}, 金幣: ${monthlyBonus}`);
-
-    return {
-      userId,
-      tier: membership.tier,
-      coinsAwarded: monthlyBonus,
-      newBalance,
-    };
+    return result;
   }
 
   return null;

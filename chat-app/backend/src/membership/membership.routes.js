@@ -23,6 +23,7 @@ import {
 } from "../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { purchaseRateLimiter, relaxedRateLimiter, standardRateLimiter } from "../middleware/rateLimiterConfig.js";
+import { validateDevModeBypass } from "../utils/devModeHelper.js";
 
 const router = express.Router();
 
@@ -76,10 +77,15 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
     const isDevBypassEnabled = process.env.ENABLE_DEV_PURCHASE_BYPASS === "true";
 
     if (isDevBypassEnabled) {
-      // 開發模式：直接執行升級，不需要實際支付驗證
-      logger.info(`[開發模式] 升級會員：userId=${userId}, tier=${tier}`);
-
+      // ✅ 使用安全驗證函數（檢查生產環境、測試帳號等）
       try {
+        validateDevModeBypass(userId, {
+          featureName: "會員升級",
+          requireTestAccount: true,
+        });
+
+        logger.info(`[開發模式] 升級會員：userId=${userId}, tier=${tier}`);
+
         // 冪等性保護
         // ✅ P2-2 修復：使用集中配置的 TTL
         const requestId = `membership-upgrade:${userId}:${tier}:${idempotencyKey}`;
@@ -97,6 +103,10 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
           devMode: true,
           membership,
         });
+      } catch (validationError) {
+        // 驗證失敗（生產環境或非測試帳號）
+        logger.error(`[安全] 開發模式繞過驗證失敗: ${validationError.message}`);
+        return sendError(res, "FORBIDDEN", validationError.message);
       } catch (upgradeError) {
         // ✅ 詳細的錯誤處理：檢查是否為部分成功
         logger.error(`[會員服務] 升級失敗 - 用戶: ${userId}, 目標等級: ${tier}`, upgradeError);

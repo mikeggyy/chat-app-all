@@ -649,44 +649,121 @@ router.post('/send',
 
 ## 🔒 安全加固
 
-### 16. 🔄 加強輸入驗證
+### 16. ✅ 加強輸入驗證
 
-**文件**: `chat-app/backend/src/middleware/validation.middleware.js`
+**問題**: 缺少統一的輸入驗證 schemas，部分路由使用手動驗證，容易遺漏或不一致
 
+**修復**: 已完成
+- 文件: `chat-app/backend/src/middleware/validation.middleware.js`
+- 添加 `giftSchemas` - 禮物相關驗證（禮物 ID 格式、送禮、獲取記錄等）
+- 添加 `membershipSchemas` - 會員相關驗證（升級、取消）
+- 添加 `assetSchemas` - 資產相關驗證（SKU 格式、購買套餐、使用解鎖券）
+- 添加 `extraValidations` - 補充驗證（年齡 0-150、大金額 1-1M、字串長度）
+- 在 `userSchemas.updateProfile` 中添加年齡驗證
+- 所有驗證統一使用 Zod，提供清晰的錯誤訊息
+
+**實現**:
 ```javascript
-// 年齡驗證
-export const validateAge = (req, res, next) => {
-  const age = req.body.age;
-  if (age !== undefined) {
-    const numAge = parseInt(age, 10);
-    if (isNaN(numAge) || numAge < 0 || numAge > 150) {
-      return sendError(res, "VALIDATION_ERROR", "年齡必須在 0-150 之間");
-    }
-  }
-  next();
+// middleware/validation.middleware.js
+
+// 禮物相關驗證
+export const giftSchemas = {
+  // 禮物 ID 格式（只允許字母、數字、底線、連字號）
+  giftId: z.string()
+    .min(1, "禮物 ID 不得為空")
+    .regex(/^[a-z0-9_-]+$/i, "禮物 ID 只能包含字母、數字、底線、連字號")
+    .trim(),
+
+  // 送禮物
+  sendGift: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+      giftId: z.string()
+        .min(1, "禮物 ID 不得為空")
+        .regex(/^[a-z0-9_-]+$/i, "禮物 ID 只能包含字母、數字、底線、連字號")
+        .trim(),
+      requestId: z.string().min(1, "請提供請求ID以防止重複扣款").trim(),
+    }),
+  },
+  // ... 其他 schemas
 };
 
-// 禮物 ID 驗證
-export const validateGiftId = (req, res, next) => {
-  const giftId = req.body.giftId;
-  if (!/^[a-z0-9_-]+$/i.test(giftId)) {
-    return sendError(res, "VALIDATION_ERROR", "無效的禮物 ID 格式");
-  }
-  next();
+// 會員相關驗證
+export const membershipSchemas = {
+  tier: z.enum(["free", "vip", "vvip"]),
+  upgradeMembership: {
+    body: z.object({
+      tier: z.enum(["vip", "vvip"]),
+      paymentInfo: z.record(z.any()).optional(),
+      idempotencyKey: z.string().min(1, "請提供冪等性鍵以防止重複購買").trim(),
+    }),
+  },
 };
 
-// 金額驗證
-export const validateAmount = (req, res, next) => {
-  const amount = req.body.amount;
-  if (amount !== undefined) {
-    const numAmount = Number(amount);
-    if (!Number.isInteger(numAmount) || numAmount <= 0 || numAmount > 1000000) {
-      return sendError(res, "VALIDATION_ERROR", "金額必須是 1-1000000 的正整數");
-    }
-  }
-  next();
+// 資產相關驗證
+export const assetSchemas = {
+  sku: z.string()
+    .min(1, "SKU 不得為空")
+    .regex(/^[a-z0-9_-]+$/i, "SKU 只能包含字母、數字、底線、連字號")
+    .trim(),
+  purchasePackage: {
+    body: z.object({
+      sku: assetSchemas.sku,
+      idempotencyKey: z.string().min(1, "請提供冪等性鍵以防止重複購買").trim(),
+    }),
+  },
+};
+
+// 補充驗證
+export const extraValidations = {
+  age: z.coerce.number()
+    .int("年齡必須為整數")
+    .min(0, "年齡不得小於 0")
+    .max(150, "年齡不得超過 150")
+    .optional(),
+  largeAmount: z.coerce.number()
+    .int("金額必須為整數")
+    .positive("金額必須為正數")
+    .max(1000000, "金額不得超過 1,000,000"),
+};
+
+// 用戶資料更新（包含年齡驗證）
+export const userSchemas = {
+  updateProfile: {
+    body: z.object({
+      displayName: commonSchemas.displayName.optional(),
+      gender: z.enum(["male", "female", "other"]).optional(),
+      age: z.coerce.number()
+        .int("年齡必須為整數")
+        .min(0, "年齡不得小於 0")
+        .max(150, "年齡不得超過 150")
+        .optional(),
+      defaultPrompt: z.string().max(200).optional(),
+    }),
+  },
 };
 ```
+
+**使用方式**:
+```javascript
+// gift/gift.routes.js（可選：將手動驗證替換為中間件）
+import { validateRequest, giftSchemas } from '../middleware/validation.middleware.js';
+
+router.post('/send',
+  requireFirebaseAuth,
+  validateRequest(giftSchemas.sendGift), // ✅ 統一驗證
+  asyncHandler(sendGiftHandler)
+);
+
+// user/user.routes.js
+router.patch('/:userId/profile',
+  requireFirebaseAuth,
+  validateRequest(userSchemas.updateProfile), // ✅ 包含年齡驗證
+  asyncHandler(updateProfileHandler)
+);
+```
+
+**影響範圍**: 提供統一的驗證標準，減少安全漏洞和數據錯誤
 
 ---
 
@@ -898,12 +975,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
 | 🔴 高危 | 4 | 1 | 5 |
-| 🟡 中危 | 5 | 3 | 8 |
-| 🟢 低危 | 0 | 5 | 5 |
+| 🟡 中危 | 6 | 2 | 8 |
+| 🟢 低危 | 1 | 4 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **11** | **10** | **21** |
+| **總計** | **13** | **8** | **21** |
 
-**完成度**: 52.4%
+**完成度**: 61.9%
 
 ### 已完成的修復
 
@@ -918,11 +995,15 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 6. ✅ 訂單狀態機驗證（Commit: `735e665`）
 7. ✅ 資產購買原子性（Commit: `738a914`）
 8. ✅ 前端用戶資料緩存 TTL（Commit: `83c66cf`）
-9. ✅ 購買確認防抖（本次提交）
+9. ✅ 購買確認防抖（Commit: `563a6bd`）
+10. ✅ 前端消息發送重試機制（Commit: `62ee425`）
+
+**低危問題**:
+11. ✅ 加強輸入驗證（本次提交）
 
 **性能優化**:
-10. ✅ 添加 Firestore 索引（Commit: `c28c549`）
-11. ✅ 創建修復文檔（Commit: `da49a75`）
+12. ✅ 添加 Firestore 索引（Commit: `c28c549`）
+13. ✅ 創建修復文檔（Commit: `da49a75`）
 
 ---
 

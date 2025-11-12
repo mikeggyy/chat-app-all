@@ -283,6 +283,11 @@ export const userSchemas = {
     body: z.object({
       displayName: commonSchemas.displayName.optional(),
       gender: z.enum(["male", "female", "other"]).optional(),
+      age: z.coerce.number()
+        .int("年齡必須為整數")
+        .min(0, "年齡不得小於 0")
+        .max(150, "年齡不得超過 150")
+        .optional(),
       defaultPrompt: z.string().max(200, "角色設定不得超過 200 字").optional(),
     }),
   },
@@ -564,6 +569,162 @@ export const potionSchemas = {
   },
 };
 
+/**
+ * 禮物相關的驗證 schemas
+ */
+export const giftSchemas = {
+  // 禮物 ID 格式（只允許字母、數字、底線、連字號）
+  giftId: z.string()
+    .min(1, "禮物 ID 不得為空")
+    .regex(/^[a-z0-9_-]+$/i, "禮物 ID 只能包含字母、數字、底線、連字號")
+    .trim(),
+
+  // 送禮物
+  sendGift: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+      giftId: z.string()
+        .min(1, "禮物 ID 不得為空")
+        .regex(/^[a-z0-9_-]+$/i, "禮物 ID 只能包含字母、數字、底線、連字號")
+        .trim(),
+      requestId: z.string().min(1, "請提供請求ID以防止重複扣款").trim(),
+    }),
+  },
+
+  // 獲取送禮記錄
+  getGiftHistory: {
+    query: z.object({
+      characterId: commonSchemas.characterId.optional(),
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      offset: z.coerce.number().int().nonnegative().optional(),
+    }),
+  },
+
+  // 獲取禮物統計
+  getCharacterStats: {
+    params: z.object({
+      characterId: commonSchemas.characterId,
+    }),
+  },
+
+  // 獲取禮物價格 - 無參數
+  getPricing: {
+    // 無參數
+  },
+
+  // 生成禮物回應
+  giftResponse: {
+    body: z.object({
+      characterData: z.object({
+        id: z.string(),
+        name: z.string(),
+        // 其他角色資料欄位可選
+      }).passthrough(), // 允許額外欄位
+      giftId: z.string()
+        .min(1, "禮物 ID 不得為空")
+        .regex(/^[a-z0-9_-]+$/i, "禮物 ID 只能包含字母、數字、底線、連字號")
+        .trim(),
+      generatePhoto: z.boolean().optional(),
+    }),
+  },
+};
+
+/**
+ * 會員相關的驗證 schemas
+ */
+export const membershipSchemas = {
+  // 會員等級枚舉
+  tier: z.enum(["free", "vip", "vvip"], {
+    required_error: "需提供會員等級",
+    invalid_type_error: "無效的會員等級",
+  }),
+
+  // 獲取會員方案 - 無參數
+  getPlans: {
+    // 無參數
+  },
+
+  // 升級會員
+  upgradeMembership: {
+    body: z.object({
+      tier: z.enum(["vip", "vvip"], {
+        required_error: "需提供目標會員等級",
+        invalid_type_error: "只能升級到 VIP 或 VVIP",
+      }),
+      paymentInfo: z.record(z.any()).optional(),
+      idempotencyKey: z.string().min(1, "請提供冪等性鍵以防止重複購買").trim(),
+    }),
+  },
+
+  // 取消會員
+  cancelMembership: {
+    body: z.object({
+      reason: z.string().max(500, "取消原因不得超過 500 字").optional(),
+    }),
+  },
+};
+
+/**
+ * 資產相關的驗證 schemas
+ */
+export const assetSchemas = {
+  // SKU 格式驗證
+  sku: z.string()
+    .min(1, "SKU 不得為空")
+    .regex(/^[a-z0-9_-]+$/i, "SKU 只能包含字母、數字、底線、連字號")
+    .trim(),
+
+  // 購買資產套餐
+  purchasePackage: {
+    body: z.object({
+      sku: z.string()
+        .min(1, "SKU 不得為空")
+        .regex(/^[a-z0-9_-]+$/i, "SKU 只能包含字母、數字、底線、連字號")
+        .trim(),
+      idempotencyKey: z.string().min(1, "請提供冪等性鍵以防止重複購買").trim(),
+    }),
+  },
+
+  // 獲取用戶資產 - 無參數
+  getUserAssets: {
+    // 無參數
+  },
+
+  // 使用解鎖券
+  useUnlockTicket: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+      ticketType: z.enum(["characterUnlockCards", "photoUnlockCards", "videoUnlockCards", "voiceUnlockCards"], {
+        required_error: "需提供解鎖券類型",
+      }),
+    }),
+  },
+};
+
+/**
+ * 特殊驗證 schemas（補充）
+ */
+export const extraValidations = {
+  // 年齡驗證（0-150 歲）
+  age: z.coerce.number()
+    .int("年齡必須為整數")
+    .min(0, "年齡不得小於 0")
+    .max(150, "年齡不得超過 150")
+    .optional(),
+
+  // 金額驗證（1-1,000,000）
+  largeAmount: z.coerce.number()
+    .int("金額必須為整數")
+    .positive("金額必須為正數")
+    .max(1000000, "金額不得超過 1,000,000"),
+
+  // 字串長度限制
+  shortString: z.string().min(1).max(50).trim(),
+  mediumString: z.string().min(1).max(200).trim(),
+  longString: z.string().min(1).max(500).trim(),
+  veryLongString: z.string().min(1).max(2000).trim(),
+};
+
 export default {
   validateRequest,
   commonSchemas,
@@ -573,4 +734,8 @@ export default {
   coinSchemas,
   transactionSchemas,
   potionSchemas,
+  giftSchemas,
+  membershipSchemas,
+  assetSchemas,
+  extraValidations,
 };

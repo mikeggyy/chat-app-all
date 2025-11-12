@@ -277,7 +277,8 @@ export function createLimitService(config) {
       );
 
       // ✅ 修復 P0-2 問題：使用 checkCanUse 計算正確的 totalAllowed（過濾過期的廣告解鎖）
-      const canUseResult = checkCanUse(limitData, configData.limit);
+      // 🧹 啟用即時清理：在 Transaction 內清理過期的解鎖記錄
+      const canUseResult = checkCanUse(limitData, configData.limit, true);
 
       if (!canUseResult.allowed) {
         throw new Error(

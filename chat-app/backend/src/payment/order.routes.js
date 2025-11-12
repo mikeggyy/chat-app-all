@@ -21,6 +21,12 @@ import { isGuestUser } from "../../../shared/config/testAccounts.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { validateRequest, orderSchemas } from "../middleware/validation.middleware.js";
 import { sendSuccess, sendError } from "../../../shared/utils/errorFormatter.js";
+import {
+  purchaseRateLimiter,
+  standardRateLimiter,
+  relaxedRateLimiter,
+  strictRateLimiter,
+} from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 
@@ -31,6 +37,7 @@ const router = express.Router();
 router.get(
   "/",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(orderSchemas.getUserOrders),
   async (req, res) => {
     try {
@@ -68,6 +75,7 @@ router.get(
 router.get(
   "/stats",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(orderSchemas.getOrderStats),
   async (req, res) => {
     try {
@@ -97,6 +105,7 @@ router.get(
 router.post(
   "/",
   requireFirebaseAuth,
+  purchaseRateLimiter,
   validateRequest(orderSchemas.createOrder),
   async (req, res) => {
     try {
@@ -137,6 +146,7 @@ router.post(
 router.get(
   "/:orderId",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(orderSchemas.getOrder),
   async (req, res) => {
     try {
@@ -167,6 +177,7 @@ router.get(
 router.get(
   "/number/:orderNumber",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(orderSchemas.getOrderByNumber),
   async (req, res) => {
     try {
@@ -197,6 +208,7 @@ router.get(
 router.patch(
   "/:orderId/complete",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(orderSchemas.completeOrder),
   async (req, res) => {
     try {
@@ -230,6 +242,7 @@ router.patch(
 router.patch(
   "/:orderId/cancel",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(orderSchemas.cancelOrder),
   async (req, res) => {
     try {
@@ -263,6 +276,7 @@ router.patch(
 router.patch(
   "/:orderId/refund",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(orderSchemas.refundOrder),
   async (req, res) => {
     try {
@@ -294,6 +308,7 @@ router.patch(
 router.delete(
   "/",
   requireFirebaseAuth,
+  strictRateLimiter,
   validateRequest(orderSchemas.clearAllOrders),
   async (req, res) => {
     try {

@@ -22,6 +22,10 @@ import {
 } from "./ad.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { IDEMPOTENCY_TTL } from "../config/limits.js";
+import {
+  standardRateLimiter,
+  relaxedRateLimiter,
+} from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 
@@ -34,6 +38,7 @@ const router = express.Router();
 router.post(
   "/api/ads/watch",
   requireFirebaseAuth,
+  standardRateLimiter,
   requireParams(["characterId"], "body"),
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
@@ -52,6 +57,7 @@ router.post(
 router.post(
   "/api/ads/verify",
   requireFirebaseAuth,
+  standardRateLimiter,
   requireParams(["adId"], "body"),
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
@@ -71,6 +77,7 @@ router.post(
 router.post(
   "/api/ads/claim",
   requireFirebaseAuth,
+  standardRateLimiter,
   requireParams(["adId"], "body"),
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
@@ -104,6 +111,7 @@ router.post(
 router.get(
   "/api/ads/limit",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
     const limit = await checkDailyAdLimit(userId);
@@ -119,6 +127,7 @@ router.get(
 router.get(
   "/api/ads/stats",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
     const stats = await getAdStats(userId);

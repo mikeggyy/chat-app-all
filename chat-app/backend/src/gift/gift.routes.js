@@ -15,7 +15,7 @@ import { sendGift, getUserGiftHistory, getCharacterGiftStats, getGiftPricing } f
 import { processGiftResponse } from "./giftResponse.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { requireFirebaseAuth } from "../auth/index.js";
-import { giftRateLimiter, standardRateLimiter } from "../middleware/rateLimiterConfig.js";
+import { giftRateLimiter, standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 import { IDEMPOTENCY_TTL } from "../config/limits.js"; // ✅ P2-2: 使用集中配置的 TTL
 
 const router = express.Router();
@@ -76,7 +76,7 @@ router.post("/send", requireFirebaseAuth, giftRateLimiter, asyncHandler(async (r
  * 獲取用戶送禮記錄
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人送禮記錄
  */
-router.get("/history", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
+router.get("/history", requireFirebaseAuth, relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, limit, offset } = req.query;
@@ -101,7 +101,7 @@ router.get("/history", requireFirebaseAuth, asyncHandler(async (req, res, next) 
  * 獲取用戶送給角色的禮物統計
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人統計
  */
-router.get("/stats/:characterId", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
+router.get("/stats/:characterId", requireFirebaseAuth, relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.params;
@@ -120,7 +120,7 @@ router.get("/stats/:characterId", requireFirebaseAuth, asyncHandler(async (req, 
  * 獲取禮物價格列表（考慮用戶會員等級）
  * 🔒 安全增強：從認證 token 獲取 userId，防止查詢他人價格
  */
-router.get("/pricing", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
+router.get("/pricing", requireFirebaseAuth, relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
 
@@ -138,7 +138,7 @@ router.get("/pricing", requireFirebaseAuth, asyncHandler(async (req, res, next) 
  * 生成AI角色收到禮物的回應（感謝訊息 + 自拍照）
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人生成禮物回應
  */
-router.post("/response", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
+router.post("/response", requireFirebaseAuth, standardRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterData, giftId, generatePhoto } = req.body;

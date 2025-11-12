@@ -3,13 +3,16 @@
  * 負責檢查使用權限和記錄使用
  */
 
+import logger from "../../utils/logger.js";
+
 /**
  * 檢查是否可以使用
  * @param {Object} limitData - 限制數據
  * @param {number} limit - 限制值 (-1 表示無限制)
+ * @param {boolean} cleanup - 是否進行即時清理（僅在 Transaction 內使用）
  * @returns {Object} 檢查結果
  */
-export const checkCanUse = (limitData, limit) => {
+export const checkCanUse = (limitData, limit, cleanup = false) => {
   // 無限制
   if (limit === -1) {
     return {
@@ -61,14 +64,38 @@ export const checkCanUse = (limitData, limit) => {
   let validAdUnlocks = 0;
 
   if (Array.isArray(limitData.unlockHistory) && limitData.unlockHistory.length > 0) {
-    // 過濾並累計未過期的解鎖次數
-    validAdUnlocks = limitData.unlockHistory
-      .filter(unlock => {
-        if (!unlock.expiresAt) return false; // 沒有過期時間的忽略
+    // 📊 日誌監控：當解鎖記錄過多時記錄警告
+    if (limitData.unlockHistory.length > 50) {
+      logger.warn(`[限制追蹤] unlockHistory 記錄過多 (${limitData.unlockHistory.length} 條)，建議檢查清理機制`);
+    }
+
+    // 🧹 即時清理：僅在 Transaction 內（cleanup = true）且記錄數量超過閾值時，清理過期記錄
+    // 這確保只在寫入操作時修改數據，避免在只讀操作中產生副作用
+    if (cleanup && limitData.unlockHistory.length > 20) {
+      const originalLength = limitData.unlockHistory.length;
+      limitData.unlockHistory = limitData.unlockHistory.filter(unlock => {
+        if (!unlock.expiresAt) return false; // 沒有過期時間的移除
         const expiresAt = new Date(unlock.expiresAt);
         return expiresAt > now; // 只保留未過期的
-      })
-      .reduce((sum, unlock) => sum + (unlock.amount || 0), 0);
+      });
+
+      const cleanedCount = originalLength - limitData.unlockHistory.length;
+      if (cleanedCount > 0) {
+        logger.info(`[限制追蹤] 即時清理過期解鎖記錄：移除 ${cleanedCount} 條，剩餘 ${limitData.unlockHistory.length} 條`);
+      }
+
+      // ⚡ 性能優化：清理後直接累計，避免重複過濾（清理後的數組都是有效的）
+      validAdUnlocks = limitData.unlockHistory.reduce((sum, unlock) => sum + (unlock.amount || 0), 0);
+    } else {
+      // 只讀模式或數量未達閾值：過濾並累計（不修改原數組）
+      validAdUnlocks = limitData.unlockHistory
+        .filter(unlock => {
+          if (!unlock.expiresAt) return false; // 沒有過期時間的忽略
+          const expiresAt = new Date(unlock.expiresAt);
+          return expiresAt > now; // 只保留未過期的
+        })
+        .reduce((sum, unlock) => sum + (unlock.amount || 0), 0);
+    }
   }
 
   // 計算總可用次數

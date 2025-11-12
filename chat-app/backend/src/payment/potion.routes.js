@@ -25,6 +25,11 @@ import {
 } from "./potion.service.js";
 import { validateRequest, potionSchemas } from "../middleware/validation.middleware.js";
 import { IDEMPOTENCY_TTL } from "../config/limits.js";
+import {
+  purchaseRateLimiter,
+  standardRateLimiter,
+  relaxedRateLimiter,
+} from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 
@@ -35,6 +40,7 @@ const router = express.Router();
 router.get(
   "/available",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(potionSchemas.getAvailablePotions),
   async (req, res, next) => {
   try {
@@ -59,6 +65,7 @@ router.get(
 router.get(
   "/active",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(potionSchemas.getActivePotions),
   async (req, res, next) => {
   try {
@@ -89,6 +96,7 @@ router.get(
 router.post(
   "/purchase/memory-boost",
   requireFirebaseAuth,
+  purchaseRateLimiter,
   validateRequest(potionSchemas.purchaseMemoryBoost),
   async (req, res, next) => {
   try {
@@ -129,6 +137,7 @@ router.post(
 router.post(
   "/purchase/brain-boost",
   requireFirebaseAuth,
+  purchaseRateLimiter,
   validateRequest(potionSchemas.purchaseBrainBoost),
   async (req, res, next) => {
   try {
@@ -168,6 +177,7 @@ router.post(
 router.post(
   "/use/memory-boost",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(potionSchemas.useMemoryBoost),
   async (req, res, next) => {
   try {
@@ -200,6 +210,7 @@ router.post(
 router.post(
   "/use/brain-boost",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(potionSchemas.useBrainBoost),
   async (req, res, next) => {
   try {
@@ -232,6 +243,7 @@ router.post(
 router.get(
   "/character/:characterId/effects",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(potionSchemas.getCharacterEffects),
   async (req, res, next) => {
   try {

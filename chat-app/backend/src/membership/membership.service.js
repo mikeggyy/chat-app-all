@@ -4,6 +4,7 @@
  */
 
 import { getUserById, upsertUser } from "../user/user.service.js";
+import { getUserProfileWithCache, deleteCachedUserProfile } from "../user/userProfileCache.service.js";
 import { MEMBERSHIP_TIERS, hasFeatureAccess } from "./membership.config.js";
 import { grantTickets } from "./unlockTickets.service.js";
 import { addCoins, TRANSACTION_TYPES } from "../payment/coins.service.js";
@@ -85,7 +86,7 @@ const getMembershipConfigFromFirestore = async (tier) => {
  * 獲取用戶的完整會員資訊
  */
 export const getUserMembership = async (userId) => {
-  const user = await getUserById(userId);
+  const user = await getUserProfileWithCache(userId);
   if (!user) {
     throw new Error("找不到用戶");
   }
@@ -173,9 +174,10 @@ const autoDowngradeExpiredMembership = async (userId) => {
     updatedAt: new Date().toISOString(),
   });
 
-  // 清除用戶會員快取，確保下次讀取時獲取最新狀態
-  clearCache(`user:${userId}:membership`);
-  logger.info(`[會員服務] 已清除過期用戶 ${userId} 的會員快取`);
+  // ✅ 清除用戶資料緩存，確保下次讀取時獲取最新狀態
+  deleteCachedUserProfile(userId);
+  clearCache(`user:${userId}:membership`); // 舊緩存系統（向後兼容）
+  logger.info(`[會員服務] 已清除過期用戶 ${userId} 的緩存`);
 
   return await getUserMembership(userId);
 };
@@ -226,93 +228,144 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
   // TODO: 這裡應該整合支付系統
   // 目前直接升級，實際應用應先驗證付款成功
 
-  const updated = await upsertUser({
-    ...user,
-    membershipTier: targetTier,
-    membershipStatus: "active",
-    membershipStartedAt: user.membershipStartedAt || now.toISOString(),
-    membershipExpiresAt: expiresAt.toISOString(),
-    membershipAutoRenew: options.autoRenew || false,
-    updatedAt: now.toISOString(),
-  });
+  // ✅ 修復: 將所有操作合併到一個 Firestore Transaction 中，確保原子性
+  const db = getFirestoreDb();
+  const userRef = db.collection("users").doc(userId);
 
   // 發放開通獎勵（解鎖票和金幣）- 只在新開通或升級時發放
   const isNewActivation = currentTier === "free" || tierOrder[targetTier] > tierOrder[currentTier];
 
-  if (isNewActivation) {
-    const features = tierConfig.features;
+  // 如果是從免費升級，保留剩餘的拍照次數（轉換成拍照卡）- 在 Transaction 外計算
+  let bonusPhotoCards = 0;
+  if (isNewActivation && currentTier === "free") {
+    try {
+      const { getPhotoStats } = await import("../ai/photoLimit.service.js");
+      const photoStats = await getPhotoStats(userId);
 
-    // 如果是從免費升級，保留剩餘的拍照次數（轉換成拍照卡）
-    let bonusPhotoCards = 0;
-    if (currentTier === "free") {
-      try {
-        const { getPhotoStats } = await import("../ai/photoLimit.service.js");
-        const photoStats = await getPhotoStats(userId);
+      // 計算剩餘次數（基礎額度 - 已使用）
+      const remaining = Math.max(0, (photoStats.standardPhotosLimit || 0) - (photoStats.used || 0));
 
-        // 計算剩餘次數（基礎額度 - 已使用）
-        const remaining = Math.max(0, (photoStats.standardPhotosLimit || 0) - (photoStats.used || 0));
-
-        if (remaining > 0) {
-          bonusPhotoCards = remaining;
-          logger.info(`[會員服務] 保留免費用戶剩餘拍照次數 - 用戶: ${userId}, 剩餘: ${remaining} 次，轉換為拍照卡`);
-        }
-      } catch (error) {
-        logger.error("獲取免費用戶剩餘拍照次數失敗:", error);
+      if (remaining > 0) {
+        bonusPhotoCards = remaining;
+        logger.info(`[會員服務] 保留免費用戶剩餘拍照次數 - 用戶: ${userId}, 剩餘: ${remaining} 次，轉換為拍照卡`);
       }
-    }
-
-    // 發放解鎖票（拍照卡數量 = 會員贈送 + 免費用戶剩餘次數）
-    if (features.characterUnlockCards || features.photoUnlockCards || features.videoUnlockCards) {
-      try {
-        const photoCardsToGrant = (features.photoUnlockCards || 0) + bonusPhotoCards;
-
-        await grantTickets(userId, {
-          characterUnlockCards: features.characterUnlockCards || 0,
-          photoUnlockCards: photoCardsToGrant,
-          videoUnlockCards: features.videoUnlockCards || 0,
-        });
-
-        if (bonusPhotoCards > 0) {
-          logger.info(`[會員服務] 發放解鎖票成功 - 用戶: ${userId}, 等級: ${targetTier}, 拍照卡: ${photoCardsToGrant} (含保留 ${bonusPhotoCards} 張)`);
-        } else {
-          logger.info(`[會員服務] 發放解鎖票成功 - 用戶: ${userId}, 等級: ${targetTier}`);
-        }
-      } catch (error) {
-        logger.error("發放解鎖票失敗:", error);
-      }
-    }
-
-    // 發放創建角色卡
-    if (features.characterCreationCards > 0) {
-      try {
-        const { addUserAsset } = await import("../user/assets.service.js");
-        await addUserAsset(userId, "createCards", features.characterCreationCards);
-        logger.info(`[會員服務] 發放創建角色卡成功 - 用戶: ${userId}, 數量: ${features.characterCreationCards}`);
-      } catch (error) {
-        logger.error("發放創建角色卡失敗:", error);
-      }
-    }
-
-    // 發放金幣
-    if (features.monthlyCoinsBonus > 0) {
-      try {
-        await addCoins(
-          userId,
-          features.monthlyCoinsBonus,
-          TRANSACTION_TYPES.REWARD,
-          `會員開通獎勵 - ${tierConfig.name}`,
-          { tier: targetTier, reason: "membership_activation" }
-        );
-        logger.info(`[會員服務] 發放金幣成功 - 用戶: ${userId}, 金幣: ${features.monthlyCoinsBonus}`);
-      } catch (error) {
-        logger.error("發放金幣失敗:", error);
-      }
+    } catch (error) {
+      logger.error("獲取免費用戶剩餘拍照次數失敗:", error);
     }
   }
 
-  // 清除用戶會員快取，確保下次讀取時獲取最新狀態
-  clearCache(`user:${userId}:membership`);
-  logger.info(`[會員服務] 用戶 ${userId} 升級至 ${targetTier}，已清除會員快取`);
+  // ✅ 使用 Transaction 確保所有操作原子性
+  let result = null;
+  await db.runTransaction(async (transaction) => {
+    // 1. 在 Transaction 內重新讀取用戶（確保使用最新數據）
+    const freshUserDoc = await transaction.get(userRef);
+    if (!freshUserDoc.exists) {
+      throw new Error("找不到用戶");
+    }
+
+    const freshUser = freshUserDoc.data();
+
+    // 2. 準備會員狀態更新
+    const membershipUpdate = {
+      membershipTier: targetTier,
+      membershipStatus: "active",
+      membershipStartedAt: freshUser.membershipStartedAt || now.toISOString(),
+      membershipExpiresAt: expiresAt.toISOString(),
+      membershipAutoRenew: options.autoRenew || false,
+      updatedAt: now.toISOString(),
+    };
+
+    // 3. 如果是新激活，在同一 Transaction 內發放獎勵
+    if (isNewActivation) {
+      const features = tierConfig.features;
+
+      // 3.1 發放解鎖票（直接更新用戶文檔）
+      const currentTickets = freshUser.unlockTickets || {};
+      const photoCardsToGrant = (features.photoUnlockCards || 0) + bonusPhotoCards;
+
+      membershipUpdate.unlockTickets = {
+        characterUnlockCards: (currentTickets.characterUnlockCards || 0) + (features.characterUnlockCards || 0),
+        photoUnlockCards: (currentTickets.photoUnlockCards || 0) + photoCardsToGrant,
+        videoUnlockCards: (currentTickets.videoUnlockCards || 0) + (features.videoUnlockCards || 0),
+        // 保留其他票券
+        voiceUnlockCards: currentTickets.voiceUnlockCards || 0,
+      };
+
+      // 3.2 發放創建角色卡（直接更新用戶 assets）
+      if (features.characterCreationCards > 0) {
+        const currentAssets = freshUser.assets || {};
+        membershipUpdate.assets = {
+          ...currentAssets,
+          createCards: (currentAssets.createCards || 0) + features.characterCreationCards,
+        };
+      }
+
+      // 3.3 發放金幣（直接更新用戶金幣餘額）
+      if (features.monthlyCoinsBonus > 0) {
+        const currentBalance = freshUser.coins?.balance || freshUser.coins || 0;
+        const newBalance = currentBalance + features.monthlyCoinsBonus;
+
+        membershipUpdate.coins = {
+          balance: newBalance,
+          lastUpdated: now.toISOString(),
+        };
+
+        // 創建交易記錄（在同一 Transaction 內）
+        const transactionRef = db.collection("transactions").doc();
+        transaction.set(transactionRef, {
+          userId,
+          type: TRANSACTION_TYPES.REWARD,
+          amount: features.monthlyCoinsBonus,
+          description: `會員開通獎勵 - ${tierConfig.name}`,
+          metadata: {
+            tier: targetTier,
+            reason: "membership_activation",
+          },
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+          status: "completed",
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      // 記錄獎勵日誌
+      const rewardLog = [];
+      if (membershipUpdate.unlockTickets) {
+        rewardLog.push(`解鎖票: 角色${membershipUpdate.unlockTickets.characterUnlockCards - currentTickets.characterUnlockCards}, 拍照${photoCardsToGrant}, 視頻${membershipUpdate.unlockTickets.videoUnlockCards - currentTickets.videoUnlockCards}`);
+      }
+      if (membershipUpdate.assets?.createCards) {
+        rewardLog.push(`創建卡: ${features.characterCreationCards}`);
+      }
+      if (membershipUpdate.coins) {
+        rewardLog.push(`金幣: ${features.monthlyCoinsBonus}`);
+      }
+
+      logger.info(`[會員服務-Transaction] 準備發放獎勵 - 用戶: ${userId}, ${rewardLog.join(', ')}`);
+    }
+
+    // 4. 在 Transaction 內更新用戶文檔
+    transaction.update(userRef, membershipUpdate);
+
+    // 5. 記錄會員變更歷史（可選，用於審計）
+    const membershipHistoryRef = db.collection("membership_history").doc();
+    transaction.set(membershipHistoryRef, {
+      userId,
+      fromTier: currentTier,
+      toTier: targetTier,
+      operation: "upgrade",
+      expiresAt: expiresAt.toISOString(),
+      isNewActivation,
+      rewards: membershipUpdate.unlockTickets || {},
+      timestamp: now.toISOString(),
+    });
+
+    result = { success: true, tier: targetTier };
+  });
+
+  // ✅ Transaction 完成後清除緩存
+  deleteCachedUserProfile(userId);
+  clearCache(`user:${userId}:membership`); // 舊緩存系統（向後兼容）
+  logger.info(`[會員服務] 用戶 ${userId} 升級至 ${targetTier} 完成（原子性操作）`);
 
   return await getUserMembership(userId);
 };
@@ -352,9 +405,10 @@ export const cancelMembership = async (userId, immediate = false) => {
     });
   }
 
-  // 清除用戶會員快取，確保下次讀取時獲取最新狀態
-  clearCache(`user:${userId}:membership`);
-  logger.info(`[會員服務] 用戶 ${userId} 取消會員（${immediate ? '立即' : '到期後'}），已清除會員快取`);
+  // ✅ 清除用戶資料緩存，確保下次讀取時獲取最新狀態
+  deleteCachedUserProfile(userId);
+  clearCache(`user:${userId}:membership`); // 舊緩存系統（向後兼容）
+  logger.info(`[會員服務] 用戶 ${userId} 取消會員（${immediate ? '立即' : '到期後'}），已清除緩存`);
 
   return await getUserMembership(userId);
 };
@@ -392,9 +446,10 @@ export const renewMembership = async (userId, durationMonths = 1) => {
     updatedAt: now.toISOString(),
   });
 
-  // 清除用戶會員快取，確保下次讀取時獲取最新狀態
-  clearCache(`user:${userId}:membership`);
-  logger.info(`[會員服務] 用戶 ${userId} 續訂會員 ${durationMonths} 個月，已清除會員快取`);
+  // ✅ 清除用戶資料緩存，確保下次讀取時獲取最新狀態
+  deleteCachedUserProfile(userId);
+  clearCache(`user:${userId}:membership`); // 舊緩存系統（向後兼容）
+  logger.info(`[會員服務] 用戶 ${userId} 續訂會員 ${durationMonths} 個月，已清除緩存`);
 
   return await getUserMembership(userId);
 };
@@ -469,6 +524,9 @@ export const distributeMonthlyRewards = async (userId) => {
       },
       updatedAt: new Date().toISOString(),
     });
+
+    // ✅ 清除用戶資料緩存（錢包餘額已更新）
+    deleteCachedUserProfile(userId);
 
     logger.info(`[會員服務] 發放每月獎勵成功 - 用戶: ${userId}, 金幣: ${monthlyBonus}`);
 

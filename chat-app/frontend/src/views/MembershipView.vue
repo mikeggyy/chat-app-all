@@ -16,6 +16,7 @@ import { useUserProfile } from "../composables/useUserProfile";
 import { useMembership } from "../composables/useMembership";
 import { useToast } from "../composables/useToast";
 import { useGuestGuard } from "../composables/useGuestGuard";
+import { logger } from "../utils/logger.js";
 import LoadingSpinner from "../components/LoadingSpinner.vue";
 
 const router = useRouter();
@@ -278,7 +279,10 @@ onMounted(async () => {
       if (currentTier.value === "vip" || currentTier.value === "vvip") {
         activeTierId.value = currentTier.value;
       }
-    } catch (error) {}
+    } catch (error) {
+      logger.error('[會員方案] 載入會員資料失敗', error);
+      // 載入失敗時，使用預設的免費方案顯示，不阻止頁面渲染
+    }
   }
 });
 </script>

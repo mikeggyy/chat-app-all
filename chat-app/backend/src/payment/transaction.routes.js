@@ -12,7 +12,13 @@ import {
 } from "./transaction.service.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { requireAdmin, requireSuperAdmin } from "../middleware/authorization.js";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
+import { validateRequest, transactionSchemas } from "../middleware/validation.middleware.js";
 
 const router = express.Router();
 
@@ -20,7 +26,11 @@ const router = express.Router();
  * GET /api/transactions
  * 獲取當前用戶的交易記錄
  */
-router.get("/", requireFirebaseAuth, async (req, res) => {
+router.get(
+  "/",
+  requireFirebaseAuth,
+  validateRequest(transactionSchemas.getUserTransactions),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { limit, offset, type, status, startDate, endDate } = req.query;
@@ -37,18 +47,15 @@ router.get("/", requireFirebaseAuth, async (req, res) => {
 
     const transactions = await getUserTransactions(userId, options);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       userId,
       total: transactions.length,
       ...options,
       transactions,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    logger.error("獲取交易記錄失敗:", error);
+    next(error);
   }
 });
 
@@ -56,7 +63,11 @@ router.get("/", requireFirebaseAuth, async (req, res) => {
  * GET /api/transactions/stats
  * 獲取當前用戶的交易統計
  */
-router.get("/stats", requireFirebaseAuth, async (req, res) => {
+router.get(
+  "/stats",
+  requireFirebaseAuth,
+  validateRequest(transactionSchemas.getTransactionStats),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { startDate, endDate } = req.query;
@@ -67,16 +78,13 @@ router.get("/stats", requireFirebaseAuth, async (req, res) => {
 
     const stats = await getUserTransactionStats(userId, options);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       userId,
       ...stats,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    logger.error("獲取交易統計失敗:", error);
+    next(error);
   }
 });
 
@@ -84,7 +92,11 @@ router.get("/stats", requireFirebaseAuth, async (req, res) => {
  * GET /api/transactions/:transactionId
  * 獲取單個交易記錄詳情
  */
-router.get("/:transactionId", requireFirebaseAuth, async (req, res) => {
+router.get(
+  "/:transactionId",
+  requireFirebaseAuth,
+  validateRequest(transactionSchemas.getTransaction),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { transactionId } = req.params;
@@ -92,29 +104,23 @@ router.get("/:transactionId", requireFirebaseAuth, async (req, res) => {
     const transaction = await getTransaction(transactionId);
 
     if (!transaction) {
-      return res.status(404).json({
-        success: false,
-        message: "找不到該交易記錄",
+      return sendError(res, "RESOURCE_NOT_FOUND", "找不到該交易記錄", {
+        transactionId,
       });
     }
 
     // 檢查權限（只能查看自己的交易）
     if (transaction.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "無權查看此交易記錄",
+      return sendError(res, "FORBIDDEN", "無權查看此交易記錄", {
+        transactionId,
+        userId,
       });
     }
 
-    res.json({
-      success: true,
-      transaction,
-    });
+    sendSuccess(res, { transaction });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    logger.error("獲取交易詳情失敗:", error);
+    next(error);
   }
 });
 
@@ -123,7 +129,12 @@ router.get("/:transactionId", requireFirebaseAuth, async (req, res) => {
  * 清除所有交易記錄（測試用，極度危險）
  * ⚠️ 安全增強：只有超級管理員可執行此操作
  */
-router.delete("/", requireFirebaseAuth, requireSuperAdmin(), async (req, res) => {
+router.delete(
+  "/",
+  requireFirebaseAuth,
+  requireSuperAdmin(),
+  validateRequest(transactionSchemas.clearAllTransactions),
+  async (req, res, next) => {
   try {
     const adminUserId = req.firebaseUser.uid;
     const adminEmail = req.firebaseUser.email || '未知';
@@ -147,20 +158,13 @@ router.delete("/", requireFirebaseAuth, requireSuperAdmin(), async (req, res) =>
       deletedCount: result.deletedCount,
     });
 
-    res.json({
-      success: true,
-      ...result,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     logger.error(`[安全審計] 清除所有交易記錄失敗`, {
       error: error.message,
       adminUserId: req.firebaseUser?.uid,
     });
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    next(error);
   }
 });
 
@@ -169,7 +173,12 @@ router.delete("/", requireFirebaseAuth, requireSuperAdmin(), async (req, res) =>
  * 刪除指定用戶的所有交易記錄
  * 🔒 安全增強：使用 Firebase Custom Claims 驗證管理員權限
  */
-router.delete("/user/:targetUserId", requireFirebaseAuth, requireAdmin(), async (req, res) => {
+router.delete(
+  "/user/:targetUserId",
+  requireFirebaseAuth,
+  requireAdmin(),
+  validateRequest(transactionSchemas.deleteUserTransactions),
+  async (req, res, next) => {
   try {
     const { targetUserId } = req.params;
     const adminUserId = req.firebaseUser.uid;
@@ -195,8 +204,7 @@ router.delete("/user/:targetUserId", requireFirebaseAuth, requireAdmin(), async 
       deletedCount: result.deletedCount,
     });
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       userId: targetUserId,
       ...result,
     });
@@ -206,11 +214,7 @@ router.delete("/user/:targetUserId", requireFirebaseAuth, requireAdmin(), async 
       targetUserId: req.params.targetUserId,
       adminUserId: req.firebaseUser?.uid,
     });
-
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    next(error);
   }
 });
 

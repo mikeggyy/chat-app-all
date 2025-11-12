@@ -11,21 +11,23 @@
  * import "./setup-emulator.js";
  */
 
+import logger from "./utils/logger.js";
+
 if (process.env.USE_FIREBASE_EMULATOR === "true") {
   const emulatorHost = process.env.FIREBASE_EMULATOR_HOST || "localhost";
 
   // Auth Emulator
   const authPort = process.env.FIREBASE_EMULATOR_AUTH_PORT || "9099";
   process.env.FIREBASE_AUTH_EMULATOR_HOST = `${emulatorHost}:${authPort}`;
-  console.log(`🔧 Firebase Auth Emulator: ${emulatorHost}:${authPort}`);
+  logger.info(`🔧 Firebase Auth Emulator: ${emulatorHost}:${authPort}`);
 
   // Firestore Emulator
   const firestorePort = process.env.FIREBASE_EMULATOR_FIRESTORE_PORT || "8080";
   process.env.FIRESTORE_EMULATOR_HOST = `${emulatorHost}:${firestorePort}`;
-  console.log(`🔧 Firebase Firestore Emulator: ${emulatorHost}:${firestorePort}`);
+  logger.info(`🔧 Firebase Firestore Emulator: ${emulatorHost}:${firestorePort}`);
 
   // Storage Emulator
   const storagePort = process.env.FIREBASE_STORAGE_EMULATOR_PORT || "9299";
   process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${emulatorHost}:${storagePort}`;
-  console.log(`🔧 Firebase Storage Emulator: ${emulatorHost}:${storagePort}`);
+  logger.info(`🔧 Firebase Storage Emulator: ${emulatorHost}:${storagePort}`);
 }

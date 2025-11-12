@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { requireFirebaseAuth } from "../auth/index.js";
 import { asyncHandler } from "../utils/routeHelpers.js";
-import { sendSuccess, sendError } from "../../../../shared/utils/errorFormatter.js";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import {
   getRandomMatch,
   listMatchesForUser,
@@ -12,6 +16,13 @@ import {
 import { getUserById } from "../user/user.service.js";
 import { recordCreation } from "../characterCreation/characterCreationLimit.service.js";
 import logger from "../utils/logger.js";
+import { validateRequest } from "../middleware/validation.middleware.js";
+import {
+  getAllMatchesSchema,
+  getPopularMatchesSchema,
+  getMatchByIdSchema,
+  createMatchSchema,
+} from "./match.schemas.js";
 
 export const matchRouter = Router();
 
@@ -37,8 +48,9 @@ matchRouter.get(
  */
 matchRouter.get(
   "/all",
+  validateRequest(getAllMatchesSchema),
   asyncHandler(async (req, res) => {
-    const userId = typeof req.query.userId === "string" ? req.query.userId : "";
+    const userId = req.query.userId || "";
     const user = userId ? await getUserById(userId) : null;
 
     const matches = await listMatchesForUser(user);
@@ -49,30 +61,51 @@ matchRouter.get(
 
 /**
  * GET /match/popular - 取得按聊天數量排序的熱門角色
+ *
+ * 支持兩種分頁模式：
+ * 1. cursor-based（推薦）：使用 cursor 參數，性能優異
+ * 2. offset-based（向後兼容）：使用 offset 參數，性能較差
+ *
  * Query params:
- *   - limit: 返回的角色數量（默認 10）
- *   - offset: 分頁偏移量（默認 0）
+ *   - limit: 返回的角色數量（默認 10，最大 100）
+ *   - cursor: 游標（推薦，用於下一頁）
+ *   - offset: 分頁偏移量（向後兼容，默認 0）
  *   - sync: 是否同步更新 Firestore 中的 totalChatUsers（true/false，默認 false）
- * 注意：返回包含聊天數量的角色列表
+ *
+ * 返回格式：
+ *   - characters: 角色列表
+ *   - cursor: 下一頁的游標（使用 cursor 分頁時）
+ *   - hasMore: 是否還有更多數據
+ *   - offset: 當前偏移量（使用 offset 分頁時）
+ *   - paginationMode: 'cursor' 或 'offset'
  */
 matchRouter.get(
   "/popular",
+  validateRequest(getPopularMatchesSchema),
   asyncHandler(async (req, res) => {
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
-    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
-    const sync = req.query.sync === "true" || req.query.sync === "1";
+    const limit = req.query.limit || 10;
+    const offset = req.query.offset || 0;
+    const cursor = req.query.cursor || null;
+    const sync = req.query.sync || false;
 
-    const matches = await getPopularMatches(limit, {
+    const result = await getPopularMatches(limit, {
       offset,
+      cursor,
       syncToFirestore: sync
     });
 
+    // 判斷使用的分頁模式
+    const paginationMode = cursor ? 'cursor' : 'offset';
+
+    // 統一的響應格式
     res.json({
-      characters: matches,
-      total: matches.length,
-      offset,
-      hasMore: matches.length === limit, // 如果返回的數量等於 limit，可能還有更多
-      synced: sync, // 告知前端是否進行了同步
+      characters: result.characters || result.__legacy || [],
+      cursor: result.cursor || null,  // cursor-based 分頁的下一頁游標
+      hasMore: result.hasMore !== undefined ? result.hasMore : result.characters.length === limit,
+      offset: offset,  // offset-based 分頁的當前偏移量
+      total: result.characters?.length || result.__legacy?.length || 0,
+      paginationMode,  // 告知前端使用的分頁模式
+      synced: sync,  // 告知前端是否進行了同步
     });
   })
 );
@@ -82,6 +115,7 @@ matchRouter.get(
  */
 matchRouter.get(
   "/:id",
+  validateRequest(getMatchByIdSchema),
   asyncHandler(async (req, res) => {
     const characterId = req.params.id;
     const match = await getMatchById(characterId);
@@ -102,6 +136,7 @@ matchRouter.get(
 matchRouter.post(
   "/create",
   requireFirebaseAuth,
+  validateRequest(createMatchSchema),
   asyncHandler(async (req, res) => {
     const userId = req.body.creatorUid || req.firebaseUser?.uid;
     const flowId = req.body.flowId; // 從前端獲取 flowId
@@ -130,11 +165,12 @@ matchRouter.post(
 
           const limitCheck = await canCreateCharacter(userId);
           if (!limitCheck.allowed) {
-            res.status(403).json({
-              message: limitCheck.message || "已達到角色創建次數限制",
-              limit: limitCheck,
-            });
-            return;
+            return sendError(
+              res,
+              "LIMIT_EXCEEDED",
+              limitCheck.message || "已達到角色創建次數限制",
+              { limit: limitCheck }
+            );
           }
 
           // ⚠️ 使用 limitCheck 的信息來判斷是否需要扣除創建卡
@@ -153,10 +189,9 @@ matchRouter.post(
         }
       } catch (error) {
         logger.error(`[角色創建] 檢查或扣除創建資源失敗: ${error.message}`);
-        res.status(500).json({
-          message: "檢查創建資源失敗",
+        return sendError(res, "INTERNAL_ERROR", "檢查創建資源失敗", {
+          error: error.message,
         });
-        return;
       }
     }
 
@@ -175,7 +210,11 @@ matchRouter.post(
       } catch (recordError) {
         logger.error("[角色創建] 記錄創建次數失敗:", recordError);
         // ⚠️ 記錄失敗必須拋出錯誤，避免免費次數被重複使用
-        throw new Error("記錄創建次數失敗，請重試");
+        throw new ApiError(
+          "INTERNAL_ERROR",
+          "記錄創建次數失敗，請重試",
+          { originalError: recordError.message }
+        );
       }
     }
 
@@ -226,20 +265,22 @@ matchRouter.post(
             );
 
             // 拋出包含支持參考的錯誤
-            const detailedError = new Error(
-              `角色創建失敗，且系統未能正確回滾您的創建次數。請聯繫客服並提供此參考號：${errorReference}`
+            throw new ApiError(
+              "ROLLBACK_FAILURE",
+              `角色創建失敗，且系統未能正確回滾您的創建次數。請聯繫客服並提供此參考號：${errorReference}`,
+              {
+                errorReference,
+                originalError: createError.message,
+              }
             );
-            detailedError.errorReference = errorReference;
-            detailedError.originalError = createError.message;
-            throw detailedError;
           } catch (logError) {
             // 如果連日誌記錄都失敗了，至少要告知用戶
             logger.error("[角色創建] 記錄回滾失敗日誌時出錯:", logError);
-            const fallbackError = new Error(
-              `角色創建失敗，且系統未能正確回滾您的創建次數。請聯繫客服並提供您的用戶 ID: ${userId}`
+            throw new ApiError(
+              "ROLLBACK_FAILURE",
+              `角色創建失敗，且系統未能正確回滾您的創建次數。請聯繫客服並提供您的用戶 ID: ${userId}`,
+              { originalError: createError.message }
             );
-            fallbackError.originalError = createError.message;
-            throw fallbackError;
           }
         }
       }

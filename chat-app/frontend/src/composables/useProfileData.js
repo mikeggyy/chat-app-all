@@ -18,6 +18,7 @@ import { useUnlockTickets } from "./useUnlockTickets";
 import { useNotifications } from "./useNotifications";
 import { useGuestGuard } from "./useGuestGuard";
 import { FALLBACK_USER, DEFAULT_USER_ASSETS } from "../config/profile";
+import { logger } from "../utils/logger";
 
 export function useProfileData() {
   // 用戶基本資料
@@ -98,9 +99,7 @@ export function useProfileData() {
         };
       }
     } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error("[useProfileData] 加載用戶資產失敗:", err);
-      }
+      logger.error("[useProfileData] 加載用戶資產失敗:", err);
     } finally {
       isLoadingAssets.value = false;
     }
@@ -122,9 +121,7 @@ export function useProfileData() {
         loadUserAssets(userId),
       ]);
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("[useProfileData] 初始化資料失敗:", error);
-      }
+      logger.error("[useProfileData] 初始化資料失敗:", error);
     }
   };
 
@@ -142,9 +139,7 @@ export function useProfileData() {
         loadUserAssets(userId),
       ]);
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("[useProfileData] 刷新資料失敗:", error);
-      }
+      logger.error("[useProfileData] 刷新資料失敗:", error);
     }
   };
 
@@ -155,9 +150,7 @@ export function useProfileData() {
     try {
       await loadMembership();
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error("[useProfileData] 刷新會員資料失敗:", error);
-      }
+      logger.error("[useProfileData] 刷新會員資料失敗:", error);
     }
   };
 

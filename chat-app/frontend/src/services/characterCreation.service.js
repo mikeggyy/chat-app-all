@@ -1,4 +1,5 @@
 import { apiJson } from "../utils/api.js";
+import { logger } from "../utils/logger";
 
 export const CHARACTER_CREATION_FLOW_STORAGE_KEY =
   "character-create-flow-id";
@@ -322,14 +323,12 @@ export const finalizeCharacterCreation = async (flowId, currentUser, selectedIma
     portraitUrl = flow.appearance?.image || "";
   }
 
-  if (import.meta.env.DEV) {
-    console.log('[finalizeCharacterCreation] 圖片 URL 選擇:', {
-      selectedImageUrl,
-      flowAppearanceImage: flow.appearance?.image,
-      generatedImagesCount: generatedImages.length,
-      finalPortraitUrl: portraitUrl
-    });
-  }
+  logger.log('[finalizeCharacterCreation] 圖片 URL 選擇:', {
+    selectedImageUrl,
+    flowAppearanceImage: flow.appearance?.image,
+    generatedImagesCount: generatedImages.length,
+    finalPortraitUrl: portraitUrl
+  });
 
   // 將 flow 資料轉換為 match 格式
   const matchData = {
@@ -365,9 +364,7 @@ export const finalizeCharacterCreation = async (flowId, currentUser, selectedIma
     try {
       await cleanupUnselectedImages(flowId, portraitUrl, generatedImages);
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn("清理未選中圖片失敗:", error);
-      }
+      logger.warn("清理未選中圖片失敗:", error);
       // 不阻斷創建流程，只記錄警告
     }
   }

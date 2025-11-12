@@ -7,8 +7,6 @@
  * - 下載截圖（降級方案）
  */
 
-import html2canvas from 'html2canvas';
-
 /**
  * 創建分享功能 composable
  * @param {Object} deps - 依賴項
@@ -63,6 +61,9 @@ export function useShareFunctionality(deps) {
     const shareText = `我正在與 ${characterName} 聊天！`;
 
     try {
+      // 動態載入 html2canvas（懶加載）
+      const html2canvas = (await import('html2canvas')).default;
+
       // 截取聊天畫面
       const canvas = await html2canvas(chatPageRef, {
         backgroundColor: '#0f1016',

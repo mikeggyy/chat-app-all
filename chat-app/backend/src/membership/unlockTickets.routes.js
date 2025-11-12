@@ -3,6 +3,11 @@
  */
 
 import express from "express";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import {
@@ -23,21 +28,15 @@ const router = express.Router();
  * GET /api/unlock-tickets/balance
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人餘額
  */
-router.get("/api/unlock-tickets/balance", requireFirebaseAuth, async (req, res) => {
+router.get("/api/unlock-tickets/balance", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const balance = await getTicketBalance(userId);
 
-    res.json({
-      success: true,
-      ...balance,
-    });
+    sendSuccess(res, balance);
   } catch (error) {
     logger.error("獲取解鎖票餘額失敗:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -46,22 +45,15 @@ router.get("/api/unlock-tickets/balance", requireFirebaseAuth, async (req, res) 
  * GET /api/unlock-tickets/active
  * 🔒 安全增強：從認證 token 獲取 userId
  */
-router.get("/api/unlock-tickets/active", requireFirebaseAuth, async (req, res) => {
+router.get("/api/unlock-tickets/active", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const activeUnlocks = await getActiveUnlocks(userId);
 
-    res.json({
-      success: true,
-      unlocks: activeUnlocks,
-    });
+    sendSuccess(res, { unlocks: activeUnlocks });
   } catch (error) {
     logger.error("獲取活躍解鎖記錄失敗:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      unlocks: [],
-    });
+    next(error);
   }
 });
 
@@ -71,31 +63,26 @@ router.get("/api/unlock-tickets/active", requireFirebaseAuth, async (req, res) =
  * Body: { characterId }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人解鎖票
  */
-router.post("/api/unlock-tickets/use/character", requireFirebaseAuth, async (req, res) => {
+router.post("/api/unlock-tickets/use/character", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.body;
 
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        error: "缺少必要參數：characterId",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：characterId", {
+        field: "characterId",
       });
     }
 
     const result = await useCharacterUnlockTicket(userId, characterId);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "成功使用角色解鎖票",
       ...result,
     });
   } catch (error) {
     logger.error("使用角色解鎖票失敗:", error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -105,31 +92,26 @@ router.post("/api/unlock-tickets/use/character", requireFirebaseAuth, async (req
  * Body: { characterId }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人照片卡
  */
-router.post("/api/unlock-tickets/use/photo", requireFirebaseAuth, async (req, res) => {
+router.post("/api/unlock-tickets/use/photo", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.body;
 
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        error: "缺少必要參數：characterId",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：characterId", {
+        field: "characterId",
       });
     }
 
     const result = await usePhotoUnlockCard(userId, characterId);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "成功使用拍照解鎖卡",
       ...result,
     });
   } catch (error) {
     logger.error("使用拍照解鎖卡失敗:", error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -139,31 +121,26 @@ router.post("/api/unlock-tickets/use/photo", requireFirebaseAuth, async (req, re
  * Body: { characterId }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人影片卡
  */
-router.post("/api/unlock-tickets/use/video", requireFirebaseAuth, async (req, res) => {
+router.post("/api/unlock-tickets/use/video", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.body;
 
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        error: "缺少必要參數：characterId",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：characterId", {
+        field: "characterId",
       });
     }
 
     const result = await useVideoUnlockCard(userId, characterId);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "成功使用影片解鎖卡",
       ...result,
     });
   } catch (error) {
     logger.error("使用影片解鎖卡失敗:", error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -173,7 +150,7 @@ router.post("/api/unlock-tickets/use/video", requireFirebaseAuth, async (req, re
  * Query: ?amount=1
  * 🔒 安全增強：從認證 token 獲取 userId，防止查詢他人餘額
  */
-router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, async (req, res) => {
+router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { ticketType } = req.params;
@@ -181,8 +158,7 @@ router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, async (
 
     const hasEnough = await hasEnoughTickets(userId, ticketType, amount);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       userId,
       ticketType,
       amount,
@@ -190,10 +166,7 @@ router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, async (
     });
   } catch (error) {
     logger.error("檢查解鎖票失敗:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 
@@ -203,7 +176,7 @@ router.get("/api/unlock-tickets/check/:ticketType", requireFirebaseAuth, async (
  * Query: ?limit=50&offset=0
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人歷史
  */
-router.get("/api/unlock-tickets/history", requireFirebaseAuth, async (req, res) => {
+router.get("/api/unlock-tickets/history", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const limit = parseInt(req.query.limit) || 50;
@@ -211,16 +184,10 @@ router.get("/api/unlock-tickets/history", requireFirebaseAuth, async (req, res) 
 
     const history = await getUsageHistory(userId, { limit, offset });
 
-    res.json({
-      success: true,
-      ...history,
-    });
+    sendSuccess(res, history);
   } catch (error) {
     logger.error("獲取使用歷史失敗:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    next(error);
   }
 });
 

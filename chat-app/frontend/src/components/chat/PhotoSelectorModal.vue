@@ -90,6 +90,7 @@ import { ref, watch } from "vue";
 import { XMarkIcon, CheckIcon } from "@heroicons/vue/24/outline";
 import { apiJson } from "../../utils/api";
 import { useFirebaseAuth } from "../../composables/useFirebaseAuth";
+import { logger } from "@/utils/logger";
 
 const props = defineProps({
   isOpen: {
@@ -155,7 +156,7 @@ const loadPhotos = async () => {
 
     photos.value = [...allPhotos, ...userPhotos];
   } catch (error) {
-    console.error("載入照片失敗:", error);
+    logger.error("載入照片失敗:", error);
     errorMessage.value = "載入照片失敗，請稍後再試";
   } finally {
     isLoading.value = false;

@@ -6,6 +6,7 @@
  */
 
 import { reactive, computed } from 'vue';
+import { logger } from '../../utils/logger';
 
 export function useModalManager() {
   // ==========================================
@@ -134,7 +135,7 @@ export function useModalManager() {
    */
   const open = (modalName, updates = {}) => {
     if (!modals[modalName]) {
-      console.warn(`Modal "${modalName}" not found`);
+      logger.warn(`Modal "${modalName}" not found`);
       return;
     }
 
@@ -161,7 +162,7 @@ export function useModalManager() {
    */
   const close = (modalName, clearData = false) => {
     if (!modals[modalName]) {
-      console.warn(`Modal "${modalName}" not found`);
+      logger.warn(`Modal "${modalName}" not found`);
       return;
     }
 
@@ -197,7 +198,7 @@ export function useModalManager() {
    */
   const update = (modalName, updates = {}) => {
     if (!modals[modalName]) {
-      console.warn(`Modal "${modalName}" not found`);
+      logger.warn(`Modal "${modalName}" not found`);
       return;
     }
 
@@ -219,7 +220,7 @@ export function useModalManager() {
    */
   const setLoading = (modalName, loading) => {
     if (!modals[modalName]) {
-      console.warn(`Modal "${modalName}" not found`);
+      logger.warn(`Modal "${modalName}" not found`);
       return;
     }
 

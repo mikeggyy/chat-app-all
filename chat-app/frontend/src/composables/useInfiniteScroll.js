@@ -1,4 +1,5 @@
 import { ref, watch, onBeforeUnmount } from "vue";
+import { logger } from "../utils/logger";
 
 /**
  * 無限滾動 Composable
@@ -40,8 +41,8 @@ export function useInfiniteScroll(loadMore, options = {}) {
           hasMore.value = false;
         }
       } catch (error) {
-        console.error('[無限滾動] 載入失敗:', error);
-      } finally {
+        logger.error('[無限滾動] 載入失敗:', error);
+      } finally{
         isLoadingMore.value = false;
       }
     }

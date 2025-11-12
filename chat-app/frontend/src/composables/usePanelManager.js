@@ -6,6 +6,7 @@ import {
   StarIcon,
   BoltIcon
 } from '@heroicons/vue/24/solid';
+import { logger } from '../utils/logger';
 
 /**
  * Panel 管理 Composable
@@ -134,7 +135,7 @@ export function usePanelManager(router, route, panelConfigs = {}) {
     const config = panelConfigs[type] || panelConfigs[Object.keys(panelConfigs)[0]];
 
     if (!config) {
-      console.warn(`Panel config for type "${type}" not found`);
+      logger.warn(`Panel config for type "${type}" not found`);
       return;
     }
 

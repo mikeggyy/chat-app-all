@@ -19,6 +19,7 @@ import {
   sendError,
   ApiError,
 } from "../../../shared/utils/errorFormatter.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -73,7 +74,7 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
 
     if (isDevBypassEnabled) {
       // 開發模式：直接執行升級，不需要實際支付驗證
-      console.log(`[開發模式] 升級會員：userId=${userId}, tier=${tier}`);
+      logger.info(`[開發模式] 升級會員：userId=${userId}, tier=${tier}`);
 
       // 冪等性保護
       const requestId = `membership-upgrade:${userId}:${tier}:${idempotencyKey}`;

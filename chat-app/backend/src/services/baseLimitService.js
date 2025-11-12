@@ -22,7 +22,7 @@ import {
   purchaseCards as trackPurchaseCards,
   unlockPermanently as trackUnlockPermanently,
 } from "./limitService/limitTracking.js";
-import { isGuestUser } from "../../../../shared/config/testAccounts.js";
+import { isGuestUser } from "../../../shared/config/testAccounts.js";
 
 const USAGE_LIMITS_COLLECTION = "usage_limits";
 

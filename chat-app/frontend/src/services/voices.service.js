@@ -1,4 +1,5 @@
 import { apiJson } from "../utils/api.js";
+import { logger } from "../utils/logger";
 
 const BASE_PATH = "/api/voices";
 
@@ -11,7 +12,7 @@ export const fetchAllVoices = async () => {
     const response = await apiJson(BASE_PATH);
     return response;
   } catch (error) {
-    console.error('[Voices Service] 獲取語音列表失敗:', error);
+    logger.error('[Voices Service] 獲取語音列表失敗:', error);
     throw error;
   }
 };
@@ -25,7 +26,7 @@ export const fetchRecommendedVoices = async () => {
     const response = await apiJson(`${BASE_PATH}/recommended`);
     return response;
   } catch (error) {
-    console.error('[Voices Service] 獲取推薦語音失敗:', error);
+    logger.error('[Voices Service] 獲取推薦語音失敗:', error);
     throw error;
   }
 };
@@ -39,7 +40,7 @@ export const fetchVoicesByLocale = async () => {
     const response = await apiJson(`${BASE_PATH}/by-locale`);
     return response;
   } catch (error) {
-    console.error('[Voices Service] 獲取分組語音失敗:', error);
+    logger.error('[Voices Service] 獲取分組語音失敗:', error);
     throw error;
   }
 };
@@ -53,7 +54,7 @@ export const fetchTTSServiceInfo = async () => {
     const response = await apiJson(`${BASE_PATH}/service`);
     return response;
   } catch (error) {
-    console.error('[Voices Service] 獲取 TTS 服務資訊失敗:', error);
+    logger.error('[Voices Service] 獲取 TTS 服務資訊失敗:', error);
     throw error;
   }
 };
@@ -67,7 +68,7 @@ export const fetchVoiceMapping = async () => {
     const response = await apiJson(`${BASE_PATH}/mapping`);
     return response;
   } catch (error) {
-    console.error('[Voices Service] 獲取語音映射失敗:', error);
+    logger.error('[Voices Service] 獲取語音映射失敗:', error);
     throw error;
   }
 };

@@ -22,7 +22,11 @@ import {
 import { generateVideoForCharacter } from "./videoGeneration.service.js";
 import { createRateLimiter } from "../middleware/rateLimiter.js";
 import { RATE_LIMITS, IDEMPOTENCY_TTL } from "../config/limits.js";
-import { sendError } from "../../../../shared/utils/errorFormatter.js";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import {
   withIdempotency,
   handleVoicePlayment,
@@ -91,7 +95,7 @@ aiRouter.post(
   validateRequest(aiSchemas.aiReply),
   requireSameUser({ errorMessage: "無權限存取其他使用者的 AI 對話回覆" }),
   replyRateLimiter,
-  async (req, res) => {
+  async (req, res, next) => {
     const { userId, characterId } = req.params;
     const { requestId, skipLimitCheck } = req.body;
 
@@ -135,10 +139,10 @@ aiRouter.post(
         { ttl: IDEMPOTENCY_TTL.AI_REPLY }
       );
 
-      res.status(201).json(result);
+      sendSuccess(res, result, 201);
     } catch (error) {
-      const { status, message } = buildErrorResponse(error, "生成 AI 回覆時發生錯誤");
-      res.status(status).json({ message });
+      logger.error("生成 AI 回覆失敗:", error);
+      next(error);
     }
   }
 );
@@ -149,7 +153,7 @@ aiRouter.post(
   validateRequest(aiSchemas.aiSuggestions),
   requireSameUser({ errorMessage: "無權限取得其他使用者的建議回覆" }),
   suggestionRateLimiter,
-  async (req, res) => {
+  async (req, res, next) => {
     const { userId, characterId } = req.params;
 
     try {
@@ -157,13 +161,10 @@ aiRouter.post(
         userId,
         characterId
       );
-      res.status(200).json(result);
+      sendSuccess(res, result);
     } catch (error) {
-      const { status, message } = buildErrorResponse(error, "生成建議回覆時發生錯誤");
-      res.status(status).json({
-        message,
-        suggestions: [],
-      });
+      logger.error("生成建議回覆失敗:", error);
+      next(error);
     }
   }
 );
@@ -173,7 +174,7 @@ aiRouter.post(
   requireFirebaseAuth,
   validateRequest(aiSchemas.tts),
   ttsRateLimiter,
-  async (req, res) => {
+  async (req, res, next) => {
     const { text, characterId, requestId, useVoiceUnlockCard } = req.body;
     const userId = req.firebaseUser?.uid;
 
@@ -265,9 +266,7 @@ aiRouter.post(
     } catch (error) {
       // 記錄錯誤（根據環境調整詳細程度）
       logError("TTS API", error, { userId, characterId });
-
-      const { status, message } = buildErrorResponse(error, "語音生成失敗，請稍後再試");
-      res.status(status).json({ message });
+      next(error);
     }
   }
 );
@@ -277,7 +276,7 @@ aiRouter.post(
   requireFirebaseAuth,
   validateRequest(aiSchemas.generateSelfie),
   imageGenerationRateLimiter,
-  async (req, res) => {
+  async (req, res, next) => {
     // 🔒 安全增強：從認證 token 獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;
     const { characterId, requestId, usePhotoCard } = req.body;
@@ -295,13 +294,10 @@ aiRouter.post(
         { ttl: IDEMPOTENCY_TTL.IMAGE_GENERATION }
       );
 
-      res.status(200).json(result);
+      sendSuccess(res, result);
     } catch (error) {
-      const { status, message } = buildErrorResponse(error, "生成自拍失敗，請稍後再試");
-      res.status(status).json({
-        message,
-        success: false,
-      });
+      logger.error("生成自拍失敗:", error);
+      next(error);
     }
   }
 );
@@ -315,15 +311,15 @@ aiRouter.get(
   requireFirebaseAuth,
   validateRequest(aiSchemas.videoCheck),
   requireSameUser({ errorMessage: "無權限查詢其他使用者的影片生成權限" }),
-  async (req, res) => {
+  async (req, res, next) => {
     const { userId } = req.params;
 
     try {
       const result = await canGenerateVideo(userId);
-      res.status(200).json(result);
+      sendSuccess(res, result);
     } catch (error) {
-      const { status, message } = buildErrorResponse(error, "檢查影片生成權限時發生錯誤");
-      res.status(status).json({ message });
+      logger.error("檢查影片生成權限失敗:", error);
+      next(error);
     }
   }
 );
@@ -337,15 +333,15 @@ aiRouter.get(
   requireFirebaseAuth,
   validateRequest(aiSchemas.videoStats),
   requireSameUser({ errorMessage: "無權限查詢其他使用者的影片生成統計" }),
-  async (req, res) => {
+  async (req, res, next) => {
     const { userId } = req.params;
 
     try {
       const stats = await getVideoStats(userId);
-      res.status(200).json(stats);
+      sendSuccess(res, stats);
     } catch (error) {
-      const { status, message } = buildErrorResponse(error, "獲取影片生成統計時發生錯誤");
-      res.status(status).json({ message });
+      logger.error("獲取影片生成統計失敗:", error);
+      next(error);
     }
   }
 );
@@ -359,7 +355,7 @@ aiRouter.post(
   requireFirebaseAuth,
   validateRequest(aiSchemas.generateVideo),
   videoGenerationRateLimiter,
-  async (req, res) => {
+  async (req, res, next) => {
     // 🔒 安全增強：從認證 token 獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;
     const { characterId, requestId, duration, resolution, aspectRatio, useVideoCard, imageUrl } = req.body;
@@ -415,16 +411,13 @@ aiRouter.post(
         { ttl: IDEMPOTENCY_TTL.VIDEO_GENERATION }
       );
 
-      res.status(200).json({
+      sendSuccess(res, {
         success: true,
         ...result,
       });
     } catch (error) {
-      const { status, message } = buildErrorResponse(error, "生成影片失敗，請稍後再試");
-      res.status(status).json({
-        message,
-        success: false,
-      });
+      logger.error("生成影片失敗:", error);
+      next(error);
     }
   }
 );

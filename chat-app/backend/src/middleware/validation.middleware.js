@@ -126,6 +126,45 @@ export const commonSchemas = {
       },
       "Base64 圖片大小不得超過 5MB"
     ),
+
+  // 訂單 ID
+  orderId: z.string().min(1, "訂單 ID 不得為空").trim(),
+
+  // 訂單編號
+  orderNumber: z.string().min(1, "訂單編號不得為空").trim(),
+
+  // 交易 ID
+  transactionId: z.string().min(1, "交易 ID 不得為空").trim(),
+
+  // 套餐 ID
+  packageId: z.string().min(1, "套餐 ID 不得為空").trim(),
+
+  // 功能 ID
+  featureId: z.string().min(1, "功能 ID 不得為空").trim(),
+
+  // 金額（正數）
+  amount: z.coerce.number().positive("金額必須為正數"),
+
+  // 金額（非負數，允許 0）
+  nonNegativeAmount: z.coerce.number().nonnegative("金額不得為負數"),
+
+  // 數量
+  quantity: z.coerce.number().int().positive("數量必須為正整數").default(1),
+
+  // 冪等性鍵
+  idempotencyKey: z.string().min(1, "冪等性鍵不得為空").trim().optional(),
+
+  // 日期字串（ISO 8601 格式）
+  dateString: z.string().refine(
+    (val) => !isNaN(Date.parse(val)),
+    "無效的日期格式"
+  ).optional(),
+
+  // 分頁查詢參數（擴展版）
+  paginationQuery: z.object({
+    limit: z.coerce.number().int().positive().max(100).default(50).optional(),
+    offset: z.coerce.number().int().nonnegative().default(0).optional(),
+  }).optional(),
 };
 
 /**
@@ -200,6 +239,36 @@ export const conversationSchemas = {
       message: commonSchemas.messageText,
     }),
   },
+
+  // 獲取對話照片的驗證
+  getPhotos: {
+    params: z.object({
+      userId: commonSchemas.userId,
+      characterId: commonSchemas.characterId,
+    }),
+  },
+
+  // 刪除對話照片的驗證
+  deletePhotos: {
+    params: z.object({
+      userId: commonSchemas.userId,
+      characterId: commonSchemas.characterId,
+    }),
+    body: z.object({
+      messageIds: z.array(z.string().min(1)).min(1, "至少需要一個訊息 ID"),
+    }),
+  },
+
+  // 刪除對話訊息的驗證
+  deleteMessages: {
+    params: z.object({
+      userId: commonSchemas.userId,
+      characterId: commonSchemas.characterId,
+    }),
+    body: z.object({
+      messageIds: z.array(z.string().min(1)).min(1, "至少需要一個訊息 ID"),
+    }),
+  },
 };
 
 /**
@@ -226,9 +295,282 @@ export const userSchemas = {
   },
 };
 
+/**
+ * 訂單相關的驗證 schemas
+ */
+export const orderSchemas = {
+  // 獲取訂單列表
+  getUserOrders: {
+    query: z.object({
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      offset: z.coerce.number().int().nonnegative().optional(),
+      type: z.enum(["coin", "membership", "potion", "asset", "unlock"]).optional(),
+      status: z.enum(["pending", "processing", "completed", "failed", "cancelled", "refunded"]).optional(),
+      startDate: commonSchemas.dateString,
+      endDate: commonSchemas.dateString,
+    }),
+  },
+
+  // 獲取訂單統計
+  getOrderStats: {
+    query: z.object({
+      startDate: commonSchemas.dateString,
+      endDate: commonSchemas.dateString,
+    }),
+  },
+
+  // 創建訂單
+  createOrder: {
+    body: z.object({
+      type: z.enum(["coin", "membership", "potion", "asset", "unlock"], {
+        required_error: "需提供訂單類型",
+      }),
+      productId: z.string().min(1, "需提供商品 ID").trim(),
+      productName: z.string().trim().optional(),
+      quantity: commonSchemas.quantity,
+      amount: commonSchemas.amount,
+      currency: z.string().default("TWD").optional(),
+      paymentMethod: z.enum(["credit_card", "paypal", "stripe", "test"]).optional(),
+      metadata: z.record(z.any()).optional(),
+    }),
+  },
+
+  // 獲取訂單詳情
+  getOrder: {
+    params: z.object({
+      orderId: commonSchemas.orderId,
+    }),
+  },
+
+  // 根據訂單編號獲取
+  getOrderByNumber: {
+    params: z.object({
+      orderNumber: commonSchemas.orderNumber,
+    }),
+  },
+
+  // 完成訂單
+  completeOrder: {
+    params: z.object({
+      orderId: commonSchemas.orderId,
+    }),
+    body: z.object({
+      metadata: z.record(z.any()).optional(),
+    }),
+  },
+
+  // 取消訂單
+  cancelOrder: {
+    params: z.object({
+      orderId: commonSchemas.orderId,
+    }),
+    body: z.object({
+      reason: z.string().max(500, "取消原因不得超過 500 字").optional(),
+    }),
+  },
+
+  // 退款訂單（管理員）
+  refundOrder: {
+    params: z.object({
+      orderId: commonSchemas.orderId,
+    }),
+    body: z.object({
+      refundReason: z.string().min(1, "需提供退款原因").max(500, "退款原因不得超過 500 字"),
+      refundAmount: commonSchemas.nonNegativeAmount.optional(),
+      refundedBy: z.string().optional(),
+    }),
+  },
+
+  // 清除所有訂單（測試）
+  clearAllOrders: {
+    // 無參數
+  },
+};
+
+/**
+ * 金幣相關的驗證 schemas
+ */
+export const coinSchemas = {
+  // 獲取金幣餘額 - 無參數（從 token 獲取 userId）
+  getBalance: {
+    // 無參數
+  },
+
+  // 購買 AI 拍照
+  purchaseAiPhoto: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+      idempotencyKey: commonSchemas.idempotencyKey,
+    }),
+  },
+
+  // 購買 AI 影片
+  purchaseAiVideo: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+      idempotencyKey: commonSchemas.idempotencyKey,
+    }),
+  },
+
+  // 購買無限對話
+  purchaseUnlimitedChat: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+      idempotencyKey: commonSchemas.idempotencyKey,
+    }),
+  },
+
+  // 獲取功能價格
+  getFeaturePricing: {
+    params: z.object({
+      featureId: commonSchemas.featureId,
+    }),
+  },
+
+  // 獲取所有功能價格 - 無參數
+  getAllPricing: {
+    // 無參數
+  },
+
+  // 獲取交易記錄
+  getTransactions: {
+    query: z.object({
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      offset: z.coerce.number().int().nonnegative().optional(),
+    }),
+  },
+
+  // 獲取金幣套餐 - 無需身份驗證
+  getPackages: {
+    // 無參數
+  },
+
+  // 購買金幣套餐
+  purchasePackage: {
+    body: z.object({
+      packageId: commonSchemas.packageId,
+      paymentInfo: z.record(z.any()).optional(),
+      idempotencyKey: z.string().min(1, "請提供冪等性鍵以防止重複購買"),
+    }),
+  },
+
+  // 充值金幣（測試）
+  rechargeCoins: {
+    body: z.object({
+      amount: commonSchemas.amount,
+      idempotencyKey: commonSchemas.idempotencyKey,
+    }),
+  },
+
+  // 設定金幣餘額（測試帳號）
+  setBalance: {
+    body: z.object({
+      balance: z.coerce.number().int().nonnegative("金幣數量必須為非負整數"),
+    }),
+  },
+};
+
+/**
+ * 交易記錄相關的驗證 schemas
+ */
+export const transactionSchemas = {
+  // 獲取交易記錄
+  getUserTransactions: {
+    query: z.object({
+      limit: z.coerce.number().int().positive().max(100).optional(),
+      offset: z.coerce.number().int().nonnegative().optional(),
+      type: z.enum(["recharge", "purchase", "refund", "reward", "deduct"]).optional(),
+      status: z.enum(["pending", "completed", "failed", "cancelled"]).optional(),
+      startDate: commonSchemas.dateString,
+      endDate: commonSchemas.dateString,
+    }),
+  },
+
+  // 獲取交易統計
+  getTransactionStats: {
+    query: z.object({
+      startDate: commonSchemas.dateString,
+      endDate: commonSchemas.dateString,
+    }),
+  },
+
+  // 獲取交易詳情
+  getTransaction: {
+    params: z.object({
+      transactionId: commonSchemas.transactionId,
+    }),
+  },
+
+  // 清除所有交易（超級管理員）
+  clearAllTransactions: {
+    // 無參數
+  },
+
+  // 刪除指定用戶交易（管理員）
+  deleteUserTransactions: {
+    params: z.object({
+      targetUserId: commonSchemas.userId,
+    }),
+  },
+};
+
+/**
+ * 道具相關的驗證 schemas
+ */
+export const potionSchemas = {
+  // 獲取可購買道具 - 無參數
+  getAvailablePotions: {
+    // 無參數
+  },
+
+  // 獲取活躍道具 - 無參數
+  getActivePotions: {
+    // 無參數
+  },
+
+  // 購買記憶增強
+  purchaseMemoryBoost: {
+    body: z.object({
+      idempotencyKey: commonSchemas.idempotencyKey,
+    }),
+  },
+
+  // 購買腦力激盪
+  purchaseBrainBoost: {
+    body: z.object({
+      idempotencyKey: commonSchemas.idempotencyKey,
+    }),
+  },
+
+  // 使用記憶增強
+  useMemoryBoost: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+    }),
+  },
+
+  // 使用腦力激盪
+  useBrainBoost: {
+    body: z.object({
+      characterId: commonSchemas.characterId,
+    }),
+  },
+
+  // 檢查角色藥水效果
+  getCharacterEffects: {
+    params: z.object({
+      characterId: commonSchemas.characterId,
+    }),
+  },
+};
+
 export default {
   validateRequest,
   commonSchemas,
   conversationSchemas,
   userSchemas,
+  orderSchemas,
+  coinSchemas,
+  transactionSchemas,
+  potionSchemas,
 };

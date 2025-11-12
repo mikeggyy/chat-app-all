@@ -17,7 +17,10 @@ import {
   ORDER_TYPES,
   ORDER_STATUS,
 } from "./order.service.js";
-import { isGuestUser } from "../../../../shared/config/testAccounts.js";
+import { isGuestUser } from "../../../shared/config/testAccounts.js";
+import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
+import { validateRequest, orderSchemas } from "../middleware/validation.middleware.js";
+import { sendSuccess, sendError } from "../../../shared/utils/errorFormatter.js";
 
 const router = express.Router();
 
@@ -25,16 +28,13 @@ const router = express.Router();
  * GET /api/orders
  * 獲取當前用戶的訂單列表
  */
-router.get("/", async (req, res) => {
-  try {
-    const userId = req.userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
+router.get(
+  "/",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.getUserOrders),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
 
     const { limit, offset, type, status, startDate, endDate } = req.query;
 
@@ -50,18 +50,14 @@ router.get("/", async (req, res) => {
 
     const orders = await getUserOrders(userId, options);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       userId,
       total: orders.length,
       ...options,
       orders,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -69,16 +65,13 @@ router.get("/", async (req, res) => {
  * GET /api/orders/stats
  * 獲取訂單統計
  */
-router.get("/stats", async (req, res) => {
-  try {
-    const userId = req.userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
+router.get(
+  "/stats",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.getOrderStats),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
 
     const { startDate, endDate } = req.query;
 
@@ -88,16 +81,12 @@ router.get("/stats", async (req, res) => {
 
     const stats = await getOrderStats(options);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       userId,
       ...stats,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -105,35 +94,23 @@ router.get("/stats", async (req, res) => {
  * POST /api/orders
  * 創建新訂單
  */
-router.post("/", async (req, res) => {
-  try {
-    const userId = req.userId;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
-
-    const {
-      type,
-      productId,
-      productName,
-      quantity,
-      amount,
-      currency,
-      paymentMethod,
-      metadata,
-    } = req.body;
-
-    // 驗證必要欄位
-    if (!type || !productId || amount === undefined || amount === null) {
-      return res.status(400).json({
-        success: false,
-        message: "缺少必要欄位：type, productId, amount",
-      });
-    }
+router.post(
+  "/",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.createOrder),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
+      const {
+        type,
+        productId,
+        productName,
+        quantity,
+        amount,
+        currency,
+        paymentMethod,
+        metadata,
+      } = req.body;
 
     const order = await createOrder({
       userId,
@@ -147,15 +124,9 @@ router.post("/", async (req, res) => {
       metadata,
     });
 
-    res.status(201).json({
-      success: true,
-      order,
-    });
+    sendSuccess(res, { order }, 201);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -163,44 +134,29 @@ router.post("/", async (req, res) => {
  * GET /api/orders/:orderId
  * 獲取訂單詳情
  */
-router.get("/:orderId", async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderId } = req.params;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
+router.get(
+  "/:orderId",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.getOrder),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
+      const { orderId } = req.params;
 
     const order = await getOrder(orderId);
 
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "找不到該訂單",
-      });
+      return sendError(res, "RESOURCE_NOT_FOUND", "找不到該訂單", { orderId }, 404);
     }
 
     // 檢查權限（只能查看自己的訂單）
     if (order.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "無權查看此訂單",
-      });
+      return sendError(res, "FORBIDDEN", "無權查看此訂單", { orderId }, 403);
     }
 
-    res.json({
-      success: true,
-      order,
-    });
+    sendSuccess(res, { order });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -208,44 +164,29 @@ router.get("/:orderId", async (req, res) => {
  * GET /api/orders/number/:orderNumber
  * 根據訂單編號獲取訂單
  */
-router.get("/number/:orderNumber", async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderNumber } = req.params;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
+router.get(
+  "/number/:orderNumber",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.getOrderByNumber),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
+      const { orderNumber } = req.params;
 
     const order = await getOrderByNumber(orderNumber);
 
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "找不到該訂單",
-      });
+      return sendError(res, "RESOURCE_NOT_FOUND", "找不到該訂單", { orderNumber }, 404);
     }
 
     // 檢查權限
     if (order.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "無權查看此訂單",
-      });
+      return sendError(res, "FORBIDDEN", "無權查看此訂單", { orderNumber }, 403);
     }
 
-    res.json({
-      success: true,
-      order,
-    });
+    sendSuccess(res, { order });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -253,47 +194,32 @@ router.get("/number/:orderNumber", async (req, res) => {
  * PATCH /api/orders/:orderId/complete
  * 完成訂單（支付成功後調用）
  */
-router.patch("/:orderId/complete", async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderId } = req.params;
-    const { metadata } = req.body;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
+router.patch(
+  "/:orderId/complete",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.completeOrder),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
+      const { orderId } = req.params;
+      const { metadata } = req.body;
 
     const order = await getOrder(orderId);
 
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "找不到該訂單",
-      });
+      return sendError(res, "RESOURCE_NOT_FOUND", "找不到該訂單", { orderId }, 404);
     }
 
     // 檢查權限
     if (order.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "無權操作此訂單",
-      });
+      return sendError(res, "FORBIDDEN", "無權操作此訂單", { orderId }, 403);
     }
 
     const updatedOrder = await completeOrder(orderId, metadata);
 
-    res.json({
-      success: true,
-      order: updatedOrder,
-    });
+    sendSuccess(res, { order: updatedOrder });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -301,47 +227,32 @@ router.patch("/:orderId/complete", async (req, res) => {
  * PATCH /api/orders/:orderId/cancel
  * 取消訂單
  */
-router.patch("/:orderId/cancel", async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderId } = req.params;
-    const { reason } = req.body;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
-    }
+router.patch(
+  "/:orderId/cancel",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.cancelOrder),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
+      const { orderId } = req.params;
+      const { reason } = req.body;
 
     const order = await getOrder(orderId);
 
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "找不到該訂單",
-      });
+      return sendError(res, "RESOURCE_NOT_FOUND", "找不到該訂單", { orderId }, 404);
     }
 
     // 檢查權限
     if (order.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "無權操作此訂單",
-      });
+      return sendError(res, "FORBIDDEN", "無權操作此訂單", { orderId }, 403);
     }
 
     const updatedOrder = await cancelOrder(orderId, reason);
 
-    res.json({
-      success: true,
-      order: updatedOrder,
-    });
+    sendSuccess(res, { order: updatedOrder });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -349,19 +260,20 @@ router.patch("/:orderId/cancel", async (req, res) => {
  * PATCH /api/orders/:orderId/refund (管理員功能)
  * 退款訂單
  */
-router.patch("/:orderId/refund", async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderId } = req.params;
-    const { refundReason, refundAmount, refundedBy } = req.body;
+router.patch(
+  "/:orderId/refund",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.refundOrder),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
+      const { orderId } = req.params;
+      const { refundReason, refundAmount, refundedBy } = req.body;
 
-    // 只允許管理員使用
-    if (!isGuestUser(userId) && userId !== "dev-user") {
-      return res.status(403).json({
-        success: false,
-        message: "此功能僅供管理員使用",
-      });
-    }
+      // 只允許管理員使用
+      if (!isGuestUser(userId) && userId !== "dev-user") {
+        return sendError(res, "FORBIDDEN", "此功能僅供管理員使用", {}, 403);
+      }
 
     const updatedOrder = await refundOrder(orderId, {
       refundReason,
@@ -369,15 +281,9 @@ router.patch("/:orderId/refund", async (req, res) => {
       refundedBy,
     });
 
-    res.json({
-      success: true,
-      order: updatedOrder,
-    });
+    sendSuccess(res, { order: updatedOrder });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    sendError(res, "SERVER_ERROR", error.message);
   }
 });
 
@@ -385,30 +291,26 @@ router.patch("/:orderId/refund", async (req, res) => {
  * DELETE /api/orders (管理員功能)
  * 清除所有訂單（測試用）
  */
-router.delete("/", async (req, res) => {
-  try {
-    const userId = req.userId;
+router.delete(
+  "/",
+  requireFirebaseAuth,
+  validateRequest(orderSchemas.clearAllOrders),
+  async (req, res) => {
+    try {
+      const userId = req.firebaseUser.uid;
 
-    // 只允許測試帳號使用
-    if (!isGuestUser(userId) && userId !== "dev-user") {
-      return res.status(403).json({
-        success: false,
-        message: "此功能僅供測試帳號使用",
-      });
+      // 只允許測試帳號使用
+      if (!isGuestUser(userId) && userId !== "dev-user") {
+        return sendError(res, "FORBIDDEN", "此功能僅供測試帳號使用", {}, 403);
+      }
+
+      const result = await clearAllOrders();
+
+      sendSuccess(res, result);
+    } catch (error) {
+      sendError(res, "SERVER_ERROR", error.message);
     }
-
-    const result = await clearAllOrders();
-
-    res.json({
-      success: true,
-      ...result,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
   }
-});
+);
 
 export default router;

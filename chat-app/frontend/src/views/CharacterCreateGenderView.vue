@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { logger } from "@/utils/logger";
 import { XMarkIcon } from "@heroicons/vue/24/outline";
 import { useGuestGuard } from "../composables/useGuestGuard";
 import { useUserProfile } from "../composables/useUserProfile";
@@ -141,9 +142,9 @@ const handleResumeFlowCancel = async () => {
   if (flowToCancel?.id && flowToCancel?.generation?.result?.images?.length > 0) {
     try {
       await cancelCharacterCreation(flowToCancel.id);
-      console.log(`[角色創建] 已取消流程並清理 ${flowToCancel.generation.result.images.length} 張生成的圖片`);
+      logger.log(`[角色創建] 已取消流程並清理 ${flowToCancel.generation.result.images.length} 張生成的圖片`);
     } catch (error) {
-      console.error("[角色創建] 取消流程失敗:", error);
+      logger.error("[角色創建] 取消流程失敗:", error);
       // 即使刪除失敗也繼續清除本地狀態
     }
   }

@@ -199,26 +199,56 @@ const resolveMatchCreatorId = (match) => {
 
 /**
  * 獲取按聊天用戶數量排序的熱門角色
+ * 支持兩種分頁模式：
+ * 1. cursor-based（推薦）：使用 cursor 參數，性能優異，僅讀取需要的數據
+ * 2. offset-based（向後兼容）：使用 offset 參數，性能較差，會讀取並跳過前面的數據
+ *
  * @param {number} limit - 返回的角色數量（默認 10）
  * @param {Object} options - 選項
- * @param {number} options.offset - 分頁偏移量（默認 0）
- * @returns {Promise<Array>} 按 totalChatUsers 排序的角色列表，messageCount 代表與該角色聊過天的用戶數
+ * @param {number} options.offset - 分頁偏移量（offset-based，向後兼容）
+ * @param {string} options.cursor - 游標（cursor-based，推薦）
+ * @returns {Promise<{characters: Array, cursor: string|null, hasMore: boolean}>} 角色列表和分頁信息
  */
 export const getPopularMatches = async (limit = 10, options = {}) => {
-  const offset = options.offset || 0;
+  const { offset = 0, cursor = null } = options;
 
   try {
     const db = getFirestoreDb();
 
-    // 直接從 Firestore 獲取所有公開角色，按 totalChatUsers 降序排序
+    // 基礎查詢
     let query = db
       .collection("characters")
       .where("status", "==", "active")
-      .where("isPublic", "==", true)
+      .where("isPublic", "==", true")
       .orderBy("totalChatUsers", "desc");
 
-    // 如果有 offset，需要先獲取前 offset 條數據作為起點
-    if (offset > 0) {
+    let paginationInfo = {
+      mode: 'offset',
+      value: offset
+    };
+
+    // 優先使用 cursor-based 分頁（高效）
+    if (cursor) {
+      try {
+        // cursor 是上一頁最後一個文檔的 ID
+        const cursorDoc = await db.collection("characters").doc(cursor).get();
+        if (cursorDoc.exists) {
+          query = query.startAfter(cursorDoc);
+          paginationInfo = {
+            mode: 'cursor',
+            value: cursor
+          };
+        } else {
+          logger.warn(`[Match Service] Cursor document not found: ${cursor}, falling back to offset`);
+        }
+      } catch (err) {
+        logger.error(`[Match Service] Failed to use cursor: ${cursor}`, err);
+        // 繼續使用 offset-based 作為 fallback
+      }
+    }
+    // Fallback：使用 offset-based 分頁（低效，但向後兼容）
+    else if (offset > 0) {
+      // ⚠️ 性能警告：這會讀取並丟棄前 offset 條數據
       const offsetSnapshot = await query.limit(offset).get();
       if (!offsetSnapshot.empty) {
         const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1];
@@ -226,30 +256,54 @@ export const getPopularMatches = async (limit = 10, options = {}) => {
       }
     }
 
-    const charactersSnapshot = await query.limit(limit).get();
+    // 多讀取 1 條以判斷是否還有更多數據
+    const charactersSnapshot = await query.limit(limit + 1).get();
 
     const characters = [];
-    charactersSnapshot.forEach((doc) => {
+    const docs = charactersSnapshot.docs.slice(0, limit); // 只取實際需要的數量
+    const hasMore = charactersSnapshot.docs.length > limit;
+
+    docs.forEach((doc) => {
       const data = doc.data();
       characters.push({
         ...data,
         id: doc.id,
-        messageCount: data.totalChatUsers || 0, // 使用 Firestore 的 totalChatUsers
+        messageCount: data.totalChatUsers || 0,
       });
     });
 
+    // 新的 cursor 是本頁最後一個文檔的 ID
+    const nextCursor = docs.length > 0 ? docs[docs.length - 1].id : null;
+
     if (process.env.NODE_ENV !== "test") {
-      logger.info(`[Match Service] Found ${characters.length} popular characters (offset: ${offset}, limit: ${limit})`);
+      logger.info(
+        `[Match Service] Found ${characters.length} popular characters ` +
+        `(mode: ${paginationInfo.mode}, value: ${paginationInfo.value}, ` +
+        `hasMore: ${hasMore}, nextCursor: ${nextCursor || 'null'})`
+      );
     }
 
-    return characters.map(cloneMatch);
+    // 返回包含分頁信息的結果
+    return {
+      characters: characters.map(cloneMatch),
+      cursor: nextCursor,
+      hasMore,
+      // 向後兼容：也返回舊格式
+      __legacy: characters.map(cloneMatch)
+    };
   } catch (error) {
     if (process.env.NODE_ENV !== "test") {
       logger.error("[Match Service] Failed to get popular matches:", error);
     }
 
     // Fallback：返回內存中的角色
-    return aiMatches.slice(offset, offset + limit).map(cloneMatch);
+    const fallbackChars = aiMatches.slice(offset, offset + limit).map(cloneMatch);
+    return {
+      characters: fallbackChars,
+      cursor: null,
+      hasMore: offset + limit < aiMatches.length,
+      __legacy: fallbackChars
+    };
   }
 };
 

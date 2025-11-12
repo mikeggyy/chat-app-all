@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import net from "node:net";
+import { fileURLToPath, URL } from 'node:url';
 
 const normalizeTarget = (value) => {
   if (!value) return "http://localhost:4000";
@@ -65,6 +66,11 @@ export default defineConfig(async () => {
 
   return {
     plugins: [vue()],
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url))
+      }
+    },
     server: {
       host: '0.0.0.0', // 允許外部訪問
       port: 5173,
@@ -72,6 +78,31 @@ export default defineConfig(async () => {
     },
     esbuild: {
       drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+    },
+    build: {
+      // 啟用壓縮
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      },
+      // 優化 chunk 拆分策略
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // 將 Vue 核心拆分為單獨的 chunk
+            'vue-vendor': ['vue', 'vue-router'],
+            // 將 Firebase SDK 拆分為單獨的 chunk
+            'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            // 將圖標庫拆分為單獨的 chunk
+            'icons-vendor': ['@heroicons/vue'],
+          },
+        },
+      },
+      // 調整 chunk 大小警告閾值
+      chunkSizeWarningLimit: 1000, // 1MB
     },
   };
 });

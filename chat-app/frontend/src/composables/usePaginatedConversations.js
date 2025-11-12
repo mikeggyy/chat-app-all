@@ -1,5 +1,6 @@
 import { ref, unref } from "vue";
 import { apiJson } from "../utils/api";
+import { logger } from "../utils/logger";
 
 /**
  * 分頁載入對話列表 Composable
@@ -38,7 +39,7 @@ export function usePaginatedConversations(userId, pageSize = 20) {
       nextCursor.value = response.nextCursor || null;
       hasMore.value = response.hasMore || false;
     } catch (error) {
-      console.error('[對話載入] 初始載入失敗:', error);
+      logger.error('[對話載入] 初始載入失敗:', error);
       conversations.value = [];
       hasMore.value = false;
     } finally {
@@ -74,7 +75,7 @@ export function usePaginatedConversations(userId, pageSize = 20) {
 
       return { hasMore: hasMore.value };
     } catch (error) {
-      console.error('[對話載入] 分頁載入失敗:', error);
+      logger.error('[對話載入] 分頁載入失敗:', error);
       hasMore.value = false;
       return { hasMore: false };
     } finally {

@@ -18,12 +18,14 @@ import {
   rechargeCoins,
   setCoinsBalance,
 } from "./coins.service.js";
-import { isTestAccount } from "../../../../shared/config/testAccounts.js";
+import { isTestAccount } from "../../../shared/config/testAccounts.js";
 import {
   sendSuccess,
   sendError,
   ApiError,
-} from "../../../../shared/utils/errorFormatter.js";
+} from "../../../shared/utils/errorFormatter.js";
+import logger from "../utils/logger.js";
+import { validateRequest, coinSchemas } from "../middleware/validation.middleware.js";
 
 const router = express.Router();
 
@@ -32,7 +34,11 @@ const router = express.Router();
  * GET /api/coins/balance
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人餘額
  */
-router.get("/api/coins/balance", requireFirebaseAuth, async (req, res, next) => {
+router.get(
+  "/api/coins/balance",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.getBalance),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const balance = await getCoinsBalance(userId);
@@ -50,7 +56,11 @@ router.get("/api/coins/balance", requireFirebaseAuth, async (req, res, next) => 
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
  * 🔒 冪等性保護：防止重複扣費
  */
-router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res, next) => {
+router.post(
+  "/api/coins/purchase/ai-photo",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.purchaseAiPhoto),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, idempotencyKey } = req.body;
@@ -95,7 +105,11 @@ router.post("/api/coins/purchase/ai-photo", requireFirebaseAuth, async (req, res
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
  * 🔒 冪等性保護：防止重複扣費
  */
-router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res, next) => {
+router.post(
+  "/api/coins/purchase/ai-video",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.purchaseAiVideo),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, idempotencyKey } = req.body;
@@ -140,7 +154,11 @@ router.post("/api/coins/purchase/ai-video", requireFirebaseAuth, async (req, res
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
  * 🔒 冪等性保護：防止重複扣費
  */
-router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (req, res, next) => {
+router.post(
+  "/api/coins/purchase/unlimited-chat",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.purchaseUnlimitedChat),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, idempotencyKey } = req.body;
@@ -183,7 +201,11 @@ router.post("/api/coins/purchase/unlimited-chat", requireFirebaseAuth, async (re
  * GET /api/coins/pricing/:featureId
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人價格
  */
-router.get("/api/coins/pricing/:featureId", requireFirebaseAuth, async (req, res, next) => {
+router.get(
+  "/api/coins/pricing/:featureId",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.getFeaturePricing),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { featureId } = req.params;
@@ -200,7 +222,11 @@ router.get("/api/coins/pricing/:featureId", requireFirebaseAuth, async (req, res
  * GET /api/coins/pricing
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人價格
  */
-router.get("/api/coins/pricing", requireFirebaseAuth, async (req, res, next) => {
+router.get(
+  "/api/coins/pricing",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.getAllPricing),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const prices = await getAllFeaturePrices(userId);
@@ -217,7 +243,11 @@ router.get("/api/coins/pricing", requireFirebaseAuth, async (req, res, next) => 
  * Query: ?limit=50&offset=0
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人交易記錄
  */
-router.get("/api/coins/transactions", requireFirebaseAuth, async (req, res) => {
+router.get(
+  "/api/coins/transactions",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.getTransactions),
+  async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { limit, offset } = req.query;
@@ -242,8 +272,12 @@ router.get("/api/coins/transactions", requireFirebaseAuth, async (req, res) => {
 /**
  * 獲取金幣充值套餐列表
  * GET /api/coins/packages
+ * ⚠️ 此端點無需身份驗證（公開套餐列表）
  */
-router.get("/api/coins/packages", async (req, res) => {
+router.get(
+  "/api/coins/packages",
+  validateRequest(coinSchemas.getPackages),
+  async (req, res) => {
   try {
     const packages = await getCoinPackages();
 
@@ -263,7 +297,11 @@ router.get("/api/coins/packages", async (req, res) => {
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人購買金幣
  * 🔒 冪等性保護：防止重複扣款和發放
  */
-router.post("/api/coins/purchase/package", requireFirebaseAuth, async (req, res) => {
+router.post(
+  "/api/coins/purchase/package",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.purchasePackage),
+  async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { packageId, paymentInfo, idempotencyKey } = req.body;
@@ -287,7 +325,7 @@ router.post("/api/coins/purchase/package", requireFirebaseAuth, async (req, res)
 
     if (isDevBypassEnabled) {
       // 開發模式：直接執行購買，不需要實際支付驗證
-      console.log(`[開發模式] 購買金幣套餐：userId=${userId}, packageId=${packageId}`);
+      logger.info(`[開發模式] 購買金幣套餐：userId=${userId}, packageId=${packageId}`);
 
       // 冪等性保護
       const requestId = `coin-package:${userId}:${packageId}:${idempotencyKey}`;
@@ -333,7 +371,11 @@ router.post("/api/coins/purchase/package", requireFirebaseAuth, async (req, res)
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人充值金幣
  * 🔒 冪等性保護：防止重複充值
  */
-router.post("/api/coins/recharge", requireFirebaseAuth, async (req, res) => {
+router.post(
+  "/api/coins/recharge",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.rechargeCoins),
+  async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { amount, idempotencyKey } = req.body;
@@ -392,7 +434,11 @@ router.post("/api/coins/recharge", requireFirebaseAuth, async (req, res) => {
  * 🔒 安全增強：從認證 token 獲取 userId，只能設置自己的餘額
  * ⚠️ 此端點僅供測試帳號使用，用於快速設定金幣數量進行測試
  */
-router.post("/api/coins/set-balance", requireFirebaseAuth, async (req, res) => {
+router.post(
+  "/api/coins/set-balance",
+  requireFirebaseAuth,
+  validateRequest(coinSchemas.setBalance),
+  async (req, res) => {
   try {
     const userId = req.firebaseUser.uid;
     const { balance } = req.body;

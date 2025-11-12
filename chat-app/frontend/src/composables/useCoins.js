@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue';
 import { apiJson } from '../utils/api.js';
 import { generateIdempotencyKey } from '../utils/idempotency.js';
+import { logger } from '../utils/logger';
 
 // 金幣狀態的全域管理
 const coinsState = ref({
@@ -135,7 +136,7 @@ export function useCoins() {
 
       // 檢查是否為重複請求（來自緩存）
       if (data._idempotent || data._cached) {
-        console.log('[購買金幣] 檢測到重複請求，返回了緩存結果');
+        logger.log('[購買金幣] 檢測到重複請求，返回了緩存結果');
       }
 
       // 更新本地餘額

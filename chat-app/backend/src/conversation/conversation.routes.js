@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireFirebaseAuth } from "../auth/index.js";
 import { requireOwnership, asyncHandler } from "../utils/routeHelpers.js";
-import { sendSuccess, sendError } from "../../../../shared/utils/errorFormatter.js";
+import { sendSuccess, sendError } from "../../../shared/utils/errorFormatter.js";
 import {
   appendConversationMessages,
   getConversationHistory,
@@ -168,6 +168,7 @@ conversationRouter.get(
   "/:userId/:characterId/photos",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  validateRequest(conversationSchemas.getPhotos),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
 
@@ -185,6 +186,7 @@ conversationRouter.delete(
   "/:userId/:characterId/photos",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  validateRequest(conversationSchemas.deletePhotos),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
     const { messageIds } = req.body;
@@ -210,6 +212,7 @@ conversationRouter.delete(
   "/:userId/:characterId/messages",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  validateRequest(conversationSchemas.deleteMessages),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
     const { messageIds } = req.body;

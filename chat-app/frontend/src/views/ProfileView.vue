@@ -1,39 +1,30 @@
 <script setup>
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-  watch,
-  watchEffect,
-} from "vue";
-import {
-  PencilSquareIcon,
-  Cog6ToothIcon,
-} from "@heroicons/vue/24/outline";
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
+import { useRouter } from "vue-router";
+import { logger } from "@/utils/logger";
 import AvatarEditorModal from "../components/AvatarEditorModal.vue";
 import StatsModal from "../components/StatsModal.vue";
 import ProfileVIPCard from "../components/profile/ProfileVIPCard.vue";
 import ProfileAssets from "../components/profile/ProfileAssets.vue";
 import ProfileQuickActions from "../components/profile/ProfileQuickActions.vue";
+import AuxiliaryActions from "../components/profile/AuxiliaryActions.vue";
+import ProfileEditor from "../components/profile/ProfileEditor.vue";
+import LogoutConfirmDialog from "../components/profile/LogoutConfirmDialog.vue";
 import { useProfileData } from "../composables/useProfileData";
-import { useRouter } from "vue-router";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth";
+import { useProfileEditor } from "../composables/useProfileEditor";
+import { useAvatarUpload } from "../composables/useAvatarUpload";
+import { useSettings } from "../composables/useSettings";
 import { clearTestSession } from "../services/testAuthSession";
 import {
-  PROFILE_LIMITS,
   FALLBACK_USER,
   BUILTIN_AVATAR_OPTIONS,
   QUICK_ACTION_ROUTES,
-  GENDER_OPTIONS,
   ASSET_TYPE_MAP,
   CARD_CATEGORY_MAP,
-  generateAgeOptions,
-  isValidGender,
-  isValidAge,
 } from "../config/profile";
+
+// ==================== 初始化 ====================
 
 const router = useRouter();
 const firebaseAuth = useFirebaseAuth();
@@ -66,6 +57,72 @@ const {
   refreshProfileData,
 } = useProfileData();
 
+// ==================== 頭像管理 ====================
+
+const avatarPreview = ref(FALLBACK_USER.photoURL);
+
+watch(
+  () => profile.value.photoURL,
+  (next) => {
+    const nextSrc = next ?? FALLBACK_USER.photoURL;
+    if (nextSrc !== avatarPreview.value) {
+      avatarUpload.isImageLoading.value = true;
+    }
+    avatarPreview.value = nextSrc;
+  },
+  { immediate: true }
+);
+
+const avatarUpload = useAvatarUpload({
+  onUpdate: updateUserAvatar,
+  avatarPreview,
+});
+
+const openAvatarEditor = () => {
+  if (requireLogin({ feature: "編輯頭像" })) {
+    return;
+  }
+  avatarUpload.openEditor();
+};
+
+// ==================== 個人資料編輯 ====================
+
+const profileEditor = useProfileEditor(profile, updateUserProfileDetails);
+
+const openProfileEditor = () => {
+  if (requireLogin({ feature: "編輯個人資料" })) {
+    return;
+  }
+  profileEditor.open();
+};
+
+// ==================== 設定與登出 ====================
+
+const handleLogout = async () => {
+  await firebaseAuth.signOut();
+  clearUserProfile();
+  clearTestSession();
+  await router.replace({ name: "login" });
+};
+
+const settings = useSettings({
+  onLogout: handleLogout,
+});
+
+// ==================== 統計彈窗 ====================
+
+const isStatsModalOpen = ref(false);
+
+const openStatsModal = () => {
+  isStatsModalOpen.value = true;
+};
+
+const closeStatsModal = () => {
+  isStatsModalOpen.value = false;
+};
+
+// ==================== 快捷操作 ====================
+
 const handleQuickActionSelect = async (action) => {
   if (!action || typeof action !== "object") {
     return;
@@ -79,123 +136,9 @@ const handleQuickActionSelect = async (action) => {
 
   try {
     await router.push({ name: routeName });
-  } catch (error) {}
-};
-
-const avatarPreview = ref(FALLBACK_USER.photoURL);
-const isAvatarModalOpen = ref(false);
-const isAvatarSaving = ref(false);
-const isAvatarImageLoading = ref(true);
-const isStatsModalOpen = ref(false);
-
-watch(
-  () => profile.value.photoURL,
-  (next) => {
-    const nextSrc = next ?? FALLBACK_USER.photoURL;
-    if (nextSrc !== avatarPreview.value) {
-      isAvatarImageLoading.value = true;
-    }
-    avatarPreview.value = nextSrc;
-  },
-  { immediate: true }
-);
-
-const auxiliaryActions = [
-  {
-    key: "edit",
-    label: "編輯個人資料",
-    icon: PencilSquareIcon,
-  },
-  {
-    key: "settings",
-    label: "設定",
-    icon: Cog6ToothIcon,
-  },
-];
-
-const settingsOptions = [{ key: "logout", label: "登出", variant: "danger" }];
-const isSettingsMenuOpen = ref(false);
-const settingsMenuButtonRef = ref(null);
-const settingsMenuRef = ref(null);
-const settingsError = ref("");
-const isLoggingOut = ref(false);
-const isLogoutConfirmVisible = ref(false);
-const logoutConfirmCancelButtonRef = ref(null);
-
-const ageOptions = computed(() => generateAgeOptions());
-
-const clampTextLength = (value, maxLength) => {
-  if (typeof value !== "string") {
-    return "";
+  } catch (error) {
+    // 路由導航失敗（忽略）
   }
-  return value.length > maxLength ? value.slice(0, maxLength) : value;
-};
-
-const fallbackDisplayName =
-  typeof FALLBACK_USER.displayName === "string"
-    ? clampTextLength(
-        FALLBACK_USER.displayName.trim(),
-        PROFILE_LIMITS.MAX_NAME_LENGTH
-      )
-    : "";
-
-const normalizeDisplayName = (
-  value,
-  { fallback = fallbackDisplayName, allowEmpty = false } = {}
-) => {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-  const trimmed = value.trim();
-  if (!trimmed.length) {
-    return allowEmpty ? "" : fallback;
-  }
-  return clampTextLength(trimmed, PROFILE_LIMITS.MAX_NAME_LENGTH);
-};
-
-const normalizePrompt = (value) => {
-  if (typeof value !== "string") {
-    return "";
-  }
-  const trimmed = value.trim();
-  return clampTextLength(trimmed, PROFILE_LIMITS.MAX_PROMPT_LENGTH);
-};
-
-const normalizeGender = (value) => {
-  if (typeof value !== "string") {
-    return "other";
-  }
-  const trimmed = value.trim();
-  return isValidGender(trimmed) ? trimmed : "other";
-};
-
-const buildNormalizedProfile = (sourceProfile = FALLBACK_USER) => ({
-  displayName: normalizeDisplayName(sourceProfile.displayName, {
-    allowEmpty: true,
-  }),
-  gender: normalizeGender(sourceProfile.gender),
-  age: sourceProfile.age ?? null,
-  defaultPrompt: normalizePrompt(sourceProfile.defaultPrompt),
-});
-
-const openAvatarEditor = () => {
-  // 檢查是否為遊客
-  if (requireLogin({ feature: "編輯頭像" })) {
-    return;
-  }
-  isAvatarModalOpen.value = true;
-};
-
-const closeAvatarEditor = () => {
-  isAvatarModalOpen.value = false;
-};
-
-const openStatsModal = () => {
-  isStatsModalOpen.value = true;
-};
-
-const closeStatsModal = () => {
-  isStatsModalOpen.value = false;
 };
 
 const handleBuyUnlockCard = (cardType) => {
@@ -244,66 +187,12 @@ const handleUseUnlockCard = async (cardType) => {
     await loadUserAssets(targetUserId.value);
   } catch (error) {
     if (import.meta.env.DEV) {
-      console.error("使用解鎖卡失敗:", error);
+      logger.error("使用解鎖卡失敗:", error);
     }
   }
 };
 
-const handleAvatarUpdate = async (nextUrl) => {
-  if (isAvatarSaving.value) return;
-  if (typeof nextUrl !== "string" || !nextUrl.length) {
-    closeAvatarEditor();
-    return;
-  }
-
-  const previousPhoto = avatarPreview.value;
-  isAvatarImageLoading.value = true;
-  avatarPreview.value = nextUrl;
-
-  const isDataUrl = nextUrl.startsWith("data:");
-
-  if (isDataUrl) {
-    closeAvatarEditor();
-    return;
-  }
-
-  if (!profile.value?.id) {
-    avatarPreview.value = previousPhoto;
-    closeAvatarEditor();
-    return;
-  }
-
-  isAvatarSaving.value = true;
-
-  try {
-    const updated = await updateUserAvatar(nextUrl);
-    if (updated?.photoURL && updated.photoURL !== avatarPreview.value) {
-      isAvatarImageLoading.value = true;
-      avatarPreview.value = updated.photoURL;
-    }
-    closeAvatarEditor();
-  } catch (error) {
-    avatarPreview.value = previousPhoto;
-    isAvatarImageLoading.value = false;
-    if (import.meta.env.DEV) {
-    }
-  } finally {
-    isAvatarSaving.value = false;
-  }
-};
-
-const handleAvatarLoad = () => {
-  isAvatarImageLoading.value = false;
-};
-
-const handleAvatarError = () => {
-  if (avatarPreview.value !== FALLBACK_USER.photoURL) {
-    isAvatarImageLoading.value = true;
-    avatarPreview.value = FALLBACK_USER.photoURL;
-    return;
-  }
-  isAvatarImageLoading.value = false;
-};
+// ==================== 滾動鎖定 ====================
 
 let previousBodyOverflow = "";
 const toggleBodyScrollLock = (isLocked) => {
@@ -317,344 +206,18 @@ const toggleBodyScrollLock = (isLocked) => {
   }
 };
 
-const profileNameInputRef = ref(null);
-const isProfileEditorOpen = ref(false);
-const isProfileSaving = ref(false);
-const profileEditorError = ref("");
-
-const profileForm = reactive({
-  displayName: "",
-  gender: "other",
-  age: null,
-  defaultPrompt: "",
-});
-
-const profileFormErrors = reactive({
-  displayName: "",
-  age: "",
-  defaultPrompt: "",
-});
-
-let suppressProfileFormDirty = false;
-
-const normalizedProfileSource = computed(() =>
-  buildNormalizedProfile(profile.value ?? fallbackUser)
-);
-
-const normalizedProfileForm = computed(() => ({
-  displayName: normalizeDisplayName(profileForm.displayName, {
-    allowEmpty: true,
-    fallback: "",
-  }),
-  gender: normalizeGender(profileForm.gender),
-  age: profileForm.age,
-  defaultPrompt: normalizePrompt(profileForm.defaultPrompt),
-}));
-
-const isProfileFormDirty = computed(() => {
-  const source = normalizedProfileSource.value;
-  const current = normalizedProfileForm.value;
-  return (
-    current.displayName !== source.displayName ||
-    current.gender !== source.gender ||
-    current.age !== source.age ||
-    current.defaultPrompt !== source.defaultPrompt
-  );
-});
-
-const applyProfileToForm = () => {
-  suppressProfileFormDirty = true;
-  const sourceProfile = normalizedProfileSource.value;
-  profileForm.displayName = sourceProfile.displayName;
-  profileForm.gender = sourceProfile.gender;
-  profileForm.age = sourceProfile.age;
-  profileForm.defaultPrompt = sourceProfile.defaultPrompt;
-  suppressProfileFormDirty = false;
-};
-
-const resetProfileEditorState = () => {
-  profileEditorError.value = "";
-  profileFormErrors.displayName = "";
-  profileFormErrors.age = "";
-  profileFormErrors.defaultPrompt = "";
-};
-
-applyProfileToForm();
-resetProfileEditorState();
-
-const openProfileEditor = () => {
-  // 檢查是否為遊客
-  if (requireLogin({ feature: "編輯個人資料" })) {
-    return;
-  }
-  applyProfileToForm();
-  resetProfileEditorState();
-  isProfileEditorOpen.value = true;
-};
-
-const closeProfileEditor = () => {
-  if (isProfileSaving.value) return;
-  isProfileEditorOpen.value = false;
-};
-
-const handleProfileOverlayClick = () => {
-  if (isProfileSaving.value) return;
-  closeProfileEditor();
-};
-
-const bindSettingsMenuButton = (el) => {
-  settingsMenuButtonRef.value = el ?? null;
-};
-
-const bindSettingsMenu = (el) => {
-  settingsMenuRef.value = el ?? null;
-};
-
-const closeSettingsMenu = () => {
-  isSettingsMenuOpen.value = false;
-  settingsMenuRef.value = null;
-};
-
-const toggleSettingsMenu = (event) => {
-  event?.stopPropagation();
-  settingsError.value = "";
-  isSettingsMenuOpen.value = !isSettingsMenuOpen.value;
-  if (!isSettingsMenuOpen.value) {
-    settingsMenuRef.value = null;
-  }
-};
-
-const handleDocumentClick = (event) => {
-  if (!isSettingsMenuOpen.value) return;
-  const menuEl = settingsMenuRef.value;
-  const buttonEl = settingsMenuButtonRef.value;
-  if (
-    menuEl &&
-    !menuEl.contains(event.target) &&
-    buttonEl &&
-    !buttonEl.contains(event.target)
-  ) {
-    closeSettingsMenu();
-  }
-};
-
-const requestLogout = () => {
-  if (isLoggingOut.value) return;
-  settingsError.value = "";
-  isLogoutConfirmVisible.value = true;
-  closeSettingsMenu();
-};
-
-const cancelLogoutConfirm = () => {
-  if (isLoggingOut.value) return;
-  settingsError.value = "";
-  isLogoutConfirmVisible.value = false;
-};
-
-const handleGlobalKeydown = (event) => {
-  if (event.key !== "Escape") return;
-  if (isProfileEditorOpen.value) {
-    event.preventDefault();
-    closeProfileEditor();
-    return;
-  }
-  if (isLogoutConfirmVisible.value) {
-    event.preventDefault();
-    cancelLogoutConfirm();
-    return;
-  }
-  if (isSettingsMenuOpen.value) {
-    event.preventDefault();
-    closeSettingsMenu();
-  }
-};
-
-const handleAuxiliaryAction = (key, event) => {
-  switch (key) {
-    case "edit":
-      closeSettingsMenu();
-      openProfileEditor();
-      return;
-    case "settings":
-      toggleSettingsMenu(event);
-      return;
-    default:
-      closeSettingsMenu();
-      if (import.meta.env.DEV) {
-      }
-  }
-};
-
-const handleSettingsOptionSelect = (key) => {
-  settingsError.value = "";
-  switch (key) {
-    case "logout":
-      requestLogout();
-      return;
-    default:
-      closeSettingsMenu();
-      if (import.meta.env.DEV) {
-      }
-      return;
-  }
-};
-
-const handleLogout = async () => {
-  if (isLoggingOut.value) return;
-  settingsError.value = "";
-  isLoggingOut.value = true;
-
-  try {
-    await firebaseAuth.signOut();
-    clearUserProfile();
-    clearTestSession();
-    isLogoutConfirmVisible.value = false;
-    closeSettingsMenu();
-    await router.replace({ name: "login" });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "登出失敗，請稍後再試。";
-    settingsError.value = message;
-    if (import.meta.env.DEV) {
-    }
-  } finally {
-    isLoggingOut.value = false;
-  }
-};
-const profileDisplayNameLength = computed(
-  () => normalizedProfileForm.value.displayName.length
-);
-
-const profilePromptLength = computed(
-  () => normalizedProfileForm.value.defaultPrompt.length
-);
-
-const validateProfileForm = () => {
-  let isValid = true;
-  const trimmedName = normalizeDisplayName(profileForm.displayName, {
-    allowEmpty: true,
-    fallback: "",
-  });
-  const rawNameLength =
-    typeof profileForm.displayName === "string"
-      ? profileForm.displayName.trim().length
-      : 0;
-
-  if (!trimmedName.length) {
-    profileFormErrors.displayName = "請輸入名稱";
-    isValid = false;
-  } else if (rawNameLength > PROFILE_LIMITS.MAX_NAME_LENGTH) {
-    profileFormErrors.displayName = `名稱請勿超過 ${PROFILE_LIMITS.MAX_NAME_LENGTH} 個字`;
-    isValid = false;
-  } else {
-    profileFormErrors.displayName = "";
-  }
-
-  // 驗證年齡
-  const age = profileForm.age;
-  if (age !== null && age !== undefined && age !== "") {
-    const ageNum = Number(age);
-    if (!isValidAge(ageNum)) {
-      profileFormErrors.age = `年齡必須在 ${PROFILE_LIMITS.MIN_AGE} 到 ${PROFILE_LIMITS.MAX_AGE} 歲之間`;
-      isValid = false;
-    } else {
-      profileFormErrors.age = "";
-    }
-  } else {
-    profileFormErrors.age = "";
-  }
-
-  const trimmedPrompt = normalizePrompt(profileForm.defaultPrompt);
-  const rawPromptLength =
-    typeof profileForm.defaultPrompt === "string"
-      ? profileForm.defaultPrompt.trim().length
-      : 0;
-
-  if (rawPromptLength > PROFILE_LIMITS.MAX_PROMPT_LENGTH) {
-    profileFormErrors.defaultPrompt = `角色設定請勿超過 ${PROFILE_LIMITS.MAX_PROMPT_LENGTH} 個字`;
-    isValid = false;
-  } else {
-    profileFormErrors.defaultPrompt = "";
-  }
-
-  return {
-    isValid,
-    trimmedName,
-    trimmedPrompt,
-  };
-};
-
-const handleProfileSubmit = async () => {
-  if (isProfileSaving.value) return;
-  profileEditorError.value = "";
-
-  const { isValid, trimmedName, trimmedPrompt } = validateProfileForm();
-
-  if (!isValid) {
-    return;
-  }
-
-  const normalizedGender = normalizeGender(profileForm.gender);
-  const normalizedAge =
-    profileForm.age !== null &&
-    profileForm.age !== undefined &&
-    profileForm.age !== ""
-      ? Number(profileForm.age)
-      : null;
-  const source = normalizedProfileSource.value;
-
-  const patch = {};
-
-  if (trimmedName !== source.displayName) {
-    patch.displayName = trimmedName;
-  }
-  if (normalizedGender !== source.gender) {
-    patch.gender = normalizedGender;
-  }
-  if (normalizedAge !== source.age) {
-    patch.age = normalizedAge;
-  }
-  if (trimmedPrompt !== source.defaultPrompt) {
-    patch.defaultPrompt = trimmedPrompt;
-  }
-
-  if (Object.keys(patch).length === 0) {
-    profileEditorError.value = "未修改任何資料。";
-    return;
-  }
-
-  isProfileSaving.value = true;
-
-  try {
-    await updateUserProfileDetails(patch);
-    isProfileEditorOpen.value = false;
-    resetProfileEditorState();
-    applyProfileToForm();
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "更新個人資料時發生錯誤，請稍後再試。";
-    profileEditorError.value = message;
-    if (import.meta.env.DEV) {
-    }
-  } finally {
-    isProfileSaving.value = false;
-  }
-};
-
 const hasBlockingOverlay = computed(
   () =>
-    isAvatarModalOpen.value ||
-    isProfileEditorOpen.value ||
-    isLogoutConfirmVisible.value
+    avatarUpload.isModalOpen.value ||
+    profileEditor.isOpen.value ||
+    settings.isLogoutConfirmVisible.value
 );
 
 const shouldListenForGlobalKeydown = computed(
   () =>
-    isProfileEditorOpen.value ||
-    isSettingsMenuOpen.value ||
-    isLogoutConfirmVisible.value
+    profileEditor.isOpen.value ||
+    settings.isMenuOpen.value ||
+    settings.isLogoutConfirmVisible.value
 );
 
 watch(
@@ -665,29 +228,25 @@ watch(
   { immediate: true }
 );
 
-watchEffect((onCleanup) => {
-  if (typeof window === "undefined") {
+// ==================== 鍵盤事件 ====================
+
+const handleGlobalKeydown = (event) => {
+  if (event.key !== "Escape") return;
+  if (profileEditor.isOpen.value) {
+    event.preventDefault();
+    profileEditor.close();
     return;
   }
-  if (!isSettingsMenuOpen.value) {
-    settingsError.value = "";
+  if (settings.isLogoutConfirmVisible.value) {
+    event.preventDefault();
+    settings.cancelLogoutConfirm();
     return;
   }
-
-  const doc = window.document;
-  doc.addEventListener("click", handleDocumentClick);
-
-  nextTick(() => {
-    const firstMenuItem = settingsMenuRef.value?.querySelector(
-      "button.settings-menu__item"
-    );
-    firstMenuItem?.focus();
-  }).catch(() => {});
-
-  onCleanup(() => {
-    doc.removeEventListener("click", handleDocumentClick);
-  });
-});
+  if (settings.isMenuOpen.value) {
+    event.preventDefault();
+    settings.closeMenu();
+  }
+};
 
 watchEffect((onCleanup) => {
   if (typeof window === "undefined" || !shouldListenForGlobalKeydown.value) {
@@ -702,14 +261,7 @@ watchEffect((onCleanup) => {
   });
 });
 
-watch(isLogoutConfirmVisible, (isOpen) => {
-  if (!isOpen) {
-    return;
-  }
-  nextTick(() => {
-    logoutConfirmCancelButtonRef.value?.focus();
-  }).catch(() => {});
-});
+// ==================== 生命週期 ====================
 
 onBeforeUnmount(() => {
   toggleBodyScrollLock(false);
@@ -721,6 +273,7 @@ const ensureProfileLoaded = async (id) => {
     await loadUserProfile(id, { fallback: FALLBACK_USER });
   } catch (error) {
     if (import.meta.env.DEV) {
+      logger.error("[ProfileView] 載入個人資料失敗:", error);
     }
   }
 };
@@ -735,7 +288,7 @@ onMounted(async () => {
       await initializeProfileData(userId);
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.error("[ProfileView] 初始化資料失敗:", error);
+        logger.error("[ProfileView] 初始化資料失敗:", error);
       }
     }
   }
@@ -755,89 +308,34 @@ watch(
 watch(
   () => profile.value,
   () => {
-    if (!isProfileEditorOpen.value) {
-      applyProfileToForm();
-      resetProfileEditorState();
+    if (!profileEditor.isOpen.value) {
+      profileEditor.applyProfileToForm();
+      profileEditor.resetEditorState();
     }
   },
   { deep: true, immediate: true }
 );
 
-watch(isProfileEditorOpen, (isOpen) => {
-  if (isOpen) {
-    profileEditorError.value = "";
-    nextTick(() => {
-      profileNameInputRef.value?.focus();
-    }).catch(() => {});
-  } else {
-    applyProfileToForm();
-    resetProfileEditorState();
+watch(profileEditor.isOpen, (isOpen) => {
+  if (!isOpen) {
+    profileEditor.applyProfileToForm();
+    profileEditor.resetEditorState();
   }
 });
 
+// 監聽表單欄位變化
 watch(
   () => [
-    profileForm.displayName,
-    profileForm.gender,
-    profileForm.age,
-    profileForm.defaultPrompt,
+    profileEditor.form.displayName,
+    profileEditor.form.gender,
+    profileEditor.form.age,
+    profileEditor.form.defaultPrompt,
   ],
-  () => {
-    if (suppressProfileFormDirty) return;
-    if (isProfileEditorOpen.value) {
-      profileEditorError.value = "";
-    }
-  }
-);
-
-watch(
-  () => profileForm.displayName,
-  (value) => {
-    if (suppressProfileFormDirty) return;
-    if (typeof value !== "string") {
-      suppressProfileFormDirty = true;
-      profileForm.displayName = "";
-      suppressProfileFormDirty = false;
-      return;
-    }
-    const clamped = clampTextLength(value, PROFILE_LIMITS.MAX_NAME_LENGTH);
-    if (clamped !== value) {
-      suppressProfileFormDirty = true;
-      profileForm.displayName = clamped;
-      suppressProfileFormDirty = false;
-    }
-  }
-);
-
-watch(
-  () => profileForm.gender,
-  (value) => {
-    if (suppressProfileFormDirty) return;
-    const normalized = normalizeGender(value);
-    if (normalized !== value) {
-      suppressProfileFormDirty = true;
-      profileForm.gender = normalized;
-      suppressProfileFormDirty = false;
-    }
-  }
-);
-
-watch(
-  () => profileForm.defaultPrompt,
-  (value) => {
-    if (suppressProfileFormDirty) return;
-    if (typeof value !== "string") {
-      suppressProfileFormDirty = true;
-      profileForm.defaultPrompt = "";
-      suppressProfileFormDirty = false;
-      return;
-    }
-    const clamped = clampTextLength(value, PROFILE_LIMITS.MAX_PROMPT_LENGTH);
-    if (clamped !== value) {
-      suppressProfileFormDirty = true;
-      profileForm.defaultPrompt = clamped;
-      suppressProfileFormDirty = false;
-    }
+  ([displayName, gender, age, defaultPrompt]) => {
+    profileEditor.watchFormField("displayName", displayName);
+    profileEditor.watchFormField("gender", gender);
+    profileEditor.watchFormField("age", age);
+    profileEditor.watchFormField("defaultPrompt", defaultPrompt);
   }
 );
 </script>
@@ -861,71 +359,15 @@ watch(
           @upgrade-click="handleQuickActionSelect({ key: 'membership' })"
         />
 
-        <nav class="profile-hero__aux">
-          <ul>
-            <li
-              v-for="action in auxiliaryActions"
-              :key="action.key"
-              class="profile-hero__aux-item"
-              :class="{
-                'profile-hero__aux-item--menu': action.key === 'settings',
-                'is-open': action.key === 'settings' && isSettingsMenuOpen,
-              }"
-            >
-              <button
-                type="button"
-                class="aux-button"
-                :aria-label="action.label"
-                :aria-haspopup="action.key === 'settings' ? 'menu' : undefined"
-                :aria-expanded="
-                  action.key === 'settings' ? isSettingsMenuOpen : undefined
-                "
-                :aria-controls="
-                  action.key === 'settings'
-                    ? 'profile-settings-menu'
-                    : undefined
-                "
-                :ref="action.key === 'settings' ? bindSettingsMenuButton : null"
-                @click="handleAuxiliaryAction(action.key, $event)"
-              >
-                <component :is="action.icon" class="icon" aria-hidden="true" />
-              </button>
-
-              <transition name="fade-scale">
-                <div
-                  v-if="action.key === 'settings' && isSettingsMenuOpen"
-                  id="profile-settings-menu"
-                  class="settings-menu"
-                  role="menu"
-                  :ref="bindSettingsMenu"
-                  @click.stop
-                >
-                  <button
-                    v-for="option in settingsOptions"
-                    :key="option.key"
-                    type="button"
-                    class="settings-menu__item"
-                    :class="{
-                      'settings-menu__item--danger':
-                        option.variant === 'danger',
-                    }"
-                    role="menuitem"
-                    @click="handleSettingsOptionSelect(option.key)"
-                  >
-                    {{ option.label }}
-                  </button>
-                  <p
-                    v-if="settingsError"
-                    class="settings-menu__error"
-                    role="alert"
-                  >
-                    {{ settingsError }}
-                  </p>
-                </div>
-              </transition>
-            </li>
-          </ul>
-        </nav>
+        <AuxiliaryActions
+          :is-settings-menu-open="settings.isMenuOpen.value"
+          :settings-error="settings.error.value"
+          :settings-menu-button-ref="settings.bindMenuButton"
+          :settings-menu-ref="settings.bindMenu"
+          @edit-click="openProfileEditor"
+          @settings-toggle="settings.toggleMenu"
+          @settings-option-select="settings.handleOptionSelect"
+        />
       </header>
 
       <div class="profile-hero__content">
@@ -934,13 +376,13 @@ watch(
             <img
               v-if="avatarPreview"
               :src="avatarPreview"
-              :class="{ 'avatar-ring__image--hidden': isAvatarImageLoading }"
+              :class="{ 'avatar-ring__image--hidden': avatarUpload.isImageLoading.value }"
               alt="使用者頭像"
-              @load="handleAvatarLoad"
-              @error="handleAvatarError"
+              @load="avatarUpload.handleLoad"
+              @error="avatarUpload.handleError"
             />
             <div
-              v-if="isAvatarImageLoading"
+              v-if="avatarUpload.isImageLoading.value"
               class="avatar-ring__spinner"
               role="status"
               aria-label="頭像載入中"
@@ -952,7 +394,9 @@ watch(
             aria-label="編輯頭像"
             @click="openAvatarEditor"
           >
-            <PencilSquareIcon class="icon" aria-hidden="true" />
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+            </svg>
           </button>
         </div>
 
@@ -975,217 +419,44 @@ watch(
       @action-select="handleQuickActionSelect"
     />
   </main>
-  <Teleport to="body">
-    <div
-      v-if="isProfileEditorOpen"
-      class="profile-editor-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="profile-editor-title"
-      @click.self="handleProfileOverlayClick"
-    >
-      <div class="profile-editor-dialog">
-        <header class="profile-editor-header">
-          <div class="profile-editor-header__text">
-            <h2 id="profile-editor-title">編輯個人資料</h2>
-            <p class="profile-editor-subtitle">
-              更新名稱、性別、年齡與角色設定，展現你的個人風格
-            </p>
-          </div>
-          <button
-            type="button"
-            class="profile-editor-close"
-            aria-label="關閉"
-            :disabled="isProfileSaving"
-            @click="closeProfileEditor"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        </header>
-        <form class="profile-editor-form" @submit.prevent="handleProfileSubmit">
-          <div class="profile-editor-field">
-            <label class="profile-editor-label" for="profile-editor-name">
-              名稱
-            </label>
-            <input
-              id="profile-editor-name"
-              ref="profileNameInputRef"
-              v-model="profileForm.displayName"
-              type="text"
-              :maxlength="PROFILE_LIMITS.MAX_NAME_LENGTH"
-              class="profile-editor-input"
-              :disabled="isProfileSaving"
-            />
-            <div class="profile-editor-meta">
-              <span
-                >{{ profileDisplayNameLength }} /
-                {{ PROFILE_LIMITS.MAX_NAME_LENGTH }}</span
-              >
-            </div>
-            <p
-              v-if="profileFormErrors.displayName"
-              class="profile-editor-error"
-              role="alert"
-            >
-              {{ profileFormErrors.displayName }}
-            </p>
-          </div>
 
-          <div class="profile-editor-field">
-            <label class="profile-editor-label" for="profile-editor-gender">
-              性別
-            </label>
-            <select
-              id="profile-editor-gender"
-              v-model="profileForm.gender"
-              class="profile-editor-select"
-              :disabled="isProfileSaving"
-            >
-              <option
-                v-for="option in GENDER_OPTIONS"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
-
-          <div class="profile-editor-field">
-            <label class="profile-editor-label" for="profile-editor-age">
-              年齡
-            </label>
-            <select
-              id="profile-editor-age"
-              v-model.number="profileForm.age"
-              class="profile-editor-select"
-              :disabled="isProfileSaving"
-            >
-              <option :value="null">請選擇年齡</option>
-              <option v-for="age in ageOptions" :key="age" :value="age">
-                {{ age }} 歲
-              </option>
-            </select>
-            <p
-              v-if="profileFormErrors.age"
-              class="profile-editor-error"
-              role="alert"
-            >
-              {{ profileFormErrors.age }}
-            </p>
-          </div>
-
-          <div class="profile-editor-field">
-            <label class="profile-editor-label" for="profile-editor-prompt">
-              角色設定
-            </label>
-            <textarea
-              id="profile-editor-prompt"
-              v-model="profileForm.defaultPrompt"
-              :maxlength="PROFILE_LIMITS.MAX_PROMPT_LENGTH"
-              class="profile-editor-textarea"
-              rows="4"
-              :disabled="isProfileSaving"
-            ></textarea>
-            <div class="profile-editor-meta profile-editor-meta--counter">
-              <span
-                >{{ profilePromptLength }} /
-                {{ PROFILE_LIMITS.MAX_PROMPT_LENGTH }}</span
-              >
-            </div>
-            <p
-              v-if="profileFormErrors.defaultPrompt"
-              class="profile-editor-error"
-              role="alert"
-            >
-              {{ profileFormErrors.defaultPrompt }}
-            </p>
-          </div>
-
-          <p
-            v-if="profileEditorError"
-            class="profile-editor-error profile-editor-error--global"
-            role="alert"
-          >
-            {{ profileEditorError }}
-          </p>
-
-          <footer class="profile-editor-actions">
-            <button
-              type="button"
-              class="btn-unified btn-cancel"
-              @click="closeProfileEditor"
-              :disabled="isProfileSaving"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              class="btn-unified btn-confirm"
-              :disabled="isProfileSaving || !isProfileFormDirty"
-            >
-              {{ isProfileSaving ? "儲存中…" : "儲存變更" }}
-            </button>
-          </footer>
-        </form>
-      </div>
-    </div>
-  </Teleport>
-  <Teleport to="body">
-    <div
-      v-if="isLogoutConfirmVisible"
-      class="logout-confirm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="logout-confirm-title"
-    >
-      <div
-        class="logout-confirm__backdrop"
-        role="presentation"
-        @click="cancelLogoutConfirm"
-      ></div>
-      <div class="logout-confirm__panel">
-        <header class="logout-confirm__header">
-          <h2 id="logout-confirm-title">確認登出</h2>
-          <p class="logout-confirm__subtitle">
-            登出後需要重新登入才能繼續使用本服務。
-          </p>
-        </header>
-        <p class="logout-confirm__message">確定要登出目前帳號嗎？</p>
-        <p v-if="settingsError" class="logout-confirm__error" role="alert">
-          {{ settingsError }}
-        </p>
-        <footer class="logout-confirm__actions">
-          <button
-            type="button"
-            class="btn-unified btn-cancel"
-            ref="logoutConfirmCancelButtonRef"
-            @click="cancelLogoutConfirm"
-            :disabled="isLoggingOut"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            class="btn-unified btn-danger"
-            @click="handleLogout"
-            :disabled="isLoggingOut"
-          >
-            {{ isLoggingOut ? "登出中…" : "確認登出" }}
-          </button>
-        </footer>
-      </div>
-    </div>
-  </Teleport>
+  <!-- 頭像編輯器 -->
   <AvatarEditorModal
-    v-if="isAvatarModalOpen"
+    v-if="avatarUpload.isModalOpen.value"
     :default-avatars="BUILTIN_AVATAR_OPTIONS"
     :current-photo="avatarPreview"
-    :saving="isAvatarSaving"
-    @close="closeAvatarEditor"
-    @update="handleAvatarUpdate"
+    :saving="avatarUpload.isSaving.value"
+    @close="avatarUpload.closeEditor"
+    @update="avatarUpload.handleUpdate"
   />
 
+  <!-- 個人資料編輯器 -->
+  <ProfileEditor
+    :is-open="profileEditor.isOpen.value"
+    :is-saving="profileEditor.isSaving.value"
+    :error="profileEditor.error.value"
+    :form="profileEditor.form"
+    :form-errors="profileEditor.formErrors"
+    :display-name-length="profileEditor.displayNameLength.value"
+    :prompt-length="profileEditor.promptLength.value"
+    :is-form-dirty="profileEditor.isFormDirty.value"
+    :input-ref="profileEditor.inputRef"
+    @close="profileEditor.close"
+    @submit="profileEditor.submit"
+    @overlay-click="profileEditor.close"
+  />
+
+  <!-- 登出確認對話框 -->
+  <LogoutConfirmDialog
+    :is-visible="settings.isLogoutConfirmVisible.value"
+    :is-logging-out="settings.isLoggingOut.value"
+    :error="settings.error.value"
+    :cancel-button-ref="settings.bindLogoutCancelButton"
+    @cancel="settings.cancelLogoutConfirm"
+    @confirm="settings.confirmLogout"
+  />
+
+  <!-- 統計彈窗 -->
   <StatsModal
     :is-open="isStatsModalOpen"
     :balance="balance"
@@ -1282,15 +553,6 @@ watch(
     justify-content: space-between;
   }
 
-  &__aux ul {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
   &__content {
     position: relative;
     z-index: 1;
@@ -1300,262 +562,6 @@ watch(
     gap: 0.75rem;
     margin-top: clamp(1.5rem, 4vw, 2.5rem);
   }
-}
-
-.vip-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(30, 33, 48, 0.85);
-  backdrop-filter: blur(8px);
-  color: #e2e8f0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-
-  .icon {
-    width: 18px;
-    height: 18px;
-    color: #94a3b8;
-  }
-
-  &:hover {
-    background: rgba(51, 65, 85, 0.9);
-    border-color: rgba(148, 163, 184, 0.4);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  &:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  }
-}
-
-.aux-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: rgba(30, 33, 48, 0.8);
-  backdrop-filter: blur(8px);
-  color: #e2e8f0;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-
-  &:hover {
-    background: rgba(51, 65, 85, 0.9);
-    border-color: rgba(148, 163, 184, 0.4);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-
-  .icon {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-.profile-hero__aux-item {
-  position: relative;
-}
-
-.profile-hero__aux-item.is-open .aux-button {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.45);
-}
-
-.settings-menu {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-width: 190px;
-  padding: 0.6rem;
-  border-radius: var(--border-radius-lg);
-  background: rgba(15, 17, 28, 0.92);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 18px 36px rgba(15, 17, 28, 0.55);
-  backdrop-filter: blur(14px);
-  z-index: 2300;
-}
-
-.settings-menu__item {
-  display: block;
-  width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  color: #e2e8f0;
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-  text-align: left;
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.settings-menu__item:hover,
-.settings-menu__item:focus {
-  background: rgba(148, 163, 184, 0.2);
-  color: #f8fafc;
-  outline: none;
-}
-
-.settings-menu__item--danger {
-  color: #fca5a5;
-}
-
-.settings-menu__item--danger:hover,
-.settings-menu__item--danger:focus {
-  background: rgba(248, 113, 113, 0.18);
-  color: #fecaca;
-}
-
-.settings-menu__error {
-  margin: 0.35rem 0 0;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  color: var(--color-danger);
-}
-
-.fade-scale-enter-active,
-.fade-scale-leave-active {
-  transition: opacity 140ms ease, transform 140ms ease;
-  transform-origin: top right;
-}
-
-.fade-scale-enter-from,
-.fade-scale-leave-to {
-  opacity: 0;
-  transform: translateY(-6px) scale(0.96);
-}
-
-.logout-confirm {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  animation: logout-fade-in 0.2s ease-out;
-}
-
-@keyframes logout-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes logout-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.logout-confirm__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-}
-
-.logout-confirm__panel {
-  position: relative;
-  width: min(400px, 85vw);
-  padding: 2rem 1.75rem;
-  border-radius: 24px;
-  background: linear-gradient(
-    165deg,
-    rgba(30, 33, 48, 0.98),
-    rgba(22, 25, 36, 0.98)
-  );
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  color: #e2e8f0;
-  animation: logout-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.logout-confirm__header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
-}
-
-.logout-confirm__header h2 {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #f8fafc;
-  line-height: 1.3;
-}
-
-.logout-confirm__subtitle {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  letter-spacing: 0.01em;
-  color: rgba(203, 213, 225, 0.85);
-}
-
-.logout-confirm__message {
-  margin: 0;
-  padding: 1rem;
-  font-size: 1rem;
-  line-height: 1.6;
-  letter-spacing: 0.01em;
-  color: rgba(226, 232, 240, 0.95);
-  background: rgba(148, 163, 184, 0.08);
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-}
-
-.logout-confirm__error {
-  margin: 0;
-  padding: 0.875rem 1rem;
-  border-radius: 12px;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  font-size: 0.875rem;
-  line-height: 1.5;
-  letter-spacing: 0.01em;
-  color: #fca5a5;
-}
-
-.logout-confirm__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.875rem;
-  margin-top: 0.5rem;
 }
 
 .avatar {
@@ -1653,530 +659,12 @@ watch(
   }
 }
 
-/* 資產查看按鈕 - 簡潔版 */
-.stats-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  width: 100%;
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(30, 33, 48, 0.7);
-  backdrop-filter: blur(12px);
-  color: #f8fafc;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-
-  &:hover {
-    background: rgba(51, 65, 85, 0.8);
-    border-color: rgba(148, 163, 184, 0.35);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  }
-
-  &:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  }
-}
-
-.stats-button__icon {
-  width: 20px;
-  height: 20px;
-  color: #fbbf24;
-  flex-shrink: 0;
-}
-
-.stats-button__icon-image {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(251, 191, 36, 0.3));
-}
-
-.stats-button__icon-fallback {
-  width: 20px;
-  height: 20px;
-  color: #fbbf24;
-}
-
-.stats-button__content {
-  display: flex;
-  align-items: baseline;
-  gap: 0.375rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.stats-button__value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: #fff;
-}
-
-.stats-button__label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.stats-button__arrow {
-  width: 18px;
-  height: 18px;
-  color: rgba(255, 255, 255, 0.5);
-  flex-shrink: 0;
-  transition: transform 0.2s ease, color 0.2s ease;
-}
-
-.stats-button:hover .stats-button__arrow {
-  transform: translateX(3px);
-  color: rgba(255, 255, 255, 0.8);
-}
-
-/* 響應式設計 */
-@media (max-width: 640px) {
-  .stats-button {
-    padding: 0.75rem 1rem;
-  }
-
-  .stats-button__icon {
-    width: 18px;
-    height: 18px;
-  }
-
-  .stats-button__icon-image {
-    width: 22px;
-    height: 22px;
-  }
-
-  .stats-button__icon-fallback {
-    width: 18px;
-    height: 18px;
-  }
-
-  .stats-button__value {
-    font-size: 1.125rem;
-  }
-}
-
-/* VIP 按鈕啟用狀態 */
-.vip-button--active {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  border: 1px solid rgba(251, 191, 36, 0.6);
-  color: #1e2130;
-  font-weight: 700;
-  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.4);
-
-  .icon {
-    color: #d97706;
-  }
-
-  &:hover {
-    background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%);
-    border-color: rgba(251, 191, 36, 0.8);
-    box-shadow: 0 6px 20px rgba(251, 191, 36, 0.5);
-    transform: translateY(-2px);
-  }
-
-  &:active {
-    transform: translateY(0);
-    box-shadow: 0 4px 14px rgba(251, 191, 36, 0.45);
-  }
-}
-.quick-actions {
-  margin-top: -3.5rem;
-  position: relative;
-  ul {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    margin: 0;
-    padding: 0.75rem 0.75rem;
-    list-style: none;
-    background: linear-gradient(160deg, #181828, #141420);
-    border-radius: 30px;
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    box-shadow: 0 18px 38px rgba(8, 10, 24, 0.35);
-    gap: 0.75rem;
-  }
-}
-
-.quick-action {
-  display: flex;
-  justify-content: center;
-
-  &__button {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 0.5rem;
-    border-radius: 18px;
-    border: none;
-    background: transparent;
-    color: #f1f5f9;
-    font-size: 0.85rem;
-    letter-spacing: 0.04em;
-    transition: background 150ms ease, transform 150ms ease;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.08);
-      transform: translateY(-2px);
-    }
-  }
-
-  &__icon {
-    position: relative;
-    width: 48px;
-    height: 48px;
-    border-radius: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.16), transparent);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-
-    .icon {
-      width: 22px;
-      height: 22px;
-    }
-  }
-
-  &__badge {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #ef4444, #dc2626);
-    box-shadow: 0 0 0 2px rgba(14, 18, 34, 0.9), 0 0 8px rgba(239, 68, 68, 0.4);
-    animation: badge-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes badge-pulse {
-    0%, 100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.8;
-      transform: scale(1.1);
-    }
-  }
-
-  &__label {
-    color: rgba(241, 245, 249, 0.92);
-  }
-}
-
-.profile-editor-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  animation: editor-fade-in 0.2s ease-out;
-}
-
-@keyframes editor-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes editor-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.profile-editor-dialog {
-  width: min(500px, 90vw);
-  max-height: 85vh;
-  border-radius: 24px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: linear-gradient(
-    165deg,
-    rgba(30, 33, 48, 0.98),
-    rgba(22, 25, 36, 0.98)
-  );
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-  padding: 2rem 1.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  overflow-y: auto;
-  animation: editor-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.profile-editor-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
-}
-
-.profile-editor-header__text h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #f8fafc;
-  line-height: 1.3;
-}
-
-.profile-editor-header__text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  flex: 1;
-}
-
-.profile-editor-subtitle {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  letter-spacing: 0.01em;
-  color: rgba(203, 213, 225, 0.85);
-}
-
-.profile-editor-close {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(30, 33, 48, 0.8);
-  color: #8b92b0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  flex-shrink: 0;
-
-  &:hover:not(:disabled) {
-    background: rgba(51, 65, 85, 0.9);
-    border-color: rgba(148, 163, 184, 0.5);
-    color: #f8f9ff;
-    transform: scale(1.05);
-  }
-
-  &:active:not(:disabled) {
-    transform: scale(0.95);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-}
-
-.profile-editor-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.profile-editor-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.profile-editor-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: #e2e8f0;
-}
-
-.profile-editor-input,
-.profile-editor-select,
-.profile-editor-textarea {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(17, 20, 32, 0.9);
-  color: #f8fafc;
-  font-size: 0.95rem;
-  letter-spacing: 0.01em;
-  padding: 0.75rem 1rem;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-
-  &::placeholder {
-    color: rgba(148, 163, 184, 0.5);
-    opacity: 1;
-  }
-
-  &:hover:not(:disabled) {
-    border-color: rgba(148, 163, 184, 0.4);
-  }
-
-  &:focus {
-    outline: none;
-    border-color: rgba(102, 126, 234, 0.6);
-    background: rgba(17, 20, 32, 0.95);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-}
-
-.profile-editor-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e2e8f0' d='M6 8.5L2 4.5h8z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 1rem center;
-  padding-right: 2.75rem;
-  cursor: pointer;
-
-  &:focus {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e2e8f0' d='M6 8.5L2 4.5h8z'/%3E%3C/svg%3E");
-  }
-}
-
-.profile-editor-select option {
-  background: #1a1d2e;
-  color: #f8fafc;
-  padding: 0.75rem;
-}
-
-.profile-editor-textarea {
-  min-height: 110px;
-  resize: vertical;
-  line-height: 1.6;
-  font-family: inherit;
-}
-
-.profile-editor-meta {
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: rgba(148, 163, 184, 0.7);
-}
-
-.profile-editor-meta--counter {
-  align-self: flex-end;
-}
-
-.profile-editor-error {
-  margin: 0;
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: #fca5a5;
-}
-
-.profile-editor-error--global {
-  padding: 0.875rem 1rem;
-  border-radius: 12px;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  line-height: 1.5;
-}
-
-.profile-editor-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.875rem;
-  padding-top: 0.5rem;
-  margin-top: 0.5rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
-}
-
 @keyframes avatar-ring-spin {
   0% {
     transform: rotate(0deg);
   }
   100% {
     transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 640px) {
-  .quick-actions ul {
-    gap: 0.5rem;
-  }
-
-  .profile-editor-dialog {
-    width: min(500px, 95vw);
-    max-height: 90vh;
-    padding: 1.5rem 1.25rem;
-  }
-
-  .profile-editor-header {
-    padding-bottom: 0.875rem;
-  }
-
-  .profile-editor-header__text h2 {
-    font-size: 1.35rem;
-  }
-
-  .profile-editor-subtitle {
-    font-size: 0.85rem;
-  }
-
-  .profile-editor-close {
-    width: 32px;
-    height: 32px;
-    font-size: 1.35rem;
-  }
-
-  .profile-editor-form {
-    gap: 1rem;
-  }
-
-  .profile-editor-field {
-    gap: 0.4rem;
-  }
-
-  .profile-editor-label {
-    font-size: 0.825rem;
-  }
-
-  .profile-editor-input,
-  .profile-editor-select,
-  .profile-editor-textarea {
-    padding: 0.65rem 0.875rem;
-    font-size: 0.9rem;
-  }
-
-  .profile-editor-textarea {
-    min-height: 100px;
-  }
-
-  .profile-editor-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
   }
 }
 </style>

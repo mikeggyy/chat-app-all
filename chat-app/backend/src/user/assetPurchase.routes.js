@@ -3,6 +3,11 @@
  */
 
 import express from "express";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { purchaseAssetCard, purchaseAssetBundle } from "./assetPurchase.service.js";
@@ -24,7 +29,7 @@ const router = express.Router();
  * - assetId: character-unlock, photo-unlock, video-unlock, voice-unlock, create
  * - quantity: 1-100
  */
-router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res) => {
+router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { sku, assetId, quantity } = req.body;
@@ -49,7 +54,7 @@ router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res) => {
         { ttl: 2 * 1000 } // 2秒 TTL，僅防止快速重複點擊
       );
 
-      return res.json(result);
+      return sendSuccess(res, result);
     }
 
     // 向後兼容：舊版 assetId + quantity
@@ -57,9 +62,9 @@ router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res) => {
       logger.warn(`[資產購買API] 使用舊版 API - assetId: ${assetId}, quantity: ${quantity || 1}`);
 
       if (quantity && (quantity < 1 || quantity > 100)) {
-        return res.status(400).json({
-          success: false,
-          message: "購買數量必須在 1-100 之間",
+        return sendError(res, "VALIDATION_ERROR", "購買數量必須在 1-100 之間", {
+          quantity,
+          validRange: "1-100",
         });
       }
 
@@ -74,22 +79,17 @@ router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res) => {
         { ttl: 2 * 1000 } // 2秒 TTL，僅防止快速重複點擊
       );
 
-      return res.json(result);
+      return sendSuccess(res, result);
     }
 
     // 缺少必要參數
     logger.warn(`[資產購買API] 缺少必要參數`);
-    return res.status(400).json({
-      success: false,
-      message: "缺少必要參數：sku 或 assetId",
+    return sendError(res, "VALIDATION_ERROR", "缺少必要參數：sku 或 assetId", {
+      providedFields: { sku: !!sku, assetId: !!assetId },
     });
   } catch (error) {
     logger.error("購買資產失敗:", error);
-    const status = error.message.includes("金幣不足") || error.message.includes("找不到") ? 400 : 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "購買失敗",
-    });
+    next(error);
   }
 });
 
@@ -98,31 +98,31 @@ router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res) => {
  * POST /api/assets/purchase/bundle
  * Body: { items: Array<{assetId: string, quantity: number}> }
  */
-router.post("/api/assets/purchase/bundle", requireFirebaseAuth, async (req, res) => {
+router.post("/api/assets/purchase/bundle", requireFirebaseAuth, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { items } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "缺少必要參數：items",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：items", {
+        field: "items",
+        expected: "Array",
       });
     }
 
     // 驗證所有項目
     for (const item of items) {
       if (!item.assetId || !item.quantity) {
-        return res.status(400).json({
-          success: false,
-          message: "每個項目必須包含 assetId 和 quantity",
+        return sendError(res, "VALIDATION_ERROR", "每個項目必須包含 assetId 和 quantity", {
+          invalidItem: item,
         });
       }
 
       if (item.quantity < 1 || item.quantity > 100) {
-        return res.status(400).json({
-          success: false,
-          message: "每個項目的購買數量必須在 1-100 之間",
+        return sendError(res, "VALIDATION_ERROR", "每個項目的購買數量必須在 1-100 之間", {
+          assetId: item.assetId,
+          quantity: item.quantity,
+          validRange: "1-100",
         });
       }
     }
@@ -139,14 +139,10 @@ router.post("/api/assets/purchase/bundle", requireFirebaseAuth, async (req, res)
       { ttl: 2 * 1000 } // 2秒 TTL，僅防止快速重複點擊
     );
 
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("批量購買資產卡失敗:", error);
-    const status = error.message.includes("金幣不足") || error.message.includes("找不到") ? 400 : 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "購買失敗",
-    });
+    next(error);
   }
 });
 

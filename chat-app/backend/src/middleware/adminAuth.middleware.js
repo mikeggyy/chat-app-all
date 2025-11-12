@@ -3,7 +3,7 @@
  * 用於保護需要管理員權限的路由
  */
 
-import { TEST_ACCOUNTS } from "../../../../shared/config/testAccounts.js";
+import { TEST_ACCOUNTS } from "../../../shared/config/testAccounts.js";
 import { sendError } from "../utils/routeHelpers.js";
 
 /**

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { logger } from '@/utils/logger';
 import {
   XMarkIcon,
   BoltIcon,
@@ -81,7 +82,7 @@ const handleOverlayClick = (event) => {
 // 📊 Console Log: 記錄角色創建次數限制信息（方便調試）
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
-    console.log(`[角色創建限制] 已使用: ${props.usedCreations} / ${displayTotal.value}, 創建卡: ${props.createCards} 張, 測試帳號: ${props.isTestAccount ? '是' : '否'}`);
+    logger.log(`[角色創建限制] 已使用: ${props.usedCreations} / ${displayTotal.value}, 創建卡: ${props.createCards} 張, 測試帳號: ${props.isTestAccount ? '是' : '否'}`);
   }
 });
 </script>

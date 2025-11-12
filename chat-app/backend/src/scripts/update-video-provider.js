@@ -12,6 +12,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import admin from "firebase-admin";
+import logger from "../utils/logger.js";
 
 // 載入環境變數
 const __filename = fileURLToPath(import.meta.url);
@@ -69,21 +70,21 @@ const PROVIDER_CONFIGS = {
  * 更新 Firestore 中的影片生成提供者配置
  */
 async function updateVideoProvider(providerName) {
-  console.log("\n========================================");
-  console.log(`📝 更新影片生成提供者配置為: ${providerName}`);
-  console.log("========================================\n");
+  logger.info("\n========================================");
+  logger.info(`📝 更新影片生成提供者配置為: ${providerName}`);
+  logger.info("========================================\n");
 
   // 驗證提供者名稱
   if (!PROVIDER_CONFIGS[providerName]) {
-    console.error(`❌ 錯誤：不支援的提供者 "${providerName}"`);
-    console.log("\n可用的提供者：");
-    console.log("  - hailuo    (Minimax Hailuo 02)");
-    console.log("  - veo       (Google Veo 3.0 Fast)");
-    console.log("  - replicate (Stable Video Diffusion)");
-    console.log("\n使用方法：");
-    console.log("  node src/scripts/update-video-provider.js hailuo");
-    console.log("  node src/scripts/update-video-provider.js veo");
-    console.log("  node src/scripts/update-video-provider.js replicate\n");
+    logger.error(`❌ 錯誤：不支援的提供者 "${providerName}"`);
+    logger.info("\n可用的提供者：");
+    logger.info("  - hailuo    (Minimax Hailuo 02)");
+    logger.info("  - veo       (Google Veo 3.0 Fast)");
+    logger.info("  - replicate (Stable Video Diffusion)");
+    logger.info("\n使用方法：");
+    logger.info("  node src/scripts/update-video-provider.js hailuo");
+    logger.info("  node src/scripts/update-video-provider.js veo");
+    logger.info("  node src/scripts/update-video-provider.js replicate\n");
     process.exit(1);
   }
 
@@ -91,65 +92,65 @@ async function updateVideoProvider(providerName) {
 
   try {
     // 1. 讀取當前配置
-    console.log("📖 讀取當前配置...");
+    logger.info("📖 讀取當前配置...");
     const docRef = db.collection("ai_settings").doc("global");
     const doc = await docRef.get();
 
     if (!doc.exists) {
-      console.error("❌ 錯誤：ai_settings/global 文檔不存在");
+      logger.error("❌ 錯誤：ai_settings/global 文檔不存在");
       process.exit(1);
     }
 
     const currentSettings = doc.data();
     const currentVideoConfig = currentSettings.videoGeneration || {};
 
-    console.log("✅ 當前配置：");
-    console.log(`   Provider: ${currentVideoConfig.provider || "（未設定）"}`);
-    console.log(`   Model: ${currentVideoConfig.model || "（未設定）"}`);
-    console.log(`   Duration: ${currentVideoConfig.durationSeconds || "（未設定）"}s`);
-    console.log(`   Resolution: ${currentVideoConfig.resolution || "（未設定）"}`);
+    logger.info("✅ 當前配置：");
+    logger.info(`   Provider: ${currentVideoConfig.provider || "（未設定）"}`);
+    logger.info(`   Model: ${currentVideoConfig.model || "（未設定）"}`);
+    logger.info(`   Duration: ${currentVideoConfig.durationSeconds || "（未設定）"}s`);
+    logger.info(`   Resolution: ${currentVideoConfig.resolution || "（未設定）"}`);
 
     // 2. 更新配置
-    console.log("\n🔄 更新為新配置...");
+    logger.info("\n🔄 更新為新配置...");
     await docRef.update({
       "videoGeneration": newConfig,
       "updatedAt": new Date().toISOString(),
     });
 
-    console.log("✅ 新配置：");
-    console.log(`   Provider: ${newConfig.provider}`);
-    console.log(`   Model: ${newConfig.model}`);
-    console.log(`   Duration: ${newConfig.durationSeconds}s`);
-    console.log(`   Resolution: ${newConfig.resolution}`);
-    console.log(`   Aspect Ratio: ${newConfig.aspectRatio}`);
-    console.log(`   Description: ${newConfig.description}`);
+    logger.info("✅ 新配置：");
+    logger.info(`   Provider: ${newConfig.provider}`);
+    logger.info(`   Model: ${newConfig.model}`);
+    logger.info(`   Duration: ${newConfig.durationSeconds}s`);
+    logger.info(`   Resolution: ${newConfig.resolution}`);
+    logger.info(`   Aspect Ratio: ${newConfig.aspectRatio}`);
+    logger.info(`   Description: ${newConfig.description}`);
 
     // 3. 驗證更新
-    console.log("\n🔍 驗證更新...");
+    logger.info("\n🔍 驗證更新...");
     const updatedDoc = await docRef.get();
     const updatedSettings = updatedDoc.data();
     const updatedVideoConfig = updatedSettings.videoGeneration;
 
     if (updatedVideoConfig.provider === newConfig.provider &&
         updatedVideoConfig.model === newConfig.model) {
-      console.log("✅ 配置更新成功！");
+      logger.info("✅ 配置更新成功！");
     } else {
-      console.error("❌ 配置更新後驗證失敗");
+      logger.error("❌ 配置更新後驗證失敗");
       process.exit(1);
     }
 
-    console.log("\n========================================");
-    console.log("✅ 影片生成提供者配置已更新");
-    console.log("========================================");
-    console.log("\n📝 後續步驟：");
-    console.log("1. 如果後端正在運行，請呼叫 POST /api/ai-settings/refresh 刷新緩存");
-    console.log("2. 或者重啟後端服務");
-    console.log("3. 在管理後台確認配置已生效\n");
+    logger.info("\n========================================");
+    logger.info("✅ 影片生成提供者配置已更新");
+    logger.info("========================================");
+    logger.info("\n📝 後續步驟：");
+    logger.info("1. 如果後端正在運行，請呼叫 POST /api/ai-settings/refresh 刷新緩存");
+    logger.info("2. 或者重啟後端服務");
+    logger.info("3. 在管理後台確認配置已生效\n");
 
     process.exit(0);
   } catch (error) {
-    console.error("\n❌ 更新失敗：", error);
-    console.error(error.stack);
+    logger.error("\n❌ 更新失敗：", error);
+    logger.error(error.stack);
     process.exit(1);
   }
 }
@@ -158,14 +159,14 @@ async function updateVideoProvider(providerName) {
 const providerArg = process.argv[2];
 
 if (!providerArg) {
-  console.log("\n使用方法：");
-  console.log("  node src/scripts/update-video-provider.js <provider>\n");
-  console.log("可用的提供者：");
-  console.log("  - hailuo    (Minimax Hailuo 02)");
-  console.log("  - veo       (Google Veo 3.0 Fast)");
-  console.log("  - replicate (Stable Video Diffusion)\n");
-  console.log("範例：");
-  console.log("  node src/scripts/update-video-provider.js hailuo\n");
+  logger.info("\n使用方法：");
+  logger.info("  node src/scripts/update-video-provider.js <provider>\n");
+  logger.info("可用的提供者：");
+  logger.info("  - hailuo    (Minimax Hailuo 02)");
+  logger.info("  - veo       (Google Veo 3.0 Fast)");
+  logger.info("  - replicate (Stable Video Diffusion)\n");
+  logger.info("範例：");
+  logger.info("  node src/scripts/update-video-provider.js hailuo\n");
   process.exit(1);
 }
 

@@ -4,6 +4,11 @@
  */
 
 import express from "express";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
@@ -18,6 +23,7 @@ import {
   hasMemoryBoost,
   hasBrainBoost,
 } from "./potion.service.js";
+import { validateRequest, potionSchemas } from "../middleware/validation.middleware.js";
 
 const router = express.Router();
 
@@ -25,28 +31,23 @@ const router = express.Router();
  * 獲取可購買的道具列表
  * GET /api/potions/available
  */
-router.get("/available", requireFirebaseAuth, async (req, res) => {
+router.get(
+  "/available",
+  requireFirebaseAuth,
+  validateRequest(potionSchemas.getAvailablePotions),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser?.uid;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
+      return sendError(res, "UNAUTHORIZED", "請先登入");
     }
 
     const potions = await getAvailablePotions(userId);
 
-    res.json({
-      success: true,
-      potions,
-    });
+    sendSuccess(res, { potions });
   } catch (error) {
     logger.error("獲取道具列表失敗:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "獲取道具列表失敗",
-    });
+    next(error);
   }
 });
 
@@ -54,14 +55,15 @@ router.get("/available", requireFirebaseAuth, async (req, res) => {
  * 獲取用戶已購買的道具（活躍中）
  * GET /api/potions/active
  */
-router.get("/active", requireFirebaseAuth, async (req, res) => {
+router.get(
+  "/active",
+  requireFirebaseAuth,
+  validateRequest(potionSchemas.getActivePotions),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser?.uid;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
+      return sendError(res, "UNAUTHORIZED", "請先登入");
     }
 
     // 清理過期道具
@@ -69,16 +71,10 @@ router.get("/active", requireFirebaseAuth, async (req, res) => {
 
     const activePotions = await getUserActivePotions(userId);
 
-    res.json({
-      success: true,
-      potions: activePotions,
-    });
+    sendSuccess(res, { potions: activePotions });
   } catch (error) {
     logger.error("獲取活躍道具失敗:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "獲取活躍道具失敗",
-    });
+    next(error);
   }
 });
 
@@ -89,14 +85,15 @@ router.get("/active", requireFirebaseAuth, async (req, res) => {
  * 購買後加入庫存，使用時才需要選擇角色
  * 🔒 冪等性保護：防止重複購買
  */
-router.post("/purchase/memory-boost", requireFirebaseAuth, async (req, res) => {
+router.post(
+  "/purchase/memory-boost",
+  requireFirebaseAuth,
+  validateRequest(potionSchemas.purchaseMemoryBoost),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser?.uid;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
+      return sendError(res, "UNAUTHORIZED", "請先登入");
     }
 
     const { idempotencyKey } = req.body;
@@ -110,19 +107,15 @@ router.post("/purchase/memory-boost", requireFirebaseAuth, async (req, res) => {
         { ttl: 15 * 60 * 1000 } // 15 分鐘
       );
 
-      return res.json(result);
+      return sendSuccess(res, result);
     }
 
     // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseMemoryBoost(userId);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("購買記憶增強藥水失敗:", error);
-    const status = error.message.includes("金幣不足") ? 400 : 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "購買失敗",
-    });
+    next(error);
   }
 });
 
@@ -132,14 +125,15 @@ router.post("/purchase/memory-boost", requireFirebaseAuth, async (req, res) => {
  * Body: { idempotencyKey }
  * 🔒 冪等性保護：防止重複購買
  */
-router.post("/purchase/brain-boost", requireFirebaseAuth, async (req, res) => {
+router.post(
+  "/purchase/brain-boost",
+  requireFirebaseAuth,
+  validateRequest(potionSchemas.purchaseBrainBoost),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser?.uid;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
+      return sendError(res, "UNAUTHORIZED", "請先登入");
     }
 
     const { idempotencyKey } = req.body;
@@ -153,19 +147,15 @@ router.post("/purchase/brain-boost", requireFirebaseAuth, async (req, res) => {
         { ttl: 15 * 60 * 1000 } // 15 分鐘
       );
 
-      return res.json(result);
+      return sendSuccess(res, result);
     }
 
     // 向後兼容：沒有 idempotencyKey 的請求
     const result = await purchaseBrainBoost(userId);
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("購買腦力激盪藥水失敗:", error);
-    const status = error.message.includes("金幣不足") || error.message.includes("已經是最高級") ? 400 : 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "購買失敗",
-    });
+    next(error);
   }
 });
 
@@ -174,34 +164,30 @@ router.post("/purchase/brain-boost", requireFirebaseAuth, async (req, res) => {
  * POST /api/potions/use/memory-boost
  * Body: { characterId: string }
  */
-router.post("/use/memory-boost", requireFirebaseAuth, async (req, res) => {
+router.post(
+  "/use/memory-boost",
+  requireFirebaseAuth,
+  validateRequest(potionSchemas.useMemoryBoost),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser?.uid;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
+      return sendError(res, "UNAUTHORIZED", "請先登入");
     }
 
     const { characterId } = req.body;
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        message: "需要提供角色ID",
+      return sendError(res, "VALIDATION_ERROR", "需要提供角色ID", {
+        field: "characterId",
       });
     }
 
     const result = await useMemoryBoost(userId, characterId);
 
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("使用記憶增強藥水失敗:", error);
-    const status = error.message.includes("庫存不足") || error.message.includes("已有") ? 400 : 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "使用失敗",
-    });
+    next(error);
   }
 });
 
@@ -210,34 +196,30 @@ router.post("/use/memory-boost", requireFirebaseAuth, async (req, res) => {
  * POST /api/potions/use/brain-boost
  * Body: { characterId: string }
  */
-router.post("/use/brain-boost", requireFirebaseAuth, async (req, res) => {
+router.post(
+  "/use/brain-boost",
+  requireFirebaseAuth,
+  validateRequest(potionSchemas.useBrainBoost),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser?.uid;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
+      return sendError(res, "UNAUTHORIZED", "請先登入");
     }
 
     const { characterId } = req.body;
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        message: "需要提供角色ID",
+      return sendError(res, "VALIDATION_ERROR", "需要提供角色ID", {
+        field: "characterId",
       });
     }
 
     const result = await useBrainBoost(userId, characterId);
 
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("使用腦力激盪藥水失敗:", error);
-    const status = error.message.includes("庫存不足") || error.message.includes("已有") ? 400 : 500;
-    res.status(status).json({
-      success: false,
-      message: error.message || "使用失敗",
-    });
+    next(error);
   }
 });
 
@@ -246,29 +228,28 @@ router.post("/use/brain-boost", requireFirebaseAuth, async (req, res) => {
  * GET /api/potions/character/:characterId/effects
  * 用於前端判斷是否顯示「使用藥水」按鈕
  */
-router.get("/character/:characterId/effects", requireFirebaseAuth, async (req, res) => {
+router.get(
+  "/character/:characterId/effects",
+  requireFirebaseAuth,
+  validateRequest(potionSchemas.getCharacterEffects),
+  async (req, res, next) => {
   try {
     const userId = req.firebaseUser?.uid;
     if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "請先登入",
-      });
+      return sendError(res, "UNAUTHORIZED", "請先登入");
     }
 
     const { characterId } = req.params;
     if (!characterId) {
-      return res.status(400).json({
-        success: false,
-        message: "需要提供角色ID",
+      return sendError(res, "VALIDATION_ERROR", "需要提供角色ID", {
+        field: "characterId",
       });
     }
 
     const hasMemory = await hasMemoryBoost(userId, characterId);
     const hasBrain = await hasBrainBoost(userId, characterId);
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       characterId,
       effects: {
         memoryBoost: hasMemory,
@@ -277,10 +258,7 @@ router.get("/character/:characterId/effects", requireFirebaseAuth, async (req, r
     });
   } catch (error) {
     logger.error("檢查角色藥水效果失敗:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "檢查失敗",
-    });
+    next(error);
   }
 });
 

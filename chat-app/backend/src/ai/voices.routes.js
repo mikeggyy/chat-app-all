@@ -5,11 +5,17 @@
 
 import { Router } from 'express';
 import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from '../../../shared/utils/errorFormatter.js';
+import {
   GOOGLE_VOICES,
   getRecommendedVoices,
   getVoicesByLocale,
   VOICE_MAPPING,
 } from './googleTts.service.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -17,7 +23,7 @@ const router = Router();
  * 獲取所有可用語音列表
  * GET /api/voices
  */
-router.get('/', (req, res) => {
+router.get('/', (req, res, next) => {
   try {
     const useGoogleTts = process.env.USE_GOOGLE_TTS === 'true';
 
@@ -35,7 +41,7 @@ router.get('/', (req, res) => {
         previewUrl: `/voices/google/${v.id}.mp3`,
       }));
 
-      res.json({
+      sendSuccess(res, {
         service: 'google',
         count: voices.length,
         voices,
@@ -61,17 +67,15 @@ router.get('/', (req, res) => {
         previewUrl: `/voices/${v.id}.mp3`,
       }));
 
-      res.json({
+      sendSuccess(res, {
         service: 'openai',
         count: openaiVoices.length,
         voices: openaiVoices,
       });
     }
   } catch (error) {
-    res.status(500).json({
-      error: '獲取語音列表失敗',
-      message: error.message,
-    });
+    logger.error('獲取語音列表失敗:', error);
+    next(error);
   }
 });
 
@@ -79,7 +83,7 @@ router.get('/', (req, res) => {
  * 獲取推薦的語音列表（台灣語音優先）
  * GET /api/voices/recommended
  */
-router.get('/recommended', (req, res) => {
+router.get('/recommended', (req, res, next) => {
   try {
     const useGoogleTts = process.env.USE_GOOGLE_TTS === 'true';
 
@@ -95,14 +99,14 @@ router.get('/recommended', (req, res) => {
         previewUrl: `/voices/google/${v.id}.mp3`,
       }));
 
-      res.json({
+      sendSuccess(res, {
         service: 'google',
         count: recommended.length,
         voices: recommended,
       });
     } else {
       // OpenAI TTS 推薦語音
-      res.json({
+      sendSuccess(res, {
         service: 'openai',
         count: 2,
         voices: [
@@ -128,10 +132,8 @@ router.get('/recommended', (req, res) => {
       });
     }
   } catch (error) {
-    res.status(500).json({
-      error: '獲取推薦語音失敗',
-      message: error.message,
-    });
+    logger.error('獲取推薦語音失敗:', error);
+    next(error);
   }
 });
 
@@ -139,7 +141,7 @@ router.get('/recommended', (req, res) => {
  * 按語言分組獲取語音
  * GET /api/voices/by-locale
  */
-router.get('/by-locale', (req, res) => {
+router.get('/by-locale', (req, res, next) => {
   try {
     const useGoogleTts = process.env.USE_GOOGLE_TTS === 'true';
 
@@ -160,14 +162,14 @@ router.get('/by-locale', (req, res) => {
         }));
       });
 
-      res.json({
+      sendSuccess(res, {
         service: 'google',
         locales: Object.keys(result),
         voices: result,
       });
     } else {
       // OpenAI 所有語音都是 multi-language
-      res.json({
+      sendSuccess(res, {
         service: 'openai',
         locales: ['multi'],
         voices: {
@@ -180,10 +182,8 @@ router.get('/by-locale', (req, res) => {
       });
     }
   } catch (error) {
-    res.status(500).json({
-      error: '獲取分組語音失敗',
-      message: error.message,
-    });
+    logger.error('獲取分組語音失敗:', error);
+    next(error);
   }
 });
 
@@ -191,17 +191,15 @@ router.get('/by-locale', (req, res) => {
  * 獲取語音映射表（OpenAI → Google）
  * GET /api/voices/mapping
  */
-router.get('/mapping', (req, res) => {
+router.get('/mapping', (req, res, next) => {
   try {
-    res.json({
+    sendSuccess(res, {
       mapping: VOICE_MAPPING,
       description: 'OpenAI 語音 ID 到 Google Cloud TTS 語音 ID 的映射',
     });
   } catch (error) {
-    res.status(500).json({
-      error: '獲取語音映射失敗',
-      message: error.message,
-    });
+    logger.error('獲取語音映射失敗:', error);
+    next(error);
   }
 });
 
@@ -209,11 +207,11 @@ router.get('/mapping', (req, res) => {
  * 獲取當前使用的 TTS 服務
  * GET /api/voices/service
  */
-router.get('/service', (req, res) => {
+router.get('/service', (req, res, next) => {
   try {
     const useGoogleTts = process.env.USE_GOOGLE_TTS === 'true';
 
-    res.json({
+    sendSuccess(res, {
       service: useGoogleTts ? 'google' : 'openai',
       name: useGoogleTts ? 'Google Cloud TTS' : 'OpenAI TTS',
       features: useGoogleTts
@@ -237,10 +235,8 @@ router.get('/service', (req, res) => {
           },
     });
   } catch (error) {
-    res.status(500).json({
-      error: '獲取 TTS 服務資訊失敗',
-      message: error.message,
-    });
+    logger.error('獲取 TTS 服務資訊失敗:', error);
+    next(error);
   }
 });
 

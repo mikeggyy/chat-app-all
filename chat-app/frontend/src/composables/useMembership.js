@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue';
 import { apiJson } from '../utils/api.js';
 import { generateIdempotencyKey } from '../utils/idempotency.js';
+import { logger } from '../utils/logger';
 
 // 會員資訊的全域狀態
 const membershipState = ref(null);
@@ -80,7 +81,7 @@ export function useMembership() {
 
       // 檢查是否為重複請求（來自緩存）
       if (data._idempotent || data._cached) {
-        console.log('[會員升級] 檢測到重複請求，返回了緩存結果');
+        logger.log('[會員升級] 檢測到重複請求，返回了緩存結果');
       }
 
       membershipState.value = data.membership || data;

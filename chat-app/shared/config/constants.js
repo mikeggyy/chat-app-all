@@ -172,6 +172,113 @@ export const ERROR_CODES = {
   RESOURCE_ALREADY_EXISTS: "resource/already-exists",
 };
 
+/**
+ * 緩存相關常量
+ */
+export const CACHE_CONSTANTS = {
+  // TTL（存活時間）
+  PROFILE_CACHE_TTL: TIME_CONSTANTS.THIRTY_MINUTES,
+  CHARACTER_CACHE_TTL: TIME_CONSTANTS.FIFTEEN_MINUTES,
+  AI_SETTINGS_CACHE_TTL: TIME_CONSTANTS.FIVE_MINUTES,
+
+  // 緩存大小
+  PROFILE_CACHE_MAX_SIZE: 1000,
+  CHARACTER_CACHE_MAX_SIZE: 500,
+
+  // 清理間隔
+  CACHE_CLEANUP_INTERVAL: TIME_CONSTANTS.FIVE_MINUTES,
+};
+
+/**
+ * AI 魔法師相關常量
+ */
+export const AI_MAGICIAN_CONSTANTS = {
+  // 使用次數限制
+  MAX_USAGE_COUNT: 3,
+
+  // 提示詞模板
+  DESCRIPTION_MAX_LENGTH: 500,
+  DESCRIPTION_MIN_LENGTH: 10,
+};
+
+/**
+ * 字符創建相關常量
+ */
+export const CHARACTER_CREATION_CONSTANTS = {
+  // 圖片生成
+  IMAGE_GENERATION_COUNT_MIN: 1,
+  IMAGE_GENERATION_COUNT_MAX: 10,
+  IMAGE_GENERATION_COUNT_DEFAULT: 4,
+
+  // 品質選項
+  IMAGE_QUALITY_OPTIONS: ['standard', 'high', 'premium'],
+  IMAGE_QUALITY_DEFAULT: 'high',
+
+  // 風格選擇
+  MAX_STYLE_SELECTIONS: 3,
+};
+
+/**
+ * 冪等性相關常量
+ */
+export const IDEMPOTENCY_CONSTANTS = {
+  // TTL（不同操作類型）
+  DEFAULT_TTL: TIME_CONSTANTS.FIFTEEN_MINUTES,
+  PAYMENT_TTL: TIME_CONSTANTS.THIRTY_MINUTES,
+  AI_GENERATION_TTL: TIME_CONSTANTS.TEN_MINUTES,
+  GIFT_TTL: TIME_CONSTANTS.FIFTEEN_MINUTES,
+
+  // 鍵前綴
+  KEY_PREFIX: 'idempotency:',
+};
+
+/**
+ * 日誌相關常量
+ */
+export const LOGGER_CONSTANTS = {
+  // 日誌文件大小限制
+  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
+  MAX_FILES: 5,
+
+  // 日誌級別
+  LEVELS: {
+    ERROR: 'error',
+    WARN: 'warn',
+    INFO: 'info',
+    HTTP: 'http',
+    DEBUG: 'debug',
+  },
+};
+
+/**
+ * 重試相關常量
+ */
+export const RETRY_CONSTANTS = {
+  // 重試次數
+  MAX_RETRIES: 3,
+
+  // 重試延遲（指數退避）
+  INITIAL_DELAY: TIME_CONSTANTS.ONE_SECOND,
+  MAX_DELAY: TIME_CONSTANTS.THIRTY_SECONDS,
+  BACKOFF_MULTIPLIER: 2,
+};
+
+/**
+ * Firestore 操作相關常量
+ */
+export const FIRESTORE_CONSTANTS = {
+  // 批次操作大小限制
+  MAX_BATCH_SIZE: 500,
+  RECOMMENDED_BATCH_SIZE: 100,
+
+  // 查詢限制
+  DEFAULT_QUERY_LIMIT: 50,
+  MAX_QUERY_LIMIT: 1000,
+
+  // 超時
+  TRANSACTION_TIMEOUT: TIME_CONSTANTS.TEN_SECONDS,
+};
+
 export default {
   TIME_CONSTANTS,
   TEXT_LENGTH_LIMITS,
@@ -182,4 +289,11 @@ export default {
   VALIDATION_RULES,
   HTTP_STATUS,
   ERROR_CODES,
+  CACHE_CONSTANTS,
+  AI_MAGICIAN_CONSTANTS,
+  CHARACTER_CREATION_CONSTANTS,
+  IDEMPOTENCY_CONSTANTS,
+  LOGGER_CONSTANTS,
+  RETRY_CONSTANTS,
+  FIRESTORE_CONSTANTS,
 };

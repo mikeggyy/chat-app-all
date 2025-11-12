@@ -213,6 +213,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { logger } from "@/utils/logger";
 import {
   XMarkIcon,
   PencilIcon,
@@ -336,7 +337,7 @@ const loadPhotos = async () => {
   } catch (err) {
     errorMessage.value = "載入照片失敗，請稍後再試";
     if (import.meta.env.DEV) {
-      console.error("[PhotoGallery] 載入照片失敗:", err);
+      logger.error("[PhotoGallery] 載入照片失敗:", err);
     }
   } finally {
     isLoading.value = false;

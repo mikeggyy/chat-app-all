@@ -19,69 +19,69 @@ import { getAiSettings, refreshAiSettings, getAiServiceSettings } from "../servi
 import logger from "../utils/logger.js";
 
 async function testAiSettings() {
-  console.log("\n========================================");
-  console.log("🧪 測試 AI 設定服務");
-  console.log("========================================\n");
+  logger.info("\n========================================");
+  logger.info("🧪 測試 AI 設定服務");
+  logger.info("========================================\n");
 
   try {
     // 測試 1: 讀取完整 AI 設定
-    console.log("📖 測試 1: 讀取完整 AI 設定");
+    logger.info("📖 測試 1: 讀取完整 AI 設定");
     const settings = await getAiSettings();
 
-    console.log("✅ AI 設定讀取成功\n");
-    console.log("設定摘要:");
-    console.log("  - 聊天 AI 模型:", settings.chat?.model);
-    console.log("  - TTS 模型:", settings.tts?.model);
-    console.log("  - TTS 預設語音:", settings.tts?.defaultVoice);
-    console.log("  - 圖片生成模型:", settings.imageGeneration?.model);
-    console.log("  - 圖片場景數量:", settings.imageGeneration?.selfieScenarios?.length);
-    console.log("  - 影片生成提供者:", settings.videoGeneration?.provider);
-    console.log("  - 影片生成模型:", settings.videoGeneration?.model);
-    console.log("  - 影片時長:", settings.videoGeneration?.durationSeconds + "s");
-    console.log("  - 影片解析度:", settings.videoGeneration?.resolution);
-    console.log("  - 更新時間:", settings.updatedAt);
+    logger.info("✅ AI 設定讀取成功\n");
+    logger.info("設定摘要:");
+    logger.info("  - 聊天 AI 模型:", settings.chat?.model);
+    logger.info("  - TTS 模型:", settings.tts?.model);
+    logger.info("  - TTS 預設語音:", settings.tts?.defaultVoice);
+    logger.info("  - 圖片生成模型:", settings.imageGeneration?.model);
+    logger.info("  - 圖片場景數量:", settings.imageGeneration?.selfieScenarios?.length);
+    logger.info("  - 影片生成提供者:", settings.videoGeneration?.provider);
+    logger.info("  - 影片生成模型:", settings.videoGeneration?.model);
+    logger.info("  - 影片時長:", settings.videoGeneration?.durationSeconds + "s");
+    logger.info("  - 影片解析度:", settings.videoGeneration?.resolution);
+    logger.info("  - 更新時間:", settings.updatedAt);
 
     // 測試 2: 測試緩存機制
-    console.log("\n📖 測試 2: 測試緩存機制（應該使用緩存）");
+    logger.info("\n📖 測試 2: 測試緩存機制（應該使用緩存）");
     const startTime = Date.now();
     const cachedSettings = await getAiSettings();
     const duration = Date.now() - startTime;
-    console.log(`✅ 緩存讀取耗時: ${duration}ms (應該 < 10ms)`);
+    logger.info(`✅ 緩存讀取耗時: ${duration}ms (應該 < 10ms)`);
 
     // 測試 3: 讀取特定服務設定
-    console.log("\n📖 測試 3: 讀取特定服務設定");
+    logger.info("\n📖 測試 3: 讀取特定服務設定");
     const videoSettings = await getAiServiceSettings("videoGeneration");
-    console.log("✅ 影片生成設定:");
-    console.log("  - Provider:", videoSettings.provider);
-    console.log("  - Model:", videoSettings.model);
-    console.log("  - Duration:", videoSettings.durationSeconds + "s");
-    console.log("  - Resolution:", videoSettings.resolution);
-    console.log("  - Aspect Ratio:", videoSettings.aspectRatio);
-    console.log("  - Enable Retry:", videoSettings.enableRetry);
-    console.log("  - Max Retries:", videoSettings.maxRetries);
-    console.log("  - Use Mock Video:", videoSettings.useMockVideo);
+    logger.info("✅ 影片生成設定:");
+    logger.info("  - Provider:", videoSettings.provider);
+    logger.info("  - Model:", videoSettings.model);
+    logger.info("  - Duration:", videoSettings.durationSeconds + "s");
+    logger.info("  - Resolution:", videoSettings.resolution);
+    logger.info("  - Aspect Ratio:", videoSettings.aspectRatio);
+    logger.info("  - Enable Retry:", videoSettings.enableRetry);
+    logger.info("  - Max Retries:", videoSettings.maxRetries);
+    logger.info("  - Use Mock Video:", videoSettings.useMockVideo);
 
     const imageSettings = await getAiServiceSettings("imageGeneration");
-    console.log("\n✅ 圖片生成設定:");
-    console.log("  - Model:", imageSettings.model);
-    console.log("  - Aspect Ratio:", imageSettings.aspectRatio);
-    console.log("  - Compression Quality:", imageSettings.compressionQuality);
-    console.log("  - Scenario Count:", imageSettings.selfieScenarios?.length);
-    console.log("  - Selection Chance:", (imageSettings.scenarioSelectionChance * 100) + "%");
+    logger.info("\n✅ 圖片生成設定:");
+    logger.info("  - Model:", imageSettings.model);
+    logger.info("  - Aspect Ratio:", imageSettings.aspectRatio);
+    logger.info("  - Compression Quality:", imageSettings.compressionQuality);
+    logger.info("  - Scenario Count:", imageSettings.selfieScenarios?.length);
+    logger.info("  - Selection Chance:", (imageSettings.scenarioSelectionChance * 100) + "%");
 
     // 測試 4: 手動刷新緩存
-    console.log("\n📖 測試 4: 手動刷新緩存");
+    logger.info("\n📖 測試 4: 手動刷新緩存");
     const refreshedSettings = await refreshAiSettings();
-    console.log("✅ 緩存刷新成功");
+    logger.info("✅ 緩存刷新成功");
 
-    console.log("\n========================================");
-    console.log("✅ 所有測試通過");
-    console.log("========================================\n");
+    logger.info("\n========================================");
+    logger.info("✅ 所有測試通過");
+    logger.info("========================================\n");
 
     process.exit(0);
   } catch (error) {
-    console.error("\n❌ 測試失敗:", error);
-    console.error(error.stack);
+    logger.error("\n❌ 測試失敗:", error);
+    logger.error(error.stack);
     process.exit(1);
   }
 }

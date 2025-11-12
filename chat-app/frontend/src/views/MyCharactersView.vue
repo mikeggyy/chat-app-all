@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { logger } from "@/utils/logger";
 import {
   ArrowLeftIcon,
   ChatBubbleLeftRightIcon,
@@ -24,7 +25,7 @@ const handleCreateCharacter = async () => {
   } catch (error) {
     // 忽略：這是背景更新，失敗不影響主流程
     if (import.meta.env.DEV) {
-      console.warn("[MyCharacters] 背景更新失敗:", error);
+      logger.warn("[MyCharacters] 背景更新失敗:", error);
     }
   }
 };
@@ -209,8 +210,8 @@ const handleCharacterSelect = (character) => {
 onMounted(() => {
   // 調試：輸出用戶資訊
   if (import.meta.env.DEV) {
-    console.log("[MyCharacters] 當前用戶:", user.value);
-    console.log("[MyCharacters] 用戶 ID:", user.value?.id);
+    logger.log("[MyCharacters] 當前用戶:", user.value);
+    logger.log("[MyCharacters] 用戶 ID:", user.value?.id);
   }
 
   if (user.value?.id) {
@@ -218,7 +219,7 @@ onMounted(() => {
   } else {
     // 如果沒有用戶資訊，嘗試從 Firebase 獲取
     if (import.meta.env.DEV) {
-      console.warn("[MyCharacters] 沒有用戶資訊，無法載入角色");
+      logger.warn("[MyCharacters] 沒有用戶資訊，無法載入角色");
     }
   }
 });

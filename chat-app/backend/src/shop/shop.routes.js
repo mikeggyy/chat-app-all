@@ -4,6 +4,11 @@
  */
 
 import express from "express";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import { getFirestoreDb } from "../firebase/index.js";
 import { createModuleLogger } from "../utils/logger.js";
 
@@ -15,7 +20,7 @@ const logger = createModuleLogger('Shop');
  * GET /api/shop/products
  * 獲取所有商品（解鎖卡、道具）
  */
-router.get("/api/shop/products", async (req, res) => {
+router.get("/api/shop/products", async (req, res, next) => {
   try {
     const { category } = req.query;
 
@@ -44,17 +49,13 @@ router.get("/api/shop/products", async (req, res) => {
       }));
     }
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       products,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.error('獲取商品失敗:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || '獲取商品失敗',
-    });
+    next(error);
   }
 });
 
@@ -62,30 +63,29 @@ router.get("/api/shop/products", async (req, res) => {
  * GET /api/shop/products/:collection/:id
  * 獲取單一商品詳情
  */
-router.get("/api/shop/products/:collection/:id", async (req, res) => {
+router.get("/api/shop/products/:collection/:id", async (req, res, next) => {
   try {
     const { collection, id } = req.params;
 
     // 驗證集合名稱
     const validCollections = ['unlock_cards', 'potions', 'coin_packages'];
     if (!validCollections.includes(collection)) {
-      return res.status(400).json({
-        success: false,
-        error: '無效的商品分類',
+      return sendError(res, "VALIDATION_ERROR", "無效的商品分類", {
+        collection,
+        validCollections,
       });
     }
 
     const doc = await db.collection(collection).doc(id).get();
 
     if (!doc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: '商品不存在',
+      return sendError(res, "RESOURCE_NOT_FOUND", "商品不存在", {
+        collection,
+        id,
       });
     }
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       product: {
         id: doc.id,
         ...doc.data(),
@@ -93,10 +93,7 @@ router.get("/api/shop/products/:collection/:id", async (req, res) => {
     });
   } catch (error) {
     logger.error('獲取商品詳情失敗:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || '獲取商品詳情失敗',
-    });
+    next(error);
   }
 });
 
@@ -104,7 +101,7 @@ router.get("/api/shop/products/:collection/:id", async (req, res) => {
  * GET /api/shop/categories
  * 獲取商城分類資訊
  */
-router.get("/api/shop/categories", async (req, res) => {
+router.get("/api/shop/categories", async (req, res, next) => {
   try {
     const categories = [
       {
@@ -151,16 +148,10 @@ router.get("/api/shop/categories", async (req, res) => {
       },
     ];
 
-    res.json({
-      success: true,
-      categories,
-    });
+    sendSuccess(res, { categories });
   } catch (error) {
     logger.error('獲取分類失敗:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || '獲取分類失敗',
-    });
+    next(error);
   }
 });
 

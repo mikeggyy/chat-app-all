@@ -5,6 +5,11 @@
 import express from "express";
 import logger from "../utils/logger.js";
 import { asyncHandler } from "../utils/routeHelpers.js";
+import {
+  sendSuccess,
+  sendError,
+  ApiError,
+} from "../../../shared/utils/errorFormatter.js";
 import { sendGift, getUserGiftHistory, getCharacterGiftStats, getGiftPricing } from "./gift.service.js";
 import { processGiftResponse } from "./giftResponse.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
@@ -17,32 +22,32 @@ const router = express.Router();
  * 送禮物給角色（支持冪等性）
  * ⚠️ 安全修復：userId 從認證 token 獲取，不從請求體讀取
  */
-router.post("/send", requireFirebaseAuth, asyncHandler(async (req, res) => {
+router.post("/send", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
   try {
     // 從認證信息獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;
     const { characterId, giftId, requestId } = req.body;
 
-    // userId 不再需要檢查，因為已從認證中獲取
-
     if (!characterId) {
-      return res.status(400).json({
-        error: "缺少必要參數：characterId",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：characterId", {
+        field: "characterId",
       });
     }
 
     if (!giftId) {
-      return res.status(400).json({
-        error: "缺少必要參數：giftId",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：giftId", {
+        field: "giftId",
       });
     }
 
     // ⚠️ 財務操作必須提供 requestId 實現冪等性保護
     if (!requestId) {
-      return res.status(400).json({
-        error: "缺少必要參數：requestId（財務操作必須提供請求ID以防止重複扣款）",
-        code: "MISSING_REQUEST_ID",
-      });
+      return sendError(
+        res,
+        "VALIDATION_ERROR",
+        "缺少必要參數：requestId（財務操作必須提供請求ID以防止重複扣款）",
+        { field: "requestId" }
+      );
     }
 
     // 使用冪等性處理防止重複扣款
@@ -54,12 +59,10 @@ router.post("/send", requireFirebaseAuth, asyncHandler(async (req, res) => {
       { ttl: 15 * 60 * 1000 } // 15分鐘
     );
 
-    return res.status(200).json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("送禮物失敗:", error);
-    res.status(400).json({
-      error: error.message || "送禮物失敗",
-    });
+    next(error);
   }
 }));
 
@@ -68,7 +71,7 @@ router.post("/send", requireFirebaseAuth, asyncHandler(async (req, res) => {
  * 獲取用戶送禮記錄
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人送禮記錄
  */
-router.get("/history", requireFirebaseAuth, async (req, res) => {
+router.get("/history", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId, limit, offset } = req.query;
@@ -81,75 +84,69 @@ router.get("/history", requireFirebaseAuth, async (req, res) => {
 
     const result = getUserGiftHistory(userId, options);
 
-    res.status(200).json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("獲取送禮記錄失敗:", error);
-    res.status(400).json({
-      error: error.message || "獲取送禮記錄失敗",
-    });
+    next(error);
   }
-});
+}));
 
 /**
  * GET /api/gifts/stats/:characterId
  * 獲取用戶送給角色的禮物統計
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人統計
  */
-router.get("/stats/:characterId", requireFirebaseAuth, async (req, res) => {
+router.get("/stats/:characterId", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterId } = req.params;
 
     const result = getCharacterGiftStats(userId, characterId);
 
-    res.status(200).json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("獲取禮物統計失敗:", error);
-    res.status(400).json({
-      error: error.message || "獲取禮物統計失敗",
-    });
+    next(error);
   }
-});
+}));
 
 /**
  * GET /api/gifts/pricing
  * 獲取禮物價格列表（考慮用戶會員等級）
  * 🔒 安全增強：從認證 token 獲取 userId，防止查詢他人價格
  */
-router.get("/pricing", requireFirebaseAuth, async (req, res) => {
+router.get("/pricing", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
 
     const result = await getGiftPricing(userId);
 
-    res.status(200).json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("獲取禮物價格失敗:", error);
-    res.status(400).json({
-      error: error.message || "獲取禮物價格失敗",
-    });
+    next(error);
   }
-});
+}));
 
 /**
  * POST /api/gifts/response
  * 生成AI角色收到禮物的回應（感謝訊息 + 自拍照）
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人生成禮物回應
  */
-router.post("/response", requireFirebaseAuth, async (req, res) => {
+router.post("/response", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { characterData, giftId, generatePhoto } = req.body;
 
     if (!characterData) {
-      return res.status(400).json({
-        error: "缺少必要參數：characterData",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：characterData", {
+        field: "characterData",
       });
     }
 
     if (!giftId) {
-      return res.status(400).json({
-        error: "缺少必要參數：giftId",
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：giftId", {
+        field: "giftId",
       });
     }
 
@@ -168,13 +165,11 @@ router.post("/response", requireFirebaseAuth, async (req, res) => {
       logger.error(`[禮物回應 API] ❌ 照片 URL 缺失，將發送給前端的結果不包含照片 URL！`);
     }
 
-    res.status(200).json(result);
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("生成禮物回應失敗:", error);
-    res.status(500).json({
-      error: error.message || "生成禮物回應失敗",
-    });
+    next(error);
   }
-});
+}));
 
 export default router;

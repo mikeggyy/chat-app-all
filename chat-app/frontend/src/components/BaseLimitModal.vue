@@ -11,6 +11,7 @@ import {
   TicketIcon,
   ShoppingCartIcon,
 } from '@heroicons/vue/24/outline';
+import { logger } from '../utils/logger';
 
 const props = defineProps({
   // 通用 Props
@@ -323,17 +324,17 @@ const handleOverlayClick = (event) => {
   }
 };
 
-// 📊 Console Log: 記錄次數限制信息（方便調試）
+// 📊 記錄次數限制信息（方便調試）
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
     if (props.type === 'conversation') {
-      console.log(`[對話限制] 角色: ${props.characterName}, 剩餘次數: ${props.remainingMessages} / 10`);
+      logger.log(`[對話限制] 角色: ${props.characterName}, 剩餘次數: ${props.remainingMessages} / 10`);
     } else if (props.type === 'voice') {
-      console.log(`[語音限制] 角色: ${props.characterName}, 已使用: ${props.usedVoices} / ${props.totalVoices}`);
+      logger.log(`[語音限制] 角色: ${props.characterName}, 已使用: ${props.usedVoices} / ${props.totalVoices}`);
     } else if (props.type === 'photo') {
-      console.log(`[拍照限制] 已使用: ${props.used} / ${displayTotal.value}, 會員等級: ${props.tier}, 拍照卡: ${props.cards} 張`);
+      logger.log(`[拍照限制] 已使用: ${props.used} / ${displayTotal.value}, 會員等級: ${props.tier}, 拍照卡: ${props.cards} 張`);
     } else if (props.type === 'video') {
-      console.log(`[影片限制] 已使用: ${props.used} 次, 影片卡: ${props.cards} 張, 會員等級: ${props.tier}`);
+      logger.log(`[影片限制] 已使用: ${props.used} 次, 影片卡: ${props.cards} 張, 會員等級: ${props.tier}`);
     }
   }
 });

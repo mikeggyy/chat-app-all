@@ -1,4 +1,4 @@
-import { TEST_ACCOUNTS } from "../../../../shared/config/testAccounts.js";
+import { TEST_ACCOUNTS } from "../../../shared/config/testAccounts.js";
 
 export const aiMatches = [
   {

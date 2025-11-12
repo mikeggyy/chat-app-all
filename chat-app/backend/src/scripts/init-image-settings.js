@@ -10,6 +10,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import admin from "firebase-admin";
+import logger from "../utils/logger.js";
 
 // 載入環境變數
 const __filename = fileURLToPath(import.meta.url);
@@ -223,13 +224,13 @@ const DEFAULT_IMAGE_SETTINGS = {
  * 初始化 Firestore 中的圖片生成設定
  */
 async function initImageSettings() {
-  console.log("\n========================================");
-  console.log("📝 初始化圖片生成設定");
-  console.log("========================================\n");
+  logger.info("\n========================================");
+  logger.info("📝 初始化圖片生成設定");
+  logger.info("========================================\n");
 
   try {
     // 1. 讀取當前配置
-    console.log("📖 讀取當前配置...");
+    logger.info("📖 讀取當前配置...");
     const docRef = db.collection("ai_settings").doc("global");
     const doc = await docRef.get();
 
@@ -237,70 +238,70 @@ async function initImageSettings() {
 
     if (doc.exists) {
       currentSettings = doc.data();
-      console.log("✅ 找到現有的 ai_settings/global 文檔");
+      logger.info("✅ 找到現有的 ai_settings/global 文檔");
 
       // 檢查是否已有 imageGeneration 配置
       if (currentSettings.imageGeneration) {
-        console.log("\n當前圖片生成配置：");
-        console.log(`   Model: ${currentSettings.imageGeneration.model || "（未設定）"}`);
-        console.log(`   Aspect Ratio: ${currentSettings.imageGeneration.aspectRatio || "（未設定）"}`);
-        console.log(`   Scenarios 數量: ${currentSettings.imageGeneration.selfieScenarios?.length || 0}`);
-        console.log(`   Scenario 選擇機率: ${currentSettings.imageGeneration.scenarioSelectionChance ?? "（未設定）"}`);
+        logger.info("\n當前圖片生成配置：");
+        logger.info(`   Model: ${currentSettings.imageGeneration.model || "（未設定）"}`);
+        logger.info(`   Aspect Ratio: ${currentSettings.imageGeneration.aspectRatio || "（未設定）"}`);
+        logger.info(`   Scenarios 數量: ${currentSettings.imageGeneration.selfieScenarios?.length || 0}`);
+        logger.info(`   Scenario 選擇機率: ${currentSettings.imageGeneration.scenarioSelectionChance ?? "（未設定）"}`);
       } else {
-        console.log("⚠️  未找到 imageGeneration 配置");
+        logger.warn("⚠️  未找到 imageGeneration 配置");
       }
     } else {
-      console.log("⚠️  ai_settings/global 文檔不存在，將創建新文檔");
+      logger.warn("⚠️  ai_settings/global 文檔不存在，將創建新文檔");
     }
 
     // 2. 更新配置
-    console.log("\n🔄 更新圖片生成配置...");
+    logger.info("\n🔄 更新圖片生成配置...");
     await docRef.set({
       imageGeneration: DEFAULT_IMAGE_SETTINGS,
       updatedAt: new Date().toISOString(),
     }, { merge: true }); // 使用 merge: true 保留其他設定
 
-    console.log("✅ 新配置：");
-    console.log(`   Model: ${DEFAULT_IMAGE_SETTINGS.model}`);
-    console.log(`   Aspect Ratio: ${DEFAULT_IMAGE_SETTINGS.aspectRatio}`);
-    console.log(`   Compression Quality: ${DEFAULT_IMAGE_SETTINGS.compressionQuality}`);
-    console.log(`   Scenarios 數量: ${DEFAULT_IMAGE_SETTINGS.selfieScenarios.length}`);
-    console.log(`   Scenario 選擇機率: ${DEFAULT_IMAGE_SETTINGS.scenarioSelectionChance * 100}%`);
+    logger.info("✅ 新配置：");
+    logger.info(`   Model: ${DEFAULT_IMAGE_SETTINGS.model}`);
+    logger.info(`   Aspect Ratio: ${DEFAULT_IMAGE_SETTINGS.aspectRatio}`);
+    logger.info(`   Compression Quality: ${DEFAULT_IMAGE_SETTINGS.compressionQuality}`);
+    logger.info(`   Scenarios 數量: ${DEFAULT_IMAGE_SETTINGS.selfieScenarios.length}`);
+    logger.info(`   Scenario 選擇機率: ${DEFAULT_IMAGE_SETTINGS.scenarioSelectionChance * 100}%`);
 
     // 3. 顯示前 5 個場景作為範例
-    console.log("\n📋 場景範例（前 5 個）：");
+    logger.info("\n📋 場景範例（前 5 個）：");
     DEFAULT_IMAGE_SETTINGS.selfieScenarios.slice(0, 5).forEach((scenario, index) => {
-      console.log(`   ${index + 1}. ${scenario}`);
+      logger.info(`   ${index + 1}. ${scenario}`);
     });
-    console.log(`   ... 以及其他 ${DEFAULT_IMAGE_SETTINGS.selfieScenarios.length - 5} 個場景`);
+    logger.info(`   ... 以及其他 ${DEFAULT_IMAGE_SETTINGS.selfieScenarios.length - 5} 個場景`);
 
     // 4. 驗證更新
-    console.log("\n🔍 驗證更新...");
+    logger.info("\n🔍 驗證更新...");
     const updatedDoc = await docRef.get();
     const updatedSettings = updatedDoc.data();
     const updatedImageConfig = updatedSettings.imageGeneration;
 
     if (updatedImageConfig?.selfieScenarios?.length === DEFAULT_IMAGE_SETTINGS.selfieScenarios.length) {
-      console.log("✅ 配置更新成功！");
+      logger.info("✅ 配置更新成功！");
     } else {
-      console.error("❌ 配置更新後驗證失敗");
-      console.error(`   預期場景數量: ${DEFAULT_IMAGE_SETTINGS.selfieScenarios.length}`);
-      console.error(`   實際場景數量: ${updatedImageConfig?.selfieScenarios?.length || 0}`);
+      logger.error("❌ 配置更新後驗證失敗");
+      logger.error(`   預期場景數量: ${DEFAULT_IMAGE_SETTINGS.selfieScenarios.length}`);
+      logger.error(`   實際場景數量: ${updatedImageConfig?.selfieScenarios?.length || 0}`);
       process.exit(1);
     }
 
-    console.log("\n========================================");
-    console.log("✅ 圖片生成設定已初始化");
-    console.log("========================================");
-    console.log("\n📝 後續步驟：");
-    console.log("1. 在管理後台前端重新載入頁面（Ctrl+F5 或 Cmd+Shift+R）");
-    console.log("2. 檢查「圖片生成」分頁，確認場景列表已顯示");
-    console.log("3. 可以開始編輯場景列表和選擇機率\n");
+    logger.info("\n========================================");
+    logger.info("✅ 圖片生成設定已初始化");
+    logger.info("========================================");
+    logger.info("\n📝 後續步驟：");
+    logger.info("1. 在管理後台前端重新載入頁面（Ctrl+F5 或 Cmd+Shift+R）");
+    logger.info("2. 檢查「圖片生成」分頁，確認場景列表已顯示");
+    logger.info("3. 可以開始編輯場景列表和選擇機率\n");
 
     process.exit(0);
   } catch (error) {
-    console.error("\n❌ 初始化失敗：", error);
-    console.error(error.stack);
+    logger.error("\n❌ 初始化失敗：", error);
+    logger.error(error.stack);
     process.exit(1);
   }
 }

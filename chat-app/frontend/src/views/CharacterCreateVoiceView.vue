@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ArrowLeftIcon, PlayIcon, PauseIcon } from "@heroicons/vue/24/outline";
+import { logger } from "@/utils/logger";
 import {
   fetchCharacterCreationFlow,
   updateCharacterCreationFlow,
@@ -610,14 +611,14 @@ const loadVoicesFromAPI = async () => {
         previewUrl: voice.previewUrl || `/voices/${voice.id}.mp3`,
       }));
 
-      console.log(
+      logger.log(
         `[Voices] 成功載入 ${voicePresetsFromAPI.value.length} 種語音`
       );
     } else {
-      console.warn("[Voices] API 返回格式異常，使用備用語音列表");
+      logger.warn("[Voices] API 返回格式異常，使用備用語音列表");
     }
   } catch (error) {
-    console.error("[Voices] 載入語音失敗，使用備用語音列表:", error);
+    logger.error("[Voices] 載入語音失敗，使用備用語音列表:", error);
     voicesLoadError.value = error.message || "載入語音失敗";
   } finally {
     isLoadingVoices.value = false;

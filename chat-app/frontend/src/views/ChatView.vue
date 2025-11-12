@@ -48,6 +48,7 @@ import { fallbackMatches } from "../utils/matchFallback";
 import { isGuestUser } from "../../../../shared/config/testAccounts";
 import { apiJson } from "../utils/api";
 import { appendCachedHistory } from "../utils/conversationCache";
+import { logger } from "@/utils/logger";
 
 const router = useRouter();
 const route = useRoute();
@@ -852,7 +853,7 @@ onMounted(async () => {
     } catch (error) {
       // 靜默失敗，不影響用戶體驗
       if (import.meta.env.DEV) {
-        console.warn("記錄對話歷史失敗:", error);
+        logger.warn("記錄對話歷史失敗:", error);
       }
     }
 

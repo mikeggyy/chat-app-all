@@ -13,7 +13,7 @@ import { userRouter } from "./user/index.js";
 import { conversationRouter } from "./conversation/index.js";
 import { aiRouter } from "./ai/index.js";
 import { matchRouter } from "./match/index.js";
-import { TEST_ACCOUNTS, issueTestSession } from "../../../shared/config/testAccounts.js";
+import { TEST_ACCOUNTS, issueTestSession } from "../../shared/config/testAccounts.js";
 import { rankingRouter } from "./ranking/index.js";
 import { characterCreationRouter } from "./characterCreation/index.js";
 import unlockTicketsRouter from "./membership/unlockTickets.routes.js";

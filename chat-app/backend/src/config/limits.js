@@ -313,4 +313,7 @@ export const IDEMPOTENCY_TTL = {
 
   // 會員升級
   MEMBERSHIP_UPGRADE: 15 * 60 * 1000, // 15 分鐘
+
+  // 資產購買（防止快速重複點擊）
+  ASSET_PURCHASE: 2 * 1000, // 2 秒
 };

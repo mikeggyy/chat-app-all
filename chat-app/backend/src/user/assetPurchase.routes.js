@@ -13,6 +13,7 @@ import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { purchaseAssetCard, purchaseAssetBundle } from "./assetPurchase.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { purchaseRateLimiter } from "../middleware/rateLimiterConfig.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js";
 
 const router = express.Router();
 
@@ -52,7 +53,7 @@ router.post("/api/assets/purchase", requireFirebaseAuth, purchaseRateLimiter, as
           const { purchaseAssetPackage } = await import("./assetPurchase.service.js");
           return await purchaseAssetPackage(userId, sku);
         },
-        { ttl: 2 * 1000 } // 2秒 TTL，僅防止快速重複點擊
+        { ttl: IDEMPOTENCY_TTL.ASSET_PURCHASE } // 2秒 TTL，僅防止快速重複點擊
       );
 
       return sendSuccess(res, result);

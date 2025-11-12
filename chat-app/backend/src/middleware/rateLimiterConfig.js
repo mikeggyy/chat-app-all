@@ -186,6 +186,102 @@ export const giftRateLimiter = createRateLimiter({
   },
 });
 
+/**
+ * AI 建議生成限制：用於生成對話建議
+ * 15 次/分鐘
+ */
+export const aiSuggestionRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 分鐘
+  maxRequests: 15,
+  keyGenerator: userBasedKeyGenerator,
+  onLimit: (req, res, bucket) => {
+    const userId = req.user?.uid || req.userId;
+    logger.warn('[AI 建議限制] AI 建議生成請求被限制', {
+      userId,
+      count: bucket.count,
+    });
+
+    res.status(429).json({
+      success: false,
+      message: 'AI 建議生成請求過於頻繁，請稍後再試',
+      error: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: Math.ceil((bucket.resetAt - Date.now()) / 1000),
+    });
+  },
+});
+
+/**
+ * TTS 語音生成限制：用於文字轉語音
+ * 30 次/分鐘（與 standardRateLimiter 相同，但有專屬錯誤訊息）
+ */
+export const ttsRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 分鐘
+  maxRequests: 30,
+  keyGenerator: userBasedKeyGenerator,
+  onLimit: (req, res, bucket) => {
+    const userId = req.user?.uid || req.userId;
+    logger.warn('[TTS 限制] 語音生成請求被限制', {
+      userId,
+      count: bucket.count,
+    });
+
+    res.status(429).json({
+      success: false,
+      message: '語音生成請求過於頻繁，請稍後再試',
+      error: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: Math.ceil((bucket.resetAt - Date.now()) / 1000),
+    });
+  },
+});
+
+/**
+ * AI 圖片生成限制：用於 AI 圖片生成（極高消耗）
+ * 5 次/分鐘（與 veryStrictRateLimiter 相同，但有專屬錯誤訊息）
+ */
+export const aiImageGenerationRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 分鐘
+  maxRequests: 5,
+  keyGenerator: userBasedKeyGenerator,
+  onLimit: (req, res, bucket) => {
+    const userId = req.user?.uid || req.userId;
+    logger.warn('[AI 圖片限制] 圖片生成請求被限制', {
+      userId,
+      count: bucket.count,
+    });
+
+    res.status(429).json({
+      success: false,
+      message: '圖片生成請求過於頻繁，請稍後再試',
+      error: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: Math.ceil((bucket.resetAt - Date.now()) / 1000),
+    });
+  },
+});
+
+/**
+ * AI 影片生成限制：用於 AI 影片生成（極高消耗）
+ * 3 次/分鐘
+ */
+export const aiVideoGenerationRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 分鐘
+  maxRequests: 3,
+  keyGenerator: userBasedKeyGenerator,
+  onLimit: (req, res, bucket) => {
+    const userId = req.user?.uid || req.userId;
+    logger.warn('[AI 影片限制] 影片生成請求被限制', {
+      userId,
+      count: bucket.count,
+    });
+
+    res.status(429).json({
+      success: false,
+      message: '影片生成請求過於頻繁，請稍後再試',
+      error: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: Math.ceil((bucket.resetAt - Date.now()) / 1000),
+    });
+  },
+});
+
 // ==================== 路由級別的速率限制配置 ====================
 
 /**
@@ -247,6 +343,10 @@ export const getRateLimiterStats = () => {
     auth: authRateLimiter.getBucketsSize(),
     conversation: conversationRateLimiter.getBucketsSize(),
     gift: giftRateLimiter.getBucketsSize(),
+    aiSuggestion: aiSuggestionRateLimiter.getBucketsSize(),
+    tts: ttsRateLimiter.getBucketsSize(),
+    aiImageGeneration: aiImageGenerationRateLimiter.getBucketsSize(),
+    aiVideoGeneration: aiVideoGenerationRateLimiter.getBucketsSize(),
   };
 };
 
@@ -259,6 +359,10 @@ export default {
   authRateLimiter,
   conversationRateLimiter,
   giftRateLimiter,
+  aiSuggestionRateLimiter,
+  ttsRateLimiter,
+  aiImageGenerationRateLimiter,
+  aiVideoGenerationRateLimiter,
   RATE_LIMIT_RECOMMENDATIONS,
   getRateLimiterStats,
 };

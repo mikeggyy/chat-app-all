@@ -20,8 +20,14 @@ import {
   getVideoStats,
 } from "./videoLimit.service.js";
 import { generateVideoForCharacter } from "./videoGeneration.service.js";
-import { createRateLimiter } from "../middleware/rateLimiter.js";
-import { RATE_LIMITS, IDEMPOTENCY_TTL } from "../config/limits.js";
+import {
+  conversationRateLimiter,
+  aiSuggestionRateLimiter,
+  ttsRateLimiter,
+  aiImageGenerationRateLimiter,
+  aiVideoGenerationRateLimiter,
+} from "../middleware/rateLimiterConfig.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js";
 import {
   sendSuccess,
   sendError,
@@ -39,62 +45,16 @@ import {
 import { validateRequest } from "../middleware/validation.middleware.js";
 import { aiSchemas } from "./ai.schemas.js";
 import { requireSameUser } from "../middleware/authorization.js";
-import { baseKeyGenerator } from "../utils/rateLimiter.helpers.js";
 
 import logger from "../utils/logger.js";
 export const aiRouter = Router();
-
-const replyRateLimiter = createRateLimiter({
-  windowMs: RATE_LIMITS.AI_REPLY.windowMs,
-  maxRequests: RATE_LIMITS.AI_REPLY.maxRequests,
-  keyGenerator: baseKeyGenerator,
-  onLimit: (_req, res) => {
-    sendError(res, "RATE_LIMIT_EXCEEDED", "生成 AI 回覆的請求過於頻繁，請稍後再試。");
-  },
-});
-
-const suggestionRateLimiter = createRateLimiter({
-  windowMs: RATE_LIMITS.AI_SUGGESTIONS.windowMs,
-  maxRequests: RATE_LIMITS.AI_SUGGESTIONS.maxRequests,
-  keyGenerator: baseKeyGenerator,
-  onLimit: (_req, res) => {
-    sendError(res, "RATE_LIMIT_EXCEEDED", "取得建議過於頻繁，請稍後再試。");
-  },
-});
-
-const ttsRateLimiter = createRateLimiter({
-  windowMs: RATE_LIMITS.TTS.windowMs,
-  maxRequests: RATE_LIMITS.TTS.maxRequests,
-  keyGenerator: baseKeyGenerator,
-  onLimit: (_req, res) => {
-    sendError(res, "RATE_LIMIT_EXCEEDED", "語音生成請求過於頻繁，請稍後再試。");
-  },
-});
-
-const imageGenerationRateLimiter = createRateLimiter({
-  windowMs: RATE_LIMITS.IMAGE_GENERATION.windowMs,
-  maxRequests: RATE_LIMITS.IMAGE_GENERATION.maxRequests,
-  keyGenerator: baseKeyGenerator,
-  onLimit: (_req, res) => {
-    sendError(res, "RATE_LIMIT_EXCEEDED", "圖片生成請求過於頻繁，請稍後再試。");
-  },
-});
-
-const videoGenerationRateLimiter = createRateLimiter({
-  windowMs: RATE_LIMITS.VIDEO_GENERATION.windowMs,
-  maxRequests: RATE_LIMITS.VIDEO_GENERATION.maxRequests,
-  keyGenerator: baseKeyGenerator,
-  onLimit: (_req, res) => {
-    sendError(res, "RATE_LIMIT_EXCEEDED", "影片生成請求過於頻繁，請稍後再試。");
-  },
-});
 
 aiRouter.post(
   "/conversations/:userId/:characterId/reply",
   requireFirebaseAuth,
   validateRequest(aiSchemas.aiReply),
   requireSameUser({ errorMessage: "無權限存取其他使用者的 AI 對話回覆" }),
-  replyRateLimiter,
+  conversationRateLimiter,
   async (req, res, next) => {
     const { userId, characterId } = req.params;
     const { requestId, skipLimitCheck } = req.body;
@@ -152,7 +112,7 @@ aiRouter.post(
   requireFirebaseAuth,
   validateRequest(aiSchemas.aiSuggestions),
   requireSameUser({ errorMessage: "無權限取得其他使用者的建議回覆" }),
-  suggestionRateLimiter,
+  aiSuggestionRateLimiter,
   async (req, res, next) => {
     const { userId, characterId } = req.params;
 
@@ -275,7 +235,7 @@ aiRouter.post(
   "/generate-selfie",
   requireFirebaseAuth,
   validateRequest(aiSchemas.generateSelfie),
-  imageGenerationRateLimiter,
+  aiImageGenerationRateLimiter,
   async (req, res, next) => {
     // 🔒 安全增強：從認證 token 獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;
@@ -354,7 +314,7 @@ aiRouter.post(
   "/generate-video",
   requireFirebaseAuth,
   validateRequest(aiSchemas.generateVideo),
-  videoGenerationRateLimiter,
+  aiVideoGenerationRateLimiter,
   async (req, res, next) => {
     // 🔒 安全增強：從認證 token 獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;

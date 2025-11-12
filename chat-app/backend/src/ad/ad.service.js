@@ -201,42 +201,134 @@ export const requestAdWatch = async (userId, characterId, adType = "rewarded_ad"
 // ==================== 廣告驗證（可選整合 AdMob）====================
 
 /**
- * 驗證 Google AdMob 伺服器端回執（可選實現）
+ * 驗證 Google AdMob 伺服器端回執（Server-Side Verification）
  * 文檔：https://developers.google.com/admob/android/ssv
  *
- * @param {string} verificationToken - AdMob 提供的 SSV token
+ * AdMob SSV 工作原理：
+ * 1. 用戶觀看廣告後，AdMob SDK 生成一個 SSV 回調
+ * 2. 回調包含一個 JWT token 和查詢參數
+ * 3. 後端驗證 JWT 簽名（使用 Google 公鑰）
+ * 4. 驗證 token 的 payload（reward_amount, user_id, timestamp 等）
+ *
+ * @param {string} verificationToken - AdMob 提供的 SSV token (JWT)
+ * @param {Object} queryParams - SSV 回調的查詢參數
  * @returns {Promise<boolean>} 是否驗證成功
  */
-const verifyWithAdMobSSV = async (verificationToken) => {
-  // ⚠️ 這是示範代碼，實際需要根據 AdMob 文檔實現
+const verifyWithAdMobSSV = async (verificationToken, queryParams = {}) => {
+  const ENABLE_STRICT_AD_VERIFICATION = process.env.ENABLE_STRICT_AD_VERIFICATION === "true";
+
+  // 寬鬆模式：開發/測試環境，信任前端
+  if (!ENABLE_STRICT_AD_VERIFICATION) {
+    logger.debug("[廣告服務] 寬鬆驗證模式，接受驗證");
+    return true;
+  }
+
+  // ====== 嚴格模式：生產環境，實際驗證 AdMob SSV ======
 
   if (!verificationToken) {
+    logger.warn("[廣告服務] 嚴格驗證模式：缺少 verificationToken");
     return false;
   }
 
   try {
-    // TODO: 實際實現需要：
-    // 1. 解析 JWT token
-    // 2. 驗證簽名（使用 Google 的公鑰）
-    // 3. 檢查 token 的 payload（userId, adId, timestamp 等）
+    // 方法 1：使用 jsonwebtoken 庫驗證 JWT（推薦）
+    // 需要安裝：npm install jsonwebtoken
 
-    // 示範：使用環境變數控制是否啟用嚴格驗證
-    const ENABLE_STRICT_AD_VERIFICATION = process.env.ENABLE_STRICT_AD_VERIFICATION === "true";
+    const jwt = await import("jsonwebtoken");
 
-    if (ENABLE_STRICT_AD_VERIFICATION) {
-      // 嚴格模式：實際調用 AdMob API 驗證
-      // const response = await fetch(`https://www.googleapis.com/...`, { ... });
-      // return response.ok;
+    // Google 的公鑰 URL（AdMob SSV 使用）
+    const GOOGLE_PUBLIC_KEYS_URL = "https://www.gstatic.com/admob/reward/verifier-keys.json";
 
-      logger.warn("[廣告服務] 嚴格驗證模式已啟用但未實現，拒絕驗證");
+    // 1. 獲取 Google 公鑰
+    const keysResponse = await fetch(GOOGLE_PUBLIC_KEYS_URL);
+    if (!keysResponse.ok) {
+      logger.error("[廣告服務] 無法獲取 Google 公鑰");
       return false;
-    } else {
-      // 寬鬆模式：信任前端（開發/測試環境）
-      logger.debug("[廣告服務] 寬鬆驗證模式，接受驗證");
-      return true;
     }
+
+    const keys = await keysResponse.json();
+
+    // 2. 解析 JWT header 獲取 key_id
+    const decoded = jwt.decode(verificationToken, { complete: true });
+    if (!decoded || !decoded.header || !decoded.header.kid) {
+      logger.warn("[廣告服務] 無效的 JWT token");
+      return false;
+    }
+
+    const keyId = decoded.header.kid;
+    const publicKey = keys.keys.find(k => k.keyId === keyId);
+
+    if (!publicKey) {
+      logger.warn(`[廣告服務] 找不到對應的公鑰: ${keyId}`);
+      return false;
+    }
+
+    // 3. 驗證 JWT 簽名
+    const verified = jwt.verify(verificationToken, publicKey.pem, {
+      algorithms: ['ES256'],
+    });
+
+    // 4. 驗證 payload
+    const now = Math.floor(Date.now() / 1000);
+
+    // 檢查過期時間
+    if (verified.exp && verified.exp < now) {
+      logger.warn("[廣告服務] SSV token 已過期");
+      return false;
+    }
+
+    // 檢查簽發時間（不能是未來時間）
+    if (verified.iat && verified.iat > now + 300) { // 允許 5 分鐘時鐘偏移
+      logger.warn("[廣告服務] SSV token 簽發時間異常");
+      return false;
+    }
+
+    // 檢查必要欄位
+    if (!verified.ad_network || !verified.ad_unit) {
+      logger.warn("[廣告服務] SSV token 缺少必要欄位");
+      return false;
+    }
+
+    // 5. 驗證 reward_amount（如果有提供）
+    if (queryParams.reward_amount && verified.reward_amount) {
+      if (parseInt(queryParams.reward_amount) !== verified.reward_amount) {
+        logger.warn("[廣告服務] 獎勵金額不匹配");
+        return false;
+      }
+    }
+
+    // 6. 驗證 user_id（如果有提供）
+    if (queryParams.user_id && verified.user_id) {
+      if (queryParams.user_id !== verified.user_id) {
+        logger.warn("[廣告服務] 用戶 ID 不匹配");
+        return false;
+      }
+    }
+
+    logger.info("[廣告服務] AdMob SSV 驗證成功", {
+      adNetwork: verified.ad_network,
+      adUnit: verified.ad_unit,
+      rewardAmount: verified.reward_amount,
+    });
+
+    return true;
+
   } catch (error) {
-    logger.error(`[廣告服務] AdMob 驗證失敗: ${error.message}`);
+    // 如果是 JWT 驗證錯誤
+    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+      logger.error(`[廣告服務] JWT 驗證失敗: ${error.message}`);
+      return false;
+    }
+
+    // 如果 jsonwebtoken 模塊不存在，提供降級方案
+    if (error.code === "ERR_MODULE_NOT_FOUND") {
+      logger.error("[廣告服務] jsonwebtoken 模塊未安裝，無法執行嚴格驗證");
+      logger.error("[廣告服務] 請執行: npm install jsonwebtoken");
+      logger.error("[廣告服務] 或暫時關閉嚴格驗證模式: ENABLE_STRICT_AD_VERIFICATION=false");
+      return false;
+    }
+
+    logger.error(`[廣告服務] AdMob 驗證異常: ${error.message}`, error);
     return false;
   }
 };

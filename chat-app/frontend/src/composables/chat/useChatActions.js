@@ -9,6 +9,7 @@ import { writeCachedHistory } from '../../utils/conversationCache';
 import { requestAiReply } from '../../utils/conversation';
 import { getGiftById } from '../../config/gifts';
 import { generateVoiceRequestId, generatePhotoRequestId, generateGiftRequestId } from '../../utils/requestId';
+import { giftQueue } from '../../utils/requestQueue';
 
 /**
  * 聊天操作 Composable
@@ -263,16 +264,19 @@ export function useChatActions({
       // 生成請求ID
       const requestId = generateGiftRequestId(userId, matchId, giftData.giftId);
 
-      // 發送禮物到後端（包含請求ID）
-      // userId 現在從後端認證 token 自動獲取
-      const sendResult = await apiJson('/api/gifts/send', {
-        method: 'POST',
-        body: {
-          characterId: matchId,
-          giftId: giftData.giftId,
-          requestId, // 包含請求ID
-        },
-        skipGlobalLoading: true,
+      // ✅ 使用請求隊列確保送禮操作順序執行，避免並發金幣扣款衝突
+      const sendResult = await giftQueue.enqueue(async () => {
+        // 發送禮物到後端（包含請求ID）
+        // userId 現在從後端認證 token 自動獲取
+        return await apiJson('/api/gifts/send', {
+          method: 'POST',
+          body: {
+            characterId: matchId,
+            giftId: giftData.giftId,
+            requestId, // 包含請求ID
+          },
+          skipGlobalLoading: true,
+        });
       });
 
       if (!sendResult || !sendResult.success) {

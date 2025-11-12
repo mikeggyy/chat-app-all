@@ -4,6 +4,7 @@ import { usePurchaseConfirm } from "../usePurchaseConfirm";
 import { useGuestGuard } from "../useGuestGuard";
 import { apiJson } from "../../utils/api";
 import { logger } from "../../utils/logger";
+import { purchaseQueue } from "../../utils/requestQueue";
 
 /**
  * 商城購買邏輯 Composable
@@ -130,20 +131,23 @@ export function useShopPurchase(options = {}) {
     isPurchasingItem.value = true;
 
     try {
-      // 構建 SKU
-      // 資產卡：構建為 category-quantity（例如 character-unlock-5）
-      const sku = `${item.category}-${item.quantity || 1}`;
+      // ✅ 使用請求隊列確保購買操作順序執行，避免並發衝突
+      const result = await purchaseQueue.enqueue(async () => {
+        // 構建 SKU
+        // 資產卡：構建為 category-quantity（例如 character-unlock-5）
+        const sku = `${item.category}-${item.quantity || 1}`;
 
-      logger.log("[購買資產] item:", item);
-      logger.log("[購買資產] sku:", sku);
-      logger.log("[購買資產] price:", item.price);
+        logger.log("[購買資產] item:", item);
+        logger.log("[購買資產] sku:", sku);
+        logger.log("[購買資產] price:", item.price);
 
-      // 呼叫資產購買 API（使用新版 SKU）
-      const result = await apiJson("/api/assets/purchase", {
-        method: "POST",
-        body: {
-          sku: sku,
-        },
+        // 呼叫資產購買 API（使用新版 SKU）
+        return await apiJson("/api/assets/purchase", {
+          method: "POST",
+          body: {
+            sku: sku,
+          },
+        });
       });
 
       if (result.success) {
@@ -199,12 +203,15 @@ export function useShopPurchase(options = {}) {
     isPurchasingItem.value = true;
 
     try {
-      // 使用統一的資產購買 API（SKU 格式）
-      const result = await apiJson("/api/assets/purchase", {
-        method: "POST",
-        body: {
-          sku: item.id, // 藥水的 SKU (例如：memory_boost_1, brain_boost_5)
-        },
+      // ✅ 使用請求隊列確保購買操作順序執行，避免並發衝突
+      const result = await purchaseQueue.enqueue(async () => {
+        // 使用統一的資產購買 API（SKU 格式）
+        return await apiJson("/api/assets/purchase", {
+          method: "POST",
+          body: {
+            sku: item.id, // 藥水的 SKU (例如：memory_boost_1, brain_boost_5)
+          },
+        });
       });
 
       if (result.success) {

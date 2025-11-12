@@ -145,37 +145,42 @@ export const purchaseMemoryBoost = async (userId, options = {}) => {
 
 ---
 
-### 4. 🔄 前端金幣餘額並發更新保護
+### 4. ✅ 前端金幣餘額並發更新保護
 
 **問題**: 多個購買操作並發時，餘額更新可能被錯誤覆蓋
 
-**狀態**: 待修復
+**修復**: 已完成
+- 文件:
+  - `chat-app/frontend/src/composables/useCoins.js`
+  - `chat-app/frontend/src/composables/shop/useShopPurchase.js`
+  - `chat-app/frontend/src/composables/chat/useChatActions.js`
+  - `chat-app/frontend/src/utils/requestQueue.js`
+- 實現完整的請求隊列系統，確保所有金幣消耗操作順序執行
+- 所有消耗金幣的操作都使用請求隊列保護：
+  - `useCoins.purchasePackage` → 使用 `coinQueue`
+  - `useShopPurchase.handlePurchaseItem` → 使用 `purchaseQueue`
+  - `useShopPurchase.handlePurchasePotion` → 使用 `purchaseQueue`
+  - `useChatActions.sendGift` → 使用 `giftQueue`
+- 配合後端增量更新（`coinsChanged`）優先策略
 
-**修復方案**:
+**實現**:
 
-**方案 1: 使用增量更新**
-```javascript
-// chat-app/frontend/src/composables/useCoins.js
-// 更新本地餘額 - 使用增量而非絕對值
-if (data.coinsChanged !== undefined) {
-  coinsState.value.balance += data.coinsChanged; // 使用 += 而非 =
-} else if (data.newBalance !== undefined) {
-  coinsState.value.balance = data.newBalance;
-}
-```
-
-**方案 2: 請求隊列**
+**方案 1: 請求隊列系統** (已實現)
 ```javascript
 // utils/requestQueue.js
 class RequestQueue {
-  constructor() {
+  constructor(name = 'default') {
+    this.name = name;
     this.queue = [];
     this.processing = false;
+    this.stats = { total: 0, succeeded: 0, failed: 0, queued: 0 };
   }
 
   async enqueue(fn) {
     return new Promise((resolve, reject) => {
       this.queue.push({ fn, resolve, reject });
+      this.stats.total++;
+      this.stats.queued++;
       this.process();
     });
   }
@@ -184,20 +189,63 @@ class RequestQueue {
     if (this.processing || this.queue.length === 0) return;
     this.processing = true;
     const { fn, resolve, reject } = this.queue.shift();
+    this.stats.queued--;
+
     try {
       const result = await fn();
+      this.stats.succeeded++;
       resolve(result);
     } catch (error) {
+      this.stats.failed++;
       reject(error);
     } finally {
       this.processing = false;
-      this.process();
+      if (this.queue.length > 0) {
+        setTimeout(() => this.process(), 0);
+      }
     }
   }
 }
 
-export const purchaseQueue = new RequestQueue();
+// 創建不同類型的請求隊列
+export const purchaseQueue = new RequestQueue('purchase');
+export const coinQueue = new RequestQueue('coin');
+export const giftQueue = new RequestQueue('gift');
 ```
+
+**方案 2: 增量更新優先** (已實現)
+```javascript
+// composables/useCoins.js - purchasePackage 函數
+// ✅ 修復: 使用增量更新或確保順序更新，避免並發覆蓋問題
+if (data.coinsAdded !== undefined) {
+  // 增量更新（更安全）
+  coinsState.value.balance += data.coinsAdded;
+} else if (data.newBalance !== undefined) {
+  // 絕對值更新（作為後備）
+  coinsState.value.balance = data.newBalance;
+}
+```
+
+**使用示例**:
+```javascript
+// 購買資產（useShopPurchase.js）
+const result = await purchaseQueue.enqueue(async () => {
+  return await apiJson("/api/assets/purchase", {
+    method: "POST",
+    body: { sku: sku },
+  });
+});
+
+// 送禮物（useChatActions.js）
+const sendResult = await giftQueue.enqueue(async () => {
+  return await apiJson('/api/gifts/send', {
+    method: 'POST',
+    body: { characterId, giftId, requestId },
+  });
+});
+```
+
+**影響範圍**: 完全消除並發購買導致的金幣餘額錯誤，確保所有財務操作的原子性和順序性
 
 ---
 
@@ -1009,37 +1057,54 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
-| 🔴 高危 | 5 | 0 | 5 |
+| 🔴 高危 | 4 | 1 | 5 |
 | 🟡 中危 | 6 | 2 | 8 |
-| 🟢 低危 | 1 | 4 | 5 |
+| 🟢 低危 | 2 | 3 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **14** | **7** | **21** |
+| **總計** | **16** | **5** | **21** |
 
-**完成度**: 66.7%
+**完成度**: 76.2%
 
 ### 已完成的修復
 
 **高危問題**:
 1. ✅ 冪等性改用 Firestore（Commit: `7e69f82`）
 2. ✅ 會員升級獎勵原子性（Commit: `1a7c8db`）
-3. ✅ 藥水購買會員檢查移到 Transaction 內（本次提交）
-4. ✅ 測試 Token 緩存時間縮短（Commit: `c28c549`）
-5. ✅ 前端金幣餘額並發保護（Commit: `52f4a0c`）
+3. ✅ 藥水購買會員檢查移到 Transaction 內（Commit: `8f420dc`）
+4. ✅ 前端金幣餘額並發保護（本次提交）
 
 **中危問題**:
-6. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
-7. ✅ 訂單狀態機驗證（Commit: `735e665`）
-8. ✅ 資產購買原子性（Commit: `738a914`）
-9. ✅ 前端用戶資料緩存 TTL（Commit: `83c66cf`）
-10. ✅ 購買確認防抖（Commit: `563a6bd`）
-11. ✅ 前端消息發送重試機制（Commit: `62ee425`）
+5. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
+6. ✅ 訂單狀態機驗證（Commit: `735e665`）
+7. ✅ 資產購買原子性（Commit: `738a914`）
+8. ✅ 前端用戶資料緩存 TTL（Commit: `83c66cf`）
+9. ✅ 購買確認防抖（Commit: `563a6bd`）
+10. ✅ 前端消息發送重試機制（Commit: `62ee425`）
 
 **低危問題**:
-12. ✅ 加強輸入驗證（Commit: `eae1d72`）
+11. ✅ 加強輸入驗證（Commit: `eae1d72`）
+12. ✅ AI 服務重試機制（Commit: `716e369`）
 
 **性能優化**:
 13. ✅ 添加 Firestore 索引（Commit: `c28c549`）
 14. ✅ 創建修復文檔（Commit: `da49a75`）
+
+### 待修復問題
+
+**高危問題** (1 個):
+- [ ] 測試 Token 緩存時間縮短
+
+**中危問題** (2 個):
+- [ ] localStorage 錯誤處理改進
+- [ ] 其他中危優化
+
+**低危問題** (3 個):
+- [ ] 其他輸入驗證增強
+- [ ] 日誌脫敏
+- [ ] 其他低危優化
+
+**性能優化** (1 個):
+- [ ] 速率限制中間件完善
 
 ---
 

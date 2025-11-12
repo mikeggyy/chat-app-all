@@ -78,7 +78,7 @@ router.post("/api/assets/purchase", requireFirebaseAuth, purchaseRateLimiter, as
         async () => {
           return await purchaseAssetCard(userId, assetId, quantity || 1);
         },
-        { ttl: 2 * 1000 } // 2秒 TTL，僅防止快速重複點擊
+        { ttl: IDEMPOTENCY_TTL.ASSET_PURCHASE } // 2秒 TTL，僅防止快速重複點擊
       );
 
       return sendSuccess(res, result);
@@ -138,7 +138,7 @@ router.post("/api/assets/purchase/bundle", requireFirebaseAuth, purchaseRateLimi
       async () => {
         return await purchaseAssetBundle(userId, items);
       },
-      { ttl: 2 * 1000 } // 2秒 TTL，僅防止快速重複點擊
+      { ttl: IDEMPOTENCY_TTL.ASSET_PURCHASE } // 2秒 TTL，僅防止快速重複點擊
     );
 
     sendSuccess(res, result);

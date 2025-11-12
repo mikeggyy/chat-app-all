@@ -303,10 +303,10 @@ export const aiVideoGenerationRateLimiter = createRateLimiter({
 export const RATE_LIMIT_RECOMMENDATIONS = {
   // AI 相關
   aiConversation: conversationRateLimiter, // POST /api/ai/conversation/:characterId
-  aiSuggestions: standardRateLimiter, // POST /api/ai/suggestions/:characterId
-  photoGeneration: veryStrictRateLimiter, // POST /api/ai/photo/:characterId
-  videoGeneration: veryStrictRateLimiter, // POST /api/ai/video/:characterId
-  ttsGeneration: strictRateLimiter, // POST /api/ai/voice/:characterId
+  aiSuggestions: aiSuggestionRateLimiter, // POST /api/ai/suggestions/:characterId
+  photoGeneration: aiImageGenerationRateLimiter, // POST /api/ai/photo/:characterId
+  videoGeneration: aiVideoGenerationRateLimiter, // POST /api/ai/video/:characterId
+  ttsGeneration: ttsRateLimiter, // POST /api/ai/voice/:characterId
 
   // 購買相關
   coinPurchase: purchaseRateLimiter, // POST /api/coins/purchase/package

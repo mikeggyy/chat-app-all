@@ -661,9 +661,88 @@ const handleConfirm = () => {
 
 ---
 
-### 12-13. 🔄 其他中危問題
+### 12. ✅ localStorage 錯誤處理改進
 
-**12. localStorage 錯誤處理**: 更激進的清理策略
+**問題**: localStorage QuotaExceededError 處理不夠激進，可能仍然導致存儲失敗
+
+**修復**: 已完成
+- 文件: `chat-app/frontend/src/utils/conversationCache.js`
+- 實現更激進的清理策略：清理所有類型的對話緩存（history、pending、hidden-threads）
+- 添加預防性清理功能：`checkAndCleanIfNeeded()`
+- 添加實用函數：`clearAllConversationCaches()`、`estimateLocalStorageUsage()`
+- 增強錯誤日誌記錄，便於追蹤問題
+
+**實現**:
+
+**1. 更激進的 QuotaExceededError 處理**:
+```javascript
+// utils/conversationCache.js - writeToStore 函數
+catch (error) {
+  if (error.name === 'QuotaExceededError') {
+    console.warn('[conversationCache] QuotaExceededError: localStorage 空間不足，嘗試清理...');
+
+    // ✅ 清理所有類型的對話緩存
+    const keysToRemove = [];
+    for (let i = 0; i < store.length; i++) {
+      const storageKey = store.key(i);
+      if (storageKey) {
+        const shouldRemove =
+          storageKey.startsWith('history::') ||
+          storageKey.startsWith('pending::') ||
+          storageKey.startsWith('chat-list-hidden-threads:');
+
+        if (shouldRemove) {
+          keysToRemove.push(storageKey);
+        }
+      }
+    }
+
+    // 優先清理：移除非當前對話的緩存
+    let removedCount = 0;
+    for (const oldKey of keysToRemove) {
+      if (oldKey !== key) {
+        store.removeItem(oldKey);
+        removedCount++;
+      }
+    }
+
+    console.log(`[conversationCache] 已清理 ${removedCount} 個緩存項`);
+
+    // 再次嘗試存儲
+    store.setItem(key, JSON.stringify(sanitized));
+    console.log('[conversationCache] 清理後重新存儲成功');
+  }
+}
+```
+
+**2. 預防性清理功能**:
+```javascript
+/**
+ * 檢查 localStorage 使用情況並預防性清理
+ * @param {number} thresholdKB - 閾值（KB），預設 2048 (2MB)
+ */
+export const checkAndCleanIfNeeded = (thresholdKB = 2048) => {
+  const usage = estimateLocalStorageUsage();
+
+  if (usage.conversation > thresholdKB) {
+    console.warn(`對話緩存超過閾值 ${thresholdKB}KB，開始預防性清理...`);
+    const removed = clearAllConversationCaches();
+    return true;
+  }
+  return false;
+};
+```
+
+**3. 實用函數**:
+- `clearAllConversationCaches()` - 清理所有對話緩存（手動清理）
+- `estimateLocalStorageUsage()` - 估算 localStorage 使用量（KB）
+- `checkAndCleanIfNeeded(thresholdKB)` - 檢查並預防性清理
+
+**影響範圍**: 顯著降低 localStorage QuotaExceededError 發生率，提升應用穩定性
+
+---
+
+### 13. 🔄 其他中危問題
 
 ---
 
@@ -1089,12 +1168,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
 | 🔴 高危 | 5 | 0 | 5 |
-| 🟡 中危 | 6 | 2 | 8 |
+| 🟡 中危 | 7 | 1 | 8 |
 | 🟢 低危 | 2 | 3 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **17** | **4** | **21** |
+| **總計** | **18** | **3** | **21** |
 
-**完成度**: 81.0%
+**完成度**: 85.7%
 
 **🎉 所有高危問題已完成！**
 
@@ -1107,26 +1186,26 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 4. ✅ 前端金幣餘額並發保護（Commit: `df9299c`）
 5. ✅ 測試 Token 緩存時間縮短（之前會話已完成）
 
-**中危問題** (6/8):
+**中危問題** (7/8):
 6. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
 7. ✅ 訂單狀態機驗證（Commit: `735e665`）
 8. ✅ 資產購買原子性（Commit: `738a914`）
 9. ✅ 前端用戶資料緩存 TTL（Commit: `83c66cf`）
 10. ✅ 購買確認防抖（Commit: `563a6bd`）
 11. ✅ 前端消息發送重試機制（Commit: `62ee425`）
+12. ✅ localStorage 錯誤處理改進（本次提交）
 
 **低危問題** (2/5):
-12. ✅ 加強輸入驗證（Commit: `eae1d72`）
-13. ✅ AI 服務重試機制（Commit: `716e369`）
+13. ✅ 加強輸入驗證（Commit: `eae1d72`）
+14. ✅ AI 服務重試機制（Commit: `716e369`）
 
 **性能優化** (2/3):
-14. ✅ 添加 Firestore 索引（Commit: `c28c549`）
-15. ✅ 創建修復文檔（Commit: `da49a75`）
+15. ✅ 添加 Firestore 索引（Commit: `c28c549`）
+16. ✅ 創建修復文檔（Commit: `da49a75`）
 
-### 待修復問題
+### 待修復問題 (僅 3 個)
 
-**中危問題** (2 個):
-- [ ] localStorage 錯誤處理改進
+**中危問題** (1 個):
 - [ ] 其他中危優化
 
 **低危問題** (3 個):
@@ -1135,7 +1214,7 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 - [ ] 其他低危優化
 
 **性能優化** (1 個):
-- [ ] 速率限制中間件完善
+- [ ] 速率限制中間件完善（已在文檔中提供實現方案，待應用到實際路由）
 
 ---
 

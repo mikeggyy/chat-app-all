@@ -33,6 +33,7 @@ import {
   sendError,
   ApiError,
 } from "../../../shared/utils/errorFormatter.js";
+import { standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 
 const shouldIncludeMatches = (query) => {
   const include = typeof query?.include === "string" ? query.include : "";
@@ -70,7 +71,7 @@ const buildFavoritesPayload = async (user, includeMatches) => {
 export const userRouter = Router();
 
 // 獲取所有用戶列表 - 僅供管理員使用
-userRouter.get("/", requireFirebaseAuth, requireAdmin, asyncHandler(async (req, res, next) => {
+userRouter.get("/", requireFirebaseAuth, requireAdmin, relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const { limit, startAfter } = req.query;
 
@@ -86,7 +87,7 @@ userRouter.get("/", requireFirebaseAuth, requireAdmin, asyncHandler(async (req, 
 }));
 
 // 獲取指定用戶資料 - 需要身份驗證且只能訪問自己的資料
-userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
+userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     let user = await getUserById(req.params.id);
 
@@ -121,7 +122,7 @@ userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), asyncHandler
   }
 }));
 
-userRouter.post("/", requireFirebaseAuth, asyncHandler(async (req, res, next) => {
+userRouter.post("/", requireFirebaseAuth, standardRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const firebaseUser = req.firebaseUser;
     if (!firebaseUser?.uid) {
@@ -161,6 +162,7 @@ userRouter.patch(
   "/:id/photo",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { photoURL } = req.body ?? {};
@@ -174,6 +176,7 @@ userRouter.patch(
   "/:id/profile",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -211,7 +214,7 @@ userRouter.patch(
   })
 );
 
-userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
+userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     let user = await getUserById(req.params.id);
 
@@ -239,7 +242,7 @@ userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), as
   }
 }));
 
-userRouter.get("/:id/characters", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
+userRouter.get("/:id/characters", requireFirebaseAuth, requireOwnership("id"), relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.params;
     const characters = await listMatchesByCreator(id);
@@ -256,6 +259,7 @@ userRouter.post(
   "/:id/favorites",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { matchId, favoriteId } = req.body ?? {};
@@ -293,6 +297,7 @@ userRouter.delete(
   "/:id/favorites/:favoriteId",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res) => {
     const { id, favoriteId } = req.params;
     const includeMatches = shouldIncludeMatches(req.query);
@@ -302,7 +307,7 @@ userRouter.delete(
   })
 );
 
-userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id"), asyncHandler(async (req, res, next) => {
+userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id"), relaxedRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const { id } = req.params;
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
@@ -388,6 +393,7 @@ userRouter.post(
   "/:id/conversations",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { matchId, conversationId } = req.body ?? {};
@@ -402,6 +408,7 @@ userRouter.delete(
   "/:id/conversations/:conversationId",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res) => {
     const { id, conversationId } = req.params;
 
@@ -420,6 +427,7 @@ userRouter.get(
   "/:id/assets",
   requireFirebaseAuth,
   requireOwnership("id"),
+  relaxedRateLimiter,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const assets = await getUserAssets(id);
@@ -436,6 +444,7 @@ userRouter.post(
   "/:id/assets/add",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -464,6 +473,7 @@ userRouter.post(
   "/:id/assets/consume",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -498,6 +508,7 @@ userRouter.put(
   "/:id/assets",
   requireFirebaseAuth,
   requireOwnership("id"),
+  standardRateLimiter,
   asyncHandler(async (req, res, next) => {
     try {
       const { id } = req.params;

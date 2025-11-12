@@ -23,6 +23,7 @@ import { getFirestoreDb } from "../firebase/index.js";
 import { FieldValue } from "firebase-admin/firestore";
 
 import logger from "../utils/logger.js";
+import { standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 export const conversationRouter = Router();
 
 // 獲取對話歷史 - 需要身份驗證且只能訪問自己的對話
@@ -30,6 +31,7 @@ conversationRouter.get(
   "/:userId/:characterId",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  relaxedRateLimiter,
   validateRequest(conversationSchemas.getHistory),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
@@ -42,6 +44,7 @@ conversationRouter.post(
   "/:userId/:characterId",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  standardRateLimiter,
   validateRequest(conversationSchemas.sendMessage),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
@@ -165,6 +168,7 @@ conversationRouter.get(
   "/:userId/:characterId/photos",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  relaxedRateLimiter,
   validateRequest(conversationSchemas.getPhotos),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
@@ -183,6 +187,7 @@ conversationRouter.delete(
   "/:userId/:characterId/photos",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  standardRateLimiter,
   validateRequest(conversationSchemas.deletePhotos),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
@@ -209,6 +214,7 @@ conversationRouter.delete(
   "/:userId/:characterId/messages",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  standardRateLimiter,
   validateRequest(conversationSchemas.deleteMessages),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
@@ -235,6 +241,7 @@ conversationRouter.delete(
   "/:userId/:characterId",
   requireFirebaseAuth,
   requireOwnership("userId"),
+  standardRateLimiter,
   validateRequest(conversationSchemas.clearHistory),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;

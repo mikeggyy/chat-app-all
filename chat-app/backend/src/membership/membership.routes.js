@@ -6,6 +6,7 @@ import express from "express";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { requireOwnership } from "../utils/routeHelpers.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js"; // ✅ P2-2: 使用集中配置的 TTL
 import {
   getUserMembership,
   upgradeMembership,
@@ -21,6 +22,7 @@ import {
   ApiError,
 } from "../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
+import { purchaseRateLimiter, relaxedRateLimiter, standardRateLimiter } from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 
@@ -28,7 +30,7 @@ const router = express.Router();
  * 獲取用戶會員資訊
  * GET /api/membership/:userId
  */
-router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
+router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("userId"), relaxedRateLimiter, async (req, res, next) => {
   try {
     const { userId } = req.params;
     const membership = await getUserMembership(userId);
@@ -49,7 +51,7 @@ router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("use
  * Body: { tier: "vip" | "vvip", durationMonths?: number, autoRenew?: boolean, idempotencyKey: string }
  * 🔒 冪等性保護：防止重複升級和發放獎勵
  */
-router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
+router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), purchaseRateLimiter, async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { tier, durationMonths, autoRenew, idempotencyKey } = req.body;
@@ -79,6 +81,7 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
 
       try {
         // 冪等性保護
+        // ✅ P2-2 修復：使用集中配置的 TTL
         const requestId = `membership-upgrade:${userId}:${tier}:${idempotencyKey}`;
         const membership = await handleIdempotentRequest(
           requestId,
@@ -86,7 +89,7 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
             durationMonths,
             autoRenew,
           }),
-          { ttl: 15 * 60 * 1000 } // 15 分鐘
+          { ttl: IDEMPOTENCY_TTL.MEMBERSHIP_UPGRADE }
         );
 
         sendSuccess(res, {
@@ -137,7 +140,7 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
  * POST /api/membership/:userId/cancel
  * Body: { immediate?: boolean }
  */
-router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
+router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwnership("userId"), standardRateLimiter, async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { immediate } = req.body;
@@ -158,7 +161,7 @@ router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwners
  * POST /api/membership/:userId/renew
  * Body: { durationMonths?: number }
  */
-router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
+router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnership("userId"), purchaseRateLimiter, async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { durationMonths } = req.body;
@@ -180,7 +183,7 @@ router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnersh
  * 檢查功能權限
  * GET /api/membership/:userId/features/:featureName
  */
-router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
+router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth, requireOwnership("userId"), relaxedRateLimiter, async (req, res, next) => {
   try {
     const { userId, featureName } = req.params;
     const hasAccess = await checkFeatureAccess(userId, featureName);
@@ -199,7 +202,7 @@ router.get("/api/membership/:userId/features/:featureName", requireFirebaseAuth,
  * 獲取用戶所有功能權限
  * GET /api/membership/:userId/features
  */
-router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwnership("userId"), async (req, res, next) => {
+router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwnership("userId"), relaxedRateLimiter, async (req, res, next) => {
   try {
     const { userId } = req.params;
     const features = await getUserFeatures(userId);

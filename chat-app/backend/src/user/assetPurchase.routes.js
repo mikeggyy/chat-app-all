@@ -12,6 +12,7 @@ import logger from "../utils/logger.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { purchaseAssetCard, purchaseAssetBundle } from "./assetPurchase.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
+import { purchaseRateLimiter } from "../middleware/rateLimiterConfig.js";
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ const router = express.Router();
  * - assetId: character-unlock, photo-unlock, video-unlock, voice-unlock, create
  * - quantity: 1-100
  */
-router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res, next) => {
+router.post("/api/assets/purchase", requireFirebaseAuth, purchaseRateLimiter, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { sku, assetId, quantity } = req.body;
@@ -98,7 +99,7 @@ router.post("/api/assets/purchase", requireFirebaseAuth, async (req, res, next) 
  * POST /api/assets/purchase/bundle
  * Body: { items: Array<{assetId: string, quantity: number}> }
  */
-router.post("/api/assets/purchase/bundle", requireFirebaseAuth, async (req, res, next) => {
+router.post("/api/assets/purchase/bundle", requireFirebaseAuth, purchaseRateLimiter, async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
     const { items } = req.body;

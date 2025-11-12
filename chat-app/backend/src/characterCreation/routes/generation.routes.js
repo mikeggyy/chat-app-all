@@ -13,6 +13,7 @@ import {
   generateCreationResult,
 } from "../characterCreation.service.js";
 import { isoNow, trimString } from "../characterCreation.helpers.js";
+import { veryStrictRateLimiter, standardRateLimiter } from "../../middleware/rateLimiterConfig.js";
 
 const generationRouter = Router();
 
@@ -20,6 +21,7 @@ const generationRouter = Router();
 generationRouter.post(
   "/flows/:flowId/generate",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(characterCreationSchemas.generateVoice),
   async (req, res, next) => {
     const userId = req.firebaseUser.uid;
@@ -122,6 +124,7 @@ generationRouter.post(
 generationRouter.post(
   "/flows/:flowId/ai-magician",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(characterCreationSchemas.aiMagician),
   async (req, res, next) => {
     const userId = req.firebaseUser.uid;
@@ -179,6 +182,7 @@ generationRouter.post(
 generationRouter.post(
   "/ai-description",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(characterCreationSchemas.aiDescription),
   async (req, res, next) => {
     try {
@@ -211,6 +215,7 @@ generationRouter.post(
 generationRouter.post(
   "/flows/:flowId/ai-description",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(characterCreationSchemas.aiDescriptionWithFlow),
   async (req, res, next) => {
     const userId = req.firebaseUser.uid;
@@ -284,6 +289,7 @@ generationRouter.post(
 generationRouter.post(
   "/flows/:flowId/generate-images",
   requireFirebaseAuth,
+  veryStrictRateLimiter,
   validateRequest(characterCreationSchemas.generateImages),
   async (req, res, next) => {
     const userId = req.firebaseUser.uid;

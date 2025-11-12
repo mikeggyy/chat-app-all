@@ -23,6 +23,7 @@ import {
   getMatchByIdSchema,
   createMatchSchema,
 } from "./match.schemas.js";
+import { standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 
 export const matchRouter = Router();
 
@@ -32,6 +33,7 @@ export const matchRouter = Router();
  */
 matchRouter.get(
   "/next",
+  relaxedRateLimiter,
   asyncHandler(async (_, res) => {
     const match = getRandomMatch();
     if (!match) {
@@ -48,6 +50,7 @@ matchRouter.get(
  */
 matchRouter.get(
   "/all",
+  relaxedRateLimiter,
   validateRequest(getAllMatchesSchema),
   asyncHandler(async (req, res) => {
     const userId = req.query.userId || "";
@@ -81,6 +84,7 @@ matchRouter.get(
  */
 matchRouter.get(
   "/popular",
+  relaxedRateLimiter,
   validateRequest(getPopularMatchesSchema),
   asyncHandler(async (req, res) => {
     const limit = req.query.limit || 10;
@@ -115,6 +119,7 @@ matchRouter.get(
  */
 matchRouter.get(
   "/:id",
+  relaxedRateLimiter,
   validateRequest(getMatchByIdSchema),
   asyncHandler(async (req, res) => {
     const characterId = req.params.id;
@@ -136,6 +141,7 @@ matchRouter.get(
 matchRouter.post(
   "/create",
   requireFirebaseAuth,
+  standardRateLimiter,
   validateRequest(createMatchSchema),
   asyncHandler(async (req, res) => {
     const userId = req.body.creatorUid || req.firebaseUser?.uid;

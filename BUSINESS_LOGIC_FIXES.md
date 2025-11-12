@@ -305,45 +305,67 @@ export const useMemoryBoost = async (userId, characterId) => {
 
 ---
 
-### 8. 🔄 資產購買原子性
+### 8. ✅ 資產購買原子性
 
 **問題**: 扣款和增加資產是兩個獨立操作，可能扣款成功但增加資產失敗
 
-**修復計畫**:
+**修復**: 已完成
+- 文件: `chat-app/backend/src/user/assetPurchase.service.js`
+- 重構 `purchaseAssetPackage` 和 `purchaseAssetBundle` 函數
+- 使用單個 Transaction 完成：餘額檢查 → 扣款 → 增加資產 → 創建交易記錄
+- Transaction 成功後異步記錄審計日誌（失敗不影響主流程）
+- 確保原子性，防止部分失敗
+
+**實現**:
 ```javascript
 // user/assetPurchase.service.js
 export const purchaseAssetPackage = async (userId, sku) => {
+  const packageConfig = await getPackageBySku(sku);
   const db = getFirestoreDb();
   const userRef = db.collection('users').doc(userId);
 
-  return await db.runTransaction(async (transaction) => {
-    // 1. 讀取用戶和套餐配置
+  const result = await db.runTransaction(async (transaction) => {
+    // 1. 讀取用戶資料
     const userDoc = await transaction.get(userRef);
-    const packageConfig = await getPackageBySku(sku);
+    const user = userDoc.data();
+    const currentBalance = getWalletBalance(user);
 
     // 2. 檢查餘額
-    const currentBalance = getWalletBalance(userDoc.data());
-    if (currentBalance < packageConfig.finalPrice) {
-      throw new Error('金幣不足');
+    if (currentBalance < price) {
+      throw new Error(`金幣不足，需要 ${price} 金幣，當前餘額 ${currentBalance} 金幣`);
     }
 
-    // 3. 在同一事務內：扣款 + 增加資產
-    const newBalance = currentBalance - packageConfig.finalPrice;
-    const currentAssets = userDoc.data().assets || {};
-    const newQuantity = (currentAssets[assetType] || 0) + quantity;
+    // 3. 計算新餘額和新資產數量
+    const currentAssets = user.assets || {};
+    const previousAssetQuantity = currentAssets[assetType] || 0;
+    const newAssetQuantity = previousAssetQuantity + quantity;
+    const newBalance = currentBalance - price;
 
+    // 4. 在同一 Transaction 內：扣款 + 增加資產
     transaction.update(userRef, {
       ...createWalletUpdate(newBalance),
-      assets: { ...currentAssets, [assetType]: newQuantity },
+      [`assets.${assetType}`]: newAssetQuantity,
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // 4. 創建交易記錄
-    const transactionRef = db.collection('transactions').doc();
-    transaction.set(transactionRef, { /* 交易記錄 */ });
+    // 5. 在同一 Transaction 內創建交易記錄
+    createTransactionInTx(transaction, {
+      userId, type: TRANSACTION_TYPES.SPEND, amount: -price,
+      description: `購買 ${name}`, balanceBefore: currentBalance,
+      balanceAfter: newBalance
+    });
 
-    return { success: true, newBalance, assetQuantity: newQuantity };
+    return { success: true, newBalance, assetQuantity: newAssetQuantity };
   });
+
+  // Transaction 成功後，異步記錄審計日誌
+  try {
+    await logAssetChange({ userId, assetType, action: "add", amount: quantity });
+  } catch (error) {
+    logger.warn(`審計日誌記錄失敗（不影響購買）: ${error.message}`);
+  }
+
+  return result;
 };
 ```
 
@@ -742,12 +764,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
 | 🔴 高危 | 4 | 1 | 5 |
-| 🟡 中危 | 2 | 6 | 8 |
+| 🟡 中危 | 3 | 5 | 8 |
 | 🟢 低危 | 0 | 5 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **8** | **13** | **21** |
+| **總計** | **9** | **12** | **21** |
 
-**完成度**: 38.1%
+**完成度**: 42.9%
 
 ### 已完成的修復
 
@@ -759,11 +781,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 
 **中危問題**:
 5. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
-6. ✅ 訂單狀態機驗證（本次提交）
+6. ✅ 訂單狀態機驗證（Commit: `735e665`）
+7. ✅ 資產購買原子性（本次提交）
 
 **性能優化**:
-7. ✅ 添加 Firestore 索引（Commit: `c28c549`）
-8. ✅ 創建修復文檔（Commit: `da49a75`）
+8. ✅ 添加 Firestore 索引（Commit: `c28c549`）
+9. ✅ 創建修復文檔（Commit: `da49a75`）
 
 ---
 

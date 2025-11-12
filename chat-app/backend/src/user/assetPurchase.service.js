@@ -37,6 +37,7 @@ const getPackageBySku = async (sku) => {
 
 /**
  * 購買資產套餐（基於 SKU）
+ * 使用 Firestore Transaction 確保扣款和增加資產的原子性
  * @param {string} userId - 用戶 ID
  * @param {string} sku - 套餐 SKU (例如: video-unlock-5)
  * @returns {Promise<Object>} 購買結果
@@ -97,29 +98,6 @@ export const purchaseAssetPackage = async (userId, sku) => {
     `[資產購買] 開始購買: userId=${userId}, sku=${sku}, quantity=${quantity}, price=${price}, assetType=${assetType}, category=${category}`
   );
 
-  // 檢查金幣餘額
-  const user = await getUserById(userId);
-  const balance = user?.walletBalance || 0;
-  if (balance < price) {
-    throw new Error(`金幣不足，需要 ${price} 金幣，當前餘額 ${balance} 金幣`);
-  }
-
-  // 1. 扣除金幣
-  const deductResult = await deductCoins(
-    userId,
-    price,
-    `購買${category} ${name}`,
-    {
-      sku,
-      packageName: name,
-      category,
-      assetType,
-      quantity,
-      finalPrice: price,
-    }
-  );
-
-  // 2. 增加資產（統一使用主文檔）
   // 轉換 assetType 格式：characterUnlockCard -> characterUnlockCards
   const assetTypeMapping = {
     characterUnlockCard: "characterUnlockCards",
@@ -130,33 +108,106 @@ export const purchaseAssetPackage = async (userId, sku) => {
   };
 
   const mainDocAssetType = assetTypeMapping[assetType] || assetType;
-  const updatedAssets = await addUserAsset(
-    userId,
-    mainDocAssetType,
-    quantity,
-    `購買 ${name}`,
-    { sku, packageName: name, category, price }
-  );
-  const newAssetQuantity = updatedAssets[mainDocAssetType] || 0;
 
-  logger.info(
-    `[資產購買] 購買成功: userId=${userId}, sku=${sku}, quantity=${quantity}, price=${price}, newBalance=${deductResult.newBalance}, newAssetQuantity=${newAssetQuantity}`
-  );
+  // 導入必要的服務
+  const { getWalletBalance, createWalletUpdate } = await import("./walletHelpers.js");
+  const { createTransactionInTx, TRANSACTION_TYPES } = await import("../payment/transaction.service.js");
+  const { FieldValue } = await import("firebase-admin/firestore");
 
-  return {
-    success: true,
-    sku,
-    packageName: name,
-    category,
-    assetType: mainDocAssetType,
-    quantity,
-    finalPrice: price,
-    coinsSpent: price,
-    newBalance: deductResult.newBalance,
-    previousBalance: deductResult.previousBalance,
-    assetQuantity: newAssetQuantity,
-    previousAssetQuantity: newAssetQuantity - quantity, // 計算之前的數量
-  };
+  // ✅ 使用單個 Transaction 確保原子性：扣款 + 增加資產 + 創建交易記錄
+  const db = getFirestoreDb();
+  const userRef = db.collection("users").doc(userId);
+
+  const result = await db.runTransaction(async (transaction) => {
+    // 1. 在 Transaction 內讀取用戶資料
+    const userDoc = await transaction.get(userRef);
+
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
+
+    const user = userDoc.data();
+    const currentBalance = getWalletBalance(user);
+
+    // 2. 檢查金幣餘額
+    if (currentBalance < price) {
+      throw new Error(`金幣不足，需要 ${price} 金幣，當前餘額 ${currentBalance} 金幣`);
+    }
+
+    // 3. 獲取當前資產數量
+    const currentAssets = user.assets || {};
+    const previousAssetQuantity = currentAssets[mainDocAssetType] || 0;
+    const newAssetQuantity = previousAssetQuantity + quantity;
+
+    // 4. 計算新金幣餘額
+    const newBalance = currentBalance - price;
+
+    // 5. 在同一 Transaction 內：扣款 + 增加資產
+    const walletUpdate = createWalletUpdate(newBalance);
+    transaction.update(userRef, {
+      ...walletUpdate,
+      [`assets.${mainDocAssetType}`]: newAssetQuantity,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 6. 在同一 Transaction 內創建交易記錄
+    createTransactionInTx(transaction, {
+      userId,
+      type: TRANSACTION_TYPES.SPEND,
+      amount: -price,
+      description: `購買${category} ${name}`,
+      metadata: {
+        sku,
+        packageName: name,
+        category,
+        assetType: mainDocAssetType,
+        quantity,
+        finalPrice: price,
+      },
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    });
+
+    logger.info(
+      `[資產購買] Transaction 成功: userId=${userId}, sku=${sku}, quantity=${quantity}, ` +
+      `price=${price}, balance: ${currentBalance} → ${newBalance}, ` +
+      `assets: ${previousAssetQuantity} → ${newAssetQuantity}`
+    );
+
+    // 返回購買結果
+    return {
+      success: true,
+      sku,
+      packageName: name,
+      category,
+      assetType: mainDocAssetType,
+      quantity,
+      finalPrice: price,
+      coinsSpent: price,
+      newBalance,
+      previousBalance: currentBalance,
+      assetQuantity: newAssetQuantity,
+      previousAssetQuantity,
+    };
+  });
+
+  // ✅ Transaction 成功後，異步記錄資產審計日誌（失敗不影響主流程）
+  try {
+    await logAssetChange({
+      userId,
+      assetType: mainDocAssetType,
+      action: "add",
+      amount: quantity,
+      previousQuantity: result.previousAssetQuantity,
+      newQuantity: result.assetQuantity,
+      reason: `購買 ${name}`,
+      metadata: { sku, packageName: name, category, price },
+    });
+  } catch (error) {
+    logger.warn(`[資產購買] 審計日誌記錄失敗（不影響購買）: ${error.message}`);
+  }
+
+  return result;
 };
 
 /**
@@ -175,6 +226,7 @@ export const purchaseAssetCard = async (userId, assetId, quantity = 1) => {
 
 /**
  * 批量購買資產卡（用於套餐）
+ * 使用 Firestore Transaction 確保扣款和增加所有資產的原子性
  * @param {string} userId - 用戶 ID
  * @param {Array<{assetId: string, quantity: number}>} items - 購買項目列表
  * @returns {Promise<Object>} 購買結果
@@ -213,56 +265,117 @@ export const purchaseAssetBundle = async (userId, items) => {
 
   logger.info(`[資產購買] 開始批量購買: userId=${userId}, itemCount=${items.length}, totalPrice=${totalPrice}`);
 
-  // 檢查金幣餘額
-  const user = await getUserById(userId);
-  const balance = user?.walletBalance || 0;
-  if (balance < totalPrice) {
-    throw new Error(`金幣不足，需要 ${totalPrice} 金幣，當前餘額 ${balance} 金幣`);
-  }
-
-  // 1. 扣除金幣
   const itemsSummary = purchaseDetails
     .map((d) => `${d.assetName} x${d.quantity}`)
     .join(", ");
 
-  const deductResult = await deductCoins(
-    userId,
-    totalPrice,
-    `批量購買: ${itemsSummary}`,
-    {
-      items: purchaseDetails,
+  // 導入必要的服務
+  const { getWalletBalance, createWalletUpdate } = await import("./walletHelpers.js");
+  const { createTransactionInTx, TRANSACTION_TYPES } = await import("../payment/transaction.service.js");
+  const { FieldValue } = await import("firebase-admin/firestore");
+
+  // ✅ 使用單個 Transaction 確保原子性：扣款 + 增加所有資產 + 創建交易記錄
+  const db = getFirestoreDb();
+  const userRef = db.collection("users").doc(userId);
+
+  const result = await db.runTransaction(async (transaction) => {
+    // 1. 在 Transaction 內讀取用戶資料
+    const userDoc = await transaction.get(userRef);
+
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
     }
-  );
 
-  // 2. 增加所有資產（統一使用主文檔）
-  const assetResults = [];
-  for (const detail of purchaseDetails) {
-    // detail.assetKey 已經是正確的格式（複數形式）
-    const updatedAssets = await addUserAsset(
-      userId,
-      detail.assetKey,
-      detail.quantity,
-      `批量購買 ${detail.assetName}`,
-      { assetId: detail.assetId, unitPrice: detail.unitPrice, totalPrice: detail.totalPrice }
-    );
-    const newQuantity = updatedAssets[detail.assetKey] || 0;
+    const user = userDoc.data();
+    const currentBalance = getWalletBalance(user);
 
-    assetResults.push({
-      assetId: detail.assetId,
-      assetName: detail.assetName,
-      quantity: detail.quantity,
-      newQuantity: newQuantity,
+    // 2. 檢查金幣餘額
+    if (currentBalance < totalPrice) {
+      throw new Error(`金幣不足，需要 ${totalPrice} 金幣，當前餘額 ${currentBalance} 金幣`);
+    }
+
+    // 3. 計算新金幣餘額
+    const newBalance = currentBalance - totalPrice;
+
+    // 4. 計算所有資產的新數量
+    const currentAssets = user.assets || {};
+    const assetUpdates = {};
+    const assetResults = [];
+
+    for (const detail of purchaseDetails) {
+      const previousQuantity = currentAssets[detail.assetKey] || 0;
+      const newQuantity = previousQuantity + detail.quantity;
+
+      assetUpdates[`assets.${detail.assetKey}`] = newQuantity;
+
+      assetResults.push({
+        assetId: detail.assetId,
+        assetName: detail.assetName,
+        assetKey: detail.assetKey,
+        quantity: detail.quantity,
+        previousQuantity,
+        newQuantity,
+      });
+    }
+
+    // 5. 在同一 Transaction 內：扣款 + 增加所有資產
+    const walletUpdate = createWalletUpdate(newBalance);
+    transaction.update(userRef, {
+      ...walletUpdate,
+      ...assetUpdates,
+      updatedAt: FieldValue.serverTimestamp(),
     });
+
+    // 6. 在同一 Transaction 內創建交易記錄
+    createTransactionInTx(transaction, {
+      userId,
+      type: TRANSACTION_TYPES.SPEND,
+      amount: -totalPrice,
+      description: `批量購買: ${itemsSummary}`,
+      metadata: {
+        items: purchaseDetails,
+      },
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    });
+
+    logger.info(
+      `[資產購買] 批量購買 Transaction 成功: userId=${userId}, itemCount=${items.length}, ` +
+      `totalPrice=${totalPrice}, balance: ${currentBalance} → ${newBalance}`
+    );
+
+    // 返回購買結果
+    return {
+      success: true,
+      items: assetResults,
+      totalPrice,
+      coinsSpent: totalPrice,
+      newBalance,
+      previousBalance: currentBalance,
+    };
+  });
+
+  // ✅ Transaction 成功後，異步記錄所有資產的審計日誌（失敗不影響主流程）
+  for (const assetResult of result.items) {
+    try {
+      await logAssetChange({
+        userId,
+        assetType: assetResult.assetKey,
+        action: "add",
+        amount: assetResult.quantity,
+        previousQuantity: assetResult.previousQuantity,
+        newQuantity: assetResult.newQuantity,
+        reason: `批量購買 ${assetResult.assetName}`,
+        metadata: {
+          assetId: assetResult.assetId,
+          unitPrice: purchaseDetails.find(d => d.assetId === assetResult.assetId)?.unitPrice,
+          totalPrice: purchaseDetails.find(d => d.assetId === assetResult.assetId)?.totalPrice,
+        },
+      });
+    } catch (error) {
+      logger.warn(`[資產購買] 審計日誌記錄失敗（不影響購買）: ${error.message}`);
+    }
   }
 
-  logger.info(`[資產購買] 批量購買成功: userId=${userId}, itemCount=${items.length}, totalPrice=${totalPrice}, newBalance=${deductResult.newBalance}`);
-
-  return {
-    success: true,
-    items: assetResults,
-    totalPrice,
-    coinsSpent: totalPrice,
-    newBalance: deductResult.newBalance,
-    previousBalance: deductResult.previousBalance,
-  };
+  return result;
 };

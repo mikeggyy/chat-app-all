@@ -7,6 +7,7 @@
  */
 
 import { apiJson } from '../../utils/api';
+import { generateUnlockCharacterRequestId } from '../../utils/requestId';
 
 /**
  * 創建對話限制操作 composable
@@ -85,6 +86,9 @@ export function useConversationLimitActions(deps) {
       const firebaseAuth = getFirebaseAuth();
       const token = await firebaseAuth.getCurrentUserIdToken();
 
+      // 生成唯一請求ID（用於冪等性保護）
+      const requestId = generateUnlockCharacterRequestId(userId, matchId);
+
       // 調用後端 API 使用解鎖卡
       const result = await apiJson('/api/unlock-tickets/use/character', {
         method: 'POST',
@@ -93,6 +97,7 @@ export function useConversationLimitActions(deps) {
         },
         body: {
           characterId: matchId,
+          requestId,
         },
         skipGlobalLoading: true,
       });

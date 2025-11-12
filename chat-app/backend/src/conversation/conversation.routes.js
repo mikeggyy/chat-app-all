@@ -18,7 +18,7 @@ import {
   trimMetadataString,
 } from "./conversation.helpers.js";
 import { validateRequest, conversationSchemas } from "../middleware/validation.middleware.js";
-import { getMatchById } from "../match/match.service.js";
+import { getCharacterById } from "../services/character/characterCache.service.js";
 import { getFirestoreDb } from "../firebase/index.js";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -107,18 +107,15 @@ conversationRouter.post(
       }
 
       // 獲取角色信息並添加到 metadata
-      try {
-        const character = await getMatchById(characterId);
-        if (character) {
-          metadata.character = {
-            id: character.id,
-            display_name: character.display_name,
-            portraitUrl: character.portraitUrl,
-            background: character.background,
-          };
-        }
-      } catch (charError) {
-        logger.warn(`獲取角色 ${characterId} 信息失敗:`, charError);
+      // ✅ 性能優化：從內存緩存讀取，避免 N+1 Firestore 查詢
+      const character = getCharacterById(characterId);
+      if (character) {
+        metadata.character = {
+          id: character.id,
+          display_name: character.display_name,
+          portraitUrl: character.portraitUrl,
+          background: character.background,
+        };
       }
 
       // 更新舊的用戶文檔中的 conversations 數組（向後兼容）

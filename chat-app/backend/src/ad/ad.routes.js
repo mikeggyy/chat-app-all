@@ -97,12 +97,14 @@ router.post(
 
 /**
  * 檢查每日廣告觀看限制
- * GET /api/ads/limit/:userId
+ * GET /api/ads/limit
+ * 🔒 安全：userId 從認證 token 自動獲取
  */
 router.get(
-  "/api/ads/limit/:userId",
+  "/api/ads/limit",
+  requireFirebaseAuth,
   asyncHandler(async (req, res) => {
-    const { userId } = req.params;
+    const userId = req.firebaseUser.uid;
     const limit = await checkDailyAdLimit(userId);
     sendSuccess(res, limit);
   })
@@ -110,12 +112,14 @@ router.get(
 
 /**
  * 獲取用戶廣告統計
- * GET /api/ads/stats/:userId
+ * GET /api/ads/stats
+ * 🔒 安全：userId 從認證 token 自動獲取
  */
 router.get(
-  "/api/ads/stats/:userId",
+  "/api/ads/stats",
+  requireFirebaseAuth,
   asyncHandler(async (req, res) => {
-    const { userId } = req.params;
+    const userId = req.firebaseUser.uid;
     const stats = await getAdStats(userId);
     sendSuccess(res, {
       userId,

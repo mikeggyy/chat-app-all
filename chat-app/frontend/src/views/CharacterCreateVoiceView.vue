@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ArrowLeftIcon, PlayIcon, PauseIcon } from "@heroicons/vue/24/outline";
 import { logger } from "@/utils/logger";
 import {
   fetchCharacterCreationFlow,
@@ -20,6 +19,10 @@ import {
   LOCALE_NAMES,
   GENDER_NAMES,
 } from "../services/voices.service.js";
+import VoiceHeader from "../components/voice-selection/VoiceHeader.vue";
+import VoiceFilters from "../components/voice-selection/VoiceFilters.vue";
+import VoiceCard from "../components/voice-selection/VoiceCard.vue";
+import VoiceActions from "../components/voice-selection/VoiceActions.vue";
 
 const SUMMARY_STORAGE_KEY = "character-create-summary";
 const GENDER_STORAGE_KEY = "characterCreation.gender";
@@ -837,88 +840,39 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="voice" :class="{ 'voice--loading': !hasLoadedSummary }">
-    <header class="voice__header">
-      <button
-        type="button"
-        class="voice__back"
-        aria-label="返回上一頁"
-        @click="goToCharacterSettings"
-      >
-        <ArrowLeftIcon class="voice__back-icon" aria-hidden="true" />
-      </button>
-      <div>
-        <h1 class="voice__title">語音設定</h1>
-        <p class="voice__subtitle">
-          系統會即時保存你的選擇，就算刷新也不會重新扣款。
-        </p>
-      </div>
-    </header>
+    <VoiceHeader
+      title="語音設定"
+      subtitle="系統會即時保存你的選擇，就算刷新也不會重新扣款。"
+      @back="goToCharacterSettings"
+    />
 
-    <section class="voice__filters" aria-label="聲線篩選">
-      <label class="voice__filter">
-        <span>聲線性別</span>
-        <select v-model="selectedGender">
-          <option
-            v-for="option in genderOptions"
-            :key="option.id"
-            :value="option.id"
-          >
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
-    </section>
+    <VoiceFilters
+      :selected-gender="selectedGender"
+      :gender-options="genderOptions"
+      @update:selected-gender="selectedGender = $event"
+    />
 
     <section class="voice__list" aria-label="可選聲線">
-      <article
+      <VoiceCard
         v-for="preset in filteredVoicePresets"
         :key="preset.id"
-        class="voice__card"
-        :class="{
-          'voice__card--selected': preset.id === selectedVoiceId,
-          'voice__card--recommended': preset.recommended,
-        }"
-        @click="!isGeneratingVoice && (selectedVoiceId = preset.id)"
-      >
-        <div class="voice__card-main">
-          <div class="voice__card-header">
-            <h2>
-              {{ preset.label }}
-              <span v-if="preset.recommended" class="voice__badge">推薦</span>
-            </h2>
-            <div class="voice__tags">
-              <span>{{ formatGender(preset.gender) }}</span>
-            </div>
-          </div>
-          <p class="voice__card-desc">{{ preset.description }}</p>
-        </div>
-        <button
-          type="button"
-          class="voice__preview"
-          :disabled="!resolvePreviewUrl(preset.id)"
-          @click.stop="toggleVoicePreview(preset.id)"
-        >
-          <component
-            :is="isPlayingId === preset.id ? PauseIcon : PlayIcon"
-            aria-hidden="true"
-          />
-        </button>
-      </article>
+        :preset="preset"
+        :is-selected="preset.id === selectedVoiceId"
+        :is-playing="isPlayingId === preset.id"
+        :format-gender="formatGender"
+        :has-preview-url="Boolean(resolvePreviewUrl(preset.id))"
+        @select="selectedVoiceId = $event"
+        @toggle-preview="toggleVoicePreview"
+      />
       <p v-if="!filteredVoicePresets.length" class="voice__empty">
         沒有符合篩選條件的聲線，請調整條件後再試。
       </p>
     </section>
 
-    <footer class="voice__actions">
-      <button
-        type="button"
-        class="voice__button voice__button--primary"
-        :disabled="isPrimaryDisabled"
-        @click="finalizeCreation"
-      >
-        完成
-      </button>
-    </footer>
+    <VoiceActions
+      :is-primary-disabled="isPrimaryDisabled"
+      @primary="finalizeCreation"
+    />
 
     <!-- 角色創建成功彈窗 -->
     <CharacterCreatedModal
@@ -952,131 +906,6 @@ onBeforeUnmount(() => {
   opacity: 0.6;
 }
 
-.voice__header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.voice__back {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.3);
-  color: inherit;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.voice__back-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.voice__title {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.voice__subtitle {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.voice__progress {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.voice__progress-track {
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.voice__progress-bar {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #ff7ac2 0%, #ff4192 100%);
-  transition: width 0.3s ease;
-}
-
-.voice__progress-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.voice__status {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.voice__status--error {
-  color: #ffabc4;
-}
-
-.voice__status--success {
-  color: #9fffc7;
-}
-
-.voice__filters {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-
-.voice__filter {
-  flex: 0 1 240px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.voice__filter span {
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.voice__filter select {
-  appearance: none;
-  background-color: rgba(12, 12, 16, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
-  padding: 10px 38px 10px 14px;
-  color: #ffffff;
-  font-weight: 600;
-  line-height: 1.2;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease,
-    background-color 0.2s ease;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='white' d='M1 0l4 4 4-4 1 1-5 5-5-5z'/%3E%3C/svg%3E"),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
-  background-repeat: no-repeat;
-  background-position: right 14px center, 0 0;
-  background-size: 12px 8px, 100% 100%;
-}
-
-.voice__filter select:hover {
-  border-color: rgba(255, 255, 255, 0.32);
-  background-color: rgba(16, 16, 24, 0.72);
-}
-
-.voice__filter select:focus {
-  outline: none;
-  border-color: #ff7ac2;
-  box-shadow: 0 0 0 3px rgba(255, 122, 194, 0.28);
-  background-color: rgba(18, 18, 28, 0.82);
-}
-
 .voice__list {
   display: flex;
   flex-direction: column;
@@ -1087,172 +916,9 @@ onBeforeUnmount(() => {
   padding-top: 1rem;
 }
 
-.voice__card {
-  display: flex;
-  gap: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 18px;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.28);
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.voice__card--selected {
-  border-color: rgba(255, 99, 168, 0.9);
-  transform: translateY(-1px);
-}
-
-.voice__card-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.voice__card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.voice__card-header h2 {
-  margin: 0;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.voice__badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: linear-gradient(90deg, #ff7ac2 0%, #ff4192 100%);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.voice__tags {
-  display: flex;
-  gap: 6px;
-  font-size: 11px;
-  flex-wrap: wrap;
-}
-
-.voice__tags span {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.voice__tag--locale {
-  background: rgba(255, 122, 194, 0.2) !important;
-  color: #ffd1e8;
-  font-weight: 600;
-}
-
-.voice__card-desc {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.voice__preview {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 16px;
-  padding: 8px 14px;
-  background: rgba(0, 0, 0, 0.35);
-  color: #ffffff;
-  font-size: 13px;
-  svg {
-    width: 2rem;
-    height: 2rem;
-  }
-}
-
-.voice__preview:disabled {
-  opacity: 0.45;
-}
-
 .voice__empty {
   margin: 0;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.6);
-}
-
-.voice__summary {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.28);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.voice__summary h2 {
-  margin: 0 0 8px;
-  font-size: 15px;
-}
-
-.voice__summary ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.voice__generation {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.voice__actions {
-  display: flex;
-  gap: 12px;
-  margin-top: auto;
-}
-
-.voice__button {
-  flex: 1;
-  padding: 12px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 15px;
-  border: none;
-  cursor: pointer;
-}
-
-.voice__button--ghost {
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: transparent;
-  color: #ffffff;
-}
-
-.voice__button--primary {
-  background: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
-  color: #ffffff;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  box-shadow: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.voice__button--primary:not(:disabled):hover {
-  transform: translateY(-1px);
-}
-
-.voice__button:disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
-  box-shadow: none;
 }
 </style>

@@ -1,81 +1,118 @@
 <script setup>
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  reactive,
-  ref,
-  watch,
-} from "vue";
-import { useRouter } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   ChatBubbleBottomCenterTextIcon,
   InformationCircleIcon,
   XMarkIcon,
   HeartIcon as HeartOutline,
-} from "@heroicons/vue/24/outline";
-import { HeartIcon as HeartSolid } from "@heroicons/vue/24/solid";
-import { apiJson } from "../utils/api";
-import { fallbackMatches } from "../utils/matchFallback";
-import { useUserProfile } from "../composables/useUserProfile";
-import { useFirebaseAuth } from "../composables/useFirebaseAuth";
-import { useGuestGuard } from "../composables/useGuestGuard";
-import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service";
-import LazyImage from "../components/common/LazyImage.vue";
+} from '@heroicons/vue/24/outline';
+import { HeartIcon as HeartSolid } from '@heroicons/vue/24/solid';
+import { useUserProfile } from '../composables/useUserProfile';
+import { useFirebaseAuth } from '../composables/useFirebaseAuth';
+import { useGuestGuard } from '../composables/useGuestGuard';
+import { useMatchCarousel } from '../composables/match/useMatchCarousel';
+import { useMatchGestures } from '../composables/match/useMatchGestures';
+import { useMatchFavorites } from '../composables/match/useMatchFavorites';
+import { useMatchData } from '../composables/match/useMatchData';
+import LazyImage from '../components/common/LazyImage.vue';
 
 const router = useRouter();
 const { user, loadUserProfile, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
 const { requireLogin } = useGuestGuard();
-const isLoading = ref(false);
-const error = ref("");
-const conversationError = ref("");
-const favoriteIds = ref(new Set());
-const favoriteMutating = ref(false);
-const favoriteError = ref("");
-const favoriteRequestState = reactive({
-  loading: false,
-  lastUserId: "",
-});
-const matches = ref([]);
-const currentIndex = ref(0);
-const swipeOffset = ref(0);
-const swipeActive = ref(false);
-const swipeStartX = ref(0);
-const swipeStartY = ref(0);
-const isAnimating = ref(false);
-const carouselContainer = ref(null);
-const cardWidth = ref(0);
-const swipeThreshold = 80;
-const interactiveElementSelector =
-  "button, [role='button'], a, input, textarea, select, label";
-let resetTimerId;
-let activePointerId = null;
-let activePointerTarget = null;
 
-const BIO_MAX_LENGTH = 50;
+// 角色數據管理
+const matchData = useMatchData({ user });
+const { matches, isLoading, error } = matchData;
 
+// 當前顯示的角色數據
 const match = reactive({
-  id: "",
-  display_name: "",
-  locale: "",
-  creatorUid: "",
-  creatorDisplayName: "",
-  gender: "",
-  background: "",
-  first_message: "",
-  secret_background: "",
-  portraitUrl: "",
+  id: '',
+  display_name: '',
+  locale: '',
+  creatorUid: '',
+  creatorDisplayName: '',
+  gender: '',
+  background: '',
+  first_message: '',
+  secret_background: '',
+  portraitUrl: '',
 });
+
+// 應用角色數據
+const applyMatchData = (data) => {
+  if (!data) return;
+
+  Object.assign(match, {
+    id: data.id ?? '',
+    display_name: data.display_name ?? '',
+    locale: data.locale ?? '',
+    creatorUid:
+      data.creatorUid ??
+      data.creator_uid ??
+      (typeof data.creator === 'string' ? data.creator : ''),
+    creatorDisplayName:
+      data.creatorDisplayName ??
+      data.creator_display_name ??
+      (typeof data.creator === 'string' ? data.creator : ''),
+    gender: data.gender ?? '',
+    background: data.background ?? '',
+    first_message: data.first_message ?? '',
+    secret_background: data.secret_background ?? '',
+    portraitUrl: data.portraitUrl ?? '',
+  });
+};
+
+// 輪播控制
+const carousel = useMatchCarousel({
+  matches,
+  onIndexChange: (index, matchData) => {
+    applyMatchData(matchData);
+  },
+});
+
+// 輪播容器 ref（需要在主組件中定義以便模板綁定）
+const carouselContainerRef = carousel.carouselContainer;
+
+// 手勢控制
+const gestures = useMatchGestures({
+  swipeThreshold: 80,
+  cardWidthRef: carousel.cardWidth,
+  swipeOffsetRef: carousel.swipeOffset,
+  isAnimatingRef: carousel.isAnimating,
+  onSwipeStart: () => {
+    carousel.measureCardWidth();
+  },
+  onSwipeComplete: (direction) => {
+    carousel.animateTo(direction);
+  },
+  onSwipeCancel: () => {
+    carousel.scheduleReset();
+  },
+});
+
+// 收藏管理
+const favorites = useMatchFavorites({
+  user,
+  firebaseAuth,
+  onUpdateProfile: setUserProfile,
+  requireLogin,
+});
+
+const isFavorited = computed(() => favorites.isFavorited(match.id));
+
+// 背景對話框
+const BIO_MAX_LENGTH = 50;
 
 const backgroundDialog = reactive({
   open: false,
-  title: "",
-  text: "",
+  title: '',
+  text: '',
 });
 
 const formatBackground = (text) => {
-  if (typeof text !== "string") return "";
+  if (typeof text !== 'string') return '';
   const normalized = text.trim();
   if (normalized.length <= BIO_MAX_LENGTH) {
     return normalized;
@@ -84,14 +121,14 @@ const formatBackground = (text) => {
 };
 
 const openBackgroundDialog = (title, text) => {
-  if (typeof text !== "string") return;
+  if (typeof text !== 'string') return;
   const content = text.trim();
   if (!content) return;
 
   backgroundDialog.title =
-    typeof title === "string" && title.trim().length
+    typeof title === 'string' && title.trim().length
       ? `${title.trim()}・角色背景`
-      : "角色背景";
+      : '角色背景';
   backgroundDialog.text = content;
   backgroundDialog.open = true;
 };
@@ -100,515 +137,48 @@ const closeBackgroundDialog = () => {
   backgroundDialog.open = false;
 };
 
-const syncFavoriteSet = (favorites) => {
-  const list = Array.isArray(favorites) ? favorites : [];
-  favoriteIds.value = new Set(list);
-};
-
-let lastLoadedUserId = "";
-
-const fetchFavoritesForCurrentUser = async (options = {}) => {
-  const targetProfile = user.value;
-  const targetUserId = targetProfile?.id;
-  if (!targetUserId) {
-    return;
-  }
-
-  if (favoriteRequestState.loading) {
-    return;
-  }
-
-  favoriteRequestState.loading = true;
-
-  let headers = {};
-  try {
-    const token = await firebaseAuth.getCurrentUserIdToken();
-    headers = {
-      Authorization: `Bearer ${token}`,
-    };
-  } catch (tokenError) {
-    const currentProfile = user.value;
-    const profileMismatch =
-      !currentProfile?.id || currentProfile.id !== targetUserId;
-
-    if (profileMismatch) {
-      favoriteRequestState.loading = false;
-      return;
-    }
-
-    const expectedUnauthenticated =
-      (tokenError instanceof Error &&
-        tokenError.message.includes("尚未登入")) ||
-      (typeof tokenError?.code === "string" &&
-        tokenError.code.includes("auth/"));
-
-    if (!expectedUnauthenticated && import.meta.env.DEV) {
-    }
-  }
-
-  try {
-    const response = await apiJson(
-      `/api/users/${encodeURIComponent(targetUserId)}/favorites`,
-      {
-        method: "GET",
-        headers: Object.keys(headers).length ? headers : undefined,
-        skipGlobalLoading: options.skipGlobalLoading ?? true,
-      }
-    );
-
-    const favorites = Array.isArray(response?.favorites)
-      ? response.favorites
-      : [];
-
-    const currentProfile = user.value;
-    if (currentProfile?.id !== targetUserId) {
-      return;
-    }
-
-    const existingFavorites = Array.isArray(currentProfile.favorites)
-      ? currentProfile.favorites
-      : [];
-
-    const isSameFavorites =
-      existingFavorites.length === favorites.length &&
-      existingFavorites.every((value, index) => value === favorites[index]);
-
-    favoriteRequestState.lastUserId = targetUserId;
-
-    syncFavoriteSet(favorites);
-
-    if (!isSameFavorites) {
-      setUserProfile({
-        ...currentProfile,
-        favorites,
-      });
-    }
-  } catch (err) {
-    if (err?.status === 404) {
-      favoriteRequestState.lastUserId = targetUserId;
-      syncFavoriteSet([]);
-      const currentProfile = user.value;
-      if (currentProfile?.id === targetUserId) {
-        setUserProfile({
-          ...currentProfile,
-          favorites: [],
-        });
-      }
-      return;
-    }
-    if (import.meta.env.DEV) {
-    }
-  } finally {
-    favoriteRequestState.loading = false;
-  }
-};
-
 const handleKeydown = (event) => {
-  if (event.key === "Escape" && backgroundDialog.open) {
+  if (event.key === 'Escape' && backgroundDialog.open) {
     closeBackgroundDialog();
   }
 };
 
-const isFavorited = computed(() => favoriteIds.value.has(match.id));
+// 進入聊天室
+const conversationError = ref('');
 
-const carouselMatches = computed(() => {
-  const list = matches.value;
-  const len = list.length;
-  if (!len) return [];
+const enterChatRoom = () => {
+  conversationError.value = '';
 
-  const wrapIndex = (offset) => (currentIndex.value + offset + len) % len;
-  const build = (offset, slot) => {
-    const idx = wrapIndex(offset);
-    const data = list[idx];
-    return {
-      slot,
-      index: idx,
-      data,
-      key: `${data?.id ?? "match"}-${slot}-${currentIndex.value}`,
-    };
-  };
-
-  if (len === 1) {
-    return [build(0, "current")];
-  }
-
-  if (len === 2) {
-    return [build(-1, "prev"), build(0, "current"), build(1, "next")];
-  }
-
-  return [build(-1, "prev"), build(0, "current"), build(1, "next")];
-});
-
-const translateValue = computed(() => {
-  const hasLoop = carouselMatches.value.length > 1;
-  const base = hasLoop ? "-100%" : "0px";
-  const offset = `${swipeOffset.value}px`;
-  return hasLoop ? `calc(${base} + ${offset})` : offset;
-});
-
-const trackStyle = computed(() => ({
-  transform: `translateX(${translateValue.value})`,
-  transition: isAnimating.value ? "transform 0.22s ease-out" : "none",
-}));
-
-const backgroundTrackStyle = computed(() => ({
-  transform: `translateX(${translateValue.value})`,
-  transition: isAnimating.value ? "transform 0.28s ease-out" : "none",
-}));
-
-const measureCardWidth = () => {
-  cardWidth.value = carouselContainer.value?.offsetWidth ?? 0;
-};
-
-const clearAnimationTimer = () => {
-  if (resetTimerId) {
-    clearTimeout(resetTimerId);
-    resetTimerId = undefined;
-  }
-};
-
-const capturePointer = (event) => {
-  if (!(event instanceof PointerEvent)) return;
-  const target = event.currentTarget;
-  if (!(target instanceof HTMLElement)) return;
-  try {
-    target.setPointerCapture(event.pointerId);
-    activePointerId = event.pointerId;
-    activePointerTarget = target;
-  } catch {
-    activePointerId = null;
-    activePointerTarget = null;
-  }
-};
-
-const releaseCapturedPointer = (event) => {
-  const pointerId =
-    event instanceof PointerEvent ? event.pointerId : activePointerId;
-  const target =
-    event instanceof PointerEvent && event.currentTarget instanceof HTMLElement
-      ? event.currentTarget
-      : activePointerTarget;
-
-  if (pointerId == null || !target) {
-    activePointerId = null;
-    activePointerTarget = null;
-    return;
-  }
-
-  try {
-    target.releasePointerCapture(pointerId);
-  } catch {
-    // 忽略無法釋放的例外
-  } finally {
-    if (activePointerId === pointerId) {
-      activePointerId = null;
-      activePointerTarget = null;
-    }
-  }
-};
-
-const scheduleReset = () => {
-  clearAnimationTimer();
-  isAnimating.value = true;
-  swipeOffset.value = 0;
-  resetTimerId = window.setTimeout(() => {
-    isAnimating.value = false;
-    resetTimerId = undefined;
-  }, 220);
-};
-
-const applyMatchData = (data) => {
-  if (!data) return;
-
-  Object.assign(match, {
-    id: data.id ?? "",
-    display_name: data.display_name ?? "",
-    locale: data.locale ?? "",
-    creatorUid:
-      data.creatorUid ??
-      data.creator_uid ??
-      (typeof data.creator === "string" ? data.creator : ""),
-    creatorDisplayName:
-      data.creatorDisplayName ??
-      data.creator_display_name ??
-      (typeof data.creator === "string" ? data.creator : ""),
-    gender: data.gender ?? "",
-    background: data.background ?? "",
-    first_message: data.first_message ?? "",
-    secret_background: data.secret_background ?? "",
-    portraitUrl: data.portraitUrl ?? "",
-  });
-};
-
-const showMatchByIndex = (index) => {
-  if (!matches.value.length) return;
-  const normalized = (index + matches.value.length) % matches.value.length;
-  currentIndex.value = normalized;
-  applyMatchData(matches.value[normalized]);
-};
-
-const goToNext = () => {
-  if (!matches.value.length) return;
-  showMatchByIndex(currentIndex.value + 1);
-};
-
-const goToPrevious = () => {
-  if (!matches.value.length) return;
-  showMatchByIndex(currentIndex.value - 1);
-};
-
-const animateTo = (direction) => {
-  clearAnimationTimer();
-  if (!cardWidth.value) {
-    measureCardWidth();
-  }
-
-  const width =
-    cardWidth.value ||
-    carouselContainer.value?.offsetWidth ||
-    window.innerWidth ||
-    1;
-
-  isAnimating.value = true;
-  swipeOffset.value = direction === "next" ? -width : width;
-
-  resetTimerId = window.setTimeout(() => {
-    if (direction === "next") {
-      showMatchByIndex(currentIndex.value + 1);
-    } else {
-      showMatchByIndex(currentIndex.value - 1);
-    }
-
-    isAnimating.value = false;
-    swipeOffset.value = 0;
-  }, 220);
-};
-
-const readPoint = (event) => {
-  if ("touches" in event && event.touches.length) return event.touches[0];
-  if ("changedTouches" in event && event.changedTouches.length)
-    return event.changedTouches[0];
-  return event;
-};
-
-const onSwipeStart = (event) => {
-  if (
-    event instanceof PointerEvent &&
-    event.pointerType === "mouse" &&
-    event.button !== 0
-  ) {
-    return;
-  }
-
-  const target = event.target;
-  if (
-    target instanceof Element &&
-    (target.closest(".actions") ||
-      target.closest(".bio-card-header") ||
-      target.closest(interactiveElementSelector))
-  ) {
-    return;
-  }
-
-  if (event instanceof PointerEvent && event.cancelable) {
-    event.preventDefault();
-  }
-
-  measureCardWidth();
-
-  capturePointer(event);
-
-  const point = readPoint(event);
-  swipeActive.value = true;
-  swipeStartX.value = point.clientX;
-  swipeStartY.value = point.clientY;
-  swipeOffset.value = 0;
-  isAnimating.value = false;
-};
-
-const onSwipeMove = (event) => {
-  if (!swipeActive.value) return;
-  const point = readPoint(event);
-  const offsetX = point.clientX - swipeStartX.value;
-  const offsetY = Math.abs(point.clientY - swipeStartY.value);
-
-  if (offsetY > 90) {
-    onSwipeCancel();
-    return;
-  }
-
-  swipeOffset.value = offsetX;
-};
-
-const onSwipeEnd = (event) => {
-  if (!swipeActive.value) return;
-  releaseCapturedPointer(event);
-  const point = readPoint(event);
-  const diffX = point.clientX - swipeStartX.value;
-  const diffY = Math.abs(point.clientY - swipeStartY.value);
-  swipeActive.value = false;
-
-  if (Math.abs(diffX) > swipeThreshold && diffY < 90) {
-    animateTo(diffX < 0 ? "next" : "prev");
-  } else {
-    scheduleReset();
-  }
-};
-
-const onSwipeCancel = (event) => {
-  releaseCapturedPointer(event);
-  if (!swipeActive.value) return;
-  swipeActive.value = false;
-  scheduleReset();
-};
-
-const toggleFavorite = async () => {
-  favoriteError.value = "";
-
-  if (favoriteMutating.value || !match.id) {
-    return;
-  }
-
-  // 檢查是否為遊客
-  if (requireLogin({ feature: "收藏角色" })) {
+  if (!match.id) {
     return;
   }
 
   const currentProfile = user.value;
   if (!currentProfile?.id) {
-    favoriteError.value = "請登入後才能收藏角色。";
+    conversationError.value = '請登入後才能開始對話。';
     return;
   }
 
-  let token;
-  try {
-    token = await firebaseAuth.getCurrentUserIdToken();
-  } catch (authError) {
-    favoriteError.value =
-      authError instanceof Error
-        ? authError.message
-        : "取得登入資訊時發生錯誤，請重新登入後再試。";
-    return;
-  }
-
-  favoriteMutating.value = true;
-  const targetId = match.id;
-  const wasFavorited = favoriteIds.value.has(targetId);
-  const previousSet = new Set(favoriteIds.value);
-  const optimisticSet = new Set(previousSet);
-
-  if (wasFavorited) {
-    optimisticSet.delete(targetId);
-  } else {
-    optimisticSet.add(targetId);
-  }
-
-  favoriteIds.value = optimisticSet;
-
-  try {
-    const endpoint = wasFavorited
-      ? `/api/users/${encodeURIComponent(
-          currentProfile.id
-        )}/favorites/${encodeURIComponent(targetId)}`
-      : `/api/users/${encodeURIComponent(currentProfile.id)}/favorites`;
-
-    const response = await apiJson(endpoint, {
-      method: wasFavorited ? "DELETE" : "POST",
-      body: wasFavorited ? undefined : { matchId: targetId },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      skipGlobalLoading: true,
-    });
-
-    const favoritesList = Array.isArray(response?.favorites)
-      ? response.favorites
-      : [];
-
-    favoriteIds.value = new Set(favoritesList);
-    setUserProfile({
-      ...currentProfile,
-      favorites: favoritesList,
-    });
-  } catch (requestError) {
-    favoriteIds.value = previousSet;
-    favoriteError.value =
-      requestError instanceof Error
-        ? requestError.message
-        : "更新收藏時發生錯誤，請稍後再試。";
-    if (import.meta.env.DEV) {
-    }
-  } finally {
-    favoriteMutating.value = false;
-  }
+  // 直接跳轉到聊天視窗，對話記錄將在 ChatView 中處理
+  router.push({
+    name: 'chat',
+    params: { id: match.id },
+  });
 };
 
-const loadMatches = async () => {
-  isLoading.value = true;
-  error.value = "";
+// 用戶變更時的數據載入
+let lastLoadedUserId = '';
 
-  try {
-    const currentUserId = user.value?.id;
-    const endpoint = currentUserId
-      ? `/match/all?userId=${encodeURIComponent(currentUserId)}`
-      : "/match/all";
-
-    // 使用 API 緩存服務，5 分鐘緩存
-    const data = await apiCache.fetch(
-      cacheKeys.matches({ userId: currentUserId || 'guest' }),
-      () => apiJson(endpoint, { skipGlobalLoading: true }),
-      cacheTTL.MATCHES
-    );
-
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error("尚未建立配對角色資料");
-    }
-
-    matches.value = data;
-    measureCardWidth();
-    showMatchByIndex(0);
-  } catch (err) {
-    const fallbackData = Array.isArray(fallbackMatches)
-      ? fallbackMatches.map((item) => ({ ...item }))
-      : [];
-
-    if (fallbackData.length) {
-      matches.value = fallbackData;
-      measureCardWidth();
-      showMatchByIndex(0);
-      error.value = "暫時無法連線至配對服務，已載入示範角色資料。";
-      if (import.meta.env.DEV) {
-        console.error('載入匹配列表失敗:', err);
-      }
-    } else {
-      matches.value = [];
-      error.value =
-        err instanceof Error ? err.message : "取得配對資料時發生錯誤";
-    }
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-// Watch for favorites changes
-watch(
-  () => user.value?.favorites,
-  (next) => {
-    syncFavoriteSet(next);
-  },
-  { immediate: true }
-);
-
-// Watch for user ID changes and load matches
 watch(
   () => user.value?.id,
   async (nextId, prevId) => {
     // 如果沒有用戶 ID（遊客模式）
     if (!nextId) {
-      lastLoadedUserId = "";
-      favoriteRequestState.lastUserId = "";
-      syncFavoriteSet([]);
-      loadMatches();
+      lastLoadedUserId = '';
+      favorites.favoriteRequestState.lastUserId = '';
+      favorites.syncFavoriteSet([]);
+      await matchData.loadMatches();
+      carousel.initialize();
       return;
     }
 
@@ -617,7 +187,7 @@ watch(
       return;
     }
 
-    favoriteError.value = "";
+    favorites.clearError();
 
     // 新用戶 - 並行執行所有請求以提升性能
     if (nextId !== lastLoadedUserId) {
@@ -625,13 +195,14 @@ watch(
 
       // 使用 Promise.allSettled 並行執行所有請求
       // allSettled 確保即使某個請求失敗，其他請求仍會繼續執行
-      const [profileResult, favoritesResult, matchesResult] = await Promise.allSettled([
-        loadUserProfile(nextId, { skipGlobalLoading: true }),
-        favoriteRequestState.lastUserId !== nextId
-          ? fetchFavoritesForCurrentUser({ skipGlobalLoading: true })
-          : Promise.resolve(),
-        loadMatches()
-      ]);
+      const [profileResult, favoritesResult, matchesResult] =
+        await Promise.allSettled([
+          loadUserProfile(nextId, { skipGlobalLoading: true }),
+          favorites.favoriteRequestState.lastUserId !== nextId
+            ? favorites.fetchFavoritesForCurrentUser({ skipGlobalLoading: true })
+            : Promise.resolve(),
+          matchData.loadMatches(),
+        ]);
 
       // 記錄開發環境中的錯誤
       if (import.meta.env.DEV) {
@@ -646,67 +217,56 @@ watch(
         }
       }
 
+      // 初始化輪播
+      carousel.initialize();
+
       return;
     }
 
     // 用戶 ID 相同，只需檢查收藏列表是否需要更新
-    if (favoriteRequestState.lastUserId !== nextId) {
-      await fetchFavoritesForCurrentUser({ skipGlobalLoading: true });
+    if (favorites.favoriteRequestState.lastUserId !== nextId) {
+      await favorites.fetchFavoritesForCurrentUser({ skipGlobalLoading: true });
     }
   },
   { immediate: true }
 );
 
-const enterChatRoom = () => {
-  conversationError.value = "";
+// 監聽用戶收藏列表變更
+watch(
+  () => user.value?.favorites,
+  (next) => {
+    favorites.syncFavoriteSet(next);
+  },
+  { immediate: true }
+);
 
-  if (!match.id) {
-    return;
-  }
-
-  const currentProfile = user.value;
-  if (!currentProfile?.id) {
-    conversationError.value = "請登入後才能開始對話。";
-    return;
-  }
-
-  // 直接跳轉到聊天視窗，對話記錄將在 ChatView 中處理
-  router.push({
-    name: "chat",
-    params: { id: match.id },
-  });
-};
-
+// 生命週期
 onMounted(() => {
-  measureCardWidth();
-  window.addEventListener("resize", measureCardWidth);
-  window.addEventListener("keydown", handleKeydown);
-  // ⚠️ 不在這裡調用 fetchFavoritesForCurrentUser 和 loadMatches
-  // 因為 watch(user.value?.id) 已經會自動執行（immediate: true）
+  carousel.measureCardWidth();
+  window.addEventListener('resize', carousel.measureCardWidth);
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onBeforeUnmount(() => {
-  clearAnimationTimer();
-  releaseCapturedPointer();
-  window.removeEventListener("resize", measureCardWidth);
-  window.removeEventListener("keydown", handleKeydown);
+  window.removeEventListener('resize', carousel.measureCardWidth);
+  window.removeEventListener('keydown', handleKeydown);
 });
 </script>
 
 <template>
   <main
     class="match-page"
-    :class="{ 'is-grabbing': swipeActive }"
-    @pointerdown="onSwipeStart"
-    @pointermove="onSwipeMove"
-    @pointerup="onSwipeEnd"
-    @pointercancel="onSwipeCancel"
-    @pointerleave="onSwipeCancel"
+    :class="{ 'is-grabbing': gestures.swipeActive.value }"
+    @pointerdown="gestures.onSwipeStart"
+    @pointermove="gestures.onSwipeMove"
+    @pointerup="gestures.onSwipeEnd"
+    @pointercancel="gestures.onSwipeCancel"
+    @pointerleave="gestures.onSwipeCancel"
   >
     <div class="background-wrapper">
-      <div class="background-track" :style="backgroundTrackStyle">
+      <div class="background-track" :style="carousel.backgroundTrackStyle.value">
         <div
-          v-for="item in carouselMatches"
+          v-for="item in carousel.carouselMatches.value"
           :key="`bg-${item.key}`"
           class="background-slide"
         >
@@ -722,10 +282,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="content-wrapper" ref="carouselContainer">
-      <div class="carousel-track" :style="trackStyle">
+    <div class="content-wrapper" ref="carouselContainerRef">
+      <div class="carousel-track" :style="carousel.trackStyle.value">
         <section
-          v-for="item in carouselMatches"
+          v-for="item in carousel.carouselMatches.value"
           :key="item.key"
           class="content"
           :class="{ 'is-active': item.data?.id === match.id }"
@@ -737,8 +297,8 @@ onBeforeUnmount(() => {
                 v-if="item.data?.id === match.id"
                 type="button"
                 class="btn-favorite-icon"
-                @click="toggleFavorite"
-                :disabled="favoriteMutating"
+                @click="favorites.toggleFavorite(match.id)"
+                :disabled="favorites.favoriteMutating.value"
                 :aria-label="isFavorited ? '取消收藏' : '加入收藏'"
               >
                 <HeartSolid
@@ -782,10 +342,10 @@ onBeforeUnmount(() => {
               :disabled="isLoading"
             >
               <ChatBubbleBottomCenterTextIcon class="icon" aria-hidden="true" />
-              <span>{{ isLoading ? "尋找配對中…" : "進入聊天室" }}</span>
+              <span>{{ isLoading ? '尋找配對中…' : '進入聊天室' }}</span>
             </button>
-            <p v-if="favoriteError" class="action-error">
-              {{ favoriteError }}
+            <p v-if="favorites.favoriteError.value" class="action-error">
+              {{ favorites.favoriteError.value }}
             </p>
           </div>
         </section>

@@ -1,5 +1,10 @@
 import { ref, computed } from 'vue';
 import { apiJson } from '../utils/api.js';
+import {
+  generateUnlockCharacterRequestId,
+  generateUnlockPhotoRequestId,
+  generateUnlockVideoRequestId,
+} from '../utils/requestId.js';
 
 // 解鎖卡狀態的全域管理（統一使用 Cards 命名，與共享配置一致）
 const ticketsState = ref({
@@ -32,7 +37,7 @@ export function useUnlockTickets() {
     error.value = null;
 
     try {
-      const data = await apiJson('/api/unlock-tickets/balance', {
+      const data = await apiJson('/api/unlock-tickets/balances', {
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
 
@@ -73,10 +78,14 @@ export function useUnlockTickets() {
     error.value = null;
 
     try {
+      // 生成唯一請求ID（用於冪等性保護）
+      const requestId = generateUnlockCharacterRequestId(userId || 'user', characterId);
+
       const data = await apiJson('/api/unlock-tickets/use/character', {
         method: 'POST',
         body: {
           characterId,
+          requestId,
         },
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
@@ -98,26 +107,25 @@ export function useUnlockTickets() {
   /**
    * 使用拍照卡
    * @param {string} userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
-   * @param {string} characterId - 角色 ID
+   * @param {string} characterId - 角色 ID（已廢棄，拍照卡不綁定角色）
    * @param {object} options - 選項
    */
   const usePhotoCard = async (userId, characterId, options = {}) => {
-    // userId 參數已廢棄，保留是為了向後兼容
+    // userId 和 characterId 參數已廢棄，保留是為了向後兼容
     // 後端現在從認證 token 自動獲取 userId
-
-    if (!characterId) {
-      error.value = '需要提供角色 ID';
-      throw new Error('需要提供角色 ID');
-    }
+    // 拍照卡是全局的，不綁定特定角色
 
     isLoading.value = true;
     error.value = null;
 
     try {
+      // 生成唯一請求ID（用於冪等性保護）
+      const requestId = generateUnlockPhotoRequestId(userId || 'user');
+
       const data = await apiJson('/api/unlock-tickets/use/photo', {
         method: 'POST',
         body: {
-          characterId,
+          requestId,
         },
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
@@ -139,26 +147,25 @@ export function useUnlockTickets() {
   /**
    * 使用視訊卡
    * @param {string} userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
-   * @param {string} characterId - 角色 ID
+   * @param {string} characterId - 角色 ID（已廢棄，影片卡不綁定角色）
    * @param {object} options - 選項
    */
   const useVideoCard = async (userId, characterId, options = {}) => {
-    // userId 參數已廢棄，保留是為了向後兼容
+    // userId 和 characterId 參數已廢棄，保留是為了向後兼容
     // 後端現在從認證 token 自動獲取 userId
-
-    if (!characterId) {
-      error.value = '需要提供角色 ID';
-      throw new Error('需要提供角色 ID');
-    }
+    // 影片卡是全局的，不綁定特定角色
 
     isLoading.value = true;
     error.value = null;
 
     try {
+      // 生成唯一請求ID（用於冪等性保護）
+      const requestId = generateUnlockVideoRequestId(userId || 'user');
+
       const data = await apiJson('/api/unlock-tickets/use/video', {
         method: 'POST',
         body: {
-          characterId,
+          requestId,
         },
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });

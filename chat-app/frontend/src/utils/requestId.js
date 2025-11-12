@@ -61,10 +61,44 @@ export function generateAiReplyRequestId(userId, characterId, userMessageId) {
   return `ai-reply-${userId}-${characterId}-${userMessageId}`;
 }
 
+/**
+ * 生成角色解鎖卡使用請求ID
+ * @param {string} userId - 用戶ID
+ * @param {string} characterId - 角色ID
+ * @returns {string} 請求ID
+ */
+export function generateUnlockCharacterRequestId(userId, characterId) {
+  // 每次解鎖都是新請求，使用時間戳保證唯一性
+  return generateRequestId(`unlock-character-${userId}-${characterId}`);
+}
+
+/**
+ * 生成拍照解鎖卡使用請求ID
+ * @param {string} userId - 用戶ID
+ * @returns {string} 請求ID
+ */
+export function generateUnlockPhotoRequestId(userId) {
+  // 每次使用都是新請求，使用時間戳保證唯一性
+  return generateRequestId(`unlock-photo-${userId}`);
+}
+
+/**
+ * 生成影片解鎖卡使用請求ID
+ * @param {string} userId - 用戶ID
+ * @returns {string} 請求ID
+ */
+export function generateUnlockVideoRequestId(userId) {
+  // 每次使用都是新請求，使用時間戳保證唯一性
+  return generateRequestId(`unlock-video-${userId}`);
+}
+
 export default {
   generateRequestId,
   generateVoiceRequestId,
   generatePhotoRequestId,
   generateGiftRequestId,
   generateAiReplyRequestId,
+  generateUnlockCharacterRequestId,
+  generateUnlockPhotoRequestId,
+  generateUnlockVideoRequestId,
 };

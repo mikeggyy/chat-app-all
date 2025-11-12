@@ -34,11 +34,19 @@ const getCachedToken = async () => {
 
     if (token) {
       cachedToken = token;
-      // 測試 token 緩存更長時間（24 小時），Firebase token 緩存 55 分鐘
+      // ✅ 修復: 測試 token 緩存時間縮短為 5 分鐘，降低安全風險
+      const isTestEnv = import.meta.env.DEV;
       const isTestToken = token === 'test-token';
+
+      // 禁止生產環境使用測試 token
+      if (isTestToken && !isTestEnv) {
+        console.error('❌ 測試 token 不應在生產環境使用');
+        throw new Error('Invalid token in production');
+      }
+
       tokenExpiry = isTestToken
-        ? now + 24 * 60 * 60 * 1000
-        : now + 55 * 60 * 1000;
+        ? now + 5 * 60 * 1000  // 測試 token 緩存 5 分鐘（從 24 小時縮短）
+        : now + 50 * 60 * 1000; // Firebase token 緩存 50 分鐘（留 10 分鐘緩衝）
       return token;
     }
   } catch (error) {

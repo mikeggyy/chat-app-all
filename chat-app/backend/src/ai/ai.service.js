@@ -489,23 +489,10 @@ const requestOpenAIReply = async (character, history, latestUserMessage, userId,
       characterId,
     });
 
-    // ✅ 補償機制：AI 請求失敗時，返還對話次數
-    // 注意：這裡不直接導入 conversationLimit.service，而是在需要時動態導入，避免循環依賴
-    try {
-      const conversationLimitService = await import("../services/limitService/conversationLimit.service.js");
-
-      // 返還對話次數（減少使用次數，實際上是增加剩餘次數）
-      await conversationLimitService.default.decrementUse(userId, characterId, {
-        reason: "ai_request_failed",
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      });
-
-      logger.info(`[AI 服務] 已返還用戶 ${userId} 對 ${characterId} 的對話次數`);
-    } catch (rollbackError) {
-      logger.error("[AI 服務] 返還對話次數失敗:", rollbackError);
-      // 不阻塞主流程，記錄錯誤即可
-    }
+    // ⚠️ 注意：不需要補償機制
+    // 原因：對話次數的記錄（recordMessage）發生在 AI 成功後（見 ai.routes.js）
+    // 如果 AI 失敗，recordMessage 不會被調用，所以對話次數根本沒有增加
+    // 因此不需要執行補償（decrementUse）來返還對話次數
 
     // 重新拋出錯誤，讓調用方處理
     throw error;

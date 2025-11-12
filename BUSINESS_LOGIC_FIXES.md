@@ -947,7 +947,7 @@ router.patch('/:userId/profile',
 
 ### 17. ✅ AI 服務重試機制
 
-**問題**: OpenAI API 調用沒有重試機制，臨時錯誤會直接導致對話失敗，且已消耗的對話次數不會返還
+**問題**: OpenAI API 調用沒有重試機制，臨時錯誤會直接導致對話失敗
 
 **修復**: 已完成
 - 文件: `chat-app/backend/src/ai/ai.service.js`
@@ -955,7 +955,7 @@ router.patch('/:userId/profile',
 - 為 `requestOpenAISuggestions` 添加重試機制（最多 2 次）
 - 只重試臨時性錯誤：5xx、429 速率限制、網絡錯誤（ETIMEDOUT、ECONNRESET 等）
 - 使用指數退避策略，避免給服務器帶來壓力
-- 添加補償機制：AI 請求失敗後自動返還對話次數
+- ⚠️ **不需要補償機制**：對話次數的記錄（recordMessage）發生在 AI 成功後，失敗時不會記錄，因此無需返還
 
 **重試工具**: `chat-app/backend/src/utils/retryWithBackoff.js`（已存在，`retryWithExponentialBackoff` 函數）
 

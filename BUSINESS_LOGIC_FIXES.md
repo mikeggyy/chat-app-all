@@ -458,9 +458,52 @@ const cacheUserProfile = (payload) => {
 
 ---
 
-### 11-13. 🔄 其他中危問題
+### 11. ✅ 購買確認防抖
 
-**11. 購買確認防抖**: 防止快速雙擊
+**問題**: 購買確認對話框沒有防抖保護，用戶快速點擊可能觸發多次購買
+
+**修復**: 已完成
+- 文件: `chat-app/frontend/src/composables/usePurchaseConfirm.js`
+- 添加 `isProcessing` 狀態追蹤處理中狀態
+- 在 `handleConfirm` 中檢查是否正在處理，防止重複點擊
+- 添加 1 秒冷卻時間，延遲重置處理狀態
+- 取消按鈕也檢查處理狀態，處理中無法取消
+
+**實現**:
+```javascript
+// frontend/src/composables/usePurchaseConfirm.js
+const dialogState = ref({
+  // ... 其他狀態
+  isProcessing: false, // 防止重複點擊
+});
+
+const handleConfirm = () => {
+  // 防抖檢查
+  if (dialogState.value.isProcessing) {
+    console.warn('[usePurchaseConfirm] 正在處理中，忽略重複點擊');
+    return;
+  }
+
+  // 設置為處理中
+  dialogState.value.isProcessing = true;
+
+  // 執行確認邏輯
+  if (dialogState.value.resolve) {
+    dialogState.value.resolve(true);
+  }
+  dialogState.value.isOpen = false;
+
+  // 1 秒後重置狀態
+  setTimeout(() => {
+    dialogState.value.isProcessing = false;
+  }, 1000);
+};
+```
+
+---
+
+### 12-13. 🔄 其他中危問題
+
 **12. localStorage 錯誤處理**: 更激進的清理策略
 
 ---
@@ -818,12 +861,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
 | 🔴 高危 | 4 | 1 | 5 |
-| 🟡 中危 | 4 | 4 | 8 |
+| 🟡 中危 | 5 | 3 | 8 |
 | 🟢 低危 | 0 | 5 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **10** | **11** | **21** |
+| **總計** | **11** | **10** | **21** |
 
-**完成度**: 47.6%
+**完成度**: 52.4%
 
 ### 已完成的修復
 
@@ -837,11 +880,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 5. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
 6. ✅ 訂單狀態機驗證（Commit: `735e665`）
 7. ✅ 資產購買原子性（Commit: `738a914`）
-8. ✅ 前端用戶資料緩存 TTL（本次提交）
+8. ✅ 前端用戶資料緩存 TTL（Commit: `83c66cf`）
+9. ✅ 購買確認防抖（本次提交）
 
 **性能優化**:
-9. ✅ 添加 Firestore 索引（Commit: `c28c549`）
-10. ✅ 創建修復文檔（Commit: `da49a75`）
+10. ✅ 添加 Firestore 索引（Commit: `c28c549`）
+11. ✅ 創建修復文檔（Commit: `da49a75`）
 
 ---
 

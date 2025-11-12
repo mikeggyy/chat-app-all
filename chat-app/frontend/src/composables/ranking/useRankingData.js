@@ -5,9 +5,10 @@
 
 import { ref, shallowRef, computed } from 'vue';
 import { fetchRanking, RANKING_PAGE_SIZE } from '../../services/ranking.service.js';
-import { apiJson } from '../../utils/api.js';
+import { apiJsonCached } from '../../utils/api.js';
 import { fallbackMatches } from '../../utils/matchFallback.js';
-import { apiCache, cacheKeys, cacheTTL } from '../../services/apiCache.service.js';
+import { cacheKeys, cacheTTL } from '../../services/apiCache.service.js';
+import { logger } from '../../utils/logger.js';
 import {
   normalizeIdentifier,
   toPositiveInteger,
@@ -71,7 +72,7 @@ export function useRankingData() {
 
       assignMatchMetadata(matches);
     } catch (error) {
-      console.error("載入角色元數據失敗:", error);
+      logger.error("載入角色元數據失敗:", error);
     }
   };
 
@@ -266,7 +267,7 @@ export function useRankingData() {
         updatedAt.value = timestamp;
       }
     } catch (error) {
-      console.error("載入排行榜失敗:", error);
+      logger.error("載入排行榜失敗:", error);
       errorMessage.value = error.message || "載入排行榜資料失敗，請稍後再試";
       hasMore.value = false;
     } finally {

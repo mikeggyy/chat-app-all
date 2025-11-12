@@ -1,5 +1,6 @@
 import { withGlobalLoading } from "../composables/useGlobalLoading.js";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth.js";
+import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service.js";
 
 /**
  * 請求去重緩存
@@ -334,4 +335,96 @@ export const apiJson = async (path, options = {}) => {
   }
 
   return response.json();
+};
+
+/**
+ * 帶長期緩存的 API JSON 請求
+ * 使用 apiCache.service.js 提供的長期緩存機制
+ *
+ * @param {string} path - API 路徑
+ * @param {Object} options - 請求選項
+ * @param {string} [options.cacheKey] - 自定義緩存鍵
+ * @param {number} [options.cacheTTL] - 緩存有效期（毫秒），默認 5 分鐘
+ * @param {boolean} [options.skipCache] - 跳過緩存，直接請求
+ * @returns {Promise<any>} JSON 數據
+ *
+ * @example
+ * ```js
+ * // 自動緩存 10 分鐘
+ * const characters = await apiJsonCached('/api/characters', {
+ *   cacheTTL: cacheTTL.CHARACTER,
+ * });
+ *
+ * // 使用預定義的緩存鍵
+ * const character = await apiJsonCached(`/api/match/${characterId}`, {
+ *   cacheKey: cacheKeys.character(characterId),
+ *   cacheTTL: cacheTTL.CHARACTER,
+ * });
+ *
+ * // 跳過緩存
+ * const freshData = await apiJsonCached('/api/user/profile', {
+ *   skipCache: true,
+ * });
+ * ```
+ */
+export const apiJsonCached = async (path, options = {}) => {
+  const {
+    cacheKey,
+    cacheTTL: customTTL,
+    skipCache = false,
+    ...apiOptions
+  } = options;
+
+  // 如果跳過緩存，直接調用 apiJson
+  if (skipCache) {
+    return apiJson(path, apiOptions);
+  }
+
+  // 僅對 GET 請求使用緩存
+  const method = apiOptions.method || 'GET';
+  if (method !== 'GET') {
+    return apiJson(path, apiOptions);
+  }
+
+  // 生成緩存鍵
+  const baseUrl = apiOptions.baseUrl || getApiBaseUrl();
+  const normalizedBase = normalizeBaseUrl(baseUrl);
+  const url = apiOptions.absolute ? path : buildUrl(normalizedBase, path);
+  const key = cacheKey || `api:${url}`;
+
+  // 確定 TTL（優先使用自定義 TTL）
+  const ttl = customTTL || cacheTTL.DEFAULT || 5 * 60 * 1000;
+
+  // 使用 apiCache 的 fetch 方法
+  return apiCache.fetch(key, () => apiJson(path, apiOptions), ttl);
+};
+
+/**
+ * 清除 API 緩存
+ * 可以清除特定鍵、匹配模式或所有緩存
+ *
+ * @param {string|RegExp|null} pattern - 匹配模式
+ *
+ * @example
+ * ```js
+ * // 清除特定緩存
+ * clearApiCache('api:/api/characters');
+ *
+ * // 清除所有角色相關緩存
+ * clearApiCache(/^character:/);
+ *
+ * // 清除所有緩存
+ * clearApiCache();
+ * ```
+ */
+export const clearApiCache = (pattern) => {
+  apiCache.clear(pattern);
+};
+
+/**
+ * 獲取 API 緩存統計信息
+ * @returns {Object} 緩存統計
+ */
+export const getApiCacheStats = () => {
+  return apiCache.getStats();
 };

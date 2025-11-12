@@ -16,6 +16,7 @@ import { useMatchGestures } from '../composables/match/useMatchGestures';
 import { useMatchFavorites } from '../composables/match/useMatchFavorites';
 import { useMatchData } from '../composables/match/useMatchData';
 import LazyImage from '../components/common/LazyImage.vue';
+import { logger } from '../utils/logger';
 
 const router = useRouter();
 const { user, loadUserProfile, setUserProfile } = useUserProfile();
@@ -144,18 +145,18 @@ const handleKeydown = (event) => {
 };
 
 // 進入聊天室
-const conversationError = ref('');
-
 const enterChatRoom = () => {
-  conversationError.value = '';
-
   if (!match.id) {
+    return;
+  }
+
+  // 檢查是否為遊客
+  if (requireLogin({ feature: '開始對話' })) {
     return;
   }
 
   const currentProfile = user.value;
   if (!currentProfile?.id) {
-    conversationError.value = '請登入後才能開始對話。';
     return;
   }
 
@@ -192,6 +193,7 @@ watch(
     // 新用戶 - 並行執行所有請求以提升性能
     if (nextId !== lastLoadedUserId) {
       lastLoadedUserId = nextId;
+      const requestUserId = nextId; // 保存當前請求的 userId
 
       // 使用 Promise.allSettled 並行執行所有請求
       // allSettled 確保即使某個請求失敗，其他請求仍會繼續執行
@@ -204,17 +206,21 @@ watch(
           matchData.loadMatches(),
         ]);
 
+      // 檢查競態條件：如果請求完成時用戶已切換，忽略這些數據
+      if (user.value?.id !== requestUserId) {
+        logger.warn('用戶已切換，忽略過期的數據載入');
+        return;
+      }
+
       // 記錄開發環境中的錯誤
-      if (import.meta.env.DEV) {
-        if (profileResult.status === 'rejected') {
-          console.warn('載入用戶資料失敗:', profileResult.reason);
-        }
-        if (favoritesResult.status === 'rejected') {
-          console.warn('載入收藏列表失敗:', favoritesResult.reason);
-        }
-        if (matchesResult.status === 'rejected') {
-          console.warn('載入匹配列表失敗:', matchesResult.reason);
-        }
+      if (profileResult.status === 'rejected') {
+        logger.warn('載入用戶資料失敗:', profileResult.reason);
+      }
+      if (favoritesResult.status === 'rejected') {
+        logger.warn('載入收藏列表失敗:', favoritesResult.reason);
+      }
+      if (matchesResult.status === 'rejected') {
+        logger.warn('載入匹配列表失敗:', matchesResult.reason);
       }
 
       // 初始化輪播

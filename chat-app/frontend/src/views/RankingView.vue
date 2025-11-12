@@ -13,9 +13,10 @@ import {
   fetchRanking,
   RANKING_PAGE_SIZE,
 } from "../services/ranking.service.js";
-import { apiJson } from "../utils/api.js";
+import { apiJsonCached } from "../utils/api.js";
 import { fallbackMatches } from "../utils/matchFallback.js";
-import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service.js";
+import { cacheKeys, cacheTTL } from "../services/apiCache.service.js";
+import { logger } from "../utils/logger.js";
 import RankingHeader from "../components/ranking/RankingHeader.vue";
 import RankingPeriodSelector from "../components/ranking/RankingPeriodSelector.vue";
 import RankingPodium from "../components/ranking/RankingPodium.vue";
@@ -114,19 +115,17 @@ const DEFAULT_MATCH_AVATAR =
 
 const loadMatchMetadata = async () => {
   try {
-    const data = await apiCache.fetch(
-      cacheKeys.matches({ all: true }),
-      () => apiJson("/match/all", { skipGlobalLoading: true }),
-      cacheTTL.MATCHES
-    );
+    const data = await apiJsonCached("/match/all", {
+      cacheKey: cacheKeys.matches({ all: true }),
+      cacheTTL: cacheTTL.MATCHES,
+      skipGlobalLoading: true,
+    });
 
     if (Array.isArray(data) && data.length) {
       assignMatchMetadata(data);
     }
   } catch (error) {
-    if (import.meta.env.DEV) {
-      console.error('載入匹配元數據失敗:', error);
-    }
+    logger.error('載入匹配元數據失敗:', error);
   }
 };
 

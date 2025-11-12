@@ -23,6 +23,7 @@
 
 import { ref, reactive, computed } from 'vue';
 import { apiJson } from '../../utils/api';
+import { logger } from '../../utils/logger';
 
 /**
  * 創建收藏管理
@@ -99,8 +100,8 @@ export function useMatchFavorites(options = {}) {
         (typeof tokenError?.code === 'string' &&
           tokenError.code.includes('auth/'));
 
-      if (!expectedUnauthenticated && import.meta.env.DEV) {
-        console.warn('獲取認證 token 失敗:', tokenError);
+      if (!expectedUnauthenticated) {
+        logger.warn('獲取認證 token 失敗:', tokenError);
       }
     }
 
@@ -155,9 +156,7 @@ export function useMatchFavorites(options = {}) {
         }
         return;
       }
-      if (import.meta.env.DEV) {
-        console.error('獲取收藏列表失敗:', err);
-      }
+      logger.error('獲取收藏列表失敗:', err);
     } finally {
       favoriteRequestState.loading = false;
     }
@@ -247,9 +246,7 @@ export function useMatchFavorites(options = {}) {
         requestError instanceof Error
           ? requestError.message
           : '更新收藏時發生錯誤，請稍後再試。';
-      if (import.meta.env.DEV) {
-        console.error('切換收藏失敗:', requestError);
-      }
+      logger.error('切換收藏失敗:', requestError);
       return false;
     } finally {
       favoriteMutating.value = false;

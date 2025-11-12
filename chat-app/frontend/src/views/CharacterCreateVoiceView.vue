@@ -1,322 +1,75 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { logger } from "@/utils/logger";
-import {
-  fetchCharacterCreationFlow,
-  updateCharacterCreationFlow,
-  readStoredCharacterCreationFlowId,
-  storeCharacterCreationFlowId,
-  clearStoredCharacterCreationFlowId,
-  createCharacterCreationFlow,
-  finalizeCharacterCreation,
-} from "../services/characterCreation.service.js";
+import { finalizeCharacterCreation } from "../services/characterCreation.service.js";
 import { useUserProfile } from "../composables/useUserProfile.js";
 import { useToast } from "../composables/useToast.js";
 import CharacterCreatedModal from "../components/CharacterCreatedModal.vue";
-import {
-  fetchAllVoices,
-  LOCALE_NAMES,
-  GENDER_NAMES,
-} from "../services/voices.service.js";
 import VoiceHeader from "../components/voice-selection/VoiceHeader.vue";
 import VoiceFilters from "../components/voice-selection/VoiceFilters.vue";
 import VoiceCard from "../components/voice-selection/VoiceCard.vue";
 import VoiceActions from "../components/voice-selection/VoiceActions.vue";
 
-const SUMMARY_STORAGE_KEY = "character-create-summary";
-const GENDER_STORAGE_KEY = "characterCreation.gender";
-const ALLOWED_GENDERS = new Set(["male", "female", "non-binary"]);
+// Composables
+import { useVoiceAudioPlayer } from "../composables/voice-selection/useVoiceAudioPlayer.js";
+import { useVoiceFiltering } from "../composables/voice-selection/useVoiceFiltering.js";
+import { useFlowSync } from "../composables/voice-selection/useFlowSync.js";
+import { useVoiceLoading } from "../composables/voice-selection/useVoiceLoading.js";
 
 const router = useRouter();
 const { user } = useUserProfile();
 const { success: showSuccess, error: showError } = useToast();
 
+// 語音加載
+const {
+  voicePresets,
+  isLoadingVoices,
+  voicesLoadError,
+  loadVoicesFromAPI,
+  resolvePreviewUrl,
+} = useVoiceLoading();
+
+// 語音播放
+const { isPlayingId, toggleVoicePreview } = useVoiceAudioPlayer();
+
+// 語音過濾
+const {
+  selectedGender,
+  hasUserAdjustedGenderFilter,
+  genderOptions,
+  localeOptions,
+  filteredVoicePresets,
+  formatGender,
+  autoSetGenderFilter,
+  setupGenderWatcher,
+} = useVoiceFiltering(voicePresets);
+
+// Flow 同步
+const {
+  flowId,
+  flowStatus,
+  isFlowInitializing,
+  isSyncingSummary,
+  lastFlowSyncError,
+  isReadyForSync,
+  hasLoadedSummary,
+  summaryData,
+  suppressSync: flowSuppressSync,
+  updateVoiceSelection,
+  initializeFlowState,
+  clearStoredData,
+  cleanupTimers,
+} = useFlowSync();
+
+// 本地狀態
 const selectedVoiceId = ref("");
-const isPlayingId = ref("");
-
-const flowId = ref("");
-const flowStatus = ref("draft");
-const isFlowInitializing = ref(false);
-const isSyncingSummary = ref(false);
-const lastFlowSyncError = ref(null);
-const isReadyForSync = ref(false);
-const hasLoadedSummary = ref(false);
-
-const summaryData = ref({
-  persona: {
-    name: "",
-    tagline: "",
-    hiddenProfile: "",
-    prompt: "",
-  },
-  appearance: null,
-  voice: null,
-  gender: "",
-  updatedAt: Date.now(),
-});
-
-const selectedGender = ref("all");
-let suppressGenderWatcher = false;
-const hasUserAdjustedGenderFilter = ref(false);
-
-// 從 API 動態載入的語音列表
-const voicePresetsFromAPI = ref([]);
-const isLoadingVoices = ref(false);
-const voicesLoadError = ref(null);
+let suppressSync = false;
 
 // 角色創建成功彈窗
 const isCharacterCreatedModalVisible = ref(false);
 const createdCharacter = ref(null);
 
-const normalizeGenderPreference = (value) => {
-  if (typeof value !== "string") {
-    return "";
-  }
-  const trimmed = value.trim();
-  return ALLOWED_GENDERS.has(trimmed) ? trimmed : "";
-};
-
-const readStoredGenderPreference = () => {
-  if (typeof window === "undefined" || !window.sessionStorage) {
-    return "";
-  }
-  try {
-    return window.sessionStorage.getItem(GENDER_STORAGE_KEY) ?? "";
-  } catch (error) {
-    return "";
-  }
-};
-
-const mapGenderToFilter = (gender) => {
-  if (gender === "male" || gender === "female") {
-    return gender;
-  }
-  return "all";
-};
-
-const applyGenderDefault = (rawGender) => {
-  const normalized =
-    normalizeGenderPreference(rawGender) ||
-    normalizeGenderPreference(readStoredGenderPreference()) ||
-    "";
-
-  summaryData.value.gender = normalized;
-
-  if (!normalized) {
-    return;
-  }
-
-  const targetFilter = mapGenderToFilter(normalized);
-
-  if (
-    hasUserAdjustedGenderFilter.value &&
-    selectedGender.value !== targetFilter
-  ) {
-    return;
-  }
-
-  // 根據角色性別自動設置聲線性別篩選器（僅在用戶未手動調整時）
-  if (
-    selectedGender.value !== targetFilter &&
-    !hasUserAdjustedGenderFilter.value
-  ) {
-    suppressGenderWatcher = true;
-
-    // 映射角色性別到聲線性別
-    if (normalized === "female") {
-      selectedGender.value = "FEMALE";
-    } else if (normalized === "male") {
-      selectedGender.value = "MALE";
-    } else {
-      selectedGender.value = targetFilter;
-    }
-  }
-};
-
-const buildMetadataPayload = (summary = null) => {
-  const source =
-    summary && typeof summary === "object" ? summary : summaryData.value;
-  const normalized = normalizeGenderPreference(source?.gender ?? "");
-  return normalized ? { gender: normalized } : undefined;
-};
-
-let voiceSyncTimer = null;
-let flowInitPromise = null;
-let suppressSync = false;
-const audioPlayers = new Map();
-
-// 備用的 OpenAI 語音列表（當 API 調用失敗時使用）
-const fallbackVoicePresets = [
-  {
-    id: "alloy",
-    label: "沉穩中性",
-    description: "沉穩偏中性的聲音，語調俐落，適合可靠型角色或系統語音。",
-    gender: "MALE",
-    ageGroup: "adult",
-    locale: "multi",
-    previewUrl: "/voices/alloy.mp3",
-  },
-  {
-    id: "ash",
-    label: "理性沉著",
-    description: "冷靜溫和的男聲，語速平穩，給人理性、沉著的感受。",
-    gender: "MALE",
-    ageGroup: "adult",
-    locale: "multi",
-    previewUrl: "/voices/ash.mp3",
-  },
-  {
-    id: "ballad",
-    label: "柔和抒情",
-    description: "柔和抒情的男聲，語氣帶有故事感，適合敘事或情感場景。",
-    gender: "MALE",
-    ageGroup: "adult",
-    locale: "multi",
-    previewUrl: "/voices/ballad.mp3",
-  },
-  {
-    id: "coral",
-    label: "活力清爽",
-    description: "充滿活力的女聲，語氣清爽有精神，能營造親切友善氛圍。",
-    gender: "FEMALE",
-    ageGroup: "teen",
-    locale: "multi",
-    previewUrl: "/voices/coral.mp3",
-  },
-  {
-    id: "echo",
-    label: "低沉磁性",
-    description: "低沈厚實的男聲，聲線帶有磁性，適合作為敘述者或權威角色。",
-    gender: "MALE",
-    ageGroup: "mature",
-    locale: "multi",
-    previewUrl: "/voices/echo.mp3",
-  },
-  {
-    id: "fable",
-    label: "溫暖柔和",
-    description: "溫暖的男聲，語調自然柔和，帶有陪伴與照顧的感受。",
-    gender: "MALE",
-    ageGroup: "adult",
-    locale: "multi",
-    previewUrl: "/voices/fable.mp3",
-  },
-  {
-    id: "onyx",
-    label: "堅定專業",
-    description: "堅定有力的男聲，語氣清晰，適合專業與指令型角色。",
-    gender: "MALE",
-    ageGroup: "adult",
-    locale: "multi",
-    previewUrl: "/voices/onyx.mp3",
-  },
-  {
-    id: "nova",
-    label: "輕快親切",
-    description: "輕快親切的女聲，語氣充滿好奇心，適合歡迎或導覽場景。",
-    gender: "FEMALE",
-    ageGroup: "teen",
-    locale: "multi",
-    previewUrl: "/voices/nova.mp3",
-  },
-  {
-    id: "sage",
-    label: "成熟知性",
-    description: "穩重睿智的女聲，語調柔和而有深度，帶來安心感。",
-    gender: "FEMALE",
-    ageGroup: "mature",
-    locale: "multi",
-    previewUrl: "/voices/sage.mp3",
-  },
-  {
-    id: "shimmer",
-    label: "明亮靈動",
-    description: "明亮靈動的女聲，節奏輕盈，適合活潑或創意型角色。",
-    gender: "FEMALE",
-    ageGroup: "teen",
-    locale: "multi",
-    previewUrl: "/voices/shimmer.mp3",
-  },
-  {
-    id: "verse",
-    label: "詩意感性",
-    description: "帶有詩意的男聲，語調富有層次，適合敘事與感性表達。",
-    gender: "MALE",
-    ageGroup: "adult",
-    locale: "multi",
-    previewUrl: "/voices/verse.mp3",
-  },
-];
-
-// 實際使用的語音列表（優先使用從 API 載入的）
-const voicePresets = computed(() =>
-  voicePresetsFromAPI.value.length > 0
-    ? voicePresetsFromAPI.value
-    : fallbackVoicePresets
-);
-
-const genderOptions = [
-  { id: "all", label: "不限性別" },
-  { id: "FEMALE", label: "女性" },
-  { id: "MALE", label: "男性" },
-];
-
-// 動態生成語言選項（基於載入的語音）
-const localeOptions = computed(() => {
-  const locales = new Set();
-  voicePresets.value.forEach((preset) => {
-    if (preset.locale) {
-      locales.add(preset.locale);
-    }
-  });
-
-  const options = [{ id: "all", label: "所有語言" }];
-
-  // 優先顯示台灣語音
-  if (locales.has("cmn-TW")) {
-    options.push({
-      id: "cmn-TW",
-      label: LOCALE_NAMES["cmn-TW"] || "繁體中文（台灣）",
-    });
-  }
-  if (locales.has("cmn-CN")) {
-    options.push({
-      id: "cmn-CN",
-      label: LOCALE_NAMES["cmn-CN"] || "簡體中文（中國）",
-    });
-  }
-  if (locales.has("yue-HK")) {
-    options.push({
-      id: "yue-HK",
-      label: LOCALE_NAMES["yue-HK"] || "粵語（香港）",
-    });
-  }
-  if (locales.has("ja-JP")) {
-    options.push({ id: "ja-JP", label: LOCALE_NAMES["ja-JP"] || "日語" });
-  }
-  if (locales.has("ko-KR")) {
-    options.push({ id: "ko-KR", label: LOCALE_NAMES["ko-KR"] || "韓語" });
-  }
-  if (locales.has("en-US")) {
-    options.push({ id: "en-US", label: LOCALE_NAMES["en-US"] || "英語" });
-  }
-  if (locales.has("multi")) {
-    options.push({ id: "multi", label: "多語言" });
-  }
-
-  return options;
-});
-
-const filteredVoicePresets = computed(() => {
-  const gender = selectedGender.value === "all" ? "" : selectedGender.value;
-
-  return voicePresets.value.filter((preset) => {
-    const genderMatch = gender ? preset.gender === gender : true;
-    return genderMatch;
-  });
-});
-
+// 計算屬性
 const personaSummary = computed(
   () =>
     summaryData.value?.persona ?? {
@@ -343,346 +96,23 @@ const voiceSummary = computed(() => {
   );
 });
 
-const formatGender = (gender) => {
-  if (gender === "FEMALE" || gender === "female") {
-    return "女性";
-  }
-  if (gender === "MALE" || gender === "male") {
-    return "男性";
-  }
-  if (gender === "NEUTRAL") {
-    return "中性";
-  }
-  return "不限";
-};
-
-const persistSummaryToSession = (summary) => {
-  summaryData.value = summary;
-  if (typeof window === "undefined" || !window.sessionStorage) {
-    return;
-  }
-  try {
-    window.sessionStorage.setItem(SUMMARY_STORAGE_KEY, JSON.stringify(summary));
-  } catch (error) {
-    // 忽略：SessionStorage 可能已滿或被阻擋，不影響主功能
-  }
-};
-
-const toVoicePayload = (preset) => {
-  if (!preset) {
-    return null;
-  }
-  return {
-    id: preset.id ?? "",
-    label: preset.label ?? "",
-    description: preset.description ?? "",
-    gender: preset.gender ?? "",
-    ageGroup: preset.ageGroup ?? "",
-  };
-};
-
-const buildSummaryPayload = (voiceOverride = null) => {
-  const base = summaryData.value ?? {};
-  const voice =
-    voiceOverride ??
-    (base.voice && typeof base.voice === "object" ? { ...base.voice } : null);
-  return {
-    persona: {
-      name: base?.persona?.name ?? "",
-      tagline: base?.persona?.tagline ?? "",
-      hiddenProfile: base?.persona?.hiddenProfile ?? "",
-      prompt: base?.persona?.prompt ?? "",
-    },
-    appearance: base?.appearance ?? null,
-    voice,
-    gender: base?.gender ?? "",
-    updatedAt: Date.now(),
-  };
-};
-
-const applyFlowRecord = (record) => {
-  if (!record || typeof record !== "object") {
-    return;
-  }
-  flowId.value = record.id ?? flowId.value;
-  flowStatus.value = record.status ?? flowStatus.value;
-
-  const normalizedGender = normalizeGenderPreference(
-    record?.metadata?.gender ?? summaryData.value.gender ?? ""
+const isPrimaryDisabled = computed(() => {
+  // 只要選擇了語音且不在初始化/同步中，就可以完成
+  return (
+    !selectedVoiceId.value || isFlowInitializing.value || isSyncingSummary.value
   );
+});
 
-  const summary = {
-    persona: {
-      name: record?.persona?.name ?? "",
-      tagline: record?.persona?.tagline ?? "",
-      hiddenProfile: record?.persona?.hiddenProfile ?? "",
-      prompt: record?.persona?.prompt ?? "",
-    },
-    appearance: record?.appearance ?? null,
-    voice: record?.voice ?? null,
-    gender: normalizedGender,
-    updatedAt: Date.now(),
-  };
-
-  suppressSync = true;
-  summaryData.value = summary;
-  if (record?.voice?.id) {
-    selectedVoiceId.value = record.voice.id;
-  }
-  suppressSync = false;
-
-  applyGenderDefault(normalizedGender);
-
-  persistSummaryToSession(summary);
-  if (record?.id) {
-    storeCharacterCreationFlowId(record.id);
-  }
-};
-
-const ensureFlowInitialized = async () => {
-  if (flowId.value) {
-    return flowId.value;
-  }
-  if (flowInitPromise) {
-    return flowInitPromise;
-  }
-
-  flowInitPromise = (async () => {
-    isFlowInitializing.value = true;
-    try {
-      const storedId = readStoredCharacterCreationFlowId();
-      if (storedId) {
-        try {
-          const existing = await fetchCharacterCreationFlow(storedId);
-          applyFlowRecord(existing);
-          flowId.value = existing?.id ?? "";
-          return flowId.value;
-        } catch (error) {
-          if (error?.status !== 404) {
-            throw error;
-          }
-        }
-      }
-
-      const summary = buildSummaryPayload();
-      const created = await createCharacterCreationFlow({
-        status: "voice",
-        persona: summary.persona,
-        appearance: summary.appearance,
-        voice: summary.voice,
-      });
-      applyFlowRecord(created);
-      flowId.value = created?.id ?? "";
-      return flowId.value;
-    } finally {
-      isFlowInitializing.value = false;
-    }
-  })()
-    .catch((error) => {
-      lastFlowSyncError.value = error;
-      return "";
-    })
-    .finally(() => {
-      flowInitPromise = null;
-    });
-
-  return flowInitPromise;
-};
-
-const syncSummaryToBackend = async (payload = {}) => {
-  try {
-    await ensureFlowInitialized();
-  } catch (error) {
-    return;
-  }
-
-  if (!flowId.value) {
-    return;
-  }
-
-  try {
-    isSyncingSummary.value = true;
-    const updated = await updateCharacterCreationFlow(flowId.value, payload);
-    applyFlowRecord(updated);
-    lastFlowSyncError.value = null;
-  } catch (error) {
-    lastFlowSyncError.value = error;
-  } finally {
-    isSyncingSummary.value = false;
-  }
-};
-
-const scheduleVoiceSync = (nextSummary) => {
-  persistSummaryToSession(nextSummary);
-
-  if (!isReadyForSync.value || typeof window === "undefined") {
-    return;
-  }
-
-  if (voiceSyncTimer) {
-    window.clearTimeout(voiceSyncTimer);
-    voiceSyncTimer = null;
-  }
-
-  voiceSyncTimer = window.setTimeout(() => {
-    voiceSyncTimer = null;
-    const metadata = buildMetadataPayload(nextSummary);
-    const payload = {
-      persona: nextSummary.persona,
-      appearance: nextSummary.appearance,
-      voice: nextSummary.voice,
-      status: "voice",
-    };
-    if (metadata) {
-      payload.metadata = metadata;
-    }
-    syncSummaryToBackend(payload).catch(() => {});
-  }, 400);
-};
-
-const updateVoiceSelection = (voiceId) => {
-  const preset = voicePresets.value.find((item) => item.id === voiceId) ?? null;
-  const summary = buildSummaryPayload(toVoicePayload(preset));
-  persistSummaryToSession(summary);
-  scheduleVoiceSync(summary);
-};
-
-const loadSessionSummary = () => {
-  if (typeof window === "undefined" || !window.sessionStorage) {
-    return;
-  }
-  try {
-    const raw = window.sessionStorage.getItem(SUMMARY_STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-    const parsed = JSON.parse(raw);
-    summaryData.value = {
-      persona: {
-        name: parsed?.persona?.name ?? "",
-        tagline: parsed?.persona?.tagline ?? "",
-        hiddenProfile: parsed?.persona?.hiddenProfile ?? "",
-        prompt: parsed?.persona?.prompt ?? "",
-      },
-      appearance: parsed?.appearance ?? null,
-      voice: parsed?.voice ?? null,
-      gender: parsed?.gender ?? "",
-      updatedAt: parsed?.updatedAt ?? Date.now(),
-    };
-    if (parsed?.voice?.id) {
-      selectedVoiceId.value = parsed.voice.id;
-    }
-    applyGenderDefault(parsed?.gender);
-  } catch (error) {
-    // 忽略：SessionStorage 解析失敗，使用預設值
-  }
-};
-
-const initializeFlowState = async () => {
-  loadSessionSummary();
-  applyGenderDefault(summaryData.value.gender);
-  try {
-    await ensureFlowInitialized();
-  } catch (error) {
-  } finally {
-    isReadyForSync.value = true;
-    hasLoadedSummary.value = true;
-  }
-};
-
-/**
- * 從後端 API 載入語音列表
- */
-const loadVoicesFromAPI = async () => {
-  isLoadingVoices.value = true;
-  voicesLoadError.value = null;
-
-  try {
-    const response = await fetchAllVoices();
-
-    if (response?.voices && Array.isArray(response.voices)) {
-      // 轉換 API 返回的語音格式
-      voicePresetsFromAPI.value = response.voices.map((voice) => ({
-        id: voice.id,
-        label: voice.name || voice.id,
-        description: voice.description || "",
-        gender: voice.gender || "NEUTRAL",
-        ageGroup: voice.ageGroup || "adult",
-        locale: voice.locale || "multi",
-        quality: voice.quality || "Standard",
-        recommended: voice.recommended || false,
-        previewUrl: voice.previewUrl || `/voices/${voice.id}.mp3`,
-      }));
-
-      logger.log(
-        `[Voices] 成功載入 ${voicePresetsFromAPI.value.length} 種語音`
-      );
-    } else {
-      logger.warn("[Voices] API 返回格式異常，使用備用語音列表");
-    }
-  } catch (error) {
-    logger.error("[Voices] 載入語音失敗，使用備用語音列表:", error);
-    voicesLoadError.value = error.message || "載入語音失敗";
-  } finally {
-    isLoadingVoices.value = false;
-  }
-};
-
-const resolvePreviewUrl = (voiceId) => {
-  if (!voiceId) {
-    return "";
-  }
-  const preset = voicePresets.value.find((item) => item.id === voiceId);
-  return preset?.previewUrl ?? "";
-};
-
-const toggleVoicePreview = (voiceId) => {
+// 方法
+const handleToggleVoicePreview = (voiceId) => {
   const url = resolvePreviewUrl(voiceId);
-  if (!url) {
-    return;
-  }
-  if (isPlayingId.value === voiceId) {
-    const existing = audioPlayers.get(voiceId);
-    if (existing) {
-      existing.pause();
-    }
-    isPlayingId.value = "";
-    return;
-  }
+  toggleVoicePreview(voiceId, url);
 
-  if (typeof Audio === "undefined") {
-    return;
+  // 播放時同時選中該語音
+  if (url) {
+    selectedVoiceId.value = voiceId;
   }
-
-  audioPlayers.forEach((player) => {
-    try {
-      player.pause();
-    } catch {}
-  });
-  audioPlayers.clear();
-
-  const audio = new Audio(url);
-  audio.preload = "auto";
-  audio.addEventListener("ended", () => {
-    if (isPlayingId.value === voiceId) {
-      isPlayingId.value = "";
-    }
-    audioPlayers.delete(voiceId);
-  });
-  audio
-    .play()
-    .then(() => {
-      audioPlayers.set(voiceId, audio);
-      isPlayingId.value = voiceId;
-      // 播放時同時選中該語音
-      selectedVoiceId.value = voiceId;
-    })
-    .catch((error) => {
-      isPlayingId.value = "";
-    });
 };
-
-// 語音生成功能已移除，用戶直接選擇預設語音即可完成
 
 const finalizeCreation = async () => {
   try {
@@ -706,17 +136,7 @@ const finalizeCreation = async () => {
     isCharacterCreatedModalVisible.value = true;
 
     // 保存成功後清除暫存資料
-    clearStoredCharacterCreationFlowId();
-    if (typeof window !== "undefined" && window.sessionStorage) {
-      try {
-        window.sessionStorage.removeItem(SUMMARY_STORAGE_KEY);
-        window.sessionStorage.removeItem(GENDER_STORAGE_KEY);
-        // 清除所有性別的 AI Magician 計數器
-        ["male", "female", "non-binary"].forEach((gender) => {
-          window.sessionStorage.removeItem(`ai-magician-usage-${gender}`);
-        });
-      } catch {}
-    }
+    clearStoredData();
 
     // 顯示成功訊息
     showSuccess("角色創建成功！");
@@ -745,39 +165,23 @@ const goToCharacterSettings = () => {
     .catch((error) => {});
 };
 
-const isPrimaryDisabled = computed(() => {
-  // 只要選擇了語音且不在初始化/同步中，就可以完成
-  return (
-    !selectedVoiceId.value || isFlowInitializing.value || isSyncingSummary.value
-  );
-});
-
-watch(
-  () => selectedGender.value,
-  () => {
-    if (suppressGenderWatcher) {
-      suppressGenderWatcher = false;
-      return;
-    }
-    if (hasLoadedSummary.value) {
-      hasUserAdjustedGenderFilter.value = true;
-    }
-  }
-);
+// 監聽器
+setupGenderWatcher(hasLoadedSummary);
 
 watch(
   () => selectedVoiceId.value,
   (voiceId, previous) => {
-    if (suppressSync) {
+    if (suppressSync || flowSuppressSync) {
       return;
     }
     if (voiceId && voiceId !== previous) {
-      updateVoiceSelection(voiceId);
+      const preset = voicePresets.value.find((item) => item.id === voiceId);
+      if (preset) {
+        updateVoiceSelection(preset);
+      }
     }
     if (!voiceId) {
-      const summary = buildSummaryPayload(null);
-      persistSummaryToSession(summary);
-      scheduleVoiceSync(summary);
+      updateVoiceSelection(null);
     }
   }
 );
@@ -785,7 +189,7 @@ watch(
 watch(
   () => filteredVoicePresets.value,
   (presets) => {
-    if (!hasLoadedSummary.value || suppressSync) {
+    if (!hasLoadedSummary.value || suppressSync || flowSuppressSync) {
       return;
     }
     const exists = presets.some(
@@ -795,46 +199,42 @@ watch(
       suppressSync = true;
       selectedVoiceId.value = presets[0].id;
       suppressSync = false;
-      updateVoiceSelection(presets[0].id);
+      const preset = presets[0];
+      updateVoiceSelection(preset);
     }
   },
   { deep: true }
 );
 
-// 監聽用戶手動更改性別篩選器
-watch(selectedGender, () => {
-  if (!suppressGenderWatcher) {
-    hasUserAdjustedGenderFilter.value = true;
-  }
-  suppressGenderWatcher = false;
-});
-
+// 生命週期
 onMounted(async () => {
   // 優先載入語音列表
   await loadVoicesFromAPI();
 
   // 然後初始化流程狀態
-  initializeFlowState().finally(() => {
-    if (!selectedVoiceId.value && filteredVoicePresets.value.length) {
-      suppressSync = true;
-      selectedVoiceId.value = filteredVoicePresets.value[0].id;
-      suppressSync = false;
-      updateVoiceSelection(filteredVoicePresets.value[0].id);
-    }
-  });
+  const loadedSummary = await initializeFlowState();
+
+  // 如果有載入的摘要且包含語音，設置選中的語音
+  if (loadedSummary?.voice?.id) {
+    selectedVoiceId.value = loadedSummary.voice.id;
+  }
+
+  // 根據角色性別自動設置聲線性別篩選器
+  if (loadedSummary?.gender) {
+    autoSetGenderFilter(loadedSummary.gender);
+  }
+
+  // 如果還沒有選中語音，默認選擇第一個
+  if (!selectedVoiceId.value && filteredVoicePresets.value.length) {
+    suppressSync = true;
+    selectedVoiceId.value = filteredVoicePresets.value[0].id;
+    suppressSync = false;
+    updateVoiceSelection(filteredVoicePresets.value[0]);
+  }
 });
 
 onBeforeUnmount(() => {
-  if (typeof window !== "undefined" && voiceSyncTimer) {
-    window.clearTimeout(voiceSyncTimer);
-    voiceSyncTimer = null;
-  }
-  audioPlayers.forEach((player) => {
-    try {
-      player.pause();
-    } catch {}
-  });
-  audioPlayers.clear();
+  cleanupTimers();
 });
 </script>
 
@@ -862,7 +262,7 @@ onBeforeUnmount(() => {
         :format-gender="formatGender"
         :has-preview-url="Boolean(resolvePreviewUrl(preset.id))"
         @select="selectedVoiceId = $event"
-        @toggle-preview="toggleVoicePreview"
+        @toggle-preview="handleToggleVoicePreview"
       />
       <p v-if="!filteredVoicePresets.length" class="voice__empty">
         沒有符合篩選條件的聲線，請調整條件後再試。

@@ -20,9 +20,10 @@
  */
 
 import { ref } from 'vue';
-import { apiJson } from '../../utils/api';
+import { apiJsonCached } from '../../utils/api';
 import { fallbackMatches } from '../../utils/matchFallback';
-import { apiCache, cacheKeys, cacheTTL } from '../../services/apiCache.service';
+import { cacheKeys, cacheTTL } from '../../services/apiCache.service';
+import { logger } from '../../utils/logger';
 
 /**
  * 創建配對數據管理
@@ -53,12 +54,12 @@ export function useMatchData(options = {}) {
         ? `/match/all?userId=${encodeURIComponent(currentUserId)}`
         : '/match/all';
 
-      // 使用 API 緩存服務，5 分鐘緩存
-      const data = await apiCache.fetch(
-        cacheKeys.matches({ userId: currentUserId || 'guest' }),
-        () => apiJson(endpoint, { skipGlobalLoading: true }),
-        cacheTTL.MATCHES
-      );
+      // 使用統一的 API 緩存服務，5 分鐘緩存
+      const data = await apiJsonCached(endpoint, {
+        cacheKey: cacheKeys.matches({ userId: currentUserId || 'guest' }),
+        cacheTTL: cacheTTL.MATCHES,
+        skipGlobalLoading: true,
+      });
 
       if (!Array.isArray(data) || data.length === 0) {
         throw new Error('尚未建立配對角色資料');
@@ -75,9 +76,7 @@ export function useMatchData(options = {}) {
       if (fallbackData.length) {
         matches.value = fallbackData;
         error.value = '暫時無法連線至配對服務，已載入示範角色資料。';
-        if (import.meta.env.DEV) {
-          console.error('載入匹配列表失敗:', err);
-        }
+        logger.error('載入匹配列表失敗:', err);
         return fallbackData;
       } else {
         matches.value = [];

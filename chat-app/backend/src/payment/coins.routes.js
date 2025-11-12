@@ -5,6 +5,7 @@
 import express from "express";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
+import { validateDevModeBypass } from "../utils/devModeHelper.js";
 import {
   getCoinsBalance,
   purchaseAiPhoto,
@@ -54,7 +55,7 @@ router.get(
  * POST /api/coins/purchase/ai-photo
  * Body: { characterId, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
- * 🔒 冪等性保護：防止重複扣費
+ * 🔒 冪等性保護：防止重複扣費（必須提供 idempotencyKey）
  */
 router.post(
   "/api/coins/purchase/ai-photo",
@@ -71,23 +72,19 @@ router.post(
       });
     }
 
-    // 冪等性保護
-    if (idempotencyKey) {
-      const requestId = `ai-photo:${userId}:${characterId}:${idempotencyKey}`;
-      const result = await handleIdempotentRequest(
-        requestId,
-        async () => await purchaseAiPhoto(userId, characterId),
-        { ttl: 15 * 60 * 1000 } // 15 分鐘
-      );
-
-      return sendSuccess(res, {
-        message: "購買成功，正在生成照片",
-        ...result,
+    if (!idempotencyKey) {
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
+        field: "idempotencyKey",
       });
     }
 
-    // 向後兼容：沒有 idempotencyKey 的請求
-    const result = await purchaseAiPhoto(userId, characterId);
+    // 冪等性保護（必須）
+    const requestId = `ai-photo:${userId}:${characterId}:${idempotencyKey}`;
+    const result = await handleIdempotentRequest(
+      requestId,
+      async () => await purchaseAiPhoto(userId, characterId),
+      { ttl: 15 * 60 * 1000 } // 15 分鐘
+    );
 
     sendSuccess(res, {
       message: "購買成功，正在生成照片",
@@ -103,7 +100,7 @@ router.post(
  * POST /api/coins/purchase/ai-video
  * Body: { characterId, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
- * 🔒 冪等性保護：防止重複扣費
+ * 🔒 冪等性保護：防止重複扣費（必須提供 idempotencyKey）
  */
 router.post(
   "/api/coins/purchase/ai-video",
@@ -120,23 +117,19 @@ router.post(
       });
     }
 
-    // 冪等性保護
-    if (idempotencyKey) {
-      const requestId = `ai-video:${userId}:${characterId}:${idempotencyKey}`;
-      const result = await handleIdempotentRequest(
-        requestId,
-        async () => await purchaseAiVideo(userId, characterId),
-        { ttl: 30 * 60 * 1000 } // 30 分鐘（影片生成時間較長）
-      );
-
-      return sendSuccess(res, {
-        message: "購買成功，正在生成影片",
-        ...result,
+    if (!idempotencyKey) {
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
+        field: "idempotencyKey",
       });
     }
 
-    // 向後兼容：沒有 idempotencyKey 的請求
-    const result = await purchaseAiVideo(userId, characterId);
+    // 冪等性保護（必須）
+    const requestId = `ai-video:${userId}:${characterId}:${idempotencyKey}`;
+    const result = await handleIdempotentRequest(
+      requestId,
+      async () => await purchaseAiVideo(userId, characterId),
+      { ttl: 30 * 60 * 1000 } // 30 分鐘（影片生成時間較長）
+    );
 
     sendSuccess(res, {
       message: "購買成功，正在生成影片",
@@ -152,7 +145,7 @@ router.post(
  * POST /api/coins/purchase/unlimited-chat
  * Body: { characterId, useTicket, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
- * 🔒 冪等性保護：防止重複扣費
+ * 🔒 冪等性保護：防止重複扣費（必須提供 idempotencyKey）
  */
 router.post(
   "/api/coins/purchase/unlimited-chat",
@@ -169,23 +162,19 @@ router.post(
       });
     }
 
-    // 冪等性保護
-    if (idempotencyKey) {
-      const requestId = `unlock-chat:${userId}:${characterId}:${idempotencyKey}`;
-      const result = await handleIdempotentRequest(
-        requestId,
-        async () => await purchaseUnlimitedChat(userId, characterId),
-        { ttl: 15 * 60 * 1000 } // 15 分鐘
-      );
-
-      return sendSuccess(res, {
-        message: "購買成功，已解鎖無限對話",
-        ...result,
+    if (!idempotencyKey) {
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
+        field: "idempotencyKey",
       });
     }
 
-    // 向後兼容：沒有 idempotencyKey 的請求
-    const result = await purchaseUnlimitedChat(userId, characterId);
+    // 冪等性保護（必須）
+    const requestId = `unlock-chat:${userId}:${characterId}:${idempotencyKey}`;
+    const result = await handleIdempotentRequest(
+      requestId,
+      async () => await purchaseUnlimitedChat(userId, characterId),
+      { ttl: 15 * 60 * 1000 } // 15 分鐘
+    );
 
     sendSuccess(res, {
       message: "購買成功，已解鎖無限對話",
@@ -324,26 +313,39 @@ router.post(
     const isDevBypassEnabled = process.env.ENABLE_DEV_PURCHASE_BYPASS === "true";
 
     if (isDevBypassEnabled) {
-      // 開發模式：直接執行購買，不需要實際支付驗證
-      logger.info(`[開發模式] 購買金幣套餐：userId=${userId}, packageId=${packageId}`);
+      // ✅ 修復：添加安全驗證
+      try {
+        validateDevModeBypass(userId, {
+          featureName: "金幣套餐購買",
+          requireTestAccount: true,
+        });
 
-      // 冪等性保護
-      const requestId = `coin-package:${userId}:${packageId}:${idempotencyKey}`;
-      const result = await handleIdempotentRequest(
-        requestId,
-        async () => await purchaseCoinPackage(userId, packageId, paymentInfo || {
-          method: "dev_bypass",
-          timestamp: new Date().toISOString(),
-        }),
-        { ttl: 15 * 60 * 1000 } // 15 分鐘
-      );
+        logger.warn(
+          `[開發模式] 繞過支付購買金幣套餐：userId=${userId}, packageId=${packageId}`
+        );
 
-      res.json({
-        success: true,
-        message: "購買成功（開發模式）",
-        devMode: true,
-        ...result,
-      });
+        // 開發模式：直接執行購買，不需要實際支付驗證
+        const requestId = `coin-package:${userId}:${packageId}:${idempotencyKey}`;
+        const result = await handleIdempotentRequest(
+          requestId,
+          async () => await purchaseCoinPackage(userId, packageId, paymentInfo || {
+            method: "dev_bypass",
+            timestamp: new Date().toISOString(),
+          }),
+          { ttl: 15 * 60 * 1000 } // 15 分鐘
+        );
+
+        return res.json({
+          success: true,
+          message: "購買成功（開發模式）",
+          devMode: true,
+          ...result,
+        });
+      } catch (error) {
+        // 驗證失敗，拒絕請求
+        logger.error(`[安全] 開發模式繞過驗證失敗: ${error.message}`);
+        return sendError(res, "FORBIDDEN", error.message);
+      }
     } else {
       // 正式環境：應整合支付系統
       // TODO: 實際應用應先驗證支付成功
@@ -369,7 +371,8 @@ router.post(
  * POST /api/coins/recharge
  * Body: { amount, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人充值金幣
- * 🔒 冪等性保護：防止重複充值
+ * 🔒 冪等性保護：防止重複充值（必須提供 idempotencyKey）
+ * ⚠️ 此端點僅供測試帳號使用
  */
 router.post(
   "/api/coins/recharge",
@@ -387,10 +390,25 @@ router.post(
       });
     }
 
-    // TODO: 實際應用應先驗證支付成功
+    if (!idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        error: "請提供 idempotencyKey（冪等性鍵）以防止重複充值",
+      });
+    }
 
-    // 冪等性保護
-    if (idempotencyKey) {
+    // ✅ 修復：限制僅測試帳號可用
+    try {
+      validateDevModeBypass(userId, {
+        featureName: "測試充值",
+        requireTestAccount: true,
+      });
+
+      logger.warn(`[測試充值] userId=${userId}, amount=${amount}`);
+
+      // TODO: 實際應用應先驗證支付成功
+
+      // 冪等性保護（必須）
       const requestId = `recharge:${userId}:${amount}:${idempotencyKey}`;
       const result = await handleIdempotentRequest(
         requestId,
@@ -406,19 +424,10 @@ router.post(
         message: `成功充值 ${amount} 金幣`,
         ...result,
       });
+    } catch (error) {
+      logger.error(`[安全] 測試充值權限驗證失敗: ${error.message}`);
+      return sendError(res, "FORBIDDEN", error.message);
     }
-
-    // 向後兼容：沒有 idempotencyKey 的請求
-    const result = await rechargeCoins(userId, amount, {
-      method: "test",
-      timestamp: new Date().toISOString(),
-    });
-
-    res.json({
-      success: true,
-      message: `成功充值 ${amount} 金幣`,
-      ...result,
-    });
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -450,21 +459,26 @@ router.post(
       });
     }
 
-    // 驗證是否為測試帳號
-    if (!isTestAccount(userId)) {
-      return res.status(403).json({
-        success: false,
-        error: "此功能僅供測試帳號使用",
+    // ✅ 加強：使用統一的驗證函數
+    try {
+      validateDevModeBypass(userId, {
+        featureName: "設定金幣餘額",
+        requireTestAccount: true,
       });
+
+      logger.warn(`[測試] 設定金幣餘額：userId=${userId}, balance=${balance}`);
+
+      const result = await setCoinsBalance(userId, Math.floor(balance));
+
+      return res.json({
+        success: true,
+        message: `成功設定金幣餘額為 ${result.newBalance}`,
+        ...result,
+      });
+    } catch (error) {
+      logger.error(`[安全] 設定餘額權限驗證失敗: ${error.message}`);
+      return sendError(res, "FORBIDDEN", error.message);
     }
-
-    const result = await setCoinsBalance(userId, Math.floor(balance));
-
-    res.json({
-      success: true,
-      message: `成功設定金幣餘額為 ${result.newBalance}`,
-      ...result,
-    });
   } catch (error) {
     res.status(400).json({
       success: false,

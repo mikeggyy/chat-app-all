@@ -266,8 +266,15 @@ export const HISTORY_LIMITS = {
   // 建議生成時使用的歷史訊息數量
   SUGGESTION_WINDOW: 6,
 
-  // 最大緩存訊息數量
-  MAX_CACHED_MESSAGES: 200,
+  // 最大緩存訊息數量（從 200 降到 100，減少 Firestore 文檔大小）
+  MAX_CACHED_MESSAGES: 100,
+
+  // 單條訊息最大大小（bytes）- 防止超大訊息（例如 base64 圖片）
+  MAX_MESSAGE_SIZE: 10 * 1024, // 10KB
+
+  // 所有訊息總大小限制（bytes）- 防止超過 Firestore 1MB 限制
+  // 設為 500KB 留有安全餘裕
+  MAX_TOTAL_SIZE: 500 * 1024, // 500KB
 };
 
 /**

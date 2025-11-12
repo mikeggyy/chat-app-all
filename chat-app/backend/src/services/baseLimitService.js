@@ -13,7 +13,7 @@ import { getFirestoreDb } from "../firebase/index.js";
 import { FieldValue } from "firebase-admin/firestore";
 import { RESET_PERIOD } from "./limitService/constants.js";
 import { getLimitConfig } from "./limitService/limitConfig.js";
-import { checkAndReset, createLimitData } from "./limitService/limitReset.js";
+import { checkAndResetAll, checkAndResetAdUnlocks, createLimitData } from "./limitService/limitReset.js";
 import {
   checkCanUse,
   recordUse as trackRecordUse,
@@ -201,7 +201,7 @@ export function createLimitService(config) {
     }
 
     const limitData = await initUserLimit(userId, characterId);
-    const wasReset = checkAndReset(limitData, resetPeriod);
+    const wasReset = checkAndResetAll(limitData, resetPeriod);
 
     // 如果發生了重置，更新到 Firestore
     if (wasReset) {
@@ -238,18 +238,103 @@ export function createLimitService(config) {
       throw new Error(`${limitType}功能需要提供有效的角色 ID`);
     }
 
-    const limitData = await initUserLimit(userId, characterId);
-    checkAndReset(limitData, resetPeriod);
+    const db = getFirestoreDb();
+    const userLimitRef = getUserLimitRef(userId);
 
-    trackRecordUse(limitData, metadata);
+    let result = null;
 
-    await updateLimitData(userId, characterId, limitData);
+    // ✅ 修復：所有操作在 Transaction 內完成
+    await db.runTransaction(async (transaction) => {
+      // 1. 在 Transaction 內讀取限制數據
+      const doc = await transaction.get(userLimitRef);
 
-    return {
-      success: true,
-      count: limitData.count,
-      lifetimeCount: limitData.lifetimeCount,
-    };
+      let userData = doc.exists ? doc.data() : { userId };
+
+      // 2. 初始化限制數據
+      let limitData;
+      if (perCharacter) {
+        if (!userData[fieldName]) userData[fieldName] = {};
+        if (!userData[fieldName][characterId]) {
+          userData[fieldName][characterId] = createLimitData(resetPeriod);
+        }
+        limitData = userData[fieldName][characterId];
+      } else {
+        if (!userData[fieldName]) {
+          userData[fieldName] = createLimitData(resetPeriod);
+        }
+        limitData = userData[fieldName];
+      }
+
+      // 3. 在 Transaction 內檢查並重置
+      const wasReset = checkAndResetAll(limitData, resetPeriod);
+
+      // 4. 檢查是否允許使用（在 Transaction 內）
+      const configData = await getLimitConfig(
+        userId,
+        getMembershipLimit,
+        testAccountLimitKey,
+        serviceName
+      );
+      const totalAllowed =
+        configData.limit === -1
+          ? -1
+          : configData.limit + limitData.unlocked;
+
+      if (
+        totalAllowed !== -1 &&
+        limitData.count >= totalAllowed &&
+        !limitData.permanentUnlock &&
+        !limitData.temporaryUnlockUntil
+      ) {
+        throw new Error(
+          `${serviceName}次數已用完（${limitData.count}/${totalAllowed}）`
+        );
+      }
+
+      // 5. 記錄使用
+      limitData.count += 1;
+      limitData.lastUsedAt = new Date().toISOString();
+
+      // 添加使用記錄（可選）
+      if (metadata && Object.keys(metadata).length > 0) {
+        if (!limitData.usageHistory) {
+          limitData.usageHistory = [];
+        }
+        limitData.usageHistory.push({
+          timestamp: new Date().toISOString(),
+          ...metadata,
+        });
+
+        // 只保留最近 100 條記錄
+        if (limitData.usageHistory.length > 100) {
+          limitData.usageHistory = limitData.usageHistory.slice(-100);
+        }
+      }
+
+      // 6. 在 Transaction 內更新數據
+      if (perCharacter) {
+        userData[fieldName][characterId] = limitData;
+      } else {
+        userData[fieldName] = limitData;
+      }
+
+      userData.updatedAt = FieldValue.serverTimestamp();
+
+      transaction.set(userLimitRef, userData, { merge: true });
+
+      // 7. 設置返回結果
+      result = {
+        success: true,
+        count: limitData.count,
+        limit: configData.limit,
+        unlocked: limitData.unlocked,
+        totalAllowed,
+        remaining:
+          totalAllowed === -1 ? -1 : Math.max(0, totalAllowed - limitData.count),
+      };
+    });
+
+    return result;
   };
 
   /**

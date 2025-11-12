@@ -1,6 +1,8 @@
 import { ref, watch, computed } from "vue";
+import { CHARACTER_CREATION_LIMITS } from "../../config/characterCreation.js";
 
-const DESCRIPTION_MAX_LENGTH = 60;
+// ✅ 使用集中化配置
+const DESCRIPTION_MAX_LENGTH = CHARACTER_CREATION_LIMITS.MAX_APPEARANCE_PREVIEW_LENGTH;
 
 const sanitizeText = (value) => {
   if (typeof value !== "string") {

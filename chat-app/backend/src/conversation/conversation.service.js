@@ -218,6 +218,25 @@ export const appendConversationMessages = async (userId, characterId, messages) 
       updatedMessages.splice(0, excessCount);
     }
 
+    // ✅ 新增：檢查總大小，防止超過 Firestore 1MB 限制
+    let totalSize = JSON.stringify(updatedMessages).length;
+    let sizeOptimized = false;
+
+    // 如果總大小超過限制，持續移除最舊的訊息直到符合限制
+    while (totalSize > HISTORY_LIMITS.MAX_TOTAL_SIZE && updatedMessages.length > 10) {
+      updatedMessages.shift(); // 移除最舊的訊息
+      totalSize = JSON.stringify(updatedMessages).length;
+      sizeOptimized = true;
+    }
+
+    // 記錄大小優化日誌（僅在實際優化時）
+    if (sizeOptimized) {
+      logger.warn(
+        `[對話服務] ⚠️ 訊息總大小超過限制，已優化至 ${(totalSize / 1024).toFixed(2)} KB，` +
+        `保留 ${updatedMessages.length} 則訊息`
+      );
+    }
+
     const lastMessage = updatedMessages[updatedMessages.length - 1];
 
     const key = createConversationKey(userId, characterId);

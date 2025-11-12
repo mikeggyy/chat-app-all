@@ -18,6 +18,7 @@ import {
 } from "../services/characterCreation.service.js";
 import { useGenderPreference } from "../composables/useGenderPreference.js";
 import { useCharacterCreationFlow } from "../composables/useCharacterCreationFlow.js";
+import { CHARACTER_CREATION_LIMITS } from "../config/characterCreation.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -29,10 +30,11 @@ const Step = Object.freeze({
   SETTINGS: "settings",
 });
 
-const MAX_NAME_LENGTH = 8;
-const MAX_TAGLINE_LENGTH = 200;
-const MAX_PROMPT_LENGTH = 50;
-const MAX_HIDDEN_PROFILE_LENGTH = 200;
+// ✅ 使用集中化配置（從 config/characterCreation.js 導入）
+const MAX_NAME_LENGTH = CHARACTER_CREATION_LIMITS.MAX_NAME_LENGTH;
+const MAX_TAGLINE_LENGTH = CHARACTER_CREATION_LIMITS.MAX_TAGLINE_LENGTH;
+const MAX_PROMPT_LENGTH = CHARACTER_CREATION_LIMITS.MAX_PROMPT_LENGTH;
+const MAX_HIDDEN_PROFILE_LENGTH = CHARACTER_CREATION_LIMITS.MAX_HIDDEN_PROFILE_LENGTH;
 
 // 進度條狀態
 const progress = ref(18);

@@ -1,12 +1,17 @@
 /**
- * 廣告服務
- * 處理廣告觀看驗證和獎勵發放
+ * 廣告服務 - 修復版本
+ * 修復內容：
+ * 1. ✅ 使用 Firestore 持久化廣告記錄（不再只存內存）
+ * 2. ✅ 添加廣告驗證邏輯（可選整合 AdMob Server-Side Verification）
+ * 3. ✅ 使用 Transaction 確保獎勵領取的原子性
+ * 4. ✅ 檢查所有未驗證的廣告（防止繞過冷卻時間）
  */
 
 import { AD_CONFIG } from "../membership/membership.config.js";
 import { unlockByAd } from "../conversation/conversationLimit.service.js";
 import { getUserById } from "../user/user.service.js";
 import { getFirestoreDb } from "../firebase/index.js";
+import { FieldValue } from "firebase-admin/firestore";
 import logger from "../utils/logger.js";
 
 // 緩存廣告配置（避免重複查詢 Firestore）
@@ -45,55 +50,33 @@ const getAdConfigFromFirestore = async () => {
   return AD_CONFIG;
 };
 
-/**
- * 儲存廣告觀看記錄
- * 格式：Map<userId, AdRecord[]>
- */
-const adRecords = new Map();
+// ==================== 持久化廣告記錄到 Firestore ====================
 
 /**
- * 廣告觀看記錄結構
+ * 獲取今日觀看廣告次數（從 Firestore）
+ * ✅ 修復：使用 Firestore 而非內存
  */
-class AdRecord {
-  constructor(adId, adType, characterId) {
-    this.adId = adId;                    // 廣告唯一 ID
-    this.adType = adType;                // 廣告類型（rewarded_ad / interstitial_ad）
-    this.characterId = characterId;      // 為哪個角色解鎖
-    this.timestamp = new Date().toISOString();
-    this.reward = null;                  // 獎勵內容
-    this.verified = false;               // 是否已驗證
-    this.claimed = false;                // 是否已領取獎勵
-  }
-}
+const getTodayAdCount = async (userId) => {
+  const db = getFirestoreDb();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-/**
- * 初始化用戶廣告記錄
- */
-const initUserAdRecords = (userId) => {
-  if (!adRecords.has(userId)) {
-    adRecords.set(userId, []);
-  }
-  return adRecords.get(userId);
-};
+  const snapshot = await db
+    .collection("ad_records")
+    .where("userId", "==", userId)
+    .where("timestamp", ">=", today)
+    .where("verified", "==", true)
+    .get();
 
-/**
- * 獲取今日觀看廣告次數
- */
-const getTodayAdCount = (userId) => {
-  const records = initUserAdRecords(userId);
-  const today = new Date().toISOString().split('T')[0];
-
-  return records.filter(record => {
-    const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-    return recordDate === today && record.verified;
-  }).length;
+  return snapshot.size;
 };
 
 /**
  * 檢查是否超過每日廣告上限
+ * ✅ 修復：使用持久化的廣告記錄
  */
 export const checkDailyAdLimit = async (userId) => {
-  const todayCount = getTodayAdCount(userId);
+  const todayCount = await getTodayAdCount(userId);
   const adConfig = await getAdConfigFromFirestore();
   const limit = adConfig.dailyAdLimit;
 
@@ -107,9 +90,10 @@ export const checkDailyAdLimit = async (userId) => {
 
 /**
  * 檢查廣告冷卻時間
+ * ✅ 修復：檢查所有廣告（包括未驗證的），防止繞過冷卻時間
  */
 const checkAdCooldown = async (userId, adType) => {
-  const records = initUserAdRecords(userId);
+  const db = getFirestoreDb();
   const adConfig = await getAdConfigFromFirestore();
   const adTypeConfig = adConfig.types[adType];
 
@@ -120,16 +104,21 @@ const checkAdCooldown = async (userId, adType) => {
   const cooldown = adTypeConfig.cooldown; // 秒
   const now = new Date();
 
-  // 找到最近一次相同類型的廣告
-  const lastAd = records
-    .filter(r => r.adType === adType && r.verified)
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+  // ✅ 修復：檢查所有廣告（不只是已驗證的）
+  const snapshot = await db
+    .collection("ad_records")
+    .where("userId", "==", userId)
+    .where("adType", "==", adType)
+    .orderBy("timestamp", "desc")
+    .limit(1)
+    .get();
 
-  if (!lastAd) {
+  if (snapshot.empty) {
     return { ready: true, cooldown: 0 };
   }
 
-  const lastTime = new Date(lastAd.timestamp);
+  const lastAd = snapshot.docs[0].data();
+  const lastTime = lastAd.timestamp.toDate();
   const elapsed = (now - lastTime) / 1000; // 秒
 
   if (elapsed < cooldown) {
@@ -146,6 +135,7 @@ const checkAdCooldown = async (userId, adType) => {
 
 /**
  * 請求觀看廣告（前置檢查）
+ * ✅ 修復：儲存到 Firestore
  */
 export const requestAdWatch = async (userId, characterId, adType = "rewarded_ad") => {
   const user = await getUserById(userId);
@@ -160,13 +150,13 @@ export const requestAdWatch = async (userId, characterId, adType = "rewarded_ad"
   }
 
   // 檢查每日上限
-  const dailyLimit = checkDailyAdLimit(userId);
+  const dailyLimit = await checkDailyAdLimit(userId);
   if (!dailyLimit.canWatch) {
     throw new Error(`今日廣告觀看次數已達上限（${dailyLimit.limit} 次）`);
   }
 
   // 檢查冷卻時間
-  const cooldown = checkAdCooldown(userId, adType);
+  const cooldown = await checkAdCooldown(userId, adType);
   if (!cooldown.ready) {
     if (cooldown.reason === "cooldown") {
       throw new Error(`請等待 ${cooldown.remaining} 秒後再觀看下一則廣告`);
@@ -177,13 +167,26 @@ export const requestAdWatch = async (userId, characterId, adType = "rewarded_ad"
   // 生成廣告 ID
   const adId = `ad_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // 創建廣告記錄
-  const record = new AdRecord(adId, adType, characterId);
-  const records = initUserAdRecords(userId);
-  records.push(record);
-
   const adConfig = await getAdConfigFromFirestore();
   const adTypeConfig = adConfig.types[adType];
+
+  // ✅ 修復：儲存到 Firestore
+  const db = getFirestoreDb();
+  await db.collection("ad_records").doc(adId).set({
+    adId,
+    userId,
+    adType,
+    characterId,
+    timestamp: FieldValue.serverTimestamp(),
+    reward: adTypeConfig.reward,
+    verified: false,
+    claimed: false,
+    verificationToken: null,
+    createdAt: FieldValue.serverTimestamp(),
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 分鐘過期
+  });
+
+  logger.info(`[廣告服務] 創建廣告記錄: adId=${adId}, userId=${userId}, characterId=${characterId}`);
 
   return {
     adId,
@@ -195,40 +198,97 @@ export const requestAdWatch = async (userId, characterId, adType = "rewarded_ad"
   };
 };
 
+// ==================== 廣告驗證（可選整合 AdMob）====================
+
+/**
+ * 驗證 Google AdMob 伺服器端回執（可選實現）
+ * 文檔：https://developers.google.com/admob/android/ssv
+ *
+ * @param {string} verificationToken - AdMob 提供的 SSV token
+ * @returns {Promise<boolean>} 是否驗證成功
+ */
+const verifyWithAdMobSSV = async (verificationToken) => {
+  // ⚠️ 這是示範代碼，實際需要根據 AdMob 文檔實現
+
+  if (!verificationToken) {
+    return false;
+  }
+
+  try {
+    // TODO: 實際實現需要：
+    // 1. 解析 JWT token
+    // 2. 驗證簽名（使用 Google 的公鑰）
+    // 3. 檢查 token 的 payload（userId, adId, timestamp 等）
+
+    // 示範：使用環境變數控制是否啟用嚴格驗證
+    const ENABLE_STRICT_AD_VERIFICATION = process.env.ENABLE_STRICT_AD_VERIFICATION === "true";
+
+    if (ENABLE_STRICT_AD_VERIFICATION) {
+      // 嚴格模式：實際調用 AdMob API 驗證
+      // const response = await fetch(`https://www.googleapis.com/...`, { ... });
+      // return response.ok;
+
+      logger.warn("[廣告服務] 嚴格驗證模式已啟用但未實現，拒絕驗證");
+      return false;
+    } else {
+      // 寬鬆模式：信任前端（開發/測試環境）
+      logger.debug("[廣告服務] 寬鬆驗證模式，接受驗證");
+      return true;
+    }
+  } catch (error) {
+    logger.error(`[廣告服務] AdMob 驗證失敗: ${error.message}`);
+    return false;
+  }
+};
+
 /**
  * 驗證廣告已觀看（由前端 SDK 回調）
+ * ✅ 修復：添加驗證邏輯
  */
 export const verifyAdWatched = async (userId, adId, verificationToken = null) => {
-  const records = initUserAdRecords(userId);
-  const record = records.find(r => r.adId === adId);
+  const db = getFirestoreDb();
+  const adRef = db.collection("ad_records").doc(adId);
 
-  if (!record) {
+  const adDoc = await adRef.get();
+  if (!adDoc.exists) {
     throw new Error("找不到廣告記錄");
+  }
+
+  const record = adDoc.data();
+
+  // 檢查廣告是否屬於此用戶
+  if (record.userId !== userId) {
+    logger.warn(`[廣告服務] 用戶 ${userId} 嘗試驗證不屬於自己的廣告 ${adId}`);
+    throw new Error("廣告記錄不屬於您");
   }
 
   if (record.verified) {
     throw new Error("此廣告已經驗證過了");
   }
 
-  // TODO: 實際應用應驗證來自廣告 SDK 的 token
-  // 例如 Google AdMob 的伺服器端驗證
-  // 目前簡化處理，信任前端回報
-
-  // 檢查是否過期（5 分鐘）
+  // ✅ 修復：檢查是否過期（5 分鐘）
   const now = new Date();
-  const created = new Date(record.timestamp);
-  const elapsed = (now - created) / 1000;
+  const expiresAt = record.expiresAt.toDate();
 
-  if (elapsed > 300) {
+  if (now > expiresAt) {
     throw new Error("廣告驗證已過期，請重新觀看");
   }
 
-  // 標記為已驗證
-  record.verified = true;
+  // ✅ 修復：添加廣告驗證邏輯
+  const isValid = await verifyWithAdMobSSV(verificationToken);
+  if (!isValid) {
+    logger.warn(`[廣告服務] 廣告驗證失敗: adId=${adId}, userId=${userId}`);
+    throw new Error("廣告驗證失敗，請重新觀看");
+  }
 
-  const adConfig = await getAdConfigFromFirestore();
-  const adTypeConfig = adConfig.types[record.adType];
-  record.reward = adTypeConfig.reward;
+  // 標記為已驗證
+  await adRef.update({
+    verified: true,
+    verifiedAt: FieldValue.serverTimestamp(),
+    verificationToken,
+  });
+
+  logger.info(`[廣告服務] 廣告驗證成功: adId=${adId}, userId=${userId}`);
 
   return {
     adId: record.adId,
@@ -237,67 +297,122 @@ export const verifyAdWatched = async (userId, adId, verificationToken = null) =>
   };
 };
 
+// ==================== 獎勵領取（原子性保護）====================
+
 /**
  * 領取廣告獎勵
+ * ✅ 修復：使用 Transaction 確保原子性
  */
 export const claimAdReward = async (userId, adId) => {
-  const records = initUserAdRecords(userId);
-  const record = records.find(r => r.adId === adId);
+  const db = getFirestoreDb();
+  const adRef = db.collection("ad_records").doc(adId);
 
-  if (!record) {
-    throw new Error("找不到廣告記錄");
-  }
+  let result = null;
 
-  if (!record.verified) {
-    throw new Error("廣告尚未驗證");
-  }
+  // ✅ 修復：使用 Transaction 確保原子性
+  await db.runTransaction(async (transaction) => {
+    const adDoc = await transaction.get(adRef);
 
-  if (record.claimed) {
-    throw new Error("獎勵已經領取過了");
-  }
+    if (!adDoc.exists) {
+      throw new Error("找不到廣告記錄");
+    }
 
-  // 根據獎勵類型發放
-  if (record.reward.type === "messages") {
-    // 解鎖對話次數
-    const result = await unlockByAd(userId, record.characterId, adId);
+    const record = adDoc.data();
 
-    record.claimed = true;
+    // 檢查廣告是否屬於此用戶
+    if (record.userId !== userId) {
+      throw new Error("廣告記錄不屬於您");
+    }
 
-    return {
-      success: true,
-      reward: {
-        type: "messages",
-        amount: record.reward.amount,
-        characterId: record.characterId,
-      },
-      result,
+    if (!record.verified) {
+      throw new Error("廣告尚未驗證");
+    }
+
+    if (record.claimed) {
+      // ✅ 冪等性：已領取，直接返回成功（不拋錯）
+      logger.info(`[廣告服務] 廣告獎勵已領取過: adId=${adId}, userId=${userId}`);
+      result = {
+        success: true,
+        alreadyClaimed: true,
+        reward: {
+          type: record.reward.type,
+          amount: record.reward.amount,
+          characterId: record.characterId,
+        },
+      };
+      return; // 提前退出事務
+    }
+
+    // 標記為已領取（防止重複）
+    transaction.update(adRef, {
+      claimed: true,
+      claimedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 設置結果（稍後在事務外執行實際的獎勵發放）
+    result = {
+      record,
+      needToGrant: true,
     };
+  });
+
+  // ✅ 事務已提交，現在發放獎勵
+  if (result.needToGrant) {
+    const record = result.record;
+
+    // 根據獎勵類型發放
+    if (record.reward.type === "messages") {
+      // 解鎖對話次數
+      const unlockResult = await unlockByAd(userId, record.characterId, adId);
+
+      logger.info(`[廣告服務] 發放廣告獎勵成功: adId=${adId}, userId=${userId}, reward=${record.reward.amount} messages`);
+
+      return {
+        success: true,
+        alreadyClaimed: false,
+        reward: {
+          type: "messages",
+          amount: record.reward.amount,
+          characterId: record.characterId,
+        },
+        result: unlockResult,
+      };
+    }
+
+    throw new Error("未知的獎勵類型");
   }
 
-  throw new Error("未知的獎勵類型");
+  // 已經領取過
+  return result;
 };
+
+// ==================== 統計和清理 ====================
 
 /**
  * 獲取用戶廣告觀看統計
+ * ✅ 修復：從 Firestore 讀取
  */
 export const getAdStats = async (userId) => {
-  const records = initUserAdRecords(userId);
-  const today = new Date().toISOString().split('T')[0];
+  const db = getFirestoreDb();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  const todayRecords = records.filter(r => {
-    const recordDate = new Date(r.timestamp).toISOString().split('T')[0];
-    return recordDate === today;
-  });
+  const [allSnapshot, todaySnapshot, todayVerifiedSnapshot, todayClaimedSnapshot] = await Promise.all([
+    db.collection("ad_records").where("userId", "==", userId).get(),
+    db.collection("ad_records").where("userId", "==", userId).where("timestamp", ">=", today).get(),
+    db.collection("ad_records").where("userId", "==", userId).where("timestamp", ">=", today).where("verified", "==", true).get(),
+    db.collection("ad_records").where("userId", "==", userId).where("timestamp", ">=", today).where("claimed", "==", true).get(),
+  ]);
 
   const adConfig = await getAdConfigFromFirestore();
 
   const stats = {
-    total: records.length,
-    today: todayRecords.length,
-    todayVerified: todayRecords.filter(r => r.verified).length,
-    todayClaimed: todayRecords.filter(r => r.claimed).length,
+    total: allSnapshot.size,
+    today: todaySnapshot.size,
+    todayVerified: todayVerifiedSnapshot.size,
+    todayClaimed: todayClaimedSnapshot.size,
     limit: adConfig.dailyAdLimit,
-    remaining: Math.max(0, adConfig.dailyAdLimit - todayRecords.filter(r => r.verified).length),
+    remaining: Math.max(0, adConfig.dailyAdLimit - todayVerifiedSnapshot.size),
   };
 
   return stats;
@@ -305,23 +420,26 @@ export const getAdStats = async (userId) => {
 
 /**
  * 清除過期的廣告記錄（定時清理）
+ * ✅ 修復：清理 Firestore 中的過期記錄
  */
-export const cleanupExpiredAdRecords = () => {
+export const cleanupExpiredAdRecords = async () => {
+  const db = getFirestoreDb();
   const now = new Date();
-  const maxAge = 7 * 24 * 60 * 60 * 1000; // 保留 7 天
+  const maxAge = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 保留 7 天
+
+  const snapshot = await db.collection("ad_records").where("timestamp", "<", maxAge).get();
 
   let cleanedCount = 0;
+  const batch = db.batch();
 
-  for (const [userId, records] of adRecords.entries()) {
-    const filtered = records.filter(record => {
-      const age = now - new Date(record.timestamp);
-      return age < maxAge;
-    });
+  snapshot.forEach((doc) => {
+    batch.delete(doc.ref);
+    cleanedCount++;
+  });
 
-    if (filtered.length !== records.length) {
-      adRecords.set(userId, filtered);
-      cleanedCount += records.length - filtered.length;
-    }
+  if (cleanedCount > 0) {
+    await batch.commit();
+    logger.info(`[廣告服務] 已清理 ${cleanedCount} 筆過期廣告記錄`);
   }
 
   return {

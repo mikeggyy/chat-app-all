@@ -83,7 +83,7 @@ router.get(
  * POST /api/potions/purchase/memory-boost
  * Body: { idempotencyKey }
  * 購買後加入庫存，使用時才需要選擇角色
- * 🔒 冪等性保護：防止重複購買
+ * 🔒 冪等性保護：防止重複購買（必須提供 idempotencyKey）
  */
 router.post(
   "/purchase/memory-boost",
@@ -98,20 +98,20 @@ router.post(
 
     const { idempotencyKey } = req.body;
 
-    // 冪等性保護
-    if (idempotencyKey) {
-      const requestId = `potion-memory:${userId}:${idempotencyKey}`;
-      const result = await handleIdempotentRequest(
-        requestId,
-        async () => await purchaseMemoryBoost(userId),
-        { ttl: 15 * 60 * 1000 } // 15 分鐘
-      );
-
-      return sendSuccess(res, result);
+    if (!idempotencyKey) {
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
+        field: "idempotencyKey",
+      });
     }
 
-    // 向後兼容：沒有 idempotencyKey 的請求
-    const result = await purchaseMemoryBoost(userId);
+    // 冪等性保護（必須）
+    const requestId = `potion-memory:${userId}:${idempotencyKey}`;
+    const result = await handleIdempotentRequest(
+      requestId,
+      async () => await purchaseMemoryBoost(userId),
+      { ttl: 15 * 60 * 1000 } // 15 分鐘
+    );
+
     sendSuccess(res, result);
   } catch (error) {
     logger.error("購買記憶增強藥水失敗:", error);
@@ -123,7 +123,7 @@ router.post(
  * 購買腦力激盪藥水
  * POST /api/potions/purchase/brain-boost
  * Body: { idempotencyKey }
- * 🔒 冪等性保護：防止重複購買
+ * 🔒 冪等性保護：防止重複購買（必須提供 idempotencyKey）
  */
 router.post(
   "/purchase/brain-boost",
@@ -138,20 +138,20 @@ router.post(
 
     const { idempotencyKey } = req.body;
 
-    // 冪等性保護
-    if (idempotencyKey) {
-      const requestId = `potion-brain:${userId}:${idempotencyKey}`;
-      const result = await handleIdempotentRequest(
-        requestId,
-        async () => await purchaseBrainBoost(userId),
-        { ttl: 15 * 60 * 1000 } // 15 分鐘
-      );
-
-      return sendSuccess(res, result);
+    if (!idempotencyKey) {
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
+        field: "idempotencyKey",
+      });
     }
 
-    // 向後兼容：沒有 idempotencyKey 的請求
-    const result = await purchaseBrainBoost(userId);
+    // 冪等性保護（必須）
+    const requestId = `potion-brain:${userId}:${idempotencyKey}`;
+    const result = await handleIdempotentRequest(
+      requestId,
+      async () => await purchaseBrainBoost(userId),
+      { ttl: 15 * 60 * 1000 } // 15 分鐘
+    );
+
     sendSuccess(res, result);
   } catch (error) {
     logger.error("購買腦力激盪藥水失敗:", error);

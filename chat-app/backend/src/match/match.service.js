@@ -96,18 +96,21 @@ export const getMatchesByIds = (ids) => {
   const matches = [];
   const missing = [];
 
-  normalizedIds.forEach((id) => {
-    // ✅ 優先從緩存讀取
-    const cachedCharacter = getCharacterById(id);
-    if (cachedCharacter) {
-      matches.push(cloneMatch(cachedCharacter));
-      return;
-    }
+  // ✅ 優化：一次性獲取所有角色並建立 Map，避免重複查找
+  const allCharacters = getAllCharacters(); // 從緩存獲取所有角色
+  const characterMap = new Map(allCharacters.map(char => [char.id, char]));
 
-    // ⚠️ 緩存未命中，檢查內存數組（舊角色）
-    const match = aiMatches.find((item) => item.id === id);
-    if (match) {
-      matches.push(cloneMatch(match));
+  // Fallback: 如果緩存為空，使用內存數組
+  if (characterMap.size === 0) {
+    aiMatches.forEach(match => characterMap.set(match.id, match));
+  }
+
+  // 批量查找，時間複雜度從 O(n*m) 降至 O(n)
+  normalizedIds.forEach((id) => {
+    const character = characterMap.get(id);
+
+    if (character) {
+      matches.push(cloneMatch(character));
     } else {
       missing.push(id);
     }

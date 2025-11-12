@@ -1,7 +1,5 @@
 /**
- * 廣告系統 API 路由 - 修復版本
- * 修復內容：
- * ✅ 領取廣告獎勵添加冪等性保護
+ * 廣告系統 API 路由
  */
 
 import express from "express";
@@ -20,7 +18,6 @@ import {
   checkDailyAdLimit,
   getAdStats,
 } from "./ad.service.js";
-import { handleIdempotentRequest } from "../utils/idempotency.js";
 
 const router = express.Router();
 
@@ -55,7 +52,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
     const { adId, verificationToken } = req.body;
-    const result = await verifyAdWatched(userId, adId, verificationToken);
+    const result = verifyAdWatched(userId, adId, verificationToken);
     sendSuccess(res, result);
   })
 );
@@ -65,7 +62,6 @@ router.post(
  * POST /api/ads/claim
  * Body: { adId }
  * 🔒 安全：userId 從認證 token 自動獲取
- * ✅ 修復：添加冪等性保護
  */
 router.post(
   "/api/ads/claim",
@@ -74,22 +70,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const userId = req.firebaseUser.uid;
     const { adId } = req.body;
-
-    // ✅ 修復：使用 adId 作為冪等性 key（因為每個廣告只能領取一次）
-    const requestId = `ad-reward:${userId}:${adId}`;
-
-    const result = await handleIdempotentRequest(
-      requestId,
-      async () => {
-        return await claimAdReward(userId, adId);
-      },
-      {
-        ttl: 10 * 60 * 1000, // 10 分鐘 TTL
-      }
-    );
-
+    const result = await claimAdReward(userId, adId);
     sendSuccess(res, {
-      message: result.alreadyClaimed ? "廣告獎勵已經領取過" : "成功領取廣告獎勵",
+      message: "成功領取廣告獎勵",
       ...result,
     });
   })
@@ -103,7 +86,7 @@ router.get(
   "/api/ads/limit/:userId",
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
-    const limit = await checkDailyAdLimit(userId);
+    const limit = checkDailyAdLimit(userId);
     sendSuccess(res, limit);
   })
 );
@@ -116,7 +99,7 @@ router.get(
   "/api/ads/stats/:userId",
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
-    const stats = await getAdStats(userId);
+    const stats = getAdStats(userId);
     sendSuccess(res, {
       userId,
       ...stats,

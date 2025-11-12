@@ -292,34 +292,9 @@ export const getAvailableGifts = async (userId) => {
   };
 };
 
-/**
- * 獲取禮物價格列表（考慮用戶會員等級）
- */
-export const getGiftPricing = async (userId) => {
-  const user = await getUserById(userId);
-  const tier = user ? await getUserTier(userId) : "free";
-
-  // 獲取所有禮物
-  const gifts = getGiftList();
-
-  const pricing = gifts.map((gift) => {
-    const priceInfo = calculateGiftPrice(gift.id, tier);
-    return {
-      id: gift.id,
-      name: gift.name,
-      emoji: gift.emoji,
-      description: gift.description,
-      rarity: gift.rarity,
-      ...priceInfo,
-    };
-  });
-
-  const balance = user ? (user.walletBalance || 0) : 0;
-
-  return {
-    userId,
-    tier,
-    balance,
-    gifts: pricing,
-  };
+export default {
+  sendGift,
+  getUserGiftHistory,
+  getCharacterGiftStats,
+  getAvailableGifts,
 };

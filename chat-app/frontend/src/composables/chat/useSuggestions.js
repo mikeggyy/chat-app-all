@@ -5,16 +5,12 @@
 
 import { ref, computed } from 'vue';
 import { requestAiSuggestions } from '../../utils/conversation';
+import { SUGGESTION_CONFIG } from '../../config/chat.js';
 
-// 常量配置
-const MAX_SUGGESTION_ITEMS = 3;
-const SUGGESTION_SIGNATURE_WINDOW = 6;
-
-const FALLBACK_SUGGESTIONS = [
-  '可以多分享你的感受嗎？',
-  '最近有發生什麼讓你印象深刻的事嗎？',
-  '我很好奇你的想法，再聊聊吧！',
-];
+// ✅ 使用集中化配置
+const MAX_SUGGESTION_ITEMS = SUGGESTION_CONFIG.MAX_ITEMS;
+const SUGGESTION_SIGNATURE_WINDOW = SUGGESTION_CONFIG.SIGNATURE_WINDOW;
+const FALLBACK_SUGGESTIONS = SUGGESTION_CONFIG.FALLBACK_SUGGESTIONS;
 
 /**
  * 建議回覆 Composable

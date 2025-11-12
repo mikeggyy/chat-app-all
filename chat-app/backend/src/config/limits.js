@@ -316,4 +316,15 @@ export const IDEMPOTENCY_TTL = {
 
   // 資產購買（防止快速重複點擊）
   ASSET_PURCHASE: 2 * 1000, // 2 秒
+
+  // 金幣相關
+  COIN_FEATURE_PURCHASE: 15 * 60 * 1000, // 15 分鐘（無限對話、AI 照片/影片等功能購買）
+  COIN_PACKAGE: 15 * 60 * 1000, // 15 分鐘（金幣套餐購買）
+  COIN_RECHARGE: 15 * 60 * 1000, // 15 分鐘（金幣儲值）
+
+  // 廣告獎勵
+  AD_REWARD: 10 * 60 * 1000, // 10 分鐘
+
+  // 藥水購買
+  POTION_PURCHASE: 15 * 60 * 1000, // 15 分鐘
 };

@@ -21,6 +21,7 @@ import {
   getAdStats,
 } from "./ad.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js";
 
 const router = express.Router();
 
@@ -84,7 +85,7 @@ router.post(
         return await claimAdReward(userId, adId);
       },
       {
-        ttl: 10 * 60 * 1000, // 10 分鐘 TTL
+        ttl: IDEMPOTENCY_TTL.AD_REWARD, // 10 分鐘 TTL
       }
     );
 

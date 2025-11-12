@@ -24,6 +24,7 @@ import {
   hasBrainBoost,
 } from "./potion.service.js";
 import { validateRequest, potionSchemas } from "../middleware/validation.middleware.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js";
 
 const router = express.Router();
 
@@ -109,7 +110,7 @@ router.post(
     const result = await handleIdempotentRequest(
       requestId,
       async () => await purchaseMemoryBoost(userId),
-      { ttl: 15 * 60 * 1000 } // 15 分鐘
+      { ttl: IDEMPOTENCY_TTL.POTION_PURCHASE } // 15 分鐘
     );
 
     sendSuccess(res, result);
@@ -149,7 +150,7 @@ router.post(
     const result = await handleIdempotentRequest(
       requestId,
       async () => await purchaseBrainBoost(userId),
-      { ttl: 15 * 60 * 1000 } // 15 分鐘
+      { ttl: IDEMPOTENCY_TTL.POTION_PURCHASE } // 15 分鐘
     );
 
     sendSuccess(res, result);

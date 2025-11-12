@@ -29,6 +29,7 @@ import {
 import logger from "../utils/logger.js";
 import { validateRequest, coinSchemas } from "../middleware/validation.middleware.js";
 import { purchaseRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js";
 
 const router = express.Router();
 
@@ -85,7 +86,7 @@ router.post(
     const result = await handleIdempotentRequest(
       requestId,
       async () => await purchaseAiPhoto(userId, characterId),
-      { ttl: 15 * 60 * 1000 } // 15 分鐘
+      { ttl: IDEMPOTENCY_TTL.IMAGE_GENERATION } // 15 分鐘
     );
 
     sendSuccess(res, {
@@ -130,7 +131,7 @@ router.post(
     const result = await handleIdempotentRequest(
       requestId,
       async () => await purchaseAiVideo(userId, characterId),
-      { ttl: 30 * 60 * 1000 } // 30 分鐘（影片生成時間較長）
+      { ttl: IDEMPOTENCY_TTL.VIDEO_GENERATION } // 30 分鐘（影片生成時間較長）
     );
 
     sendSuccess(res, {
@@ -175,7 +176,7 @@ router.post(
     const result = await handleIdempotentRequest(
       requestId,
       async () => await purchaseUnlimitedChat(userId, characterId),
-      { ttl: 15 * 60 * 1000 } // 15 分鐘
+      { ttl: IDEMPOTENCY_TTL.COIN_FEATURE_PURCHASE } // 15 分鐘
     );
 
     sendSuccess(res, {
@@ -334,7 +335,7 @@ router.post(
             method: "dev_bypass",
             timestamp: new Date().toISOString(),
           }),
-          { ttl: 15 * 60 * 1000 } // 15 分鐘
+          { ttl: IDEMPOTENCY_TTL.COIN_PACKAGE } // 15 分鐘
         );
 
         return res.json({
@@ -418,7 +419,7 @@ router.post(
           method: "test",
           timestamp: new Date().toISOString(),
         }),
-        { ttl: 15 * 60 * 1000 } // 15 分鐘
+        { ttl: IDEMPOTENCY_TTL.COIN_RECHARGE } // 15 分鐘
       );
 
       return res.json({

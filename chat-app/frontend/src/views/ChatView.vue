@@ -10,10 +10,8 @@ import { useRoute, useRouter } from "vue-router";
 
 // Chat 組件
 import ChatHeader from "../components/chat/ChatHeader.vue";
-import MessageList from "../components/chat/MessageList.vue";
-import MessageInput from "../components/chat/MessageInput.vue";
+import ChatContent from "../components/chat/ChatContent.vue";
 import ChatModals from "../components/chat/ChatModals.vue";
-import UnlockFab from "../components/chat/UnlockFab.vue";
 
 // Composables
 import { useUserProfile } from "../composables/useUserProfile";
@@ -47,13 +45,14 @@ import { useMenuActions } from "../composables/chat/useMenuActions";
 import { useChatInitialization } from "../composables/chat/useChatInitialization";
 import { useEventHandlers } from "../composables/chat/useEventHandlers";
 import { useChatWatchers } from "../composables/chat/useChatWatchers";
+import { useSendMessage } from "../composables/chat/useSendMessage";
 
 // Utils
 import { appendCachedHistory } from "../utils/conversationCache";
 import {
-  rollbackUserMessage as rollbackUserMessageHelper,
-  createLimitModalData as createLimitModalDataHelper,
-  getConversationContext as getConversationContextHelper,
+  rollbackUserMessage,
+  createLimitModalData,
+  getConversationContext,
 } from "../utils/chat/chatHelpers";
 
 // Config
@@ -123,9 +122,6 @@ const {
   loadPartner,
 } = usePartner({ partnerId });
 
-// Chat Page Ref (用於截圖)
-const chatPageRef = ref(null);
-
 // Current User ID
 const currentUserId = computed(() => user.value?.id || "");
 
@@ -179,7 +175,7 @@ const {
   firebaseAuth,
   toast: { success, error: showError },
   requireLogin,
-  scrollToBottom: () => messageListRef.value?.scrollToBottom(),
+  scrollToBottom: () => chatContentRef.value?.messageListRef?.scrollToBottom(),
   appendCachedHistory: (entries) => {
     const matchId = partner.value?.id ?? "";
     const userId = currentUserId.value ?? "";
@@ -200,8 +196,16 @@ const {
   getPartnerId: () => partner.value?.id,
   getFirebaseAuth: () => firebaseAuth,
   messages,
-  messageListRef,
-  rollbackUserMessage,
+  messageListRef: computed(() => chatContentRef.value?.messageListRef),
+  rollbackUserMessage: (userId, matchId, messageId) =>
+    rollbackUserMessage({
+      userId,
+      matchId,
+      messageId,
+      firebaseAuth,
+      messages,
+      showError,
+    }),
   requireLogin,
   showVideoLimit,
   showPhotoSelector,
@@ -220,8 +224,8 @@ const {
 // Local State
 // ====================
 const draft = ref("");
-const messageListRef = ref(null);
-const messageInputRef = ref(null);
+const chatContentRef = ref(null);
+const chatPageRef = ref(null);
 
 // ====================
 // Modal Manager
@@ -292,8 +296,16 @@ const {
   getPartnerId: () => partnerId.value,
   getFirebaseAuth: () => firebaseAuth,
   messages,
-  messageListRef,
-  rollbackUserMessage,
+  messageListRef: computed(() => chatContentRef.value?.messageListRef),
+  rollbackUserMessage: (userId, matchId, messageId) =>
+    rollbackUserMessage({
+      userId,
+      matchId,
+      messageId,
+      firebaseAuth,
+      messages,
+      showError,
+    }),
   requireLogin,
   canGeneratePhoto,
   fetchPhotoStats,
@@ -458,93 +470,35 @@ const {
 });
 
 // ====================
-// Conversation Context
+// Send Message Handler (使用 useSendMessage composable)
 // ====================
-const getConversationContext = () => {
-  return getConversationContextHelper({
-    matchId: partner.value?.id,
-    currentUserId: currentUserId.value,
-  });
-};
+const { handleSendMessage } = useSendMessage({
+  // Getters
+  getCurrentUserId: () => currentUserId.value,
+  getPartnerId: () => partner.value?.id,
+  getPartnerDisplayName: () => partnerDisplayName.value,
+  getDraft: () => draft.value,
+  setDraft: (value) => { draft.value = value; },
+  getMessageInputRef: () => chatContentRef.value?.messageInputRef,
+  getCharacterTickets: () => characterTickets.value,
 
-// ====================
-// Helper Functions
-// ====================
+  // Guest checks
+  isGuest,
+  canGuestSendMessage,
+  requireLogin,
+  incrementGuestMessageCount,
 
-/**
- * 撤回用戶消息（從後端和前端同時刪除）
- * 使用抽取的 helper 函數
- */
-const rollbackUserMessage = async (userId, matchId, messageId) => {
-  return rollbackUserMessageHelper({
-    userId,
-    matchId,
-    messageId,
-    firebaseAuth,
-    messages,
-    showError,
-  });
-};
+  // Limit checks
+  checkLimit,
+  showConversationLimit,
 
-/**
- * 創建限制 Modal 的數據結構
- * 使用抽取的 helper 函數
- */
-const createLimitModalData = (limitCheck, type = "photo") => {
-  return createLimitModalDataHelper(limitCheck, type);
-};
+  // Message actions
+  sendMessageToApi,
+  invalidateSuggestions,
 
-// ====================
-// Send Message Handler
-// ====================
-const handleSendMessage = async (text) => {
-  const userId = currentUserId.value;
-  const matchId = partner.value?.id;
-
-  if (!userId || !matchId || !text) return;
-
-  // Guest message limit check
-  if (isGuest.value && !canGuestSendMessage.value) {
-    requireLogin({ feature: "發送訊息" });
-    return;
-  }
-
-  // Check conversation limit
-  const limitCheck = await checkLimit(userId, matchId);
-  if (!limitCheck.allowed) {
-    showConversationLimit({
-      characterName: partnerDisplayName.value,
-      remainingMessages: limitCheck.remaining || 0,
-      dailyAdLimit: limitCheck.dailyAdLimit || 10,
-      adsWatchedToday: limitCheck.adsWatchedToday || 0,
-      isUnlocked: limitCheck.isUnlocked || false,
-      characterUnlockCards: characterTickets.value || 0,
-    });
-    return;
-  }
-
-  // Clear draft immediately
-  draft.value = "";
-
-  try {
-    // Send message (sendMessage only takes text parameter)
-    await sendMessageToApi(text);
-
-    // Invalidate suggestions
-    invalidateSuggestions();
-
-    // Increment guest message count
-    if (isGuest.value) {
-      incrementGuestMessageCount();
-    }
-
-    // Focus input
-    await nextTick();
-    messageInputRef.value?.focus();
-  } catch (error) {
-    showError(error instanceof Error ? error.message : "發送消息失敗");
-  }
-};
+  // Toast
+  showError,
+});
 
 // ====================
 // Event Handlers (使用 useEventHandlers composable)
@@ -609,7 +563,7 @@ const { initializeChat } = useChatInitialization({
   getPartnerId: () => partnerId.value,
   getPartner: () => partner.value,
   getMessages: () => messages.value,
-  getMessageListRef: () => messageListRef.value,
+  getMessageListRef: () => chatContentRef.value?.messageListRef,
 
   // Loaders
   loadPartner,
@@ -657,22 +611,15 @@ onBeforeUnmount(() => {
       @view-buff-details="handleViewBuffDetails"
     />
 
-    <!-- Message List -->
-    <MessageList
-      ref="messageListRef"
+    <!-- Chat Content (MessageList + MessageInput + UnlockFab) -->
+    <ChatContent
+      ref="chatContentRef"
       :messages="messages"
       :partner-name="partnerDisplayName"
       :partner-background="partnerBackground"
       :is-replying="isReplying"
       :playing-voice-message-id="playingVoiceMessageId"
-      @play-voice="handlePlayVoice"
-      @image-click="handleImageClick"
-    />
-
-    <!-- Message Input -->
-    <MessageInput
-      ref="messageInputRef"
-      v-model="draft"
+      :draft="draft"
       :disabled="isLoadingHistory || isReplying"
       :suggestions="suggestionOptions"
       :is-loading-suggestions="isLoadingSuggestions"
@@ -681,19 +628,18 @@ onBeforeUnmount(() => {
       :is-requesting-selfie="isRequestingSelfie"
       :is-requesting-video="isRequestingVideo"
       :photo-remaining="photoRemaining"
+      :is-character-unlocked="isCharacterUnlocked"
+      :has-character-tickets="hasCharacterTickets"
+      :character-tickets="characterTickets"
+      @play-voice="handlePlayVoice"
+      @image-click="handleImageClick"
+      @update:draft="draft = $event"
       @send="handleSendMessage"
       @suggestion-click="handleSuggestionClick"
       @request-suggestions="handleRequestSuggestions"
       @gift-click="handleOpenGiftSelector"
       @selfie-click="handleRequestSelfie"
       @video-click="handleRequestVideo"
-    />
-
-    <!-- 快速解鎖角色懸浮按鈕 -->
-    <UnlockFab
-      :is-character-unlocked="isCharacterUnlocked"
-      :has-character-tickets="hasCharacterTickets"
-      :character-tickets="characterTickets"
       @unlock-action="handleMenuAction('unlock-character')"
     />
 

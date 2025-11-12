@@ -47,14 +47,14 @@ const shouldIncludeMatches = (query) => {
     );
 };
 
-const buildFavoritesPayload = (user, includeMatches) => {
+const buildFavoritesPayload = async (user, includeMatches) => {
   const favorites = Array.isArray(user?.favorites) ? user.favorites : [];
 
   if (!includeMatches) {
     return { favorites };
   }
 
-  const { matches, missing } = getMatchesByIds(favorites);
+  const { matches, missing } = await getMatchesByIds(favorites);
   const payload = {
     favorites,
     matches,
@@ -233,7 +233,7 @@ userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), as
     }
 
     const includeMatches = shouldIncludeMatches(req.query);
-    sendSuccess(res, buildFavoritesPayload(user, includeMatches));
+    sendSuccess(res, await buildFavoritesPayload(user, includeMatches));
   } catch (error) {
     next(error);
   }
@@ -285,7 +285,7 @@ userRouter.post(
       }
     }
 
-    sendSuccess(res, buildFavoritesPayload(user, includeMatches), 201);
+    sendSuccess(res, await buildFavoritesPayload(user, includeMatches), 201);
   })
 );
 
@@ -298,7 +298,7 @@ userRouter.delete(
     const includeMatches = shouldIncludeMatches(req.query);
 
     const user = await removeFavoriteForUser(id, favoriteId);
-    sendSuccess(res, buildFavoritesPayload(user, includeMatches));
+    sendSuccess(res, await buildFavoritesPayload(user, includeMatches));
   })
 );
 
@@ -323,8 +323,8 @@ userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id")
       .map((conv) => conv.characterId || conv.conversationId)
       .filter(Boolean);
 
-    // 首先從內存獲取基本信息
-    const { matches: characters } = getMatchesByIds(characterIds);
+    // 首先從內存獲取基本信息（批量查詢，避免 N+1 問題）
+    const { matches: characters } = await getMatchesByIds(characterIds);
     const charactersMap = new Map(characters.map((char) => [char.id, char]));
 
     // 從 Firestore 獲取統計信息（totalChatUsers, totalFavorites）

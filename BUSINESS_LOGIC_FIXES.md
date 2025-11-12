@@ -184,42 +184,72 @@ tokenExpiry = isTestToken
 
 ## 🟡 中危問題修復
 
-### 6. 🔄 訂單狀態機驗證
+### 6. ✅ 訂單狀態機驗證
 
 **問題**: 訂單狀態可能非法回退（如 `completed` → `pending`）
 
-**修復計畫**:
+**修復**: 已完成
+- 文件: `chat-app/backend/src/payment/order.service.js`
+- 定義 `ORDER_STATE_TRANSITIONS` 狀態機規則
+- 在 Transaction 內檢查狀態轉換合法性
+- 記錄狀態轉換歷史到 metadata.statusHistory
+- 確保原子性，防止並發衝突
+
+**實現**:
 ```javascript
 // payment/order.service.js
-const ORDER_STATE_TRANSITIONS = {
-  pending: ['processing', 'cancelled'],
-  processing: ['completed', 'failed'],
-  completed: ['refunded'],
-  failed: [],
-  refunded: [],
-  cancelled: []
+export const ORDER_STATE_TRANSITIONS = {
+  pending: ['processing', 'cancelled', 'failed'],     // 待支付 → 處理中/已取消/失敗
+  processing: ['completed', 'failed', 'cancelled'],   // 處理中 → 已完成/失敗/已取消
+  completed: ['refunded'],                            // 已完成 → 已退款（不可逆）
+  failed: ['pending'],                                // 失敗 → 待支付（允許重試）
+  refunded: [],                                       // 已退款 → 終態
+  cancelled: []                                       // 已取消 → 終態
 };
 
-export const updateOrderStatus = async (orderId, newStatus, metadata = {}) => {
+export const updateOrderStatus = async (orderId, status, metadata = {}) => {
   const db = getFirestoreDb();
   const orderRef = db.collection(ORDERS_COLLECTION).doc(orderId);
 
   return await db.runTransaction(async (transaction) => {
     const orderDoc = await transaction.get(orderRef);
-    const currentStatus = orderDoc.data().status;
+    const currentOrder = orderDoc.data();
+    const currentStatus = currentOrder.status;
 
-    // 檢查狀態轉換是否合法
-    if (!ORDER_STATE_TRANSITIONS[currentStatus]?.includes(newStatus)) {
-      throw new Error(`無效的狀態轉換: ${currentStatus} → ${newStatus}`);
+    // 驗證狀態轉換是否合法
+    const allowedTransitions = ORDER_STATE_TRANSITIONS[currentStatus];
+    if (!allowedTransitions || !allowedTransitions.includes(status)) {
+      throw new Error(
+        `無效的訂單狀態轉換：${currentStatus} → ${status}。` +
+        `允許的轉換：${allowedTransitions?.join(', ') || '無'}`
+      );
     }
 
-    transaction.update(orderRef, {
-      status: newStatus,
-      updatedAt: FieldValue.serverTimestamp(),
-      ...metadata
-    });
+    // 冪等性檢查
+    if (currentStatus === status) {
+      return currentOrder;
+    }
 
-    return { success: true, from: currentStatus, to: newStatus };
+    // 構建更新數據（包含狀態轉換歷史）
+    const updateData = {
+      status,
+      updatedAt: FieldValue.serverTimestamp(),
+      metadata: {
+        ...(currentOrder.metadata || {}),
+        ...metadata,
+        statusHistory: [
+          ...((currentOrder.metadata?.statusHistory) || []),
+          {
+            from: currentStatus,
+            to: status,
+            timestamp: new Date().toISOString()
+          }
+        ]
+      }
+    };
+
+    transaction.update(orderRef, updateData);
+    return { ...currentOrder, ...updateData };
   });
 };
 ```
@@ -711,13 +741,13 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
-| 🔴 高危 | 3 | 2 | 5 |
-| 🟡 中危 | 1 | 7 | 8 |
+| 🔴 高危 | 4 | 1 | 5 |
+| 🟡 中危 | 2 | 6 | 8 |
 | 🟢 低危 | 0 | 5 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **6** | **15** | **21** |
+| **總計** | **8** | **13** | **21** |
 
-**完成度**: 28.6%
+**完成度**: 38.1%
 
 ### 已完成的修復
 
@@ -725,13 +755,15 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 1. ✅ 冪等性改用 Firestore（Commit: `7e69f82`）
 2. ✅ 會員升級獎勵原子性（Commit: `1a7c8db`）
 3. ✅ 測試 Token 緩存時間縮短（Commit: `c28c549`）
+4. ✅ 前端金幣餘額並發保護（Commit: `52f4a0c`）
 
 **中危問題**:
-4. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
+5. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
+6. ✅ 訂單狀態機驗證（本次提交）
 
 **性能優化**:
-5. ✅ 添加 Firestore 索引（Commit: `c28c549`）
-6. ✅ 創建修復文檔（Commit: `da49a75`）
+7. ✅ 添加 Firestore 索引（Commit: `c28c549`）
+8. ✅ 創建修復文檔（Commit: `da49a75`）
 
 ---
 

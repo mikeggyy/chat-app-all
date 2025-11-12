@@ -74,11 +74,9 @@ loveStory/
 │   ├── backend/         # Node.js + Express 後端 (port 4001)
 │   └── README.md        # 管理後臺完整文檔 ⭐
 │
+├── docs/                # 共享文檔（部署、會員機制、TTS 等）
 ├── start-all.js         # 統一啟動腳本（同時啟動所有服務）
-├── PORTS.md             # 端口配置說明
-├── TESTING_GUIDE.md     # 測試指南
-├── LIMIT_SYSTEM_EXPLAINED.md  # 限制系統說明
-└── SECURITY_AUDIT_FIXES.md    # 安全審計修復記錄
+└── PORTS.md             # 端口配置說明
 ```
 
 ## 開發環境
@@ -265,7 +263,7 @@ npm run test:env            # 驗證環境變數配置（推薦首次啟動前�
 - VIP/VVIP 用戶：大幅提升或無限次數
 - 重置邏輯：對話/語音每日重置（廣告解鎖），照片每月重置
 
-詳見：[LIMIT_SYSTEM_EXPLAINED.md](LIMIT_SYSTEM_EXPLAINED.md)
+詳細限制邏輯請參閱：`backend/src/services/limitService/` 目錄下的各個服務文件
 
 ### 主要功能系統
 
@@ -307,12 +305,44 @@ npm run test:env            # 驗證環境變數配置（推薦首次啟動前�
 - `useFirebaseAuth` - Firebase 認證整合
 - `useMembership` - 會員等級和權限檢查
 - `useCoins` - 虛擬貨幣餘額管理
+- `useGuestGuard` - 訪客權限守衛和限制
 
 **限制系統**：
 - `useConversationLimit` - 對話次數限制查詢
 - `useVoiceLimit` - 語音播放限制查詢
 - `usePhotoLimit` - 照片生成限制查詢
 - `useBaseLimitService` - 統一限制服務基類
+
+**聊天核心** (`composables/chat/`)：
+- `useSendMessage` - 消息發送完整邏輯（含限制檢查、訪客處理）
+- `useChatMessages` - 消息列表管理、歷史加載、API 通訊
+- `useChatActions` - 聊天操作（重置對話、刪除消息等）
+- `useSuggestions` - 快速回覆建議生成和管理
+- `useChatInitialization` - 聊天頁面初始化流程
+- `usePartner` - 對話夥伴資料和背景管理
+- `useEventHandlers` - 聊天事件處理（發送、重試等）
+- `useChatWatchers` - 聊天狀態監聽器
+
+**聊天進階功能**：
+- `useVoiceManagement` - TTS 語音播放管理和限制檢查
+- `useSelfieGeneration` - AI 自拍照片生成和顯示
+- `useVideoGeneration` - AI 視頻生成和處理
+- `useGiftManagement` - 禮物發送管理和購買流程
+- `usePotionManagement` - 藥水使用和效果管理
+- `useFavoriteManagement` - 角色收藏/取消收藏
+- `useConversationReset` - 對話重置確認和執行
+
+**角色解鎖與限制**：
+- `useCharacterUnlock` - 角色解鎖邏輯和狀態檢查
+- `useConversationLimitActions` - 對話限制彈窗和解鎖操作
+
+**聊天 UI 管理**：
+- `useModalManager` - 聊天相關彈窗管理（禮物、照片等）
+- `usePhotoVideoHandler` - 照片/視頻全螢幕查看處理
+- `useShareFunctionality` - 分享功能（對話、照片等）
+- `useChatListState` - 聊天列表狀態管理
+- `useChatListActions` - 聊天列表操作（刪除、標記等）
+- `useMenuActions` - 聊天選單操作（更多選項）
 
 **角色創建**：
 - `useCharacterCreationFlow` - 角色創建流程狀態管理
@@ -454,16 +484,21 @@ console.log(user.customClaims);
 
 ### 根目錄文檔
 
+- **[CHANGELOG.md](CHANGELOG.md)** - 版本更新日誌 📋
 - **[PORTS.md](PORTS.md)** - 端口配置詳細說明
-- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - 測試指南
-- **[LIMIT_SYSTEM_EXPLAINED.md](LIMIT_SYSTEM_EXPLAINED.md)** - 使用限制系統詳解
-- **[SECURITY_AUDIT_FIXES.md](SECURITY_AUDIT_FIXES.md)** - 安全審計和修復記錄
+- **[會員機制說明.md](docs/會員機制說明.md)** - 會員系統完整說明
+- **[docs/CODE_CLEANUP_2025-01.md](docs/CODE_CLEANUP_2025-01.md)** - 代碼清理報告（2025年1月）🧹
 
 ### 部署相關文檔
 
 - **[docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md)** ⚡ - Cloudflare Pages 快速部署（5 分鐘）
 - **[docs/cloudflare-pages-deployment.md](docs/cloudflare-pages-deployment.md)** - Cloudflare Pages 完整部署指南
 - **[docs/cloudflare-pages-migration-summary.md](docs/cloudflare-pages-migration-summary.md)** - 遷移總結和檢查清單
+
+### AI 服務文檔
+
+- **[docs/TTS_COMPARISON.md](docs/TTS_COMPARISON.md)** - TTS 服務比較分析
+- **[docs/GOOGLE_TTS_SETUP.md](docs/GOOGLE_TTS_SETUP.md)** - Google TTS 設置指南
 
 ### 主應用文檔（chat-app）
 
@@ -473,6 +508,11 @@ console.log(user.customClaims);
 - [chat-app/docs/firebase-emulator-setup.md](chat-app/docs/firebase-emulator-setup.md) - Firebase Emulator 設置指南
 - [chat-app/docs/IDEMPOTENCY.md](chat-app/docs/IDEMPOTENCY.md) - 冪等性系統實現指南
 - [chat-app/docs/DEPLOYMENT.md](chat-app/docs/DEPLOYMENT.md) - 部署指南
+- [chat-app/docs/COST-OPTIMIZATION.md](chat-app/docs/COST-OPTIMIZATION.md) - 成本優化指南
+- [chat-app/docs/DATABASE-OPTIMIZATION-SUMMARY.md](chat-app/docs/DATABASE-OPTIMIZATION-SUMMARY.md) - 資料庫優化總結
+- [chat-app/docs/ASSET_SYSTEM_ARCHITECTURE.md](chat-app/docs/ASSET_SYSTEM_ARCHITECTURE.md) - 資產系統架構
+- [chat-app/docs/CHARACTER_CREATION_FLOW.md](chat-app/docs/CHARACTER_CREATION_FLOW.md) - 角色創建流程
+- [chat-app/docs/USER_PROFILE_CACHE.md](chat-app/docs/USER_PROFILE_CACHE.md) - 用戶資料緩存說明
 - [chat-app/backend/scripts/README.md](chat-app/backend/scripts/README.md) - 數據導入腳本指南
 
 ### 管理後臺文檔（chat-app-admin）
@@ -873,8 +913,8 @@ npm run import:test-data    # 導入測試用戶和對話
 **修改後必須更新的文檔**：
 1. **新增 API 端點** → `chat-app/CLAUDE.md` 的 API 列表
 2. **新增 Firestore 集合** → `chat-app/docs/firestore-collections.md`
-3. **修改限制邏輯** → `LIMIT_SYSTEM_EXPLAINED.md`
-4. **安全修復** → `SECURITY_AUDIT_FIXES.md`
+3. **修改限制邏輯** → 更新對應的 limit service 和 `backend/src/config/limits.js`
+4. **新增優化措施** → `chat-app/docs/COST-OPTIMIZATION.md` 或 `DATABASE-OPTIMIZATION-SUMMARY.md`
 5. **部署流程變更** → `chat-app/docs/DEPLOYMENT.md`
 
 **文檔位置索引**：
@@ -893,9 +933,9 @@ npm run import:test-data    # 導入測試用戶和對話
 
 **添加新的限制類型**：
 1. `backend/src/config/limits.js` 定義限制值
-2. `backend/src/services/limitService/` 創建服務
-3. `frontend/src/composables/` 創建對應的 composable
-4. 更新 `LIMIT_SYSTEM_EXPLAINED.md`
+2. `backend/src/services/limitService/` 創建服務（參考 `baseLimitService.js`）
+3. `frontend/src/composables/` 創建對應的 composable（參考 `useConversationLimit.js`）
+4. 在主應用的 CLAUDE.md 文檔中記錄新的限制系統
 
 **添加新的虛擬商品**：
 1. Firestore `gifts` / `coin_packages` 集合添加文檔

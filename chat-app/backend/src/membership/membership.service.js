@@ -5,6 +5,7 @@
 
 import { getUserById, upsertUser } from "../user/user.service.js";
 import { getUserProfileWithCache, deleteCachedUserProfile } from "../user/userProfileCache.service.js";
+import { getWalletBalance, createWalletUpdate } from "../user/walletHelpers.js";
 import { MEMBERSHIP_TIERS, hasFeatureAccess } from "./membership.config.js";
 import { grantTickets } from "./unlockTickets.service.js";
 import { addCoins, TRANSACTION_TYPES } from "../payment/coins.service.js";
@@ -283,12 +284,27 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
       const currentTickets = freshUser.unlockTickets || {};
       const photoCardsToGrant = (features.photoUnlockCards || 0) + bonusPhotoCards;
 
+      // ✅ 保留現有的使用歷史記錄
+      const existingHistory = currentTickets.usageHistory || [];
+      const newGrantRecord = {
+        type: "grant",
+        amounts: {
+          characterUnlockCards: features.characterUnlockCards || 0,
+          photoUnlockCards: photoCardsToGrant,
+          videoUnlockCards: features.videoUnlockCards || 0,
+        },
+        timestamp: now.toISOString(),
+        reason: "membership_activation",
+        tier: targetTier,
+      };
+
+      // ✅ 使用展開運算符保留所有現有字段（防止覆蓋未來新增的票券類型）
       membershipUpdate.unlockTickets = {
+        ...currentTickets,
         characterUnlockCards: (currentTickets.characterUnlockCards || 0) + (features.characterUnlockCards || 0),
         photoUnlockCards: (currentTickets.photoUnlockCards || 0) + photoCardsToGrant,
         videoUnlockCards: (currentTickets.videoUnlockCards || 0) + (features.videoUnlockCards || 0),
-        // 保留其他票券
-        voiceUnlockCards: currentTickets.voiceUnlockCards || 0,
+        usageHistory: [...existingHistory, newGrantRecord],
       };
 
       // 3.2 發放創建角色卡（直接更新用戶 assets）
@@ -302,13 +318,13 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
 
       // 3.3 發放金幣（直接更新用戶金幣餘額）
       if (features.monthlyCoinsBonus > 0) {
-        const currentBalance = freshUser.coins?.balance || freshUser.coins || 0;
+        // ✅ 使用 walletHelpers 獲取當前餘額（向後兼容）
+        const currentBalance = getWalletBalance(freshUser);
         const newBalance = currentBalance + features.monthlyCoinsBonus;
 
-        membershipUpdate.coins = {
-          balance: newBalance,
-          lastUpdated: now.toISOString(),
-        };
+        // ✅ 使用標準的錢包格式（與 walletHelpers.createWalletUpdate 一致）
+        const walletUpdate = createWalletUpdate(newBalance, freshUser.wallet?.currency || "TWD");
+        Object.assign(membershipUpdate, walletUpdate);
 
         // 創建交易記錄（在同一 Transaction 內）
         const transactionRef = db.collection("transactions").doc();
@@ -328,16 +344,16 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
         });
       }
 
-      // 記錄獎勵日誌
+      // 記錄獎勵日誌（記錄增量）
       const rewardLog = [];
       if (membershipUpdate.unlockTickets) {
-        rewardLog.push(`解鎖票: 角色${membershipUpdate.unlockTickets.characterUnlockCards - currentTickets.characterUnlockCards}, 拍照${photoCardsToGrant}, 視頻${membershipUpdate.unlockTickets.videoUnlockCards - currentTickets.videoUnlockCards}`);
+        rewardLog.push(`解鎖票: 角色+${features.characterUnlockCards || 0}, 拍照+${photoCardsToGrant}, 視頻+${features.videoUnlockCards || 0}`);
       }
       if (membershipUpdate.assets?.createCards) {
-        rewardLog.push(`創建卡: ${features.characterCreationCards}`);
+        rewardLog.push(`創建卡: +${features.characterCreationCards}`);
       }
-      if (membershipUpdate.coins) {
-        rewardLog.push(`金幣: ${features.monthlyCoinsBonus}`);
+      if (membershipUpdate.wallet) {
+        rewardLog.push(`金幣: +${features.monthlyCoinsBonus}`);
       }
 
       logger.info(`[會員服務-Transaction] 準備發放獎勵 - 用戶: ${userId}, ${rewardLog.join(', ')}`);

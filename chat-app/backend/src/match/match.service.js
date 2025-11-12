@@ -1,5 +1,6 @@
 import { aiMatches } from "./match.data.js";
 import { getFirestoreDb } from "../firebase/index.js";
+import { FieldPath } from "firebase-admin/firestore";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 import logger from "../utils/logger.js";
 import { getCharacterById, getAllCharacters, characterExists } from "../services/character/characterCache.service.js";
@@ -77,7 +78,7 @@ export const getMatchById = async (id) => {
   }
 };
 
-export const getMatchesByIds = (ids) => {
+export const getMatchesByIds = async (ids) => {
   if (!Array.isArray(ids) || !ids.length) {
     return { matches: [], missing: [] };
   }
@@ -105,7 +106,7 @@ export const getMatchesByIds = (ids) => {
     aiMatches.forEach(match => characterMap.set(match.id, match));
   }
 
-  // 批量查找，時間複雜度從 O(n*m) 降至 O(n)
+  // 第一步：從緩存/內存中查找
   normalizedIds.forEach((id) => {
     const character = characterMap.get(id);
 
@@ -115,6 +116,64 @@ export const getMatchesByIds = (ids) => {
       missing.push(id);
     }
   });
+
+  // 🔥 第二步：批量查詢缺失的角色（避免 N+1 問題）
+  if (missing.length > 0) {
+    try {
+      const db = getFirestoreDb();
+
+      // Firestore 的 'in' 查詢限制為 10 個，需要分批查詢
+      const chunks = [];
+      for (let i = 0; i < missing.length; i += 10) {
+        chunks.push(missing.slice(i, i + 10));
+      }
+
+      if (process.env.NODE_ENV !== "test") {
+        logger.info(
+          `[Match Service] 批量查詢 ${missing.length} 個缺失角色（分 ${chunks.length} 批）`
+        );
+      }
+
+      // 並行查詢所有批次（使用 FieldPath.documentId() 查詢文檔 ID）
+      const queryPromises = chunks.map(chunk =>
+        db.collection("characters")
+          .where(FieldPath.documentId(), "in", chunk)
+          .get()
+      );
+
+      const snapshots = await Promise.all(queryPromises);
+
+      // 處理查詢結果
+      const foundIds = new Set();
+      snapshots.forEach(snapshot => {
+        snapshot.docs.forEach(doc => {
+          const character = {
+            ...doc.data(),
+            id: doc.id,
+          };
+          matches.push(cloneMatch(character));
+          foundIds.add(doc.id);
+        });
+      });
+
+      // 更新 missing 陣列，只保留真正找不到的
+      const stillMissing = missing.filter(id => !foundIds.has(id));
+
+      if (process.env.NODE_ENV !== "test") {
+        logger.info(
+          `[Match Service] 批量查詢完成: 找到 ${foundIds.size} 個，仍缺失 ${stillMissing.length} 個`
+        );
+      }
+
+      return { matches, missing: stillMissing };
+    } catch (error) {
+      if (process.env.NODE_ENV !== "test") {
+        logger.error("[Match Service] 批量查詢角色失敗:", error);
+      }
+      // 查詢失敗時，返回已找到的角色和原始的 missing 陣列
+      return { matches, missing };
+    }
+  }
 
   return { matches, missing };
 };

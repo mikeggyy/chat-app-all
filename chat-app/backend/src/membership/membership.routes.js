@@ -14,6 +14,7 @@ import {
   checkFeatureAccess,
   getUserFeatures,
 } from "./membership.service.js";
+import { getUserById } from "../user/user.service.js";
 import {
   sendSuccess,
   sendError,
@@ -76,22 +77,52 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
       // 開發模式：直接執行升級，不需要實際支付驗證
       logger.info(`[開發模式] 升級會員：userId=${userId}, tier=${tier}`);
 
-      // 冪等性保護
-      const requestId = `membership-upgrade:${userId}:${tier}:${idempotencyKey}`;
-      const membership = await handleIdempotentRequest(
-        requestId,
-        async () => await upgradeMembership(userId, tier, {
-          durationMonths,
-          autoRenew,
-        }),
-        { ttl: 15 * 60 * 1000 } // 15 分鐘
-      );
+      try {
+        // 冪等性保護
+        const requestId = `membership-upgrade:${userId}:${tier}:${idempotencyKey}`;
+        const membership = await handleIdempotentRequest(
+          requestId,
+          async () => await upgradeMembership(userId, tier, {
+            durationMonths,
+            autoRenew,
+          }),
+          { ttl: 15 * 60 * 1000 } // 15 分鐘
+        );
 
-      sendSuccess(res, {
-        message: `成功升級為 ${tier.toUpperCase()}（開發模式）`,
-        devMode: true,
-        membership,
-      });
+        sendSuccess(res, {
+          message: `成功升級為 ${tier.toUpperCase()}（開發模式）`,
+          devMode: true,
+          membership,
+        });
+      } catch (upgradeError) {
+        // ✅ 詳細的錯誤處理：檢查是否為部分成功
+        logger.error(`[會員服務] 升級失敗 - 用戶: ${userId}, 目標等級: ${tier}`, upgradeError);
+
+        try {
+          // 檢查用戶當前狀態
+          const currentUser = await getUserById(userId);
+
+          if (currentUser && currentUser.membershipTier === tier) {
+            // ⚠️ 會員等級已更新，但 Transaction 報告失敗
+            // 這種情況理論上不應該發生（Transaction 保證原子性）
+            logger.error(`[會員服務] 異常狀態 - 用戶 ${userId} 的會員等級已是 ${tier}，但操作報告失敗`);
+
+            // 返回當前會員資訊，並標記為可能不完整
+            const membership = await getUserMembership(userId);
+            return sendSuccess(res, {
+              message: `會員等級已更新，但操作可能未完全完成。請刷新頁面查看最新狀態。`,
+              warning: "PARTIAL_SUCCESS_DETECTED",
+              devMode: true,
+              membership,
+            });
+          }
+        } catch (checkError) {
+          logger.error(`[會員服務] 檢查用戶狀態失敗:`, checkError);
+        }
+
+        // 正常的失敗情況：Transaction 回滾，所有操作未生效
+        throw upgradeError;
+      }
     } else {
       // 正式環境：應整合支付系統
       return sendError(res, "NOT_IMPLEMENTED", "支付系統尚未整合，請聯繫管理員");

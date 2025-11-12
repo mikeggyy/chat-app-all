@@ -73,7 +73,6 @@ import usersRoutes from "./routes/users.routes.js";
 import charactersRoutes from "./routes/characters.routes.js";
 import conversationsRoutes from "./routes/conversations.routes.js";
 import transactionsRoutes from "./routes/transactions.routes.js";
-import settingsRoutes from "./routes/settings.routes.js";
 import membershipRoutes from "./routes/membership.routes.js";
 import productsRoutes from "./routes/products.routes.js";
 import categoriesRoutes from "./routes/categories.routes.js";
@@ -96,7 +95,6 @@ app.use(
   adminMiddleware,
   transactionsRoutes
 );
-app.use("/api/settings", authMiddleware, adminMiddleware, settingsRoutes);
 app.use("/api/membership-tiers", authMiddleware, adminMiddleware, membershipRoutes);
 app.use("/api/products", authMiddleware, adminMiddleware, productsRoutes);
 app.use("/api/categories", authMiddleware, adminMiddleware, categoriesRoutes);

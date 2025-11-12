@@ -84,9 +84,27 @@ export function useMembership() {
         logger.log('[會員升級] 檢測到重複請求，返回了緩存結果');
       }
 
+      // ✅ 檢查是否有部分成功的警告
+      if (data.warning === 'PARTIAL_SUCCESS_DETECTED') {
+        logger.warn('[會員升級] 檢測到部分成功狀態，已更新會員資訊');
+        // 用戶會看到後端返回的警告訊息
+      }
+
       membershipState.value = data.membership || data;
       return data;
     } catch (err) {
+      // ✅ 升級失敗後，重新載入會員資訊以確保 UI 顯示最新狀態
+      logger.error('[會員升級] 升級失敗，重新載入會員資訊', err);
+
+      try {
+        // 靜默重新載入（不顯示 loading，不覆蓋錯誤訊息）
+        await loadMembership(userId, { skipGlobalLoading: true });
+        logger.log('[會員升級] 已重新載入會員資訊');
+      } catch (reloadErr) {
+        logger.error('[會員升級] 重新載入會員資訊失敗', reloadErr);
+        // 不拋出 reloadErr，保留原始錯誤
+      }
+
       error.value = err?.message || '升級會員失敗';
       throw err;
     } finally {

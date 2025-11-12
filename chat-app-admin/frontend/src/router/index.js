@@ -68,12 +68,6 @@ const routes = [
         component: () => import("../views/AISettings.vue"),
         meta: { title: "AI 參數設定", icon: "MagicStick" },
       },
-      {
-        path: "settings",
-        name: "Settings",
-        component: () => import("../views/Settings.vue"),
-        meta: { title: "系統設置", icon: "Setting" },
-      },
     ],
   },
 ];

@@ -10,10 +10,10 @@ import {
   trimMetadataString,
 } from "../conversation/conversation.helpers.js";
 import { addConversationForUser, getUserById } from "../user/user.service.js";
+import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 import { getMatchById } from "../match/match.service.js";
 import { MEMBERSHIP_TIERS } from "../membership/membership.config.js";
 import { getExtraMemoryTokens, getEffectiveAIModel } from "../payment/potion.service.js";
-import { getCached, CACHE_TTL } from "../utils/firestoreCache.js";
 import { generateSpeechWithGoogle } from "./googleTts.service.js";
 import { getAiServiceSettings } from "../services/aiSettings.service.js";
 
@@ -91,27 +91,29 @@ const countTokens = (text) => {
 
 /**
  * 獲取用戶的會員等級配置
- * 使用快取以減少 Firestore 讀取成本（5 分鐘 TTL）
+ * 使用專門的用戶緩存服務，減少 Firestore 讀取成本
+ * 緩存策略：LRU，TTL 5 分鐘
  */
 const getUserMembershipConfig = async (userId) => {
   try {
-    return await getCached(
-      `user:${userId}:membership`,
-      async () => {
-        const user = await getUserById(userId);
-        const tier = user?.membershipTier || "free";
+    // ✅ 使用專門的用戶緩存服務，自動處理緩存查找和回填
+    const user = await getUserProfileWithCache(userId);
 
-        // 檢查會員是否過期
-        if (tier !== "free" && user?.membershipExpiresAt) {
-          if (new Date(user.membershipExpiresAt) < new Date()) {
-            return MEMBERSHIP_TIERS.free;
-          }
-        }
+    if (!user) {
+      logger.warn(`用戶 ${userId} 不存在，使用免費會員配置`);
+      return MEMBERSHIP_TIERS.free;
+    }
 
-        return MEMBERSHIP_TIERS[tier] || MEMBERSHIP_TIERS.free;
-      },
-      CACHE_TTL.USER_PROFILE  // 5 分鐘快取
-    );
+    const tier = user.membershipTier || "free";
+
+    // 檢查會員是否過期
+    if (tier !== "free" && user.membershipExpiresAt) {
+      if (new Date(user.membershipExpiresAt) < new Date()) {
+        return MEMBERSHIP_TIERS.free;
+      }
+    }
+
+    return MEMBERSHIP_TIERS[tier] || MEMBERSHIP_TIERS.free;
   } catch (error) {
     logger.error("獲取會員配置失敗:", error);
     return MEMBERSHIP_TIERS.free;
@@ -539,10 +541,10 @@ export const createAiReplyForConversation = async (
     throw error;
   }
 
-  // 獲取用戶資料
+  // 獲取用戶資料（使用緩存）
   let user = null;
   try {
-    user = await getUserById(userId);
+    user = await getUserProfileWithCache(userId);
   } catch (error) {
     if (process.env.NODE_ENV !== "test") {
       logger.warn(

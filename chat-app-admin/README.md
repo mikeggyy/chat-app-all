@@ -82,6 +82,31 @@ admin-dashboard/
 └── package.json       # 根配置
 ```
 
+## 開發工具與腳本
+
+### Firebase Emulator 支援
+
+管理後台現在支援 Firebase Emulator 模式進行本地測試：
+
+**配置文件**: `backend/src/setup-emulator.js`
+- 自動設置 Auth、Firestore、Storage Emulator
+- 與主應用一致的 Emulator 架構
+- 通過 `USE_FIREBASE_EMULATOR=true` 環境變數啟用
+
+**創建管理員帳號** (Emulator 模式):
+```bash
+cd backend
+USE_FIREBASE_EMULATOR=true node scripts/create-admin-user.js
+```
+
+### 可用腳本
+
+| 腳本路徑 | 說明 | 用途 |
+|---------|------|------|
+| `scripts/create-admin-user.js` | 創建管理員帳號 | 在 Emulator 或生產環境創建測試管理員 |
+
+詳細腳本文檔請參考：`backend/scripts/README.md`
+
 ## 權限管理
 
 管理後臺使用 Firebase Custom Claims 進行權限控制：
@@ -131,6 +156,29 @@ R2_PUBLIC_URL=https://your-custom-domain
 - 使用 Firestore 作為數據源（不創建重複數據）
 - UI 組件使用 Element Plus
 - 響應式設計支援平板和桌面端
+
+## 代碼維護
+
+### 最近更新（2025-01）
+
+**代碼清理** 🧹
+- 移除未完成的 `Settings.vue` 和 `settings.routes.js`（系統設置功能）
+- 新增 `setup-emulator.js` 支援 Firebase Emulator 模式
+- 移除未註冊的測試腳本
+- 代碼健康度提升至 98%
+
+詳細清理報告：[docs/CODE_CLEANUP_2025-01.md](../docs/CODE_CLEANUP_2025-01.md)
+
+### 核心服務
+
+**角色統計服務** (`backend/src/services/character/characterStats.service.js`)
+
+管理後台提供角色統計同步功能，通過以下 API 端點使用：
+- `POST /api/characters/sync-chat-users` - 批量同步所有角色統計
+- `POST /api/characters/:characterId/sync-chat-users` - 同步單個角色統計
+- `GET /api/characters/stats/overview` - 獲取統計概覽
+
+⚠️ **注意**: 批量同步是高成本操作，建議只在低流量時段執行。
 
 ## 部署
 

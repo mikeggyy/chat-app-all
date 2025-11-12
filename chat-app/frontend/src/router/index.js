@@ -19,7 +19,6 @@ const ChatView = () => import("../views/ChatView.vue");
 const SearchView = () => import("../views/SearchView.vue");
 const RankingView = () => import("../views/RankingView.vue");
 const FavoritesView = () => import("../views/FavoritesView.vue");
-const WalletView = () => import("../views/WalletView.vue");
 const MembershipView = () => import("../views/MembershipView.vue");
 const ShopView = () => import("../views/ShopView.vue");
 const NotificationsView = () => import("../views/NotificationsView.vue");

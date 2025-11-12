@@ -31,6 +31,19 @@ export const ORDER_STATUS = {
 };
 
 /**
+ * 訂單狀態轉換規則（狀態機）
+ * 定義每個狀態可以轉換到哪些狀態
+ */
+export const ORDER_STATE_TRANSITIONS = {
+  pending: ["processing", "cancelled", "failed"],           // 待支付 → 處理中/已取消/失敗
+  processing: ["completed", "failed", "cancelled"],         // 處理中 → 已完成/失敗/已取消
+  completed: ["refunded"],                                  // 已完成 → 已退款（不可逆）
+  failed: ["pending"],                                      // 失敗 → 待支付（允許重試）
+  refunded: [],                                             // 已退款 → 終態（不可轉換）
+  cancelled: [],                                            // 已取消 → 終態（不可轉換）
+};
+
+/**
  * 支付方式
  */
 export const PAYMENT_METHODS = {
@@ -212,7 +225,7 @@ export const getUserOrders = async (userId, options = {}) => {
 };
 
 /**
- * 更新訂單狀態
+ * 更新訂單狀態（帶狀態機驗證）
  * @param {string} orderId - 訂單 ID
  * @param {string} status - 新狀態
  * @param {Object} metadata - 額外資訊
@@ -226,35 +239,94 @@ export const updateOrderStatus = async (orderId, status, metadata = {}) => {
   const db = getFirestoreDb();
   const orderRef = db.collection(ORDERS_COLLECTION).doc(orderId);
 
-  const updateData = {
-    status,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
+  // 使用 Transaction 確保狀態轉換的原子性和一致性
+  const result = await db.runTransaction(async (transaction) => {
+    // 1. 在 Transaction 內讀取當前訂單狀態
+    const orderDoc = await transaction.get(orderRef);
 
-  // 根據狀態更新相應的時間戳
-  if (status === ORDER_STATUS.COMPLETED) {
-    updateData.completedAt = FieldValue.serverTimestamp();
-  } else if (status === ORDER_STATUS.REFUNDED) {
-    updateData.refundedAt = FieldValue.serverTimestamp();
-  }
+    if (!orderDoc.exists) {
+      throw new Error(`訂單不存在：${orderId}`);
+    }
 
-  // 如果有額外資訊，更新 metadata
-  if (Object.keys(metadata).length > 0) {
-    const doc = await orderRef.get();
-    if (doc.exists) {
-      const currentMetadata = doc.data().metadata || {};
+    const currentOrder = orderDoc.data();
+    const currentStatus = currentOrder.status;
+
+    // 2. 驗證狀態轉換是否合法（狀態機檢查）
+    const allowedTransitions = ORDER_STATE_TRANSITIONS[currentStatus];
+    if (!allowedTransitions || !allowedTransitions.includes(status)) {
+      throw new Error(
+        `無效的訂單狀態轉換：${currentStatus} → ${status}。` +
+        `允許的轉換：${allowedTransitions?.join(', ') || '無'}`
+      );
+    }
+
+    // 3. 如果狀態相同，直接返回（冪等性）
+    if (currentStatus === status) {
+      logger.info(`[訂單服務] 訂單 ${orderId} 狀態已經是 ${status}，跳過更新`);
+      return currentOrder;
+    }
+
+    // 4. 構建更新數據
+    const updateData = {
+      status,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    // 根據狀態更新相應的時間戳
+    if (status === ORDER_STATUS.COMPLETED) {
+      updateData.completedAt = FieldValue.serverTimestamp();
+    } else if (status === ORDER_STATUS.REFUNDED) {
+      updateData.refundedAt = FieldValue.serverTimestamp();
+    }
+
+    // 如果有額外資訊，合併 metadata
+    if (Object.keys(metadata).length > 0) {
+      const currentMetadata = currentOrder.metadata || {};
       updateData.metadata = {
         ...currentMetadata,
         ...metadata,
+        // 記錄狀態轉換歷史
+        statusHistory: [
+          ...(currentMetadata.statusHistory || []),
+          {
+            from: currentStatus,
+            to: status,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+    } else {
+      // 即使沒有額外 metadata，也記錄狀態轉換歷史
+      updateData.metadata = {
+        ...(currentOrder.metadata || {}),
+        statusHistory: [
+          ...((currentOrder.metadata?.statusHistory) || []),
+          {
+            from: currentStatus,
+            to: status,
+            timestamp: new Date().toISOString(),
+          },
+        ],
       };
     }
-  }
 
-  await orderRef.update(updateData);
+    // 5. 在 Transaction 內執行更新
+    transaction.update(orderRef, updateData);
 
-  logger.info(`[訂單服務] 更新訂單狀態: ${orderId}, 新狀態: ${status}`);
+    logger.info(`[訂單服務] 更新訂單狀態: ${orderId}, ${currentStatus} → ${status}`);
 
-  return await getOrder(orderId);
+    // 返回更新後的訂單數據（用於返回值）
+    return {
+      ...currentOrder,
+      ...updateData,
+      id: orderId,
+      updatedAt: new Date().toISOString(),
+      completedAt: updateData.completedAt ? new Date().toISOString() : currentOrder.completedAt,
+      refundedAt: updateData.refundedAt ? new Date().toISOString() : currentOrder.refundedAt,
+    };
+  });
+
+  return result;
 };
 
 /**

@@ -75,30 +75,73 @@ const result = await upgradeMembership('user-123', 'vip');
 
 ---
 
-### 3. 🔄 藥水購買會員檢查移到 Transaction 內
+### 3. ✅ 藥水購買會員檢查移到 Transaction 內
 
 **問題**: 會員等級檢查在 Transaction 外執行，可能在檢查和購買之間會員等級改變
 
-**狀態**: 待修復
+**修復**: 已完成
+- 文件: `chat-app/backend/src/payment/potion.service.js`
+- 將 `purchaseMemoryBoost` 和 `purchaseBrainBoost` 的會員等級檢查移到 Transaction 內部
+- 在 Transaction 內使用最新的用戶資料進行檢查，防止 TOCTOU（Time-of-Check to Time-of-Use）問題
+- 確保會員等級驗證的原子性
 
-**修復計畫**:
+**實現**:
 ```javascript
-// potion.service.js - purchaseMemoryBoost / purchaseBrainBoost
-await db.runTransaction(async (transaction) => {
-  // 1. 在事務內重新讀取用戶
-  const userDoc = await transaction.get(userRef);
-  const user = userDoc.data();
+// payment/potion.service.js
+export const purchaseMemoryBoost = async (userId, options = {}) => {
+  const potion = POTION_CONFIG.MEMORY_BOOST;
+  const quantity = options.quantity || 1;
+  const unitPrice = options.unitPrice || potion.price;
 
-  // 2. 在事務內檢查會員等級 (使用最新數據)
-  const userTier = user.membershipTier || "free";
-  if (potion.restrictedTiers?.includes(userTier)) {
-    throw new Error("您的會員等級不能購買此道具");
-  }
+  const userRef = db.collection("users").doc(userId);
+  const userLimitRef = getUserLimitRef(userId);
 
-  // 3. 繼續扣款和增加庫存
-  // ...
-});
+  await db.runTransaction(async (transaction) => {
+    // 1. 在事務內讀取用戶資料
+    const userDoc = await transaction.get(userRef);
+    const user = userDoc.data();
+
+    // 2. ✅ 在事務內檢查會員等級（使用最新數據，防止並發修改）
+    const userTier = user.membershipTier || "free";
+    if (potion.restrictedTiers && potion.restrictedTiers.includes(userTier)) {
+      throw new Error(potion.restrictedMessage || "您的會員等級不能購買此道具");
+    }
+
+    // 3. 檢查金幣餘額
+    const currentBalance = user.walletBalance || 0;
+    if (currentBalance < unitPrice) {
+      throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${unitPrice}`);
+    }
+
+    // 4. 讀取當前庫存
+    const limitDoc = await transaction.get(userLimitRef);
+    const limitData = limitDoc.exists ? limitDoc.data() : {};
+    const currentInventory = limitData.potionInventory?.memoryBoost || 0;
+
+    // 5. 計算新值並更新
+    const newBalance = currentBalance - unitPrice;
+    const newInventoryCount = currentInventory + quantity;
+
+    transaction.update(userRef, {
+      walletBalance: newBalance,
+      // ... 其他更新
+    });
+
+    transaction.set(userLimitRef, {
+      potionInventory: {
+        memoryBoost: FieldValue.increment(quantity),
+      },
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+
+  // ... 返回結果
+};
+
+// purchaseBrainBoost 同樣實現
 ```
+
+**影響範圍**: 防止並發購買時的會員等級檢查繞過，確保數據一致性
 
 ---
 
@@ -974,36 +1017,37 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
-| 🔴 高危 | 4 | 1 | 5 |
+| 🔴 高危 | 5 | 0 | 5 |
 | 🟡 中危 | 6 | 2 | 8 |
 | 🟢 低危 | 1 | 4 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **13** | **8** | **21** |
+| **總計** | **14** | **7** | **21** |
 
-**完成度**: 61.9%
+**完成度**: 66.7%
 
 ### 已完成的修復
 
 **高危問題**:
 1. ✅ 冪等性改用 Firestore（Commit: `7e69f82`）
 2. ✅ 會員升級獎勵原子性（Commit: `1a7c8db`）
-3. ✅ 測試 Token 緩存時間縮短（Commit: `c28c549`）
-4. ✅ 前端金幣餘額並發保護（Commit: `52f4a0c`）
+3. ✅ 藥水購買會員檢查移到 Transaction 內（本次提交）
+4. ✅ 測試 Token 緩存時間縮短（Commit: `c28c549`）
+5. ✅ 前端金幣餘額並發保護（Commit: `52f4a0c`）
 
 **中危問題**:
-5. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
-6. ✅ 訂單狀態機驗證（Commit: `735e665`）
-7. ✅ 資產購買原子性（Commit: `738a914`）
-8. ✅ 前端用戶資料緩存 TTL（Commit: `83c66cf`）
-9. ✅ 購買確認防抖（Commit: `563a6bd`）
-10. ✅ 前端消息發送重試機制（Commit: `62ee425`）
+6. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
+7. ✅ 訂單狀態機驗證（Commit: `735e665`）
+8. ✅ 資產購買原子性（Commit: `738a914`）
+9. ✅ 前端用戶資料緩存 TTL（Commit: `83c66cf`）
+10. ✅ 購買確認防抖（Commit: `563a6bd`）
+11. ✅ 前端消息發送重試機制（Commit: `62ee425`）
 
 **低危問題**:
-11. ✅ 加強輸入驗證（本次提交）
+12. ✅ 加強輸入驗證（Commit: `eae1d72`）
 
 **性能優化**:
-12. ✅ 添加 Firestore 索引（Commit: `c28c549`）
-13. ✅ 創建修復文檔（Commit: `da49a75`）
+13. ✅ 添加 Firestore 索引（Commit: `c28c549`）
+14. ✅ 創建修復文檔（Commit: `da49a75`）
 
 ---
 

@@ -176,23 +176,30 @@ export const purchaseMemoryBoost = async (userId, options = {}) => {
     }
 
     const user = userDoc.data();
+
+    // 2. ✅ 在事務內檢查會員等級限制（使用最新數據）
+    const userTier = user.membershipTier || "free";
+    if (potion.restrictedTiers && potion.restrictedTiers.includes(userTier)) {
+      throw new Error(potion.restrictedMessage || "您的會員等級不能購買此道具");
+    }
+
     const currentBalance = user.walletBalance || 0;
 
-    // 2. 檢查金幣餘額
+    // 3. 檢查金幣餘額
     if (currentBalance < unitPrice) {
       throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${unitPrice}`);
     }
 
-    // 3. 讀取當前庫存
+    // 4. 讀取當前庫存
     const limitDoc = await transaction.get(userLimitRef);
     const limitData = limitDoc.exists ? limitDoc.data() : {};
     const currentInventory = limitData.potionInventory?.memoryBoost || 0;
 
-    // 4. 計算新值
+    // 5. 計算新值
     newBalance = currentBalance - unitPrice;
     newInventoryCount = currentInventory + quantity;
 
-    // 5. ✅ 在同一事務中：扣除金幣 + 增加庫存
+    // 6. ✅ 在同一事務中：扣除金幣 + 增加庫存
     transaction.update(userRef, {
       walletBalance: newBalance,
       "wallet.balance": newBalance,

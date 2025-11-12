@@ -159,20 +159,32 @@ router.post("/api/membership/:userId/cancel", requireFirebaseAuth, requireOwners
 /**
  * 續訂會員
  * POST /api/membership/:userId/renew
- * Body: { durationMonths?: number }
+ * Body: { durationMonths?: number, idempotencyKey: string }
+ * 🔒 冪等性保護（2025-01）：防止重複扣款
  */
 router.post("/api/membership/:userId/renew", requireFirebaseAuth, requireOwnership("userId"), purchaseRateLimiter, async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const { durationMonths } = req.body;
+    const { durationMonths, idempotencyKey } = req.body;
 
-    // TODO: 整合支付系統
+    // 🔒 冪等性保護：必須提供 idempotencyKey
+    if (!idempotencyKey) {
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：idempotencyKey（財務操作必須提供請求ID以防止重複扣款）", 400);
+    }
 
-    const membership = await renewMembership(userId, durationMonths);
+    const requestId = `membership-renew:${userId}:${idempotencyKey}`;
+    const result = await handleIdempotentRequest(
+      requestId,
+      async () => {
+        // TODO: 整合支付系統
+        return await renewMembership(userId, durationMonths);
+      },
+      { ttl: IDEMPOTENCY_TTL.MEMBERSHIP_UPGRADE }
+    );
 
     sendSuccess(res, {
       message: "續訂成功",
-      membership,
+      membership: result,
     });
   } catch (error) {
     next(error);

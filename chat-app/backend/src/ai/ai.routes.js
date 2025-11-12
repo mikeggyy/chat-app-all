@@ -142,6 +142,15 @@ aiRouter.post(
       return sendError(res, "UNAUTHORIZED", "無法識別用戶身份");
     }
 
+    // 🔒 P2 優化（2025-01）：限制文字長度以控制成本
+    const MAX_TTS_TEXT_LENGTH = 500;
+    if (text && text.length > MAX_TTS_TEXT_LENGTH) {
+      return sendError(res, "VALIDATION_ERROR", `文字長度超過限制（最多 ${MAX_TTS_TEXT_LENGTH} 字符）`, {
+        textLength: text.length,
+        maxLength: MAX_TTS_TEXT_LENGTH,
+      });
+    }
+
     try {
       // ✅ 如果使用語音解鎖卡，先驗證用戶有卡（但不扣除）
       if (useVoiceUnlockCard) {

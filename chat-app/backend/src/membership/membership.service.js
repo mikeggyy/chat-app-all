@@ -236,25 +236,6 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
   // 發放開通獎勵（解鎖票和金幣）- 只在新開通或升級時發放
   const isNewActivation = currentTier === "free" || tierOrder[targetTier] > tierOrder[currentTier];
 
-  // 如果是從免費升級，保留剩餘的拍照次數（轉換成拍照卡）- 在 Transaction 外計算
-  let bonusPhotoCards = 0;
-  if (isNewActivation && currentTier === "free") {
-    try {
-      const { getPhotoStats } = await import("../ai/photoLimit.service.js");
-      const photoStats = await getPhotoStats(userId);
-
-      // 計算剩餘次數（基礎額度 - 已使用）
-      const remaining = Math.max(0, (photoStats.standardPhotosLimit || 0) - (photoStats.used || 0));
-
-      if (remaining > 0) {
-        bonusPhotoCards = remaining;
-        logger.info(`[會員服務] 保留免費用戶剩餘拍照次數 - 用戶: ${userId}, 剩餘: ${remaining} 次，轉換為拍照卡`);
-      }
-    } catch (error) {
-      logger.error("獲取免費用戶剩餘拍照次數失敗:", error);
-    }
-  }
-
   // ✅ 使用 Transaction 確保所有操作原子性
   let result = null;
   await db.runTransaction(async (transaction) => {
@@ -265,6 +246,39 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
     }
 
     const freshUser = freshUserDoc.data();
+
+    // 2. 🔒 在 Transaction 內計算免費用戶剩餘拍照次數（修復競態條件）
+    let bonusPhotoCards = 0;
+    if (isNewActivation && currentTier === "free") {
+      try {
+        // 在 Transaction 內讀取拍照統計
+        const usageLimitsRef = db.collection("usage_limits").doc(userId);
+        const usageLimitsDoc = await transaction.get(usageLimitsRef);
+
+        if (usageLimitsDoc.exists) {
+          const usageLimitsData = usageLimitsDoc.data();
+          const photoData = usageLimitsData.photos || {};
+
+          // 免費用戶的基礎額度是 3 次終生
+          const FREE_PHOTO_LIMIT = 3;
+          const used = photoData.count || 0;
+          const remaining = Math.max(0, FREE_PHOTO_LIMIT - used);
+
+          if (remaining > 0) {
+            bonusPhotoCards = remaining;
+            logger.info(`[會員服務] 🔒 在 Transaction 內保留免費用戶剩餘拍照次數 - 用戶: ${userId}, 剩餘: ${remaining} 次，轉換為拍照卡`);
+          }
+        } else {
+          // 如果沒有使用記錄，給予完整的 3 次
+          bonusPhotoCards = 3;
+          logger.info(`[會員服務] 🔒 免費用戶無使用記錄，給予完整額度 3 次拍照卡`);
+        }
+      } catch (error) {
+        logger.error("在 Transaction 內獲取免費用戶剩餘拍照次數失敗:", error);
+        // 發生錯誤時不給予獎勵卡，避免不一致
+        bonusPhotoCards = 0;
+      }
+    }
 
     // 2. 準備會員狀態更新
     const membershipUpdate = {
@@ -509,6 +523,128 @@ export const getExpiringMemberships = (daysThreshold = 7) => {
 };
 
 /**
+ * 🔒 P2-2: 批量檢查並降級過期會員（定時任務）
+ * 掃描所有付費會員，自動降級已過期的會員到 free tier
+ * @returns {Promise<Object>} 處理統計結果
+ */
+export const checkAndDowngradeExpiredMemberships = async () => {
+  const startTime = Date.now();
+  const db = getFirestoreDb();
+
+  logger.info(`[會員定時任務] 開始批量檢查過期會員...`);
+
+  try {
+    const now = new Date();
+
+    // 🔍 查詢所有付費會員（vip 或 vvip），且狀態為 active
+    const usersSnapshot = await db
+      .collection("users")
+      .where("membershipTier", "in", ["vip", "vvip"])
+      .where("membershipStatus", "==", "active")
+      .get();
+
+    const totalUsers = usersSnapshot.size;
+    logger.info(`[會員定時任務] 找到 ${totalUsers} 個活躍付費會員待檢查`);
+
+    if (totalUsers === 0) {
+      return {
+        success: true,
+        totalChecked: 0,
+        expired: 0,
+        downgraded: 0,
+        errors: 0,
+        duration: Date.now() - startTime,
+      };
+    }
+
+    let expiredCount = 0;
+    let downgradedCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    // 批量處理（每次最多 500 個，Firestore 限制）
+    let batch = db.batch(); // ✅ 使用 let 而不是 const
+    let batchCount = 0;
+    const BATCH_LIMIT = 500;
+
+    for (const doc of usersSnapshot.docs) {
+      const user = doc.data();
+      const userId = doc.id;
+
+      try {
+        // 檢查會員是否過期
+        const isExpired = user.membershipExpiresAt && new Date(user.membershipExpiresAt) <= now;
+
+        if (isExpired) {
+          expiredCount++;
+
+          // 降級到 free tier
+          const userRef = db.collection("users").doc(userId);
+          batch.update(userRef, {
+            membershipTier: "free",
+            membershipStatus: "expired",
+            updatedAt: new Date().toISOString(),
+          });
+
+          batchCount++;
+          downgradedCount++;
+
+          logger.info(`[會員定時任務] 標記過期會員: ${userId} (${user.membershipTier} -> free, 過期時間: ${user.membershipExpiresAt})`);
+
+          // 清除緩存（批量處理後再清除，避免過多操作）
+          deleteCachedUserProfile(userId);
+          clearCache(`user:${userId}:membership`);
+
+          // 如果達到批次上限，提交批次
+          if (batchCount >= BATCH_LIMIT) {
+            await batch.commit();
+            logger.info(`[會員定時任務] 已提交 ${batchCount} 筆降級操作`);
+            batch = db.batch(); // ✅ 創建新的 batch 對象
+            batchCount = 0;
+          }
+        }
+      } catch (error) {
+        errorCount++;
+        errors.push({ userId, error: error.message });
+        logger.error(`[會員定時任務] 處理用戶 ${userId} 時發生錯誤:`, error);
+      }
+    }
+
+    // 提交剩餘的批次
+    if (batchCount > 0) {
+      await batch.commit();
+      logger.info(`[會員定時任務] 已提交最後 ${batchCount} 筆降級操作`);
+    }
+
+    const duration = Date.now() - startTime;
+    const result = {
+      success: true,
+      totalChecked: totalUsers,
+      expired: expiredCount,
+      downgraded: downgradedCount,
+      errors: errorCount,
+      duration,
+      errorDetails: errors.length > 0 ? errors : undefined,
+    };
+
+    logger.info(
+      `[會員定時任務] ✅ 完成批量檢查 - 檢查: ${totalUsers}, 過期: ${expiredCount}, 降級: ${downgradedCount}, 錯誤: ${errorCount}, 耗時: ${duration}ms`
+    );
+
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logger.error(`[會員定時任務] ❌ 批量檢查失敗:`, error);
+
+    return {
+      success: false,
+      error: error.message,
+      duration,
+    };
+  }
+};
+
+/**
  * 發放每月會員獎勵（定時任務）
  */
 export const distributeMonthlyRewards = async (userId) => {
@@ -567,4 +703,5 @@ export default {
   getExpiringMemberships,
   distributeMonthlyRewards,
   clearMembershipConfigCache, // 新增：清除會員配置快取
+  checkAndDowngradeExpiredMemberships, // 🔒 P2-2: 批量過期會員檢查
 };

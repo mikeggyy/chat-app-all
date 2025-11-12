@@ -295,6 +295,11 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
     );
     logger.error(`錯誤堆疊:`, error.stack);
 
+    // ✅ 安全性說明：不需要退款邏輯
+    // 因為扣費操作（recordPhotoGeneration / usePhotoUnlockCard）
+    // 在所有關鍵步驟（生成圖片、上傳、添加到對話）成功後才執行（行 266/278）
+    // 如果任何步驟失敗，都不會執行到扣費步驟，所以不需要回滾
+
     // 處理 PhotoMaker/Replicate API 錯誤
     if (error?.status === 400) {
       const fallbackError = new Error("圖片生成參數錯誤或提示詞不符合內容政策");

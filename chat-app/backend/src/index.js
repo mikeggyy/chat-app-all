@@ -210,6 +210,16 @@ function setupMemoryCleanup() {
     logger.info(`[記憶體清理] 開始執行清理任務 - ${now.toISOString()}`);
 
     try {
+      // 🔒 P2-2: 批量檢查並降級過期會員（優先執行，確保會員狀態準確）
+      const { checkAndDowngradeExpiredMemberships } = await import("./membership/membership.service.js");
+      const membershipCleanup = await checkAndDowngradeExpiredMemberships();
+      logger.info(`[記憶體清理] 會員過期檢查完成`, membershipCleanup);
+
+      // 🔒 P2-3: 清理舊的模型使用統計（保留 90 天）
+      const { cleanupOldModelUsageStats } = await import("./services/modelUsageMonitoring.service.js");
+      const modelUsageCleanup = await cleanupOldModelUsageStats();
+      logger.info(`[記憶體清理] 模型使用統計清理完成`, modelUsageCleanup);
+
       // 1. 清理用戶資料（會自動清理對應的對話歷史）
       const userCleanupResult = await cleanupInactiveUsers(INACTIVE_DAYS_THRESHOLD);
       logger.info(`[記憶體清理] 用戶清理完成`, userCleanupResult);

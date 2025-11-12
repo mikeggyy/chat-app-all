@@ -362,14 +362,60 @@ export function createLimitService(config) {
 
   /**
    * 透過廣告解鎖額外次數
+   * ✅ 修復：使用 Transaction 確保原子性，防止併發問題
    */
   const unlockByAd = async (userId, amount = 1, characterId = null) => {
-    const limitData = await initUserLimit(userId, characterId);
-    checkAndReset(limitData, resetPeriod);
+    const db = getFirestoreDb();
+    const userLimitRef = getUserLimitRef(userId);
 
-    const result = trackUnlockByAd(limitData, amount);
+    let result = null;
 
-    await updateLimitData(userId, characterId, limitData);
+    // ✅ 使用 Transaction 確保原子性
+    await db.runTransaction(async (transaction) => {
+      // 1. 在 Transaction 內讀取限制數據
+      const doc = await transaction.get(userLimitRef);
+
+      let userData = {};
+      if (doc.exists) {
+        userData = doc.data();
+      } else {
+        userData.userId = userId;
+        userData.createdAt = FieldValue.serverTimestamp();
+      }
+
+      // 2. 初始化限制數據
+      let limitData;
+      if (perCharacter) {
+        if (!userData[fieldName]) {
+          userData[fieldName] = {};
+        }
+        if (!userData[fieldName][characterId]) {
+          userData[fieldName][characterId] = createLimitData(resetPeriod);
+        }
+        limitData = userData[fieldName][characterId];
+      } else {
+        if (!userData[fieldName]) {
+          userData[fieldName] = createLimitData(resetPeriod);
+        }
+        limitData = userData[fieldName];
+      }
+
+      // 3. 檢查並重置（如果需要）
+      checkAndResetAll(limitData, resetPeriod);
+
+      // 4. 記錄廣告解鎖
+      result = trackUnlockByAd(limitData, amount);
+
+      // 5. 更新數據到 Firestore
+      if (perCharacter) {
+        userData[fieldName][characterId] = limitData;
+      } else {
+        userData[fieldName] = limitData;
+      }
+      userData.updatedAt = FieldValue.serverTimestamp();
+
+      transaction.set(userLimitRef, userData, { merge: true });
+    });
 
     return result;
   };

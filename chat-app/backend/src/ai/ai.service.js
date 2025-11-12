@@ -13,10 +13,11 @@ import { addConversationForUser, getUserById } from "../user/user.service.js";
 import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 import { getMatchById } from "../match/match.service.js";
 import { MEMBERSHIP_TIERS } from "../membership/membership.config.js";
-import { getExtraMemoryTokens, getEffectiveAIModel } from "../payment/potion.service.js";
+import { getExtraMemoryTokens, getEffectiveAIModel, hasBrainBoost } from "../payment/potion.service.js";
 import { generateSpeechWithGoogle } from "./googleTts.service.js";
 import { getAiServiceSettings } from "../services/aiSettings.service.js";
 import { retryWithExponentialBackoff } from "../utils/retryWithBackoff.js";
+import { recordModelUsage } from "../services/modelUsageMonitoring.service.js";
 
 import logger from "../utils/logger.js";
 
@@ -424,8 +425,49 @@ const requestOpenAIReply = async (character, history, latestUserMessage, userId,
   // 🔥 使用 Firestore 的 maxTokens 設定，如果會員有特殊權限則優先使用會員設定
   const maxResponseTokens = membershipConfig?.features?.maxResponseTokens || chatConfig.maxTokens || 150;
 
-  // 應用道具效果（腦力激盪藥水）- 針對特定角色
-  const aiModel = await getEffectiveAIModel(userId, characterId, baseAiModel);
+  // 🔒 P2-3: 應用道具效果（腦力激盪藥水）並檢查每日配額
+  const potentialModel = await getEffectiveAIModel(userId, characterId, baseAiModel);
+
+  let aiModel = baseAiModel;
+  let quotaExceeded = false;
+
+  // 如果藥水想要升級模型（與 baseAiModel 不同），檢查配額
+  if (potentialModel !== baseAiModel) {
+    // ✅ 確保有用戶資料以獲取正確的會員等級
+    let userTier = user?.membershipTier || "free";
+
+    // 如果 user 為 null（獲取失敗），嘗試重新獲取以確保配額檢查準確
+    if (!user) {
+      try {
+        const freshUser = await getUserProfileWithCache(userId);
+        userTier = freshUser?.membershipTier || "free";
+        logger.debug(`[模型監控] 重新獲取用戶資料成功 - userId: ${userId}, tier: ${userTier}`);
+      } catch (error) {
+        // 獲取失敗時使用 "free" 作為安全默認值（更嚴格的限制）
+        logger.warn(`[模型監控] 重新獲取用戶資料失敗，使用默認 tier: free - userId: ${userId}`);
+        userTier = "free";
+      }
+    }
+
+    const quotaCheck = await canUseBrainBoost(userId, userTier);
+
+    if (quotaCheck.allowed) {
+      // 配額內，使用升級模型
+      aiModel = potentialModel;
+      logger.debug(
+        `[模型監控] ✅ Brain Boost 生效 - userId: ${userId}, model: ${aiModel}, 今日使用: ${quotaCheck.used}/${quotaCheck.limit}`
+      );
+    } else {
+      // 超過配額，自動降級到默認模型
+      aiModel = baseAiModel;
+      quotaExceeded = true;
+      logger.warn(
+        `[模型監控] ⚠️ Brain Boost 超過每日限額，自動降級 - userId: ${userId}, 今日使用: ${quotaCheck.used}/${quotaCheck.limit}`
+      );
+    }
+  } else {
+    aiModel = baseAiModel;
+  }
 
   logger.debug("[Chat] 使用 AI 設定:", {
     model: aiModel,
@@ -478,6 +520,29 @@ const requestOpenAIReply = async (character, history, latestUserMessage, userId,
     );
 
     const reply = completion?.choices?.[0]?.message?.content?.trim() ?? "";
+
+    // 🔒 P2-3: 記錄模型使用情況（如果使用了 Brain Boost 藥水）
+    const usedBrainBoost = await hasBrainBoost(userId, characterId);
+    if (usedBrainBoost && completion?.usage) {
+      // 異步記錄，不阻塞主流程
+      recordModelUsage({
+        userId,
+        characterId,
+        model: aiModel,
+        promptTokens: completion.usage.prompt_tokens || 0,
+        completionTokens: completion.usage.completion_tokens || 0,
+        totalTokens: completion.usage.total_tokens || 0,
+        usedBrainBoost: true,
+      }).catch((err) => {
+        logger.error(`[模型監控] 記錄失敗（不影響對話）:`, err);
+      });
+
+      // 記錄到日誌（方便成本監控）
+      logger.info(
+        `[模型監控] 🧪 Brain Boost 使用 - userId: ${userId}, model: ${aiModel}, tokens: ${completion.usage.total_tokens}`
+      );
+    }
+
     return reply.length ? reply : null;
 
   } catch (error) {

@@ -21,15 +21,17 @@ export const TEST_ACCOUNTS = {
 /**
  * 測試帳號配置選項
  * 注意：此配置在瀏覽器環境中使用默認值
+ *
+ * 🔒 安全性增強（2025-01）：
+ * - 強制禁用生產環境測試帳號（移除 ENABLED_IN_PRODUCTION 配置）
+ * - 測試帳號僅限本地開發環境（localhost/127.0.0.1）
+ * - 測試 token 有 24 小時有效期限
  */
 export const TEST_CONFIG = typeof process !== 'undefined' && process.env ? {
-  // 在生產環境是否啟用測試帳號（預設：僅在開發環境啟用）
-  ENABLED_IN_PRODUCTION: process.env.ENABLE_TEST_ACCOUNTS_IN_PROD === "true",
   // 測試 token 有效期限（小時）
   TOKEN_EXPIRY_HOURS: parseInt(process.env.TEST_TOKEN_EXPIRY_HOURS || "24", 10),
 } : {
   // 瀏覽器環境默認值
-  ENABLED_IN_PRODUCTION: false,
   TOKEN_EXPIRY_HOURS: 24,
 };
 
@@ -58,19 +60,34 @@ export const issueTestSession = () => {
 
 /**
  * 驗證測試 token 是否有效（僅後端使用）
+ * 🔒 安全性增強（2025-01）：強制禁用生產環境和非本地環境
  * @param {string} token - 測試 token
+ * @param {string} hostname - 請求來源主機名（可選，用於域名檢查）
  * @returns {Object} 驗證結果
  */
-export const validateTestToken = (token) => {
+export const validateTestToken = (token, hostname = null) => {
   // 檢查是否為測試 token
   if (token !== TEST_ACCOUNTS.GUEST_TOKEN) {
     return { valid: false, reason: "invalid_token" };
   }
 
-  // 檢查生產環境是否允許測試帳號
+  // 🔒 強制檢查：生產環境完全禁用測試帳號
   const isProduction = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === "production";
-  if (isProduction && !TEST_CONFIG.ENABLED_IN_PRODUCTION) {
-    return { valid: false, reason: "disabled_in_production" };
+  if (isProduction) {
+    return {
+      valid: false,
+      reason: "disabled_in_production",
+      message: "測試帳號在生產環境已完全禁用",
+    };
+  }
+
+  // 🔒 額外檢查：確保只在本地環境使用（如果提供了 hostname）
+  if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.startsWith('192.168.')) {
+    return {
+      valid: false,
+      reason: "non_local_environment",
+      message: "測試帳號僅限本地開發環境使用",
+    };
   }
 
   // 如果在瀏覽器環境，直接返回有效（不檢查過期）
@@ -81,7 +98,7 @@ export const validateTestToken = (token) => {
   // 檢查 token 是否已簽發
   const issuedAt = testTokenIssuedAt.get(token);
   if (!issuedAt) {
-    // 首次使用，自動簽發
+    // 開發環境首次使用，自動簽發
     const session = issueTestSession();
     return { valid: true, session };
   }

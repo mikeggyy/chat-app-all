@@ -19,6 +19,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Firestore 資料庫（兩個應用共享）
 - Firebase Authentication（主應用用戶 + 管理員權限）
 
+## 📌 最近重要更新
+
+- **2025-01-12**: 代碼清理與健康度提升（詳見 [CHANGELOG.md](CHANGELOG.md)）
+- **2025-01**: 安全性增強 - 日誌脫敏、速率限制配置、統一錯誤碼
+- **2025-01**: 冪等性系統優化 - 統一 TTL 配置
+- **2024**: Cloudflare Pages 部署支援（快速指南：[docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md)）
+
 ## 快速開始
 
 ### 一鍵啟動所有服務（推薦）
@@ -59,24 +66,29 @@ npm run dev            # 啟動前後端
 ## Repository 結構
 
 ```
-loveStory/
-├── chat-app/          # 主應用 - AI 聊天應用
-│   ├── frontend/        # Vue 3 + Vite 前端 (port 5173)
-│   ├── backend/         # Node.js + Express 後端 (port 4000)
-│   ├── shared/          # 應用內共享配置和工具
-│   ├── config/          # 集中化端口和環境配置
-│   ├── scripts/         # 開發和部署腳本
-│   ├── docs/            # 詳細文檔
-│   └── CLAUDE.md        # 主應用完整開發指南 ⭐
+chat-app-all/            # 根目錄
+├── chat-app/              # 主應用 - AI 聊天應用
+│   ├── frontend/          # Vue 3 + Vite 前端 (port 5173)
+│   ├── backend/           # Node.js + Express 後端 (port 4000)
+│   ├── shared/            # 應用內共享配置和工具
+│   ├── config/            # 集中化端口和環境配置
+│   ├── scripts/           # 開發和部署腳本
+│   ├── docs/              # 詳細文檔
+│   └── CLAUDE.md          # 主應用完整開發指南 ⭐
 │
-├── chat-app-admin/      # 管理後臺
-│   ├── frontend/        # Vue 3 + Element Plus 前端 (port 5174)
-│   ├── backend/         # Node.js + Express 後端 (port 4001)
-│   └── README.md        # 管理後臺完整文檔 ⭐
+├── chat-app-admin/        # 管理後臺
+│   ├── frontend/          # Vue 3 + Element Plus 前端 (port 5174)
+│   ├── backend/           # Node.js + Express 後端 (port 4001)
+│   └── README.md          # 管理後臺完整文檔 ⭐
 │
-├── docs/                # 共享文檔（部署、會員機制、TTS 等）
-├── start-all.js         # 統一啟動腳本（同時啟動所有服務）
-└── PORTS.md             # 端口配置說明
+├── docs/                  # 共享文檔（部署、會員機制、TTS 等）
+├── scripts/               # 根目錄工具腳本
+│   ├── cleanup-ports.js   # 清理特定端口（推薦）
+│   ├── kill-all-node.js   # 終止所有 Node.js 進程（測試用）
+│   └── README.md          # 腳本使用說明
+├── start-all.js           # 統一啟動腳本（同時啟動所有服務）
+├── CHANGELOG.md           # 版本更新日誌 📋
+└── PORTS.md               # 端口配置說明
 ```
 
 ## 開發環境
@@ -247,6 +259,20 @@ npm run test:env            # 驗證環境變數配置（推薦首次啟動前�
 **4. 驗證中間件** (`middleware/validation.middleware.js`)
 - 請求參數驗證
 - 統一錯誤響應格式
+
+**5. 安全性中間件**
+- **日誌脫敏** (`backend/src/utils/sanitizer.js`) - 自動過濾日誌中的敏感信息（密碼、Token、Email、手機等）
+- **錯誤碼系統** (`backend/src/utils/errorCodes.js`) - 統一的錯誤碼體系（8 大類別，80+ 標準錯誤碼）
+- **速率限制配置** (`backend/src/middleware/rateLimiterConfig.js`) - 分級速率限制策略
+  - `veryStrictRateLimiter` (5次/分) - AI 圖片/影片生成
+  - `strictRateLimiter` (10次/分) - TTS 語音生成
+  - `purchaseRateLimiter` (10次/分) - 購買操作
+  - `giftRateLimiter` (15次/分) - 送禮操作
+  - `conversationRateLimiter` (20次/分) - AI 對話
+  - `standardRateLimiter` (30次/分) - 一般寫操作
+  - `relaxedRateLimiter` (60次/分) - 讀取操作
+  - `authRateLimiter` (5次/5分，基於 IP) - 認證操作
+- 詳見：[chat-app/backend/RATE_LIMITING_GUIDE.md](chat-app/backend/RATE_LIMITING_GUIDE.md)
 
 ### 限制服務系統
 
@@ -479,6 +505,9 @@ console.log(user.customClaims);
 7. **修改端口後運行驗證** - 修改端口配置後運行 `npm run verify-config`
 8. **端口配置參考 PORTS.md** - 所有端口配置詳見 [PORTS.md](PORTS.md)
 9. **所有回應使用繁體中文** - 與用戶的所有溝通應使用繁體中文
+10. **錯誤處理標準化** - 使用統一的錯誤碼系統（`backend/src/utils/errorCodes.js`）
+11. **日誌安全** - 確保敏感信息自動脫敏（已內建於 logger）
+12. **速率限制分級** - 根據操作成本選擇適當的速率限制器
 
 ## 文檔索引
 
@@ -504,6 +533,7 @@ console.log(user.customClaims);
 
 - **[chat-app/CLAUDE.md](chat-app/CLAUDE.md)** - 主應用完整開發指南 ⭐
 - **[chat-app/docs/ENVIRONMENT_VALIDATION.md](chat-app/docs/ENVIRONMENT_VALIDATION.md)** - 環境變數驗證系統 🔍
+- **[chat-app/backend/RATE_LIMITING_GUIDE.md](chat-app/backend/RATE_LIMITING_GUIDE.md)** - 速率限制應用指南 🛡️
 - [chat-app/docs/firestore-collections.md](chat-app/docs/firestore-collections.md) - Firestore 資料庫架構
 - [chat-app/docs/firebase-emulator-setup.md](chat-app/docs/firebase-emulator-setup.md) - Firebase Emulator 設置指南
 - [chat-app/docs/IDEMPOTENCY.md](chat-app/docs/IDEMPOTENCY.md) - 冪等性系統實現指南
@@ -688,12 +718,18 @@ npm run install:all
 詳細的部署指南請參閱：
 - **[chat-app/docs/DEPLOYMENT.md](chat-app/docs/DEPLOYMENT.md)** - 完整部署指南
 
-**推薦架構**：
+**推薦架構（方案 A - Firebase）**：
 - **前端**: Firebase Hosting
 - **後端**: Google Cloud Run
 - **資料庫**: Firestore + Firebase Auth + Storage
 
-**快速部署流程**：
+**替代架構（方案 B - Cloudflare）**：
+- **前端**: Cloudflare Pages（更快、更便宜）
+- **後端**: Google Cloud Run（或 Cloudflare Workers）
+- **資料庫**: Firestore + Firebase Auth + Storage
+- **快速指南**: [docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md) ⚡
+
+**快速部署流程（Firebase）**：
 
 ```bash
 # 1. 後端部署到 Cloud Run
@@ -713,6 +749,21 @@ firebase deploy --only firestore:rules
 # 4. 導入初始數據（首次部署）
 cd backend
 npm run import:all
+```
+
+**快速部署流程（Cloudflare Pages）**：
+
+```bash
+# 1. 後端部署到 Cloud Run（同上）
+cd chat-app/backend
+./deploy-cloudrun.sh
+
+# 2. 前端部署到 Cloudflare Pages
+cd chat-app
+npm run deploy:pages  # 或 npm run deploy:pages:preview
+
+# 3. 部署 Firestore Rules（同上）
+firebase deploy --only firestore:rules
 ```
 
 ## Agent 工作指南
@@ -782,6 +833,27 @@ await api.post('/purchase', { data }, {
 - **邏輯提取**: 複雜邏輯提取到 composables
 - **重用性**: 可重用邏輯放在 `src/composables/`
 - **示例**: 查看 `ChatView.vue` + `composables/chat/` 的拆分模式
+
+**錯誤處理和安全性**：
+```javascript
+// 使用統一的錯誤碼系統
+import { ErrorCodes, createErrorResponse } from './utils/errorCodes.js';
+
+// 返回標準化錯誤響應
+return res.status(400).json(
+  createErrorResponse(ErrorCodes.VALIDATION.MISSING_PARAMETER, 'userId')
+);
+
+// 速率限制應用
+import { giftRateLimiter } from './middleware/rateLimiterConfig.js';
+router.post('/send', giftRateLimiter, handleIdempotentRequest, async (req, res) => {
+  // 業務邏輯
+});
+
+// 日誌記錄（自動脫敏）
+logger.info('User login', { userId, email: 'user@example.com' });
+// 輸出: { userId: '...', email: 'us***@example.com' }
+```
 
 ### 緩存系統開發
 
@@ -891,6 +963,18 @@ npm run import:characters   # 僅測試角色導入
 npm run import:test-data    # 導入測試用戶和對話
 ```
 
+**安全性驗證**：
+```bash
+# 查看所有標準錯誤碼
+cat chat-app/backend/src/utils/errorCodes.js
+
+# 查看速率限制配置
+cat chat-app/backend/src/middleware/rateLimiterConfig.js
+
+# 查看日誌脫敏配置
+cat chat-app/backend/src/utils/sanitizer.js
+```
+
 ### 性能優化指南
 
 **何時使用虛擬滾動**：
@@ -947,6 +1031,17 @@ npm run import:test-data    # 導入測試用戶和對話
 2. 修改對應等級的 `features` 欄位
 3. 無需重啟服務（動態讀取）
 
+**添加速率限制到新路由**：
+1. 選擇適當的限制器（參考 `backend/src/middleware/rateLimiterConfig.js`）
+2. 在路由中應用中間件：`router.post('/endpoint', giftRateLimiter, handler)`
+3. 測試限制是否生效
+4. 在 `RATE_LIMITING_GUIDE.md` 中記錄
+
+**添加新的錯誤碼**：
+1. 在 `backend/src/utils/errorCodes.js` 中添加錯誤碼定義
+2. 使用 `createErrorResponse()` 返回標準化錯誤
+3. 前端根據錯誤碼進行相應處理
+
 ### 重要提醒
 
 **生產環境操作**：
@@ -965,3 +1060,6 @@ npm run import:test-data    # 導入測試用戶和對話
 - 🔒 **安全第一**: 所有用戶輸入必須驗證和清理
 - 🚫 **避免硬編碼**: 使用集中化配置
 - ♻️ **可重用性**: 重複邏輯提取為函數或 composable
+- 🛡️ **錯誤處理**: 使用統一的錯誤碼系統
+- 🔐 **敏感信息**: 永不記錄敏感信息到日誌（已自動脫敏）
+- ⏱️ **速率限制**: 所有寫操作和成本較高的操作必須有速率限制

@@ -28,34 +28,40 @@ export const requireFirebaseAuth = async (req, res, next) => {
 
   // 處理測試 token（遊客登入）
   if (rawToken === TEST_ACCOUNTS.GUEST_TOKEN) {
-    // 🔒 安全增強：在生產環境完全禁用測試帳號
-    const isProduction = process.env.NODE_ENV === "production";
-    if (isProduction) {
-      logger.error('[Auth] 🚨 生產環境禁止使用測試帳號');
-      res.status(401).json({
-        message: "測試帳號在生產環境已停用",
-        code: "auth/test-disabled-in-production",
-      });
-      return;
-    }
+    // 🔒 安全增強（2025-01）：多層安全檢查
+    // 1. 生產環境完全禁用
+    // 2. 非本地域名禁用
+    // 3. Token 過期檢查
 
-    const validation = validateTestToken(rawToken);
+    const hostname = req.hostname || req.get('host')?.split(':')[0];
+    const validation = validateTestToken(rawToken, hostname);
 
     if (!validation.valid) {
       const errorMessages = {
         invalid_token: "無效的測試 token",
-        disabled_in_production: "測試帳號在生產環境已停用",
+        disabled_in_production: "測試帳號在生產環境已完全禁用",
+        non_local_environment: "測試帳號僅限本地開發環境使用",
         token_expired: "測試 token 已過期，請重新登入",
       };
 
+      logger.error(`[Auth] 🚨 測試帳號驗證失敗: ${validation.reason}`, {
+        hostname,
+        reason: validation.reason,
+        message: validation.message,
+      });
+
       res.status(401).json({
-        message: errorMessages[validation.reason] || "測試 token 驗證失敗",
+        message: errorMessages[validation.reason] || validation.message || "測試 token 驗證失敗",
         code: `auth/test-${validation.reason}`,
       });
       return;
     }
 
-    logger.info('[Auth] ✅ 測試帳號驗證成功（開發環境）');
+    logger.info('[Auth] ✅ 測試帳號驗證成功（開發環境）', {
+      hostname,
+      userId: TEST_ACCOUNTS.GUEST_USER_ID,
+    });
+
     req.firebaseUser = {
       uid: TEST_ACCOUNTS.GUEST_USER_ID,
       email: "test@example.com",

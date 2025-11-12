@@ -303,13 +303,14 @@ export const getUserTransactionStats = async (userId, options = {}) => {
     stats.byType[type].count++;
     stats.byType[type].totalAmount += amount;
 
+    // ✅ P1-3 修復：統一使用絕對值累計（amount 已統一為正數）
     // 按交易類型累計
     switch (type) {
       case TRANSACTION_TYPES.PURCHASE:
         stats.totalPurchased += amount;
         break;
       case TRANSACTION_TYPES.SPEND:
-        stats.totalSpent += Math.abs(amount);
+        stats.totalSpent += amount; // 移除 Math.abs()，amount 已是絕對值
         break;
       case TRANSACTION_TYPES.REWARD:
         stats.totalRewarded += amount;

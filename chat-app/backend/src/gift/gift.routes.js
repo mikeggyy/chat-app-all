@@ -16,6 +16,7 @@ import { processGiftResponse } from "./giftResponse.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { requireFirebaseAuth } from "../auth/index.js";
 import { giftRateLimiter, standardRateLimiter } from "../middleware/rateLimiterConfig.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js"; // ✅ P2-2: 使用集中配置的 TTL
 
 const router = express.Router();
 
@@ -54,12 +55,13 @@ router.post("/send", requireFirebaseAuth, giftRateLimiter, asyncHandler(async (r
     }
 
     // 使用冪等性處理防止重複扣款
+    // ✅ P2-2 修復：使用集中配置的 TTL
     const result = await handleIdempotentRequest(
       requestId,
       async () => {
         return await sendGift(userId, characterId, giftId);
       },
-      { ttl: 15 * 60 * 1000 } // 15分鐘
+      { ttl: IDEMPOTENCY_TTL.GIFT }
     );
 
     sendSuccess(res, result);

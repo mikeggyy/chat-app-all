@@ -159,10 +159,11 @@ export const deductCoins = async (userId, amount, description, metadata = {}) =>
     });
 
     // 4. 在同一事務中創建交易記錄
+    // ✅ P1-3 修復：統一使用絕對值存儲 amount，由 type 決定加減
     createTransactionInTx(transaction, {
       userId,
       type: TRANSACTION_TYPES.SPEND,
-      amount: -amount,
+      amount: amount, // 使用絕對值（正數），統計時根據 type 判斷加減
       description,
       metadata,
       balanceBefore: currentBalance,
@@ -242,6 +243,16 @@ export const addCoins = async (userId, amount, type, description, metadata = {})
 
 /**
  * 購買 AI 拍照功能
+ *
+ * @deprecated 此函數已廢棄，不再被前端使用
+ *
+ * ⚠️ 已知問題 (P0-3)：卡片檢查與金幣扣除不在同一事務中，可能導致雙重扣費
+ * - 如果卡片扣除成功但網絡中斷，重試時會檢查到卡片已用完，改為扣除金幣
+ * - 結果：用戶損失卡片 + 金幣，但只得到一次服務
+ *
+ * 現狀：
+ * - 前端已改用 /api/ai/generate-selfie，該路由有完整的冪等性保護
+ * - 此函數僅保留用於向後兼容，建議未來移除
  */
 export const purchaseAiPhoto = async (userId, characterId, options = {}) => {
   const user = await getUserById(userId);
@@ -301,6 +312,12 @@ export const purchaseAiPhoto = async (userId, characterId, options = {}) => {
 
 /**
  * 購買 AI 影片功能
+ *
+ * @deprecated 此函數可能已廢棄或僅用於特殊場景
+ *
+ * ⚠️ 已知問題 (P0-3)：卡片檢查與金幣扣除不在同一事務中，可能導致雙重扣費
+ * - 與 purchaseAiPhoto 有相同的問題
+ * - 建議使用 /api/ai/generate-video 路由，該路由有完整的冪等性保護
  */
 export const purchaseAiVideo = async (userId, characterId, options = {}) => {
   const user = await getUserById(userId);

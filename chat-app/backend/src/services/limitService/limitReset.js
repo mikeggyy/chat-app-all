@@ -64,7 +64,11 @@ export const checkAndResetBaseLimit = (limitData, resetPeriod) => {
 
 /**
  * 檢查並重置廣告解鎖次數（每日重置）
- * ✅ 新增：專門用於重置廣告解鎖相關的數據
+ * ✅ 修復：不再重置 unlocked 字段，改為清理過期的解鎖記錄
+ *
+ * 說明：
+ * - 廣告解鎖現在使用獨立的 24 小時過期時間（unlockHistory）
+ * - 每日重置只重置統計數據（adsWatchedToday），不影響未過期的解鎖次數
  *
  * @param {Object} limitData - 限制數據
  * @returns {boolean} 是否已重置
@@ -81,15 +85,34 @@ export const checkAndResetAdUnlocks = (limitData) => {
 
   if (shouldReset) {
     logger.info(
-      `[限制重置] 重置廣告解鎖次數: lastAdResetDate=${lastAdResetDate}, currentDate=${currentDate}`
+      `[限制重置] 重置廣告統計數據: lastAdResetDate=${lastAdResetDate}, currentDate=${currentDate}`
     );
 
-    // ✅ 只重置廣告相關的數據
-    limitData.unlocked = 0; // 廣告解鎖的額外次數
+    // ✅ 修復：清理過期的解鎖記錄（基於獨立過期時間）
+    if (Array.isArray(limitData.unlockHistory)) {
+      const beforeCount = limitData.unlockHistory.length;
+
+      // 只保留未過期的解鎖記錄
+      limitData.unlockHistory = limitData.unlockHistory.filter(unlock => {
+        if (!unlock.expiresAt) return false;
+        const expiresAt = new Date(unlock.expiresAt);
+        return expiresAt > now;
+      });
+
+      const afterCount = limitData.unlockHistory.length;
+      const cleanedCount = beforeCount - afterCount;
+
+      if (cleanedCount > 0) {
+        logger.info(`[限制重置] 清理了 ${cleanedCount} 個過期的廣告解鎖記錄`);
+      }
+    }
+
+    // ✅ 只重置每日統計數據（不影響解鎖次數）
     limitData.adsWatchedToday = 0; // 今日觀看廣告次數
-    limitData.lastAdTime = null; // 上次觀看廣告時間
     limitData.lastAdResetDate = currentDate;
     limitData.lastAdResetAt = now.toISOString();
+
+    // ⚠️ 不再重置 unlocked 和 lastAdTime（這些由過期時間控制）
 
     return true;
   }

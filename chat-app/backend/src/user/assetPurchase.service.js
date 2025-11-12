@@ -151,10 +151,11 @@ export const purchaseAssetPackage = async (userId, sku) => {
     });
 
     // 6. 在同一 Transaction 內創建交易記錄
+    // ✅ P1-3 修復：統一使用絕對值存儲 amount
     createTransactionInTx(transaction, {
       userId,
       type: TRANSACTION_TYPES.SPEND,
-      amount: -price,
+      amount: price, // 使用絕對值
       description: `購買${category} ${name}`,
       metadata: {
         sku,
@@ -327,10 +328,11 @@ export const purchaseAssetBundle = async (userId, items) => {
     });
 
     // 6. 在同一 Transaction 內創建交易記錄
+    // ✅ P1-3 修復：統一使用絕對值存儲 amount
     createTransactionInTx(transaction, {
       userId,
       type: TRANSACTION_TYPES.SPEND,
-      amount: -totalPrice,
+      amount: totalPrice, // 使用絕對值
       description: `批量購買: ${itemsSummary}`,
       metadata: {
         items: purchaseDetails,

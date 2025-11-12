@@ -275,21 +275,17 @@ export function createLimitService(config) {
         testAccountLimitKey,
         serviceName
       );
-      const totalAllowed =
-        configData.limit === -1
-          ? -1
-          : configData.limit + limitData.unlocked;
 
-      if (
-        totalAllowed !== -1 &&
-        limitData.count >= totalAllowed &&
-        !limitData.permanentUnlock &&
-        !limitData.temporaryUnlockUntil
-      ) {
+      // ✅ 修復 P0-2 問題：使用 checkCanUse 計算正確的 totalAllowed（過濾過期的廣告解鎖）
+      const canUseResult = checkCanUse(limitData, configData.limit);
+
+      if (!canUseResult.allowed) {
         throw new Error(
-          `${serviceName}次數已用完（${limitData.count}/${totalAllowed}）`
+          `${serviceName}次數已用完（${canUseResult.used}/${canUseResult.total}）`
         );
       }
+
+      const totalAllowed = canUseResult.total;
 
       // 5. 記錄使用
       limitData.count += 1;
@@ -327,10 +323,10 @@ export function createLimitService(config) {
         success: true,
         count: limitData.count,
         limit: configData.limit,
+        // ⚠️ unlocked 欄位已廢棄，但保留用於向後兼容（顯示舊的累計值）
         unlocked: limitData.unlocked,
         totalAllowed,
-        remaining:
-          totalAllowed === -1 ? -1 : Math.max(0, totalAllowed - limitData.count),
+        remaining: canUseResult.remaining,
       };
     });
 
@@ -442,14 +438,8 @@ export function createLimitService(config) {
       serviceName
     );
 
-    // 注意：limitData.cards 已廢棄，保留用於向後兼容
-    // 新的卡片資產應使用 users/{userId}/assets 系統管理
-    const totalAllowed = configData.limit === -1
-      ? -1
-      : configData.limit + limitData.unlocked + limitData.cards;
-
-    const used = limitData.count;
-    const remaining = totalAllowed === -1 ? -1 : Math.max(0, totalAllowed - used);
+    // ✅ 修復 P0-2 問題：使用 checkCanUse 計算正確的 totalAllowed 和 remaining（過濾過期的廣告解鎖）
+    const canUseResult = checkCanUse(limitData, configData.limit);
 
     const result = {
       tier: configData.tier,
@@ -457,11 +447,13 @@ export function createLimitService(config) {
       limit: configData.limit,
       standardLimit: configData.standardLimit,
       isTestAccount: configData.isTestAccount,
-      used,
-      remaining,
-      total: totalAllowed,
+      used: canUseResult.used,
+      remaining: canUseResult.remaining,
+      total: canUseResult.total,
       permanentUnlock: limitData.permanentUnlock,
+      // ⚠️ unlocked 欄位已廢棄，但保留用於向後兼容（顯示舊的累計值）
       unlocked: limitData.unlocked,
+      // ⚠️ cards 欄位已廢棄，保留用於向後兼容
       cards: limitData.cards,
       adsWatchedToday: limitData.adsWatchedToday,
       lifetimeUsed: limitData.lifetimeCount,
@@ -539,20 +531,15 @@ export function createLimitService(config) {
       // 為每個角色計算 remaining 值
       const charactersWithRemaining = {};
       for (const [characterId, limitData] of Object.entries(characterData)) {
-        // 計算剩餘次數（不做重置，只讀操作）
-        const limit = configData.limit;
-        // 注意：limitData.cards 已廢棄，保留用於向後兼容
-        const totalAllowed = limit === -1
-          ? -1
-          : limit + limitData.unlocked + limitData.cards;
-        const used = limitData.count;
-        const remaining = totalAllowed === -1 ? -1 : Math.max(0, totalAllowed - used);
+        // ✅ 修復 P0-2 問題：使用 checkCanUse 計算正確的統計數據（過濾過期的廣告解鎖）
+        const canUseResult = checkCanUse(limitData, configData.limit);
 
         charactersWithRemaining[characterId] = {
           ...limitData,
-          remaining,
-          limit,
-          total: totalAllowed,
+          remaining: canUseResult.remaining,
+          limit: configData.limit,
+          total: canUseResult.total,
+          used: canUseResult.used,
         };
       }
 

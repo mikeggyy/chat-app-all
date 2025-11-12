@@ -21,6 +21,7 @@ import {
   TICKET_TYPES,
 } from "./unlockTickets.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js"; // ✅ P2-2: 使用集中配置的 TTL
 
 const router = express.Router();
 
@@ -41,13 +42,14 @@ router.post(
     // ✅ 修復：使用冪等性保護
     const idempotencyKey = requestId || `unlock-character:${userId}:${characterId}:${Date.now()}`;
 
+    // ✅ P2-2 修復：使用集中配置的 TTL
     const result = await handleIdempotentRequest(
       idempotencyKey,
       async () => {
         return await useCharacterUnlockTicket(userId, characterId);
       },
       {
-        ttl: 5 * 60 * 1000, // 5 分鐘 TTL
+        ttl: IDEMPOTENCY_TTL.UNLOCK_TICKET,
       }
     );
 
@@ -74,13 +76,14 @@ router.post(
 
     const idempotencyKey = requestId || `unlock-photo:${userId}:${Date.now()}`;
 
+    // ✅ P2-2 修復：使用集中配置的 TTL
     const result = await handleIdempotentRequest(
       idempotencyKey,
       async () => {
         return await usePhotoUnlockCard(userId);
       },
       {
-        ttl: 5 * 60 * 1000,
+        ttl: IDEMPOTENCY_TTL.UNLOCK_TICKET,
       }
     );
 
@@ -104,13 +107,14 @@ router.post(
 
     const idempotencyKey = requestId || `unlock-video:${userId}:${Date.now()}`;
 
+    // ✅ P2-2 修復：使用集中配置的 TTL
     const result = await handleIdempotentRequest(
       idempotencyKey,
       async () => {
         return await useVideoUnlockCard(userId);
       },
       {
-        ttl: 5 * 60 * 1000,
+        ttl: IDEMPOTENCY_TTL.UNLOCK_TICKET,
       }
     );
 

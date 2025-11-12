@@ -303,4 +303,14 @@ export const IDEMPOTENCY_TTL = {
 
   // 影片生成（需要較長時間）
   VIDEO_GENERATION: 30 * 60 * 1000, // 30 分鐘
+
+  // ✅ P2-2 新增：其他冪等性操作的 TTL
+  // 禮物發送
+  GIFT: 15 * 60 * 1000, // 15 分鐘
+
+  // 解鎖券使用（角色、照片、影片）
+  UNLOCK_TICKET: 5 * 60 * 1000, // 5 分鐘
+
+  // 會員升級
+  MEMBERSHIP_UPGRADE: 15 * 60 * 1000, // 15 分鐘
 };

@@ -56,10 +56,26 @@ export const checkCanUse = (limitData, limit) => {
     }
   }
 
+  // ✅ 修復：計算有效的廣告解鎖次數（自動過濾過期的）
+  const now = new Date();
+  let validAdUnlocks = 0;
+
+  if (Array.isArray(limitData.unlockHistory) && limitData.unlockHistory.length > 0) {
+    // 過濾並累計未過期的解鎖次數
+    validAdUnlocks = limitData.unlockHistory
+      .filter(unlock => {
+        if (!unlock.expiresAt) return false; // 沒有過期時間的忽略
+        const expiresAt = new Date(unlock.expiresAt);
+        return expiresAt > now; // 只保留未過期的
+      })
+      .reduce((sum, unlock) => sum + (unlock.amount || 0), 0);
+  }
+
   // 計算總可用次數
   // 注意：limitData.cards 已廢棄，保留用於向後兼容
   // 新的卡片資產應使用 users/{userId}/assets 系統管理
-  const totalAllowed = limit + limitData.unlocked + limitData.cards;
+  // ⚠️ limitData.unlocked 也已廢棄，改用 validAdUnlocks
+  const totalAllowed = limit + validAdUnlocks + limitData.cards;
   const used = limitData.count;
   const remaining = totalAllowed - used;
 
@@ -107,20 +123,43 @@ export const recordUse = (limitData, metadata = {}) => {
 
 /**
  * 解鎖額外次數（通過廣告）
+ * ✅ 修復：添加過期時間，避免依賴每日重置導致提前失效
+ *
  * @param {Object} limitData - 限制數據
  * @param {number} amount - 解鎖數量
  * @returns {Object} 解鎖結果
  */
 export const unlockByAd = (limitData, amount) => {
-  limitData.unlocked += amount;
+  const now = new Date();
+
+  // ✅ 設置過期時間為 24 小時後
+  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  // 初始化解鎖歷史（如果不存在）
+  if (!Array.isArray(limitData.unlockHistory)) {
+    limitData.unlockHistory = [];
+  }
+
+  // 記錄這次廣告解鎖（包含過期時間）
+  limitData.unlockHistory.push({
+    amount,
+    unlockedAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    unlockType: 'ad',
+  });
+
+  // ⚠️ 保留舊的 unlocked 字段用於向後兼容（但不再使用）
+  limitData.unlocked = (limitData.unlocked || 0) + amount;
+
   limitData.adsWatchedToday += 1;
-  limitData.lastAdTime = new Date().toISOString();
+  limitData.lastAdTime = now.toISOString();
 
   return {
     success: true,
     unlockedAmount: amount,
     totalUnlocked: limitData.unlocked,
     adsWatchedToday: limitData.adsWatchedToday,
+    expiresAt: expiresAt.toISOString(),
   };
 };
 

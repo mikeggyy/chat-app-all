@@ -169,28 +169,35 @@ const visibleThreadsFiltered = computed(() => {
   return visibleThreads.value.filter((thread) => !isThreadHidden(thread?.id));
 });
 
+// 優化：使用 Map 和 Set 提升查找效率
+const conversationThreadsMap = computed(() => {
+  const map = new Map();
+  conversationThreads.value.forEach((thread) => {
+    const id = normalizeId(thread?.id);
+    if (id) {
+      map.set(id, thread);
+    }
+  });
+  return map;
+});
+
 // 監聽對話變化，自動恢復已更新的隱藏對話
 watch(
   conversationThreads,
   (threads) => {
     if (!hiddenThreads.size) return;
 
-    const byId = new Map();
-    threads.forEach((thread) => {
-      const id = normalizeId(thread?.id);
-      if (id) {
-        byId.set(id, thread);
-      }
-    });
-
     const restoreIds = [];
+
+    // 優化：使用 computed 的 Map 避免重複創建，O(n) 遍歷而非 O(n*m)
     hiddenThreads.forEach((meta, id) => {
-      const thread = byId.get(id);
+      const thread = conversationThreadsMap.value.get(id);
       if (!thread) return;
 
       const lastMessage = typeof thread.lastMessage === 'string' ? thread.lastMessage : '';
       const timeLabel = typeof thread.timeLabel === 'string' ? thread.timeLabel : '';
 
+      // 檢查是否有更新
       if ((meta?.lastMessage ?? '') !== lastMessage || (meta?.timeLabel ?? '') !== timeLabel) {
         restoreIds.push(id);
       }

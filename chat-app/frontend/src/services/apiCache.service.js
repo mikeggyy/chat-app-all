@@ -206,25 +206,57 @@ class ApiCacheService {
   }
 
   /**
+   * 根據緩存鍵獲取對應的 TTL
+   * @param {string} key - 緩存鍵
+   * @returns {number} TTL (毫秒)
+   */
+  getTTLForKey(key) {
+    // 根據鍵的前綴返回不同的 TTL
+    if (key.startsWith('character:')) return cacheTTL.CHARACTER;
+    if (key.startsWith('user:')) return cacheTTL.USER_PROFILE;
+    if (key.startsWith('ranking:')) return cacheTTL.RANKING;
+    if (key.startsWith('matches:')) return cacheTTL.MATCHES;
+    // 默認 60 分鐘
+    return 60 * 60 * 1000;
+  }
+
+  /**
    * 啟動自動清理
-   * 每 5 分鐘檢查一次，清理超過最大 TTL 的緩存
+   * 優化：縮短清理間隔、智能 TTL、LRU 策略
    */
   startAutoCleanup() {
     if (this.cleanupInterval) {
       return;
     }
 
-    // 最大 TTL 設為 60 分鐘，超過這個時間的緩存必定過期
-    const MAX_TTL = 60 * 60 * 1000;
+    // 配置
+    const CLEANUP_INTERVAL = 2 * 60 * 1000; // 優化：縮短為 2 分鐘
+    const MAX_CACHE_SIZE = 1000; // 最大緩存項目數
 
     this.cleanupInterval = setInterval(() => {
       const now = Date.now();
       const keys = Array.from(this.timestamps.keys());
       let cleaned = 0;
 
+      // 優化 1: LRU 策略 - 如果超過最大數量，刪除最舊的
+      if (keys.length > MAX_CACHE_SIZE) {
+        const sortedKeys = keys.sort((a, b) =>
+          this.timestamps.get(a) - this.timestamps.get(b)
+        );
+        const toDelete = sortedKeys.slice(0, keys.length - MAX_CACHE_SIZE);
+        toDelete.forEach(key => {
+          this.delete(key);
+          cleaned++;
+        });
+        logger.debug(`[API Cache] 🧹 LRU 清理: 移除 ${toDelete.length} 個最舊緩存`);
+      }
+
+      // 優化 2: 按不同類型設置不同的 TTL
       for (const key of keys) {
         const timestamp = this.timestamps.get(key);
-        if (timestamp && now - timestamp > MAX_TTL) {
+        const ttl = this.getTTLForKey(key);
+
+        if (timestamp && now - timestamp > ttl) {
           this.delete(key);
           cleaned++;
         }
@@ -233,7 +265,7 @@ class ApiCacheService {
       if (cleaned > 0) {
         logger.debug(`[API Cache] 🧹 自動清理: 移除 ${cleaned} 個過期緩存`);
       }
-    }, 5 * 60 * 1000); // 每 5 分鐘
+    }, CLEANUP_INTERVAL);
   }
 
   /**

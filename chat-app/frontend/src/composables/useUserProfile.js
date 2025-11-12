@@ -9,7 +9,9 @@ const baseState = reactive({
   user: null,
 });
 
-const profileCache = new Map();
+// ✅ 添加 TTL 的用戶資料緩存（2 分鐘過期）
+const profileCache = new Map(); // 存儲格式: { data: userData, timestamp: Date.now() }
+const CACHE_TTL = 2 * 60 * 1000; // 2 分鐘 = 120000ms
 const firebaseAuth = useFirebaseAuth();
 
 const normalizeUser = (payload = {}) => {
@@ -79,8 +81,12 @@ const normalizeUser = (payload = {}) => {
 const cacheUserProfile = (payload) => {
   const profile = normalizeUser(payload);
 
+  // ✅ 存儲帶時間戳的緩存項
   if (profile.id) {
-    profileCache.set(profile.id, profile);
+    profileCache.set(profile.id, {
+      data: profile,
+      timestamp: Date.now(),
+    });
   }
   baseState.user = profile;
   return profile;
@@ -92,13 +98,28 @@ const loadUserProfile = async (id, options = {}) => {
     throw new Error("載入使用者資料時需要提供 id");
   }
 
+  // ✅ 檢查緩存是否存在且未過期
   if (!force && profileCache.has(id)) {
-    const cached = profileCache.get(id);
-    baseState.user = cached;
-    return cached;
+    const cacheEntry = profileCache.get(id);
+    const now = Date.now();
+    const age = now - cacheEntry.timestamp;
+
+    // 如果緩存未過期（小於 2 分鐘），直接返回
+    if (age < CACHE_TTL) {
+      const cached = cacheEntry.data;
+      baseState.user = cached;
+      console.debug(`[useUserProfile] 使用緩存資料: ${id}, 年齡: ${Math.round(age / 1000)}秒`);
+      return cached;
+    } else {
+      // 緩存已過期，從 Map 中刪除
+      profileCache.delete(id);
+      console.debug(`[useUserProfile] 緩存已過期並刪除: ${id}, 年齡: ${Math.round(age / 1000)}秒`);
+    }
   }
 
+  // 緩存不存在或已過期，從 API 獲取新資料
   try {
+    console.debug(`[useUserProfile] 從 API 獲取用戶資料: ${id}`);
     const data = await apiJson(`/api/users/${encodeURIComponent(id)}`, {
       skipGlobalLoading,
     });

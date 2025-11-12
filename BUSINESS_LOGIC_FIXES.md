@@ -403,9 +403,63 @@ const sendMessage = async (text) => {
 
 ---
 
-### 10-13. 🔄 其他中危問題
+### 10. ✅ 前端用戶資料緩存 TTL
 
-**10. 前端用戶資料緩存 TTL**: 添加 2 分鐘過期時間
+**問題**: 用戶資料緩存沒有過期時間，一旦緩存就永久保存，可能導致顯示過時資料
+
+**修復**: 已完成
+- 文件: `chat-app/frontend/src/composables/useUserProfile.js`
+- 添加 2 分鐘的 TTL（Time-To-Live）
+- 修改緩存存儲格式為 `{ data: userData, timestamp: Date.now() }`
+- 在 `loadUserProfile` 中檢查緩存年齡，超過 2 分鐘自動刪除並重新獲取
+- 添加調試日誌方便排查
+
+**實現**:
+```javascript
+// frontend/src/composables/useUserProfile.js
+const profileCache = new Map(); // 存儲格式: { data, timestamp }
+const CACHE_TTL = 2 * 60 * 1000; // 2 分鐘
+
+const loadUserProfile = async (id, options = {}) => {
+  if (!force && profileCache.has(id)) {
+    const cacheEntry = profileCache.get(id);
+    const now = Date.now();
+    const age = now - cacheEntry.timestamp;
+
+    // 檢查緩存是否過期
+    if (age < CACHE_TTL) {
+      const cached = cacheEntry.data;
+      baseState.user = cached;
+      console.debug(`[useUserProfile] 使用緩存資料: ${id}, 年齡: ${Math.round(age / 1000)}秒`);
+      return cached;
+    } else {
+      // 緩存已過期，刪除並重新獲取
+      profileCache.delete(id);
+      console.debug(`[useUserProfile] 緩存已過期並刪除: ${id}`);
+    }
+  }
+
+  // 從 API 獲取新資料
+  const data = await apiJson(`/api/users/${id}`);
+  return cacheUserProfile(data);
+};
+
+const cacheUserProfile = (payload) => {
+  const profile = normalizeUser(payload);
+  if (profile.id) {
+    profileCache.set(profile.id, {
+      data: profile,
+      timestamp: Date.now() // 記錄緩存時間
+    });
+  }
+  return profile;
+};
+```
+
+---
+
+### 11-13. 🔄 其他中危問題
+
 **11. 購買確認防抖**: 防止快速雙擊
 **12. localStorage 錯誤處理**: 更激進的清理策略
 
@@ -764,12 +818,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 | 類別 | 已完成 | 待完成 | 總計 |
 |------|--------|--------|------|
 | 🔴 高危 | 4 | 1 | 5 |
-| 🟡 中危 | 3 | 5 | 8 |
+| 🟡 中危 | 4 | 4 | 8 |
 | 🟢 低危 | 0 | 5 | 5 |
 | 📈 優化 | 2 | 1 | 3 |
-| **總計** | **9** | **12** | **21** |
+| **總計** | **10** | **11** | **21** |
 
-**完成度**: 42.9%
+**完成度**: 47.6%
 
 ### 已完成的修復
 
@@ -782,11 +836,12 @@ curl https://your-backend-url.run.app/api/system/idempotency/stats
 **中危問題**:
 5. ✅ 藥水使用 Transaction 保護（Commit: `e3fafcb`）
 6. ✅ 訂單狀態機驗證（Commit: `735e665`）
-7. ✅ 資產購買原子性（本次提交）
+7. ✅ 資產購買原子性（Commit: `738a914`）
+8. ✅ 前端用戶資料緩存 TTL（本次提交）
 
 **性能優化**:
-8. ✅ 添加 Firestore 索引（Commit: `c28c549`）
-9. ✅ 創建修復文檔（Commit: `da49a75`）
+9. ✅ 添加 Firestore 索引（Commit: `c28c549`）
+10. ✅ 創建修復文檔（Commit: `da49a75`）
 
 ---
 

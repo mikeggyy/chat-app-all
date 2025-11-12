@@ -219,7 +219,7 @@ export const getPopularMatches = async (limit = 10, options = {}) => {
     let query = db
       .collection("characters")
       .where("status", "==", "active")
-      .where("isPublic", "==", true")
+      .where("isPublic", "==", true)
       .orderBy("totalChatUsers", "desc");
 
     let paginationInfo = {

@@ -88,7 +88,19 @@ loveStory/
 - **默認模式**: 連接生產環境 Firebase（非 Emulator）
 - **Node.js**: 需要 ESM 支援（`"type": "module"`）
 
-⚠️ **重要**: 默認情況下，所有服務連接到**生產環境 Firebase**。修改數據時需格外小心。
+### ⚠️ 當前環境狀態警告
+
+**默認配置狀態**：
+- 🌐 **Firebase 模式**: 生產環境（非 Emulator）
+- 📊 **數據庫**: 直接連接到生產 Firestore
+- 🔒 **認證**: 生產環境 Firebase Auth
+- ⚡ **即時生效**: 所有數據操作會立即影響生產資料庫
+
+**開發建議**：
+1. ✅ **測試新功能**: 使用 `npm run dev:with-emulator`（主應用）
+2. ✅ **本地測試**: 設置 `USE_FIREBASE_EMULATOR=true`
+3. ⚠️ **生產操作**: 修改生產數據前務必確認操作正確性
+4. 📝 **數據備份**: 重要操作前建議先備份相關數據
 
 💡 **本地開發**: 如需使用 Firebase Emulator 進行本地測試，請參閱 [chat-app/docs/firebase-emulator-setup.md](chat-app/docs/firebase-emulator-setup.md)。
 
@@ -189,6 +201,175 @@ npm run test:env            # 驗證環境變數配置（推薦首次啟動前�
 - 📊 數據統計（使用量、營收、用戶活躍度）
 - ⚙️ 系統配置（禮物、會員方案、功能限制）
 - 💰 交易管理（訂單記錄、退款處理）
+
+## 核心架構概覽
+
+此章節提供主應用的關鍵架構概覽。詳細架構說明請參閱 [chat-app/CLAUDE.md](chat-app/CLAUDE.md)。
+
+### 緩存系統架構
+
+應用使用多層緩存提升性能：
+
+**1. Character Cache（角色緩存）**
+- **位置**: `backend/src/services/character/characterCache.service.js`
+- **策略**: 啟動時預加載所有 AI 角色到內存
+- **更新**: 支援熱更新，無需重啟服務
+- **優勢**: 減少 99% 的 Firestore 讀取請求
+
+**2. User Profile Cache（用戶資料緩存）**
+- **位置**: `backend/src/user/userProfileCache.service.js`
+- **策略**: LRU (最近最少使用) 緩存，最多 1000 個用戶
+- **TTL**: 15 分鐘自動過期
+- **監控**: 內建緩存命中率監控
+
+**3. Conversation Cache（對話緩存）**
+- **位置**: `backend/src/conversation/conversation.service.js`
+- **存儲**: 內存 Map，key 為 `userId::characterId`
+- **持久化**: Firestore 作為持久層
+- **管理**: 自動清理不活躍對話
+
+### 中間件系統
+
+**1. 冪等性中間件** (`middleware/idempotency.js`)
+- 防止重複消耗虛擬貨幣或資源
+- 使用 Firestore 存儲冪等性 key
+- 支援自動過期（24 小時）
+- 詳見：[chat-app/docs/IDEMPOTENCY.md](chat-app/docs/IDEMPOTENCY.md)
+
+**2. 認證中間件** (`auth/firebaseAuth.middleware.js`, `middleware/adminAuth.middleware.js`)
+- Firebase Auth token 驗證
+- 測試帳號支援（開發環境）
+- 管理員權限驗證（Custom Claims）
+
+**3. 速率限制中間件** (`middleware/rateLimiter.js`)
+- 基於用戶 ID 的速率限制
+- 不同 API 端點有不同限制
+- 防止 API 濫用
+
+**4. 驗證中間件** (`middleware/validation.middleware.js`)
+- 請求參數驗證
+- 統一錯誤響應格式
+
+### 限制服務系統
+
+統一的使用限制追蹤系統，位於 `backend/src/services/limitService/`：
+
+**核心服務**：
+- `conversationLimit.service.js` - 對話次數限制（每角色計數）
+- `voiceLimit.service.js` - 語音播放限制（每角色計數）
+- `photoLimit.service.js` - AI 照片生成限制（月度重置）
+- `ad.service.js` - 廣告觀看追蹤（每日限制 10 次）
+
+**會員系統整合**：
+- Free 用戶：有限次數 + 廣告解鎖
+- VIP/VVIP 用戶：大幅提升或無限次數
+- 重置邏輯：對話/語音每日重置（廣告解鎖），照片每月重置
+
+詳見：[LIMIT_SYSTEM_EXPLAINED.md](LIMIT_SYSTEM_EXPLAINED.md)
+
+### 主要功能系統
+
+**1. 配對/角色系統**
+- **位置**: `backend/src/match/`, `backend/src/services/character/`
+- **功能**: 角色發現、搜尋、收藏
+- **緩存**: 啟動時預加載所有角色
+- **API**: `/api/match`, `/api/characters`
+
+**2. 對話系統**
+- **位置**: `backend/src/conversation/`, `backend/src/ai/`
+- **AI 整合**: OpenAI GPT-4o-mini 生成回覆
+- **上下文**: 保留最近 12 條訊息
+- **建議系統**: 基於最近 6 條訊息生成 3 個快速回覆
+
+**3. 虛擬商品系統**
+- **禮物**: `backend/src/gift/` - 用戶送禮給 AI 角色
+- **商店**: `backend/src/shop/` - 虛擬貨幣、解鎖券、藥水
+- **資產**: `backend/src/user/assetPurchase.routes.js` - 用戶資產管理
+- **交易**: `backend/src/payment/` - 訂單、交易記錄
+
+**4. AI 功能**
+- **TTS 語音**: OpenAI TTS，支援多種語音（shimmer, nova, coral 等）
+- **圖片生成**: Gemini 2.5 Flash，自動壓縮為 WebP（減少 70-85% 大小）
+- **角色創建**: 多步驟流程（性別 → 外觀 → 生成 → 語音）
+
+**5. 會員系統**
+- **位置**: `backend/src/membership/`
+- **等級**: Free, VIP, VVIP
+- **解鎖券**: 用於解鎖特定 AI 角色
+- **藥水**: 暫時提升使用限制
+
+### 前端架構：Composables
+
+主應用前端使用 Vue 3 Composition API，關鍵 composables 位於 `frontend/src/composables/`：
+
+**核心功能**：
+- `useUserProfile` - 用戶資料和認證狀態管理
+- `useFirebaseAuth` - Firebase 認證整合
+- `useMembership` - 會員等級和權限檢查
+- `useCoins` - 虛擬貨幣餘額管理
+
+**限制系統**：
+- `useConversationLimit` - 對話次數限制查詢
+- `useVoiceLimit` - 語音播放限制查詢
+- `usePhotoLimit` - 照片生成限制查詢
+- `useBaseLimitService` - 統一限制服務基類
+
+**角色創建**：
+- `useCharacterCreationFlow` - 角色創建流程狀態管理
+- `useGenderPreference` - 性別偏好設置
+
+**UI 增強**：
+- `useVirtualScroll` - 虛擬滾動（長列表性能優化）
+- `useChatVirtualScroll` - 聊天訊息虛擬滾動
+- `usePaginatedConversations` - 對話列表分頁加載
+- `usePanelManager` - 面板管理（個人資料編輯）
+- `useToast` - 通知提示
+- `useConfirmDialog` - 確認對話框
+
+**商店和購買**：
+- `usePurchaseConfirm` - 購買確認流程
+- `useUnlockTickets` - 解鎖券管理
+- `useLimitModalActions` - 限制提示彈窗操作
+
+### 性能優化策略
+
+**1. 圖片壓縮**
+- AI 生成圖片自動壓縮為 WebP 格式
+- 品質設置：60（平衡品質和檔案大小）
+- 減少 70-85% 檔案大小（從 ~1MB → ~100-200KB）
+- 防止 localStorage QuotaExceededError
+
+**2. 虛擬滾動**
+- 長列表（聊天訊息、對話列表）使用虛擬滾動
+- 只渲染可見區域的元素
+- 大幅減少 DOM 節點數量
+
+**3. 分頁加載**
+- 對話列表分頁加載（每頁 20 條）
+- 無限滾動自動加載下一頁
+- 減少初始載入時間
+
+**4. 緩存策略**
+- 角色數據啟動時預加載
+- 用戶資料使用 LRU 緩存
+- 對話數據內存緩存 + Firestore 持久化
+
+### 錯誤處理和日誌
+
+**日誌系統** (`backend/src/utils/logger.js`)
+- 使用自定義 logger
+- 區分環境（開發/生產）
+- HTTP 請求日誌記錄
+
+**錯誤處理**
+- 統一錯誤響應格式（`shared/utils/errorFormatter.js`）
+- 錯誤處理中間件自動捕獲異常
+- 詳細錯誤訊息（開發環境）vs 簡化訊息（生產環境）
+
+**環境驗證** (`backend/src/utils/validateEnv.js`)
+- 啟動時自動驗證必要的環境變數
+- 缺少配置時阻止啟動並提示錯誤
+- 詳見：[chat-app/docs/ENVIRONMENT_VALIDATION.md](chat-app/docs/ENVIRONMENT_VALIDATION.md)
 
 ## 環境配置
 
@@ -496,36 +677,251 @@ npm run import:all
 
 ## Agent 工作指南
 
+### 開發模式選擇
+
+**生產環境模式**（默認）：
+```bash
+npm run dev  # 連接生產 Firebase
+```
+- ⚠️ 所有操作直接影響生產資料庫
+- 適合：Bug 修復、小型改進、查看生產數據
+- 注意：修改數據前務必確認操作正確性
+
+**Emulator 模式**（推薦用於開發新功能）：
+```bash
+cd chat-app
+npm run dev:with-emulator  # 使用 Firebase Emulator + 自動導入測試數據
+```
+- ✅ 完全隔離的本地環境
+- ✅ 自動導入測試數據（角色、配置、會員方案）
+- 適合：開發新功能、測試數據變更、實驗性修改
+
 ### 配置管理
 
-- **使用集中化配置**: 從 `config/` 和 `shared/config/` 導入，不要硬編碼
-- **端口修改**: 修改端口後必須運行 `npm run verify-config`
-- **共享常量**: 使用 `shared/config/constants.js` 中的常量，不要使用 magic numbers
+**集中化配置原則**：
+- **端口配置**: 從 `config/ports.js` 導入（前後端統一）
+- **限制配置**: 從 `backend/src/config/limits.js` 導入
+- **測試帳號**: 從 `shared/config/testAccounts.js` 導入
+- **禁止硬編碼**: 不要在代碼中直接寫端口號、限制值等
+
+**修改配置後的步驟**：
+```bash
+# 1. 修改配置文件（如 config/ports.js）
+# 2. 驗證配置同步
+npm run verify-config
+# 3. 重啟相關服務
+```
 
 ### 功能開發
 
-- **限制系統**: 新增使用限制功能時，參考 `backend/src/services/limitService/` 的模式
-- **冪等性**: 所有消耗性操作必須使用 `handleIdempotentRequest()` 實現冪等性
-- **組件大小**: 保持組件在 500 行以下，大型組件拆分為子組件和 composables
+**新增使用限制功能**：
+1. 在 `backend/src/config/limits.js` 定義限制值
+2. 參考 `backend/src/services/limitService/` 的模式創建服務
+3. 使用 `baseLimitService.js` 作為基類
+4. 實現 Firestore 持久化追蹤
+5. 前端使用對應的 composable（如 `useConversationLimit`）
+
+**實現冪等性**（消耗性操作必須）：
+```javascript
+// Backend 路由
+import { handleIdempotentRequest } from './middleware/idempotency.js';
+
+router.post('/purchase', handleIdempotentRequest, async (req, res) => {
+  // 業務邏輯（只會執行一次）
+});
+
+// Frontend 調用
+const idempotencyKey = `purchase_${userId}_${Date.now()}`;
+await api.post('/purchase', { data }, {
+  headers: { 'Idempotency-Key': idempotencyKey }
+});
+```
+
+**組件開發規範**：
+- **大小限制**: 單個組件不超過 500 行
+- **邏輯提取**: 複雜邏輯提取到 composables
+- **重用性**: 可重用邏輯放在 `src/composables/`
+- **示例**: 查看 `ChatView.vue` + `composables/chat/` 的拆分模式
+
+### 緩存系統開發
+
+**Character Cache（角色緩存）**：
+```javascript
+// 獲取角色（自動從緩存讀取）
+import { getCharacterById } from './services/character/characterCache.service.js';
+const character = getCharacterById('match-001');
+
+// 更新緩存（修改角色後）
+import { updateCharacterInCache } from './services/character/characterCache.service.js';
+await updateCharacterInCache(characterId, updatedData);
+```
+
+**User Profile Cache（用戶緩存）**：
+```javascript
+// 獲取用戶（自動緩存）
+import { getUserProfile } from './user/userProfileCache.service.js';
+const profile = await getUserProfile(userId);
+
+// 清除緩存（修改用戶資料後）
+import { invalidateUserCache } from './user/userProfileCache.service.js';
+invalidateUserCache(userId);
+```
 
 ### 資料庫操作
 
-- **優先使用 Firestore**: 新的持久化數據應使用 Firestore 而非內存存儲
-- **集合命名**: 使用小寫加下劃線（如 `user_conversations`）
-- **數據導入**: 新增 Firestore 集合時創建對應的導入腳本
-- **Emulator 測試**: 測試 Firestore 變更時優先使用 Firebase Emulator
+**Firestore 集合命名規範**：
+- 使用小寫 + 下劃線：`user_conversations`, `user_favorites`
+- 配置類集合：單數形式 `membership_tiers`, `gift_rarities`
+- 用戶數據：使用子集合 `users/{userId}/conversations/{characterId}`
+
+**新增 Firestore 集合的步驟**：
+1. 在 `docs/firestore-collections.md` 記錄數據結構
+2. 創建導入腳本（`backend/scripts/import-*.js`）
+3. 在 `firestore.indexes.json` 添加必要的索引
+4. 更新 `firestore.rules` 添加安全規則
+5. 使用 Emulator 測試：`npm run dev:with-emulator`
+
+**Firestore 操作示例**：
+```javascript
+import { getFirestoreDb } from './firebase/index.js';
+
+const db = getFirestoreDb();
+
+// 讀取
+const doc = await db.collection('characters').doc(characterId).get();
+const character = doc.data();
+
+// 寫入（使用事務確保原子性）
+await db.runTransaction(async (transaction) => {
+  const userRef = db.collection('users').doc(userId);
+  transaction.update(userRef, { coins: newBalance });
+});
+```
+
+### 前端開發
+
+**Composables 使用模式**：
+```javascript
+// 在組件中使用
+import { useUserProfile } from '@/composables/useUserProfile';
+import { useConversationLimit } from '@/composables/useConversationLimit';
+
+export default {
+  setup() {
+    const { profile, isVIP } = useUserProfile();
+    const { canSendMessage, remainingMessages } = useConversationLimit(characterId);
+
+    return { profile, isVIP, canSendMessage, remainingMessages };
+  }
+}
+```
+
+**API 調用規範**：
+```javascript
+// 使用統一的 API 客戶端
+import { apiJson } from '@/utils/api';
+
+// GET 請求
+const characters = await apiJson('/api/characters');
+
+// POST 請求（自動處理錯誤和認證）
+const result = await apiJson('/api/conversations/send', {
+  method: 'POST',
+  body: JSON.stringify({ message, characterId })
+});
+```
+
+### 測試和驗證
+
+**環境變數驗證**（新增環境變數後）：
+```bash
+cd chat-app
+npm run test:env  # 驗證所有必要的環境變數
+```
+
+**端口配置驗證**（修改端口後）：
+```bash
+npm run verify-config  # 確保前後端端口配置同步
+```
+
+**數據導入測試**（Emulator 模式）：
+```bash
+npm run import:all          # 導入所有數據
+npm run import:characters   # 僅測試角色導入
+npm run import:test-data    # 導入測試用戶和對話
+```
+
+### 性能優化指南
+
+**何時使用虛擬滾動**：
+- 列表項目 > 100 個
+- 每個列表項目渲染成本較高
+- 示例：聊天訊息列表、對話列表
+
+**圖片處理**：
+- AI 生成圖片：自動壓縮為 WebP（已實現）
+- 用戶上傳圖片：需要在前端壓縮後再上傳
+- 使用 `sharp` (後端) 或 `browser-image-compression` (前端)
+
+**緩存使用時機**：
+- 靜態數據（角色列表）：啟動時預加載
+- 熱數據（用戶資料）：LRU 緩存
+- 會話數據（對話記錄）：內存 + Firestore 雙層
 
 ### 文檔維護
 
-- **參考現有文檔**: 開發前先查閱 `docs/` 目錄中的相關文檔
-- **更新文檔**: 重大功能變更時更新相關文檔
-- **文檔位置**:
-  - 架構說明 → `chat-app/CLAUDE.md`
-  - API 文檔 → `chat-app/docs/`
-  - 部署指南 → `chat-app/docs/DEPLOYMENT.md`
+**修改後必須更新的文檔**：
+1. **新增 API 端點** → `chat-app/CLAUDE.md` 的 API 列表
+2. **新增 Firestore 集合** → `chat-app/docs/firestore-collections.md`
+3. **修改限制邏輯** → `LIMIT_SYSTEM_EXPLAINED.md`
+4. **安全修復** → `SECURITY_AUDIT_FIXES.md`
+5. **部署流程變更** → `chat-app/docs/DEPLOYMENT.md`
+
+**文檔位置索引**：
+- 總體架構 → 根目錄 `CLAUDE.md`（本文件）
+- 主應用詳細 → `chat-app/CLAUDE.md`
+- 管理後臺 → `chat-app-admin/README.md`
+- API 參考 → `chat-app/docs/`
+- Firestore 架構 → `chat-app/docs/firestore-collections.md`
+
+### 常見開發任務
+
+**添加新的 AI 角色**：
+1. Firestore Console 添加文檔到 `characters` 集合
+2. 或使用管理後臺：http://localhost:5174
+3. 或修改 `backend/scripts/characters.data.js` + `npm run import:characters`
+
+**添加新的限制類型**：
+1. `backend/src/config/limits.js` 定義限制值
+2. `backend/src/services/limitService/` 創建服務
+3. `frontend/src/composables/` 創建對應的 composable
+4. 更新 `LIMIT_SYSTEM_EXPLAINED.md`
+
+**添加新的虛擬商品**：
+1. Firestore `gifts` / `coin_packages` 集合添加文檔
+2. 或使用管理後臺添加
+3. 前端會自動顯示（動態讀取）
+
+**修改會員限制**：
+1. Firestore Console → `membership_tiers` 集合
+2. 修改對應等級的 `features` 欄位
+3. 無需重啟服務（動態讀取）
 
 ### 重要提醒
 
+**生產環境操作**：
 - ⚠️ **默認連接生產環境**: 所有數據修改操作需格外小心
-- ✅ **測試用 Emulator**: 測試新功能時使用 Firebase Emulator
+- 🔍 **先查後改**: 修改前先查詢確認數據正確
+- 💾 **重要數據備份**: Firestore Console 導出備份
+- 📝 **記錄變更**: 在 git commit 中詳細說明生產數據變更
+
+**測試建議**：
+- ✅ **新功能用 Emulator**: `npm run dev:with-emulator`
+- ✅ **測試帳號測試**: 使用 `shared/config/testAccounts.js` 中的測試帳號
+- ✅ **小範圍驗證**: 生產環境測試時使用測試帳號先驗證
+
+**代碼規範**：
 - 📝 **繁體中文回應**: 與用戶的所有溝通使用繁體中文
+- 🔒 **安全第一**: 所有用戶輸入必須驗證和清理
+- 🚫 **避免硬編碼**: 使用集中化配置
+- ♻️ **可重用性**: 重複邏輯提取為函數或 composable

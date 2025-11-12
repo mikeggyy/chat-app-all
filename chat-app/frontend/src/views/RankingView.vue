@@ -5,6 +5,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  shallowRef,
   watch,
 } from "vue";
 import { useRouter } from "vue-router";
@@ -22,6 +23,7 @@ import {
 } from "../services/ranking.service.js";
 import { apiJson } from "../utils/api.js";
 import { fallbackMatches } from "../utils/matchFallback.js";
+import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service.js";
 
 const router = useRouter();
 
@@ -114,12 +116,19 @@ const DEFAULT_MATCH_AVATAR =
 
 const loadMatchMetadata = async () => {
   try {
-    const data = await apiJson("/match/all", { skipGlobalLoading: true });
+    // 使用 API 緩存服務，5 分鐘緩存
+    const data = await apiCache.fetch(
+      cacheKeys.matches({ all: true }),
+      () => apiJson("/match/all", { skipGlobalLoading: true }),
+      cacheTTL.MATCHES
+    );
+
     if (Array.isArray(data) && data.length) {
       assignMatchMetadata(data);
     }
   } catch (error) {
     if (import.meta.env.DEV) {
+      console.error('載入匹配元數據失敗:', error);
     }
   }
 };
@@ -236,8 +245,9 @@ const PERIOD_OPTIONS = [
 ];
 
 const activePeriod = ref(PERIOD_OPTIONS[0].id);
-const podium = ref([]);
-const entries = ref([]);
+// 使用 shallowRef 避免深度響應式，提升性能
+const podium = shallowRef([]);
+const entries = shallowRef([]);
 const updatedAt = ref("");
 const errorMessage = ref("");
 const loading = ref(false);
@@ -248,14 +258,39 @@ const sentinelRef = ref(null);
 let observer = null;
 let requestToken = 0;
 
+// 裝飾緩存 - 避免重複計算相同條目的裝飾結果
+const decorationCache = new Map();
+
 const decoratedPodiumEntries = computed(() =>
   podium.value
-    .map((entry) => decorateEntry(entry))
+    .map((entry) => {
+      // 使用緩存避免重複計算
+      const cacheKey = `podium-${entry?.id || entry?.chatId}`;
+      if (decorationCache.has(cacheKey)) {
+        return decorationCache.get(cacheKey);
+      }
+      const decorated = decorateEntry(entry);
+      if (decorated) {
+        decorationCache.set(cacheKey, decorated);
+      }
+      return decorated;
+    })
     .filter((entry) => entry && [1, 2, 3].includes(entry.rank))
 );
 
 const decoratedEntries = computed(() =>
-  entries.value.map((entry) => decorateEntry(entry)).filter(Boolean)
+  entries.value.map((entry) => {
+    // 使用緩存避免重複計算
+    const cacheKey = `entry-${entry?.id || entry?.chatId || entry?.rank}`;
+    if (decorationCache.has(cacheKey)) {
+      return decorationCache.get(cacheKey);
+    }
+    const decorated = decorateEntry(entry);
+    if (decorated) {
+      decorationCache.set(cacheKey, decorated);
+    }
+    return decorated;
+  }).filter(Boolean)
 );
 
 const activePeriodOption = computed(() => {
@@ -363,6 +398,8 @@ const resetState = () => {
   errorMessage.value = "";
   offset.value = 0;
   hasMore.value = true;
+  // 清理裝飾緩存
+  decorationCache.clear();
 };
 
 const loadRankings = async ({ reset = false } = {}) => {
@@ -458,7 +495,8 @@ const attachObserver = () => {
     },
     {
       root: null,
-      rootMargin: "160px 0px 0px 0px",
+      // 優化: 減少預加載距離從 160px 到 50px，避免過早觸發
+      rootMargin: "50px 0px 0px 0px",
       threshold: 0,
     }
   );

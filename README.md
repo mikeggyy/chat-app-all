@@ -41,12 +41,14 @@ npm run dev
 ```
 
 這會同時啟動：
+
 - ✅ 主應用後端 API (port 4000)
 - ✅ 主應用前端 (port 5173)
 - ✅ 管理後台後端 API (port 4001)
 - ✅ 管理後台前端 (port 5174)
 
 啟動後訪問：
+
 - **主應用**: http://127.0.0.1:5173
 - **管理後台**: http://127.0.0.1:5174
 
@@ -77,6 +79,7 @@ npm run dev:admin-frontend
 ### 主應用 (chat-app)
 
 1. **Backend** (`chat-app/backend/.env`)
+
    - 已配置連接真實 Firebase
    - Firebase Emulator 已關閉
 
@@ -87,6 +90,7 @@ npm run dev:admin-frontend
 ### 管理後台 (chat-app-admin)
 
 1. **Backend** (`chat-app-admin/backend/.env`)
+
    - 已配置連接真實 Firebase
    - 與主應用共用同一個 Firebase 專案
 
@@ -97,6 +101,7 @@ npm run dev:admin-frontend
 ## 主要功能
 
 ### 主應用 (chat-app)
+
 - 🤖 與 AI 角色實時對話
 - 🎤 TTS 語音播放
 - 📸 AI 生成角色照片
@@ -105,6 +110,7 @@ npm run dev:admin-frontend
 - 📊 使用限制管理
 
 ### 管理後台 (chat-app-admin)
+
 - 👥 用戶管理（查看、編輯、刪除）
 - 💰 會員等級管理
 - 🎁 禮物資產管理
@@ -123,6 +129,7 @@ npm run dev:admin-frontend
 ## 開發指南
 
 詳細的開發文檔請參閱：
+
 - [主應用文檔](./chat-app/CLAUDE.md)
 - [管理後台文檔](./chat-app-admin/README.md)
 - [專案總覽](./CLAUDE.md)
@@ -130,6 +137,7 @@ npm run dev:admin-frontend
 ## 故障排除
 
 ### Port 衝突
+
 如果遇到端口被占用的問題：
 
 ```bash
@@ -138,21 +146,19 @@ npm run cleanup-ports
 ```
 
 ### Firebase 連接問題
+
 確保 `.env` 文件中：
+
 - `USE_FIREBASE_EMULATOR=false`
 - Firebase Emulator 相關配置已註解
 
 ### 依賴問題
+
 重新安裝所有依賴：
 
 ```bash
 npm run install:all
 ```
-
-## 部署
-
-生產環境部署請參閱：
-- [部署指南](./chat-app/docs/DEPLOYMENT.md)
 
 ## 授權
 

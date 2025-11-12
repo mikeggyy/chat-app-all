@@ -20,6 +20,7 @@ import { fallbackMatches } from "../utils/matchFallback";
 import { useUserProfile } from "../composables/useUserProfile";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth";
 import { useGuestGuard } from "../composables/useGuestGuard";
+import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service";
 
 const router = useRouter();
 const { user, loadUserProfile, setUserProfile } = useUserProfile();
@@ -550,9 +551,14 @@ const loadMatches = async () => {
     const endpoint = currentUserId
       ? `/match/all?userId=${encodeURIComponent(currentUserId)}`
       : "/match/all";
-    const data = await apiJson(endpoint, {
-      skipGlobalLoading: true,
-    });
+
+    // 使用 API 緩存服務，5 分鐘緩存
+    const data = await apiCache.fetch(
+      cacheKeys.matches({ userId: currentUserId || 'guest' }),
+      () => apiJson(endpoint, { skipGlobalLoading: true }),
+      cacheTTL.MATCHES
+    );
+
     if (!Array.isArray(data) || data.length === 0) {
       throw new Error("尚未建立配對角色資料");
     }
@@ -571,6 +577,7 @@ const loadMatches = async () => {
       showMatchByIndex(0);
       error.value = "暫時無法連線至配對服務，已載入示範角色資料。";
       if (import.meta.env.DEV) {
+        console.error('載入匹配列表失敗:', err);
       }
     } else {
       matches.value = [];
@@ -594,7 +601,8 @@ watch(
 // Watch for user ID changes and load matches
 watch(
   () => user.value?.id,
-  (nextId) => {
+  async (nextId, prevId) => {
+    // 如果沒有用戶 ID（遊客模式）
     if (!nextId) {
       lastLoadedUserId = "";
       favoriteRequestState.lastUserId = "";
@@ -603,28 +611,47 @@ watch(
       return;
     }
 
-    favoriteError.value = "";
-
-    if (nextId !== lastLoadedUserId) {
-      lastLoadedUserId = nextId;
-      loadUserProfile(nextId, { skipGlobalLoading: true })
-        .catch((err) => {
-          if (import.meta.env.DEV) {
-          }
-        })
-        .finally(() => {
-          if (favoriteRequestState.lastUserId !== nextId) {
-            fetchFavoritesForCurrentUser({ skipGlobalLoading: true });
-          }
-          loadMatches();
-        });
+    // 如果 userId 沒變，不需要重新加載
+    if (nextId === prevId && nextId === lastLoadedUserId) {
       return;
     }
 
-    if (favoriteRequestState.lastUserId !== nextId) {
-      fetchFavoritesForCurrentUser({ skipGlobalLoading: true });
+    favoriteError.value = "";
+
+    // 新用戶 - 並行執行所有請求以提升性能
+    if (nextId !== lastLoadedUserId) {
+      lastLoadedUserId = nextId;
+
+      // 使用 Promise.allSettled 並行執行所有請求
+      // allSettled 確保即使某個請求失敗，其他請求仍會繼續執行
+      const [profileResult, favoritesResult, matchesResult] = await Promise.allSettled([
+        loadUserProfile(nextId, { skipGlobalLoading: true }),
+        favoriteRequestState.lastUserId !== nextId
+          ? fetchFavoritesForCurrentUser({ skipGlobalLoading: true })
+          : Promise.resolve(),
+        loadMatches()
+      ]);
+
+      // 記錄開發環境中的錯誤
+      if (import.meta.env.DEV) {
+        if (profileResult.status === 'rejected') {
+          console.warn('載入用戶資料失敗:', profileResult.reason);
+        }
+        if (favoritesResult.status === 'rejected') {
+          console.warn('載入收藏列表失敗:', favoritesResult.reason);
+        }
+        if (matchesResult.status === 'rejected') {
+          console.warn('載入匹配列表失敗:', matchesResult.reason);
+        }
+      }
+
+      return;
     }
-    loadMatches();
+
+    // 用戶 ID 相同，只需檢查收藏列表是否需要更新
+    if (favoriteRequestState.lastUserId !== nextId) {
+      await fetchFavoritesForCurrentUser({ skipGlobalLoading: true });
+    }
   },
   { immediate: true }
 );

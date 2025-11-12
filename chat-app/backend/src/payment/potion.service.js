@@ -9,6 +9,7 @@
 
 import { getFirestoreDb } from "../firebase/index.js";
 import { getUserById, upsertUser } from "../user/user.service.js";
+import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 import { POTION_CONFIG } from "../config/limits.js";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -314,43 +315,52 @@ export const purchaseBrainBoost = async (userId, options = {}) => {
  * @returns {Promise<object>} 使用結果
  */
 export const useMemoryBoost = async (userId, characterId) => {
-  const { potionInventory, activePotionEffects } = await getUserPotionData(userId);
-
-  // 檢查庫存
-  if (potionInventory.memoryBoost < 1) {
-    throw new Error("記憶增強藥水庫存不足");
-  }
-
-  // 檢查該角色是否已有激活的效果
-  const effectId = `memory_boost_${characterId}`;
-  const existingEffect = activePotionEffects[effectId];
-
-  if (existingEffect && isPotionEffectActive(existingEffect)) {
-    throw new Error("該角色已有記憶增強藥水效果，請等待過期後再使用");
-  }
-
-  // 扣除庫存並激活效果
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + POTION_CONFIG.MEMORY_BOOST.duration * 24 * 60 * 60 * 1000);
-
+  // ✅ 修復: 使用 Transaction 確保庫存檢查和扣除的原子性
   const userLimitRef = getUserLimitRef(userId);
-  await userLimitRef.set(
-    {
-      potionInventory: {
-        memoryBoost: FieldValue.increment(-1),
-      },
-      activePotionEffects: {
-        [effectId]: {
-          characterId,
-          potionType: "memory_boost",
-          activatedAt: now.toISOString(),
-          expiresAt: expiresAt.toISOString(),
+  const effectId = `memory_boost_${characterId}`;
+  let expiresAt;
+
+  await db.runTransaction(async (transaction) => {
+    // 1. 在 Transaction 內讀取數據
+    const doc = await transaction.get(userLimitRef);
+    const data = doc.exists ? doc.data() : {};
+    const potionInventory = data.potionInventory || { memoryBoost: 0 };
+    const activePotionEffects = data.activePotionEffects || {};
+
+    // 2. 在 Transaction 內檢查庫存
+    if (potionInventory.memoryBoost < 1) {
+      throw new Error("記憶增強藥水庫存不足");
+    }
+
+    // 3. 檢查該角色是否已有激活的效果
+    const existingEffect = activePotionEffects[effectId];
+    if (existingEffect && isPotionEffectActive(existingEffect)) {
+      throw new Error("該角色已有記憶增強藥水效果，請等待過期後再使用");
+    }
+
+    // 4. 在 Transaction 內扣除庫存並激活效果
+    const now = new Date();
+    expiresAt = new Date(now.getTime() + POTION_CONFIG.MEMORY_BOOST.duration * 24 * 60 * 60 * 1000);
+
+    transaction.set(
+      userLimitRef,
+      {
+        potionInventory: {
+          memoryBoost: FieldValue.increment(-1),
         },
+        activePotionEffects: {
+          [effectId]: {
+            characterId,
+            potionType: "memory_boost",
+            activatedAt: now.toISOString(),
+            expiresAt: expiresAt.toISOString(),
+          },
+        },
+        updatedAt: FieldValue.serverTimestamp(),
       },
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+      { merge: true }
+    );
+  });
 
   return {
     success: true,
@@ -368,43 +378,52 @@ export const useMemoryBoost = async (userId, characterId) => {
  * @returns {Promise<object>} 使用結果
  */
 export const useBrainBoost = async (userId, characterId) => {
-  const { potionInventory, activePotionEffects } = await getUserPotionData(userId);
-
-  // 檢查庫存
-  if (potionInventory.brainBoost < 1) {
-    throw new Error("腦力激盪藥水庫存不足");
-  }
-
-  // 檢查該角色是否已有激活的效果
-  const effectId = `brain_boost_${characterId}`;
-  const existingEffect = activePotionEffects[effectId];
-
-  if (existingEffect && isPotionEffectActive(existingEffect)) {
-    throw new Error("該角色已有腦力激盪藥水效果，請等待過期後再使用");
-  }
-
-  // 扣除庫存並激活效果
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + POTION_CONFIG.BRAIN_BOOST.duration * 24 * 60 * 60 * 1000);
-
+  // ✅ 修復: 使用 Transaction 確保庫存檢查和扣除的原子性
   const userLimitRef = getUserLimitRef(userId);
-  await userLimitRef.set(
-    {
-      potionInventory: {
-        brainBoost: FieldValue.increment(-1),
-      },
-      activePotionEffects: {
-        [effectId]: {
-          characterId,
-          potionType: "brain_boost",
-          activatedAt: now.toISOString(),
-          expiresAt: expiresAt.toISOString(),
+  const effectId = `brain_boost_${characterId}`;
+  let expiresAt;
+
+  await db.runTransaction(async (transaction) => {
+    // 1. 在 Transaction 內讀取數據
+    const doc = await transaction.get(userLimitRef);
+    const data = doc.exists ? doc.data() : {};
+    const potionInventory = data.potionInventory || { brainBoost: 0 };
+    const activePotionEffects = data.activePotionEffects || {};
+
+    // 2. 在 Transaction 內檢查庫存
+    if (potionInventory.brainBoost < 1) {
+      throw new Error("腦力激盪藥水庫存不足");
+    }
+
+    // 3. 檢查該角色是否已有激活的效果
+    const existingEffect = activePotionEffects[effectId];
+    if (existingEffect && isPotionEffectActive(existingEffect)) {
+      throw new Error("該角色已有腦力激盪藥水效果，請等待過期後再使用");
+    }
+
+    // 4. 在 Transaction 內扣除庫存並激活效果
+    const now = new Date();
+    expiresAt = new Date(now.getTime() + POTION_CONFIG.BRAIN_BOOST.duration * 24 * 60 * 60 * 1000);
+
+    transaction.set(
+      userLimitRef,
+      {
+        potionInventory: {
+          brainBoost: FieldValue.increment(-1),
         },
+        activePotionEffects: {
+          [effectId]: {
+            characterId,
+            potionType: "brain_boost",
+            activatedAt: now.toISOString(),
+            expiresAt: expiresAt.toISOString(),
+          },
+        },
+        updatedAt: FieldValue.serverTimestamp(),
       },
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
+      { merge: true }
+    );
+  });
 
   return {
     success: true,
@@ -419,7 +438,7 @@ export const useBrainBoost = async (userId, characterId) => {
  * 獲取用戶可購買的道具列表（考慮限制）
  */
 export const getAvailablePotions = async (userId) => {
-  const user = await getUserById(userId);
+  const user = await getUserProfileWithCache(userId);
   const userTier = user?.membershipTier || "free";
   const balance = user?.walletBalance || 0;
 

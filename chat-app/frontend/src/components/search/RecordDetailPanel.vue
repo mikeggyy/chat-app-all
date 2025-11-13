@@ -1,6 +1,7 @@
 <script setup>
 import { ArrowLeftIcon, ArrowRightIcon } from "@heroicons/vue/24/outline";
 import { HeartIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
+import LazyImage from '@/components/common/LazyImage.vue';
 
 const props = defineProps({
   isOpen: {
@@ -83,7 +84,13 @@ const handleEntryClick = (entry) => {
         </button>
 
         <div class="recent-records-hero__media" aria-hidden="true">
-          <img :src="heroImage" alt="" loading="lazy" />
+          <LazyImage
+            :src="heroImage"
+            alt=""
+            loading="eager"
+            root-margin="0px"
+            image-class="hero-image"
+          />
         </div>
 
         <div class="recent-records-hero__content">
@@ -109,7 +116,12 @@ const handleEntryClick = (entry) => {
         >
           <div class="recent-record-card__media">
             <div class="recent-record-card__media-frame">
-              <img :src="entry.image" :alt="entry.name" />
+              <LazyImage
+                :src="entry.image"
+                :alt="entry.name"
+                root-margin="150px"
+                image-class="record-card-image"
+              />
             </div>
           </div>
           <div class="recent-record-card__body">
@@ -338,7 +350,13 @@ const handleEntryClick = (entry) => {
   overflow: hidden;
   pointer-events: none;
 
-  img {
+  // ✅ P1 優化（2025-01）：LazyImage 支援
+  :deep(.lazy-image) {
+    width: 100%;
+    height: 100%;
+  }
+
+  :deep(.hero-image) {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -441,16 +459,22 @@ const handleEntryClick = (entry) => {
   place-items: center;
   border-radius: 26px;
   box-shadow: 0 20px 44px rgba(220, 172, 46, 0.38);
-}
 
-.recent-record-card__media img {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  border-radius: 20px;
-  object-fit: cover;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  // ✅ P1 優化（2025-01）：LazyImage 支援
+  :deep(.lazy-image) {
+    width: 100%;
+    border-radius: 20px;
+  }
+
+  :deep(.record-card-image) {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    object-fit: cover;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  }
 }
 
 .recent-record-card__body {

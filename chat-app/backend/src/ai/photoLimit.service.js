@@ -74,8 +74,23 @@ const getPhotoUnlockCards = async (userId) => {
  *   1. 如果 allowed=true，可以直接生成（不傳 usePhotoUnlockCard）
  *   2. 如果 allowed=false 但 allowedWithCard=true，提示用戶使用卡片
  *   3. 如果兩者都是 false，提示用戶購買卡片或升級會員
+ *
+ * ✅ P1-1 修復：檢查會員升級鎖定狀態，防止在升級期間拍照導致次數計算錯誤
  */
 export const canGeneratePhoto = async (userId) => {
+  // ✅ P1-1 修復：檢查是否正在升級會員
+  const { getFirestoreDb } = await import("../firebase/index.js");
+  const db = getFirestoreDb();
+  const usageLimitsRef = db.collection("usage_limits").doc(userId);
+  const usageLimitsDoc = await usageLimitsRef.get();
+
+  if (usageLimitsDoc.exists) {
+    const photoData = usageLimitsDoc.data()?.photos || {};
+    if (photoData.upgrading) {
+      throw new Error("會員升級處理中，請稍後再試（約需 3-5 秒）");
+    }
+  }
+
   // 1. 獲取基礎限制檢查結果
   const result = await photoLimitService.canUse(userId);
 

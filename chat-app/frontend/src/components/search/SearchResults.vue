@@ -1,4 +1,6 @@
 <script setup>
+import LazyImage from '@/components/common/LazyImage.vue';
+
 const props = defineProps({
   results: {
     type: Array,
@@ -66,7 +68,12 @@ const handleKeyup = (event, profile) => {
         @keyup.enter="(e) => handleKeyup(e, profile)"
       >
         <div class="result-media">
-          <img :src="profile.image" :alt="profile.name" />
+          <LazyImage
+            :src="profile.image"
+            :alt="profile.name"
+            root-margin="100px"
+            image-class="result-image"
+          />
         </div>
         <div class="result-body">
           <header class="result-header">
@@ -197,7 +204,13 @@ const handleKeyup = (event, profile) => {
     position: relative;
     box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.08);
 
-    img {
+    // ✅ P1 優化（2025-01）：LazyImage 支援
+    :deep(.lazy-image) {
+      width: 100%;
+      height: 100%;
+    }
+
+    :deep(.result-image) {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -285,7 +298,7 @@ const handleKeyup = (event, profile) => {
       padding-top: 100%;
       border-radius: 16px;
 
-      img {
+      :deep(.result-image) {
         position: absolute;
         inset: 0;
       }

@@ -21,6 +21,7 @@ import {
   TRANSACTION_TYPES as TX_TYPES
 } from "./transaction.service.js";
 import { getFirestoreDb } from "../firebase/index.js";
+import { FieldValue } from "firebase-admin/firestore";
 import logger from "../utils/logger.js";
 
 // 緩存 AI 功能價格和金幣套餐（避免重複查詢 Firestore）
@@ -243,6 +244,7 @@ export const addCoins = async (userId, amount, type, description, metadata = {})
 
 /**
  * 購買角色無限對話解鎖（使用角色解鎖票或金幣）
+ * ✅ P1-3 修復：檢查角色是否已解鎖，避免重複購買
  */
 export const purchaseUnlimitedChat = async (userId, characterId, options = {}) => {
   const user = await getUserById(userId);
@@ -250,58 +252,141 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
     throw new Error("找不到用戶");
   }
 
-  // 檢查是否有角色解鎖票
-  const ticketBalance = await getTicketBalance(userId);
-  const useTicket = options.useTicket !== false; // 預設使用解鎖票
+  const db = getFirestoreDb();
 
-  if (useTicket && ticketBalance.characterUnlockCards > 0) {
-    // 使用角色解鎖票
-    await useCharacterUnlockTicket(userId, characterId);
-
-    // 永久解鎖該角色的對話
-    unlockPermanently(userId, characterId);
-
-    return {
-      success: true,
-      featureId: "character_unlock_ticket",
-      characterId,
-      cost: 0,
-      paymentMethod: "unlock_ticket",
-      remainingTickets: ticketBalance.characterUnlockCards - 1,
-      permanent: true,
-    };
-  }
-
-  // 如果沒有解鎖票，使用金幣購買
+  // 獲取價格配置（在 Transaction 外）
   const aiFeaturePrices = await getAiFeaturePricesFromFirestore();
   const feature = aiFeaturePrices.character_unlock_ticket || aiFeaturePrices.characterUnlockTicket;
-
   if (!feature) {
     throw new Error("找不到角色解鎖票價格配置");
   }
 
-  const result = await deductCoins(
-    userId,
-    feature.basePrice,
-    `${feature.description} - ${characterId}`,
-    {
-      featureId: feature.id,
-      characterId,
+  // 檢查是否使用解鎖票（在 Transaction 外）
+  const ticketBalance = await getTicketBalance(userId);
+  const useTicket = options.useTicket !== false; // 預設使用解鎖票
+
+  // ✅ P1-3 Critical 修復：使用 Transaction 確保原子性
+  // 將檢查、扣款、解鎖三個操作放在同一個 Transaction 內
+  let result;
+
+  await db.runTransaction(async (transaction) => {
+    // 1. 在 Transaction 內讀取最新狀態
+    const limitRef = db.collection("usage_limits").doc(userId);
+    const limitDoc = await transaction.get(limitRef);
+
+    const conversationLimit = limitDoc.exists
+      ? limitDoc.data()?.conversation?.[characterId]
+      : null;
+
+    // 2. 檢查是否已永久解鎖（在 Transaction 內）
+    if (conversationLimit?.permanentUnlock) {
+      throw new Error("該角色已永久解鎖，無需重複購買");
     }
-  );
 
-  // 永久解鎖該角色的對話
-  unlockPermanently(userId, characterId);
+    // 提示用戶是否有臨時解鎖（可選）
+    if (conversationLimit?.temporaryUnlockUntil) {
+      const expiryDate = new Date(conversationLimit.temporaryUnlockUntil);
+      if (expiryDate > new Date()) {
+        logger.info(
+          `[角色解鎖] 用戶 ${userId} 購買永久解鎖，當前有臨時解鎖至 ${expiryDate.toISOString()}`
+        );
+      }
+    }
 
-  return {
-    success: true,
-    featureId: feature.id,
-    characterId,
-    cost: feature.basePrice,
-    paymentMethod: "coins",
-    balance: result.newBalance,
-    permanent: true,
-  };
+    // 3. 使用解鎖票或金幣
+    if (useTicket && ticketBalance.characterUnlockCards > 0) {
+      // 使用解鎖票（在 Transaction 內扣除）
+      const userRef = db.collection("users").doc(userId);
+      const userDoc = await transaction.get(userRef);
+      const userData = userDoc.data();
+
+      const currentTickets = userData.unlockTickets?.characterUnlockCards || 0;
+      if (currentTickets < 1) {
+        throw new Error("解鎖票不足");
+      }
+
+      transaction.update(userRef, {
+        "unlockTickets.characterUnlockCards": currentTickets - 1,
+        updatedAt: new Date().toISOString(),
+      });
+
+      result = {
+        success: true,
+        featureId: "character_unlock_ticket",
+        characterId,
+        cost: 0,
+        paymentMethod: "unlock_ticket",
+        remainingTickets: currentTickets - 1,
+        permanent: true,
+      };
+    } else {
+      // 使用金幣（在 Transaction 內扣除）
+      const userRef = db.collection("users").doc(userId);
+      const userDoc = await transaction.get(userRef);
+      const userData = userDoc.data();
+
+      const currentBalance = getWalletBalance(userData);
+      if (currentBalance < feature.basePrice) {
+        throw new Error(`金幣不足，需要 ${feature.basePrice}，當前餘額 ${currentBalance}`);
+      }
+
+      const newBalance = currentBalance - feature.basePrice;
+
+      // 更新用戶餘額
+      transaction.update(userRef, {
+        ...createWalletUpdate(newBalance),
+        updatedAt: new Date().toISOString(),
+      });
+
+      // 創建交易記錄
+      const transactionRef = db.collection("transactions").doc();
+      transaction.set(transactionRef, {
+        userId,
+        type: "purchase",
+        amount: -feature.basePrice,
+        description: `${feature.description} - ${characterId}`,
+        metadata: {
+          featureId: feature.id,
+          characterId,
+        },
+        balanceBefore: currentBalance,
+        balanceAfter: newBalance,
+        status: "completed",
+        createdAt: new Date().toISOString(),
+      });
+
+      result = {
+        success: true,
+        featureId: feature.id,
+        characterId,
+        cost: feature.basePrice,
+        paymentMethod: "coins",
+        balance: newBalance,
+        permanent: true,
+      };
+    }
+
+    // 4. 永久解鎖（在 Transaction 內）
+    const newConversationLimit = {
+      ...conversationLimit,
+      permanentUnlock: true,
+      unlockedAt: new Date().toISOString(),
+    };
+
+    transaction.set(
+      limitRef,
+      {
+        conversation: {
+          [characterId]: newConversationLimit,
+        },
+      },
+      { merge: true }
+    );
+
+    logger.info(`[角色解鎖] ✅ Transaction 完成 - 用戶 ${userId} 永久解鎖角色 ${characterId}`);
+  });
+
+  return result;
 };
 
 /**

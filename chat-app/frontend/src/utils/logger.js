@@ -21,7 +21,7 @@ const handleProductionError = (...args) => {
   }
 };
 
-export const logger = {
+const logger = {
   /**
    * 一般日誌 - 僅開發環境
    */
@@ -55,3 +55,7 @@ export const logger = {
     if (isDev) console.debug(...args);
   },
 };
+
+// 同時提供命名導出和默認導出
+export { logger };
+export default logger;

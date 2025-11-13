@@ -53,6 +53,10 @@ export const TEST_ACCOUNT_LIMITS = {
 
 /**
  * 對話限制配置
+ *
+ * ✅ P1-1 修復：明確定義重置周期
+ * - 實際實現：conversationLimit.service.js 使用 RESET_PERIOD.DAILY
+ * - 對話次數每日凌晨重置（提升用戶體驗）
  */
 export const CONVERSATION_LIMITS = {
   // 免費用戶每個角色的對話次數
@@ -81,10 +85,17 @@ export const CONVERSATION_LIMITS = {
 
   // VVIP 用戶每次廣告解鎖的對話次數
   VVIP_UNLOCKED_PER_AD: 20,
+
+  // ✅ P1-1 修復：重置週期（與 conversationLimit.service.js 一致）
+  RESET_PERIOD: "daily", // 每日凌晨重置
 };
 
 /**
  * 語音限制配置
+ *
+ * ✅ P1-1 修復：明確定義重置周期
+ * - 實際實現：voiceLimit.service.js 使用 RESET_PERIOD.DAILY
+ * - 語音次數每日凌晨重置（提升用戶體驗）
  */
 export const VOICE_LIMITS = {
   // 免費用戶每個角色的語音次數
@@ -98,6 +109,9 @@ export const VOICE_LIMITS = {
 
   // 付費會員無限語音（用 -1 表示）
   PAID_UNLIMITED: -1,
+
+  // ✅ P1-1 修復：重置週期（與 voiceLimit.service.js 一致）
+  RESET_PERIOD: "daily", // 每日凌晨重置
 };
 
 /**

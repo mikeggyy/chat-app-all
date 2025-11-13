@@ -317,36 +317,29 @@ export const getTicketBalance = async (userId, ticketType) => {
     throw new Error("找不到用戶");
   }
 
-  // 根據券類型檢查餘額
+  // ✅ Quick Win #2: 統一從 assets 讀取所有卡片數據
+  // 所有寫入操作都寫到 assets.*Cards (見 membership.service.js)
+  // 為了數據一致性，讀取也統一從 assets 讀取
   let balance = 0;
 
   switch (ticketType) {
     case TICKET_TYPES.CHARACTER:
-      // 檢查多個位置
-      if (user?.unlockTickets?.characterUnlockCards > 0) {
-        balance = user.unlockTickets.characterUnlockCards;
-      } else if (user?.assets?.characterUnlockCards > 0) {
-        balance = user.assets.characterUnlockCards;
-      } else if (user?.characterUnlockCards > 0) {
-        balance = user.characterUnlockCards;
-      }
+      // ✅ 統一從 assets 讀取（移除舊的 unlockTickets 和直接掛在 user 上的字段）
+      balance = user?.assets?.characterUnlockCards || 0;
       break;
 
     case TICKET_TYPES.PHOTO:
-      if (user?.unlockTickets?.photoUnlockCards > 0) {
-        balance = user.unlockTickets.photoUnlockCards;
-      } else if (user?.assets?.photoUnlockCards > 0) {
-        balance = user.assets.photoUnlockCards;
-      } else if (user?.photoUnlockCards > 0) {
-        balance = user.photoUnlockCards;
-      }
+      // ✅ 統一從 assets 讀取
+      balance = user?.assets?.photoUnlockCards || 0;
       break;
 
     case TICKET_TYPES.VIDEO:
+      // ✅ 統一從 assets 讀取
       balance = user?.assets?.videoUnlockCards || 0;
       break;
 
     case TICKET_TYPES.VOICE:
+      // ✅ 統一從 assets 讀取
       balance = user?.assets?.voiceUnlockCards || 0;
       break;
 

@@ -177,8 +177,29 @@
 - **成本控制**: 圖片/影片生成增加大小/長度限制，減少意外高額費用
 - **監控系統**: 全新的 API 成本監控和預警機制，實時掌握支出
 
+#### 緊急修復 (2025-11-13 晚上)
+- **修復 FieldValue 導入缺失** (`backend/src/payment/coins.service.js`)
+  - ✅ 添加 `import { FieldValue } from "firebase-admin/firestore";`
+  - 修復退款功能運行時錯誤（`ReferenceError: FieldValue is not defined`）
+  - 退款功能現在可以正常工作
+
+- **統一使用 UTC+8 時區** (`backend/src/services/limitService/limitReset.js`)
+  - ✅ 新增 `getUTC8Date()` 和 `getUTC8Month()` 輔助函數
+  - ✅ 所有每日重置邏輯改為基於 UTC+8 時區（台灣時間）
+  - ✅ 台灣用戶重置時間：午夜 00:00（本地時間）✨ 最佳體驗
+  - ✅ 月度重置同樣基於 UTC+8 時區
+  - **影響**:
+    - 🇹🇼 台灣 (UTC+8): 午夜 00:00 重置 ✅
+    - 🇨🇳 中國 (UTC+8): 午夜 00:00 重置 ✅
+    - 🇬🇧 英國 (UTC+0): 下午 16:00 重置
+    - 🇺🇸 美東 (UTC-5): 上午 11:00 重置
+    - 🇯🇵 日本 (UTC+9): 凌晨 01:00 重置
+  - **測試**: 新增 `backend/scripts/test-utc8-timezone.js`，所有測試通過 ✅
+
 #### 待完成任務
 - [ ] 測試所有新功能（會員過期、退款流程、限制重置、成本監控）
+- [x] 修復退款功能的 FieldValue 錯誤
+- [x] 統一時區邏輯為 UTC+8
 - [ ] 管理後台整合（語音次數編輯功能確認）
 - [ ] 部署 Firestore 索引：`firebase deploy --only firestore:indexes`
 

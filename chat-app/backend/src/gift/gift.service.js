@@ -43,7 +43,7 @@ const calculateGiftPrice = (giftId, membershipTier) => {
 
 /**
  * 送禮物給角色
- * ✅ 修復：使用 deductCoins 服務（已有 Transaction 保護）
+ * ✅ P1-2 修復：將所有操作合併到單一 Transaction 中，確保原子性
  */
 export const sendGift = async (userId, characterId, giftId) => {
   // 驗證禮物是否存在
@@ -64,60 +64,75 @@ export const sendGift = async (userId, characterId, giftId) => {
   const tier = await getUserTier(userId);
   const pricing = calculateGiftPrice(giftId, tier);
 
-  // ✅ 修復：使用 deductCoins 服務（已有 Transaction 和餘額檢查）
-  const deductResult = await deductCoins(
-    userId,
-    pricing.finalPrice,
-    `送禮物：${gift.name} 給角色 ${characterId}`,
-    {
-      type: "gift",
-      giftId,
-      characterId,
-      pricing,
-    }
-  );
-
-  // 記錄到 Firestore（持久化）
+  // ✅ P1-2 修復：使用單一 Transaction 執行所有操作
   const db = getFirestoreDb();
+  const userRef = db.collection("users").doc(userId);
   const giftRecordRef = db.collection("gift_transactions").doc();
-
-  await giftRecordRef.set({
-    id: giftRecordRef.id,
-    userId,
-    characterId,
-    giftId,
-    giftName: gift.name,
-    giftEmoji: gift.emoji,
-    cost: pricing.finalPrice,
-    basePrice: pricing.basePrice,
-    discount: pricing.discount,
-    saved: pricing.saved,
-    membershipTier: tier,
-    timestamp: FieldValue.serverTimestamp(),
-    status: "completed",
-    previousBalance: deductResult.previousBalance,
-    newBalance: deductResult.newBalance,
-  });
-
-  // 更新角色收到的禮物統計（在用戶文檔的子集合中）
   const characterGiftStatsRef = db
     .collection("users")
     .doc(userId)
     .collection("character_gift_stats")
     .doc(characterId);
+  const transactionRef = db.collection("transactions").doc();
+
+  let result = null;
 
   await db.runTransaction(async (transaction) => {
-    const statsDoc = await transaction.get(characterGiftStatsRef);
+    // 1. 讀取用戶資料（在 Transaction 內重新讀取以確保最新）
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) {
+      throw new Error("找不到用戶");
+    }
 
-    let stats = statsDoc.exists ? statsDoc.data() : {
+    const userData = userDoc.data();
+    const { getWalletBalance, createWalletUpdate } = await import("../user/walletHelpers.js");
+    const currentBalance = getWalletBalance(userData);
+
+    // 2. 檢查餘額是否足夠
+    if (currentBalance < pricing.finalPrice) {
+      throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${pricing.finalPrice}`);
+    }
+
+    const newBalance = currentBalance - pricing.finalPrice;
+
+    // 3. 在同一事務中更新用戶餘額
+    const walletUpdate = createWalletUpdate(newBalance);
+    transaction.update(userRef, {
+      ...walletUpdate,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 4. 創建禮物記錄
+    transaction.set(giftRecordRef, {
+      id: giftRecordRef.id,
       userId,
       characterId,
-      gifts: {},
-      totalGifts: 0,
-      totalSpent: 0,
-    };
+      giftId,
+      giftName: gift.name,
+      giftEmoji: gift.emoji,
+      cost: pricing.finalPrice,
+      basePrice: pricing.basePrice,
+      discount: pricing.discount,
+      saved: pricing.saved,
+      membershipTier: tier,
+      timestamp: FieldValue.serverTimestamp(),
+      status: "completed",
+      previousBalance: currentBalance,
+      newBalance: newBalance,
+    });
 
-    // 更新統計
+    // 5. 更新禮物統計
+    const statsDoc = await transaction.get(characterGiftStatsRef);
+    let stats = statsDoc.exists
+      ? statsDoc.data()
+      : {
+          userId,
+          characterId,
+          gifts: {},
+          totalGifts: 0,
+          totalSpent: 0,
+        };
+
     if (!stats.gifts[giftId]) {
       stats.gifts[giftId] = {
         count: 0,
@@ -134,23 +149,46 @@ export const sendGift = async (userId, characterId, giftId) => {
     stats.updatedAt = FieldValue.serverTimestamp();
 
     transaction.set(characterGiftStatsRef, stats);
+
+    // 6. 創建交易記錄
+    const { TRANSACTION_TYPES } = await import("../payment/coins.service.js");
+    transaction.set(transactionRef, {
+      id: transactionRef.id,
+      userId,
+      type: TRANSACTION_TYPES.SPEND,
+      amount: pricing.finalPrice,
+      description: `送禮物：${gift.name} 給角色 ${characterId}`,
+      metadata: {
+        type: "gift",
+        giftId,
+        characterId,
+        pricing,
+      },
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      status: "completed",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // 設置返回結果
+    result = {
+      success: true,
+      transactionId: giftRecordRef.id,
+      gift: {
+        id: gift.id,
+        name: gift.name,
+        emoji: gift.emoji,
+      },
+      pricing,
+      previousBalance: currentBalance,
+      newBalance: newBalance,
+      thankYouMessage: gift.thankYouMessage,
+    };
   });
 
   logger.info(`[禮物] 用戶 ${userId} 送禮物 ${gift.name} 給角色 ${characterId}，花費 ${pricing.finalPrice} 金幣`);
 
-  return {
-    success: true,
-    transactionId: giftRecordRef.id,
-    gift: {
-      id: gift.id,
-      name: gift.name,
-      emoji: gift.emoji,
-    },
-    pricing,
-    previousBalance: deductResult.previousBalance,
-    newBalance: deductResult.newBalance,
-    thankYouMessage: gift.thankYouMessage,
-  };
+  return result;
 };
 
 /**

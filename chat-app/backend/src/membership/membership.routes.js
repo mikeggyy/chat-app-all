@@ -14,6 +14,7 @@ import {
   renewMembership,
   checkFeatureAccess,
   getUserFeatures,
+  clearMembershipConfigCache, // ✅ Quick Win #4: 添加手動清除緩存功能
 } from "./membership.service.js";
 import { getUserById } from "../user/user.service.js";
 import {
@@ -238,6 +239,43 @@ router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwner
     const features = await getUserFeatures(userId);
 
     sendSuccess(res, features);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * ✅ Quick Win #4: 手動清除會員配置緩存
+ * POST /api/membership/admin/clear-cache
+ * Body: { tier?: "free" | "vip" | "vvip" } - 不提供則清除所有緩存
+ * 🔒 需要開發模式或管理員權限
+ */
+router.post("/api/membership/admin/clear-cache", requireFirebaseAuth, standardRateLimiter, async (req, res, next) => {
+  try {
+    const userId = req.firebaseUser.uid;
+    const { tier } = req.body;
+
+    // ✅ 驗證權限（開發模式或測試帳號）
+    try {
+      validateDevModeBypass(userId, {
+        featureName: "清除會員配置緩存",
+        requireTestAccount: true,
+      });
+
+      logger.info(`[會員配置緩存] 手動清除緩存請求 - userId: ${userId}, tier: ${tier || 'all'}`);
+
+      // 清除緩存
+      clearMembershipConfigCache(tier);
+
+      sendSuccess(res, {
+        message: tier ? `已清除 ${tier} 等級的配置緩存` : "已清除所有會員配置緩存",
+        tier: tier || "all",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error(`[安全] 清除緩存權限驗證失敗: ${error.message}`);
+      return sendError(res, "FORBIDDEN", error.message);
+    }
   } catch (error) {
     next(error);
   }

@@ -8,12 +8,12 @@
     @click="$emit('click', photo)"
   >
     <!-- 圖片 -->
-    <img
+    <LazyImage
       v-if="photo.imageUrl"
       :src="photo.imageUrl"
       :alt="`${alt}的照片`"
-      class="photo-image"
-      loading="lazy"
+      root-margin="200px"
+      image-class="photo-image"
     />
     <!-- 影片縮略圖（使用 video 標籤的第一幀） -->
     <video
@@ -61,6 +61,8 @@
 </template>
 
 <script setup>
+import LazyImage from '@/components/common/LazyImage.vue';
+
 defineProps({
   photo: {
     type: Object,
@@ -102,6 +104,12 @@ defineEmits(['click', 'toggle-selection']);
 .photo-card--selected {
   outline: 3px solid #ff4d8f;
   outline-offset: -3px;
+}
+
+/* ✅ P1 優化（2025-01）：LazyImage 支援 */
+.photo-card :deep(.lazy-image) {
+  width: 100%;
+  height: 100%;
 }
 
 .photo-image {

@@ -47,14 +47,143 @@ export const recordMessage = async (userId, characterId) => {
 
 /**
  * 透過觀看廣告解鎖額外對話次數
+ *
+ * ✅ 安全性增強 - 添加基本防護機制（2025-01-13）
+ *
+ * 已實現的防護：
+ * - ✅ 每日廣告次數限制檢查（10 次/天）
+ * - ✅ 冷卻時間檢查（60 秒）
+ * - ✅ adId 格式驗證
+ * - ✅ 防止重放攻擊（adId 去重）
+ * - ✅ 記錄廣告觀看歷史
+ *
+ * 待 Google AdMob 整合後增強：
+ * - ⏳ 真實廣告驗證（需 AdMob SDK）
+ * - ⏳ 觀看時長驗證（通過 AdMob 回調）
  */
 export const unlockByAd = async (userId, characterId, adId) => {
-  // 從會員配置中獲取解鎖參數
-  const tier = await getUserTier(userId);
-  const membershipConfig = MEMBERSHIP_TIERS[tier];
-  const unlockedAmount = membershipConfig?.features?.unlockedMessagesPerAd ?? 5;
+  const { getFirestoreDb } = await import("../firebase/index.js");
+  const { FieldValue } = await import("firebase-admin/firestore");
+  const { logger } = await import("../utils/logger.js");
+  const db = getFirestoreDb();
 
-  return await conversationLimitService.unlockByAd(userId, unlockedAmount, characterId);
+  // ✅ P0-1 High 修復：使用 Transaction 確保原子性
+  // 防止併發請求導致計數錯誤
+  let unlockResult;
+
+  await db.runTransaction(async (transaction) => {
+    const adStatsRef = db.collection("ad_watch_stats").doc(userId);
+
+    // 1. 在 Transaction 內讀取用戶廣告觀看統計
+    const statsDoc = await transaction.get(adStatsRef);
+    const statsData = statsDoc.exists ? statsDoc.data() : {};
+
+    // 2. 檢查每日廣告次數限制（10 次/天）
+    const today = new Date().toISOString().split("T")[0];
+    const todayCount = statsData[today] || 0;
+    const DAILY_AD_LIMIT = 10;
+
+    if (todayCount >= DAILY_AD_LIMIT) {
+      throw new Error(`今日廣告觀看次數已達上限（${DAILY_AD_LIMIT} 次），請明天再來`);
+    }
+
+    // 3. 檢查冷卻時間（60 秒）
+    const lastWatchTime = statsData.lastWatchTime || 0;
+    const COOLDOWN_SECONDS = 60;
+    const cooldownRemaining = Math.ceil((lastWatchTime + COOLDOWN_SECONDS * 1000 - Date.now()) / 1000);
+
+    if (cooldownRemaining > 0) {
+      throw new Error(`請等待 ${cooldownRemaining} 秒後再觀看下一個廣告`);
+    }
+
+    // 4. 簡單的 adId 格式驗證
+    // 預期格式：ad-{timestamp}-{random8}，例如 ad-1705123456789-a1b2c3d4
+    if (!adId || !adId.match(/^ad-\d{13}-[a-z0-9]{8}$/)) {
+      throw new Error("無效的廣告 ID 格式");
+    }
+
+    // 5. 檢查 adId 是否已使用過（防止重放攻擊）
+    const usedAdIds = statsData.usedAdIds || [];
+    if (usedAdIds.includes(adId)) {
+      throw new Error("該廣告獎勵已領取，請勿重複領取");
+    }
+
+    // 6. 在 Transaction 內記錄廣告觀看
+    transaction.set(
+      adStatsRef,
+      {
+        [today]: todayCount + 1,
+        lastWatchTime: Date.now(),
+        usedAdIds: [...usedAdIds.slice(-100), adId], // 只保留最近 100 個 adId
+        lastAdId: adId,
+        lastCharacterId: characterId,
+        totalAdsWatched: (statsData.totalAdsWatched || 0) + 1,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // 從會員配置中獲取解鎖參數
+    const tier = await getUserTier(userId);
+    const membershipConfig = MEMBERSHIP_TIERS[tier];
+    const unlockedAmount = membershipConfig?.features?.unlockedMessagesPerAd ?? 5;
+
+    logger.info(`[廣告解鎖] Transaction 內驗證通過 - 用戶 ${userId} 觀看廣告解鎖對話`, {
+      characterId,
+      adId: adId.substring(0, 20) + "...", // 只記錄部分 adId
+      todayCount: todayCount + 1,
+      unlockedAmount,
+    });
+
+    // 7. 在 Transaction 內解鎖對話
+    const limitRef = db.collection("usage_limits").doc(userId);
+    const limitDoc = await transaction.get(limitRef);
+    const limitData = limitDoc.exists ? limitDoc.data() : {};
+
+    const conversationLimit = limitData.conversation?.[characterId] || {
+      count: 0,
+      lastReset: new Date().toISOString().split("T")[0],
+    };
+
+    // 增加解鎖次數
+    conversationLimit.count = (conversationLimit.count || 0) + unlockedAmount;
+    conversationLimit.lastUnlockedByAd = new Date().toISOString();
+
+    transaction.set(
+      limitRef,
+      {
+        conversation: {
+          [characterId]: conversationLimit,
+        },
+      },
+      { merge: true }
+    );
+
+    unlockResult = {
+      success: true,
+      unlockedAmount,
+      newCount: conversationLimit.count,
+      characterId,
+    };
+
+    logger.info(`[廣告解鎖] ✅ Transaction 完成 - 用戶 ${userId} 解鎖 ${unlockedAmount} 次對話`);
+  });
+
+  // Transaction 完成後，異步記錄監控事件（不阻塞響應）
+  // ✅ P0-1 監控：記錄廣告觀看事件並檢測異常
+  try {
+    const { recordAdWatchEvent } = await import("../services/adWatchMonitor.service.js");
+    await recordAdWatchEvent(userId, characterId, adId, {
+      // 可選：從 request 中獲取 IP 和 User-Agent
+      // ip: req.ip,
+      // userAgent: req.headers['user-agent'],
+    });
+  } catch (error) {
+    // 監控失敗不應影響主流程
+    logger.error(`[廣告監控] 記錄廣告觀看事件失敗:`, error);
+  }
+
+  return unlockResult;
 };
 
 /**

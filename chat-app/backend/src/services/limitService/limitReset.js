@@ -3,6 +3,7 @@
  * 修復內容：
  * ✅ 分離基礎限制（永不重置）和廣告解鎖（每日重置）的邏輯
  * ✅ 對話/語音限制：基礎次數永不重置，但廣告解鎖次數每日重置
+ * ✅ 統一使用 UTC+8 時區（台灣時間）進行每日重置
  */
 
 import logger from "../../utils/logger.js";
@@ -14,8 +15,34 @@ export const RESET_PERIOD = {
 };
 
 /**
+ * 獲取 UTC+8 時區的當前日期（YYYY-MM-DD 格式）
+ * 用於統一的每日重置邏輯
+ *
+ * @returns {string} UTC+8 時區的日期字符串（例如："2025-01-13"）
+ */
+const getUTC8Date = () => {
+  const now = new Date();
+  // 獲取 UTC 時間戳並加上 8 小時（28800000 毫秒）
+  const utc8Time = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  // 返回 YYYY-MM-DD 格式
+  return utc8Time.toISOString().split("T")[0];
+};
+
+/**
+ * 獲取 UTC+8 時區的當前月份（YYYY-MM 格式）
+ *
+ * @returns {string} UTC+8 時區的月份字符串（例如："2025-01"）
+ */
+const getUTC8Month = () => {
+  const now = new Date();
+  const utc8Time = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return utc8Time.toISOString().slice(0, 7);
+};
+
+/**
  * 檢查並執行基礎限制的重置
  * （對話/語音的基礎限制永不重置，照片限制按原有邏輯）
+ * ✅ 使用 UTC+8 時區（台灣時間）進行每日重置
  *
  * @param {Object} limitData - 限制數據
  * @param {string} resetPeriod - 重置週期
@@ -30,24 +57,24 @@ export const checkAndResetBaseLimit = (limitData, resetPeriod) => {
   }
 
   const now = new Date();
-  const currentDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
+  const currentDate = getUTC8Date(); // ✅ 使用 UTC+8 時區日期
   const lastResetDate = limitData.lastResetDate;
 
   let shouldReset = false;
 
   if (resetPeriod === RESET_PERIOD.DAILY) {
-    // 每日重置：檢查是否跨天
+    // 每日重置：檢查是否跨天（UTC+8 時區）
     shouldReset = lastResetDate !== currentDate;
   } else if (resetPeriod === RESET_PERIOD.MONTHLY) {
-    // 每月重置：檢查是否跨月
-    const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
+    // 每月重置：檢查是否跨月（UTC+8 時區）
+    const currentMonth = getUTC8Month();
     const lastResetMonth = lastResetDate ? lastResetDate.slice(0, 7) : null;
     shouldReset = lastResetMonth !== currentMonth;
   }
 
   if (shouldReset) {
     logger.info(
-      `[限制重置] 重置基礎限制: resetPeriod=${resetPeriod}, lastResetDate=${lastResetDate}, currentDate=${currentDate}`
+      `[限制重置] 重置基礎限制 (UTC+8): resetPeriod=${resetPeriod}, lastResetDate=${lastResetDate}, currentDate=${currentDate}`
     );
 
     // ⚠️ 注意：只重置 count（基礎使用次數）
@@ -65,6 +92,7 @@ export const checkAndResetBaseLimit = (limitData, resetPeriod) => {
 /**
  * 檢查並重置廣告解鎖次數（每日重置）
  * ✅ 修復：不再重置 unlocked 字段，改為清理過期的解鎖記錄
+ * ✅ 使用 UTC+8 時區（台灣時間）進行每日重置
  *
  * 說明：
  * - 廣告解鎖現在使用獨立的 24 小時過期時間（unlockHistory）
@@ -77,15 +105,15 @@ export const checkAndResetAdUnlocks = (limitData) => {
   if (!limitData) return false;
 
   const now = new Date();
-  const currentDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
+  const currentDate = getUTC8Date(); // ✅ 使用 UTC+8 時區日期
   const lastAdResetDate = limitData.lastAdResetDate;
 
-  // 檢查是否跨天
+  // 檢查是否跨天（UTC+8 時區）
   const shouldReset = lastAdResetDate !== currentDate;
 
   if (shouldReset) {
     logger.info(
-      `[限制重置] 重置廣告統計數據: lastAdResetDate=${lastAdResetDate}, currentDate=${currentDate}`
+      `[限制重置] 重置廣告統計數據 (UTC+8): lastAdResetDate=${lastAdResetDate}, currentDate=${currentDate}`
     );
 
     // ✅ 修復：清理過期的解鎖記錄（基於獨立過期時間）
@@ -137,13 +165,14 @@ export const checkAndResetAll = (limitData, resetPeriod) => {
 
 /**
  * 初始化限制數據（如果不存在）
+ * ✅ 使用 UTC+8 時區（台灣時間）作為初始日期
  *
  * @param {string} resetPeriod - 重置週期
  * @returns {Object} 初始化的限制數據
  */
 export const createLimitData = (resetPeriod) => {
   const now = new Date();
-  const currentDate = now.toISOString().split("T")[0];
+  const currentDate = getUTC8Date(); // ✅ 使用 UTC+8 時區日期
 
   return {
     count: 0, // 基礎使用次數

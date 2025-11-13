@@ -8,7 +8,9 @@ validateEnvOrExit();
 
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import logger, { httpLogger } from "./utils/logger.js";
+import { setCsrfToken, getCsrfTokenHandler, csrfProtection } from "../../../shared/backend-utils/csrfProtection.js";
 import { userRouter } from "./user/index.js";
 import { conversationRouter } from "./conversation/index.js";
 import { aiRouter } from "./ai/index.js";
@@ -34,6 +36,7 @@ import assetPurchaseRouter from "./user/assetPurchase.routes.js";
 import assetPackagesRouter from "./user/assetPackages.routes.js";
 import shopRouter from "./shop/shop.routes.js";
 import aiSettingsRouter from "./ai/aiSettings.routes.js";
+import cronRouter from "./routes/cron.routes.js";
 import { cleanupInactiveUsers, getAllUsers } from "./user/user.service.js";
 import { conversationLimitService } from "./conversation/conversationLimit.service.js";
 import { voiceLimitService } from "./ai/voiceLimit.service.js";
@@ -77,9 +80,36 @@ app.use(
 // HTTP 請求日誌
 app.use(httpLogger);
 
-// 增加 JSON payload 限制以支持 base64 圖片數據
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+// 🔒 P0 優化（2025-01）：請求大小限制（防止 DoS 攻擊）
+// 調整為 10MB（足夠支持 base64 圖片，但更安全）
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// 🔒 P0 優化（2025-01）：CSRF 保護
+app.use(cookieParser());
+app.use(setCsrfToken());
+
+// CSRF Token 獲取端點（GET 請求，無需 CSRF 保護）
+app.get('/api/csrf-token', getCsrfTokenHandler);
+
+// 對所有 POST/PUT/DELETE 請求應用 CSRF 保護
+// 跳過公開端點（如登入、註冊等）
+app.use((req, res, next) => {
+  const publicPaths = [
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/test-session',
+  ];
+
+  const isPublicPath = publicPaths.some(path => req.path.startsWith(path));
+  const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
+
+  if (isWriteMethod && !isPublicPath) {
+    return csrfProtection()(req, res, next);
+  }
+
+  next();
+});
 
 app.use("/api/users", userRouter);
 app.use("/api/conversations", conversationRouter);
@@ -109,6 +139,9 @@ app.use("/api/character-styles", characterStylesRouter);
 app.use(assetPurchaseRouter);
 app.use(assetPackagesRouter);
 app.use(shopRouter);
+
+// 定時任務路由（Cloud Scheduler）
+app.use("/api/cron", cronRouter);
 
 app.get("/health", (_, res) => {
   res.json({ status: "ok" });

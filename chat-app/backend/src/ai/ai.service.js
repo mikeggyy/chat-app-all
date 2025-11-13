@@ -855,14 +855,29 @@ export const generateSpeech = async (text, characterId, options = {}) => {
     service: USE_GOOGLE_TTS ? 'Google Cloud TTS' : 'OpenAI TTS',
   });
 
+  // ✅ 使用緩存包裝 TTS 生成
+  const { generateWithCache } = await import('./ttsCache.service.js');
+
   try {
-    if (USE_GOOGLE_TTS) {
-      // 使用 Google Cloud TTS（推薦，成本更低）
-      return await generateSpeechWithGoogle(text, characterId, options);
+    const generatorFn = async (text, characterId, options) => {
+      if (USE_GOOGLE_TTS) {
+        // 使用 Google Cloud TTS（推薦，成本更低）
+        return await generateSpeechWithGoogle(text, characterId, options);
+      } else {
+        // 使用 OpenAI TTS（備用方案）
+        return await generateSpeechWithOpenAI(text, characterId);
+      }
+    };
+
+    const result = await generateWithCache(text, characterId, generatorFn, options);
+
+    if (result.cached) {
+      logger.info('[TTS] ✅ 從緩存返回音頻（節省成本）');
     } else {
-      // 使用 OpenAI TTS（備用方案）
-      return await generateSpeechWithOpenAI(text, characterId);
+      logger.info('[TTS] ⚡ 生成新音頻並緩存');
     }
+
+    return result.audioBuffer;
   } catch (error) {
     logger.error('[TTS] 語音生成失敗，嘗試備用方案:', {
       error: error.message,

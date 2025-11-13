@@ -11,14 +11,22 @@ import { setInventory } from "../services/potions/potion-inventory.service.js";
 import { getEffects, addEffect, updateEffect, deleteEffect } from "../services/potions/potion-effects.service.js";
 import { deleteImages } from "../storage/r2Storage.service.js";
 
+// Rate limiting
+import {
+  strictAdminRateLimiter,
+  standardAdminRateLimiter,
+  relaxedAdminRateLimiter,
+} from "../middleware/rateLimiterConfig.js";
+
 const router = express.Router();
 
 /**
  * GET /api/users
  * 獲取用戶列表（從 Firebase Auth 和 Firestore 合併數據）
  * 🔒 權限：moderator 以上
+ * 🛡️ 速率限制：200 次/15 分鐘
  */
-router.get("/", requireMinRole("moderator"), async (req, res) => {
+router.get("/", requireMinRole("moderator"), relaxedAdminRateLimiter, async (req, res) => {
   try {
     const { page = 1, limit = 20, search = "" } = req.query;
     const pageNum = parseInt(page);
@@ -285,8 +293,9 @@ router.get("/", requireMinRole("moderator"), async (req, res) => {
  * GET /api/users/:userId
  * 獲取單個用戶詳情
  * 🔒 權限：moderator 以上
+ * 🛡️ 速率限制：200 次/15 分鐘
  */
-router.get("/:userId", requireMinRole("moderator"), async (req, res) => {
+router.get("/:userId", requireMinRole("moderator"), relaxedAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -419,15 +428,17 @@ const updateUserHandler = async (req, res) => {
 };
 
 // 註冊 PATCH 和 PUT 路由（使用相同的處理函數）
-router.patch("/:userId", requireMinRole("admin"), updateUserHandler);
-router.put("/:userId", requireMinRole("admin"), updateUserHandler);
+// 🛡️ 速率限制：100 次/15 分鐘
+router.patch("/:userId", requireMinRole("admin"), standardAdminRateLimiter, updateUserHandler);
+router.put("/:userId", requireMinRole("admin"), standardAdminRateLimiter, updateUserHandler);
 
 /**
  * DELETE /api/users/:userId
  * 刪除用戶（同時刪除 Auth 和 Firestore 數據）
  * 🔒 權限：僅限 super_admin
+ * 🛡️ 速率限制：20 次/15 分鐘（危險操作）
  */
-router.delete("/:userId", requireRole("super_admin"), async (req, res) => {
+router.delete("/:userId", requireRole("super_admin"), strictAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -531,8 +542,9 @@ router.delete("/:userId", requireRole("super_admin"), async (req, res) => {
  * PATCH /api/users/:userId/usage-limits
  * 更新用戶使用限制（重置或直接設置）
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
  */
-router.patch("/:userId/usage-limits", requireMinRole("admin"), async (req, res) => {
+router.patch("/:userId/usage-limits", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await updateUsageLimits(userId, req.body);
@@ -550,8 +562,9 @@ router.patch("/:userId/usage-limits", requireMinRole("admin"), async (req, res) 
  * POST /api/users/:userId/clean-null-keys
  * 清理用戶使用限制中的 null 鍵
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
  */
-router.post("/:userId/clean-null-keys", requireMinRole("admin"), async (req, res) => {
+router.post("/:userId/clean-null-keys", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await cleanNullKeys(userId);
@@ -581,8 +594,9 @@ router.post("/:userId/clean-null-keys", requireMinRole("admin"), async (req, res
  * POST /api/users/:userId/potions
  * 管理用戶的藥水（添加/刪除）
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
  */
-router.post("/:userId/potions", requireMinRole("admin"), async (req, res) => {
+router.post("/:userId/potions", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await addOrRemovePotions(userId, req.body);
@@ -603,8 +617,9 @@ router.post("/:userId/potions", requireMinRole("admin"), async (req, res) => {
  * GET /api/users/:userId/potions/details
  * 獲取用戶藥水詳細信息（從 usage_limits 集合）
  * 🔒 權限：moderator 以上
+ * 🛡️ 速率限制：200 次/15 分鐘
  */
-router.get("/:userId/potions/details", requireMinRole("moderator"), async (req, res) => {
+router.get("/:userId/potions/details", requireMinRole("moderator"), relaxedAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -662,8 +677,9 @@ router.get("/:userId/potions/details", requireMinRole("moderator"), async (req, 
  * PUT /api/users/:userId/potions/inventory
  * 直接設置用戶的藥水庫存數量（兩階段系統）
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
  */
-router.put("/:userId/potions/inventory", requireMinRole("admin"), async (req, res) => {
+router.put("/:userId/potions/inventory", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await setInventory(userId, req.body);
@@ -684,8 +700,9 @@ router.put("/:userId/potions/inventory", requireMinRole("admin"), async (req, re
  * GET /api/users/:userId/potion-effects
  * 獲取用戶所有角色的活躍藥水效果
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：200 次/15 分鐘
  */
-router.get("/:userId/potion-effects", requireMinRole("admin"), async (req, res) => {
+router.get("/:userId/potion-effects", requireMinRole("admin"), relaxedAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await getEffects(userId);
@@ -703,9 +720,10 @@ router.get("/:userId/potion-effects", requireMinRole("admin"), async (req, res) 
  * POST /api/users/:userId/potion-effects
  * 為用戶的特定角色添加藥水效果
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
  * Body: { characterId, potionType, durationDays }
  */
-router.post("/:userId/potion-effects", requireMinRole("admin"), async (req, res) => {
+router.post("/:userId/potion-effects", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await addEffect(userId, req.body);
@@ -726,9 +744,10 @@ router.post("/:userId/potion-effects", requireMinRole("admin"), async (req, res)
  * PUT /api/users/:userId/potion-effects/:effectId
  * 更新用戶的藥水效果（延長或縮短時間）
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
  * Body: { durationDays }
  */
-router.put("/:userId/potion-effects/:effectId", requireMinRole("admin"), async (req, res) => {
+router.put("/:userId/potion-effects/:effectId", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId, effectId } = req.params;
     const result = await updateEffect(userId, effectId, req.body);
@@ -749,8 +768,9 @@ router.put("/:userId/potion-effects/:effectId", requireMinRole("admin"), async (
  * DELETE /api/users/:userId/potion-effects/:effectId
  * 刪除用戶的藥水效果
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：20 次/15 分鐘（危險操作）
  */
-router.delete("/:userId/potion-effects/:effectId", requireMinRole("admin"), async (req, res) => {
+router.delete("/:userId/potion-effects/:effectId", requireMinRole("admin"), strictAdminRateLimiter, async (req, res) => {
   try {
     const { userId, effectId } = req.params;
     const result = await deleteEffect(userId, effectId);
@@ -768,8 +788,9 @@ router.delete("/:userId/potion-effects/:effectId", requireMinRole("admin"), asyn
  * DELETE /api/users/:userId/unlock-effects/:characterId
  * 刪除用戶的角色解鎖效果
  * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：20 次/15 分鐘（危險操作）
  */
-router.delete("/:userId/unlock-effects/:characterId", requireMinRole("admin"), async (req, res) => {
+router.delete("/:userId/unlock-effects/:characterId", requireMinRole("admin"), strictAdminRateLimiter, async (req, res) => {
   try {
     const { userId, characterId } = req.params;
 
@@ -808,8 +829,10 @@ router.delete("/:userId/unlock-effects/:characterId", requireMinRole("admin"), a
  * GET /api/users/:userId/resource-limits
  * 獲取用戶的所有資源限制（對話、語音、藥水）
  * 用於管理後台的統一資源管理界面
+ * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：200 次/15 分鐘
  */
-router.get("/:userId/resource-limits", requireMinRole("admin"), async (req, res) => {
+router.get("/:userId/resource-limits", requireMinRole("admin"), relaxedAdminRateLimiter, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -1047,9 +1070,10 @@ router.get("/:userId/resource-limits", requireMinRole("admin"), async (req, res)
 /**
  * PUT /api/users/:userId/resource-limits/conversation/:characterId
  * 更新用戶與特定角色的對話限制
+ * 🛡️ 速率限制：100 次/15 分鐘
  * Body: { unlocked?, cards?, permanentUnlock?, customLimit?, reset?, used? }
  */
-router.put("/:userId/resource-limits/conversation/:characterId", requireMinRole("admin"), async (req, res) => {
+router.put("/:userId/resource-limits/conversation/:characterId", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId, characterId } = req.params;
     const { unlocked, cards, permanentUnlock, customLimit, reset, used } = req.body;
@@ -1129,9 +1153,10 @@ router.put("/:userId/resource-limits/conversation/:characterId", requireMinRole(
 /**
  * PUT /api/users/:userId/resource-limits/voice/:characterId
  * 更新用戶與特定角色的語音限制
+ * 🛡️ 速率限制：100 次/15 分鐘
  * Body: { unlocked?, cards?, permanentUnlock?, customLimit?, reset?, used? }
  */
-router.put("/:userId/resource-limits/voice/:characterId", requireMinRole("admin"), async (req, res) => {
+router.put("/:userId/resource-limits/voice/:characterId", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId, characterId } = req.params;
     const { unlocked, cards, permanentUnlock, customLimit, reset, used } = req.body;
@@ -1211,10 +1236,11 @@ router.put("/:userId/resource-limits/voice/:characterId", requireMinRole("admin"
 /**
  * PUT /api/users/:userId/resource-limits/global/:type
  * 更新用戶的全局資源設定（拍照、影片生成）
+ * 🛡️ 速率限制：100 次/15 分鐘
  * :type 可以是 'photos' 或 'videos'
  * Body: { unlocked?, cards?, permanentUnlock? }
  */
-router.put("/:userId/resource-limits/global/:type", requireMinRole("admin"), async (req, res) => {
+router.put("/:userId/resource-limits/global/:type", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId, type } = req.params;
     const { unlocked, cards, permanentUnlock, used } = req.body;
@@ -1287,9 +1313,10 @@ router.put("/:userId/resource-limits/global/:type", requireMinRole("admin"), asy
 /**
  * PUT /api/users/:userId/resource-limits/global/:type/reset
  * 重置用戶的全局資源使用次數（拍照、影片生成）
+ * 🛡️ 速率限制：100 次/15 分鐘
  * :type 可以是 'photos' 或 'videos'
  */
-router.put("/:userId/resource-limits/global/:type/reset", requireMinRole("admin"), async (req, res) => {
+router.put("/:userId/resource-limits/global/:type/reset", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
   try {
     const { userId, type } = req.params;
 

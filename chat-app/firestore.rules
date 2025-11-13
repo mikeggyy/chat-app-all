@@ -30,6 +30,54 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid;
     }
 
+    // 廣告觀看統計 - 用戶只能讀取自己的統計，只能由後端寫入
+    // ✅ P0-1 安全規則：防止前端偽造廣告觀看記錄
+    match /ad_watch_stats/{userId} {
+      // 用戶可以讀取自己的廣告統計（用於顯示剩餘次數）
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // ⚠️ 禁止前端直接寫入（只能由後端 Admin SDK 寫入）
+      // 這確保了廣告觀看驗證的安全性
+      allow write: if false;
+    }
+
+    // 禮物交易記錄 - 用戶只能讀取自己的記錄
+    match /gift_transactions/{transactionId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 會員變更歷史 - 用戶只能讀取自己的記錄
+    match /membership_history/{historyId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 用戶子集合：角色禮物統計
+    match /users/{userId}/character_gift_stats/{characterId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 廣告觀看事件記錄 - 只能由後端寫入（用於異常檢測）
+    match /ad_watch_events/{eventId} {
+      allow read: if false; // 用戶無需讀取
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 廣告異常告警 - 只能由後端管理
+    match /ad_anomaly_alerts/{alertId} {
+      allow read: if false; // 僅管理員可讀（通過後端 API）
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 冪等性 Key - 只能由後端管理（防止重複消耗）
+    // ✅ 冪等性系統：確保支付、解鎖等操作不會重複執行
+    match /idempotency_keys/{keyId} {
+      allow read: if false; // 用戶無需讀取
+      allow write: if false; // 只能由後端寫入
+    }
+
     // 開發環境：允許所有操作（僅在 Emulator 模式）
     // ⚠️ 警告：此規則在生產環境已被禁用以確保安全性
     // 如需在開發環境使用寬鬆規則，請在本地 Firebase Emulator 中配置

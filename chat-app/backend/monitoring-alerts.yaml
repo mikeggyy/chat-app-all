@@ -1,0 +1,223 @@
+# Cloud Monitoring 告警策略配置
+#
+# 用途：監控清理任務和系統健康狀態
+# 部署：使用 gcloud monitoring policies create 命令
+#
+# 參考：https://cloud.google.com/monitoring/alerts
+
+# 告警通知頻道（需要先創建）
+# 1. Email: 團隊郵箱
+# 2. Slack: 運維頻道（可選）
+# 3. PagerDuty: 緊急告警（可選）
+#
+# 創建通知頻道：
+# gcloud alpha monitoring channels create \
+#   --display-name="Team Email" \
+#   --type=email \
+#   --channel-labels=email_address=your-team@example.com
+
+---
+# 告警策略 1: 清理任務失敗
+displayName: "清理任務失敗告警"
+documentation:
+  content: |
+    ## 清理任務失敗
+
+    **說明**：Cloud Scheduler 執行清理任務失敗
+
+    **影響**：過期的會員升級鎖定未被清理，可能導致用戶無法拍照或升級
+
+    **處理步驟**：
+    1. 查看 Cloud Scheduler 日誌：https://console.cloud.google.com/cloudscheduler
+    2. 檢查後端 API 日誌：檢查 /api/cron/cleanup-locks 端點
+    3. 手動執行清理：gcloud scheduler jobs run cleanup-upgrade-locks --location=asia-east1
+    4. 如持續失敗，手動執行清理腳本：node scripts/cleanup-upgrade-locks.js
+
+conditions:
+  - displayName: "Scheduler Job 失敗率 > 50%"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_scheduler_job"
+        resource.labels.job_id="cleanup-upgrade-locks"
+        metric.type="logging.googleapis.com/user/scheduler_job_error"
+      comparison: COMPARISON_GT
+      thresholdValue: 0.5
+      duration: 300s  # 5 分鐘
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+
+---
+# 告警策略 2: 清理任務發現大量過期鎖定
+displayName: "檢測到大量過期鎖定"
+documentation:
+  content: |
+    ## 檢測到大量過期鎖定
+
+    **說明**：清理任務發現超過 10 個過期鎖定
+
+    **可能原因**：
+    1. 系統負載過高，Transaction 頻繁失敗
+    2. 清理任務執行間隔過長
+    3. 會員升級流程存在 bug
+
+    **處理步驟**：
+    1. 檢查最近的會員升級錯誤日誌
+    2. 分析 Transaction 失敗率
+    3. 考慮縮短清理任務執行間隔（從 5 分鐘改為 3 分鐘）
+    4. 檢查是否有特定用戶反覆觸發問題
+
+conditions:
+  - displayName: "清理任務處理 > 10 個過期鎖定"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_run_revision"
+        metric.type="logging.googleapis.com/user/cleanup_locks_count"
+      comparison: COMPARISON_GT
+      thresholdValue: 10
+      duration: 60s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_MAX
+
+---
+# 告警策略 3: Transaction 失敗率過高
+displayName: "會員升級 Transaction 失敗率過高"
+documentation:
+  content: |
+    ## Transaction 失敗率過高
+
+    **說明**：會員升級的 Firestore Transaction 失敗率 > 10%
+
+    **可能原因**：
+    1. 用戶在升級過程中同時操作（拍照、對話等）
+    2. 系統併發請求過多
+    3. Firestore 負載過高
+
+    **處理步驟**：
+    1. 查看 Transaction 失敗日誌
+    2. 分析用戶操作模式
+    3. 考慮優化前端 UI，防止用戶在升級過程中進行其他操作
+    4. 檢查 Firestore 性能指標
+
+conditions:
+  - displayName: "Transaction 失敗率 > 10%"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_run_revision"
+        metric.type="logging.googleapis.com/user/membership_upgrade_transaction_failure_rate"
+      comparison: COMPARISON_GT
+      thresholdValue: 0.1
+      duration: 300s  # 5 分鐘
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_RATE
+
+---
+# 告警策略 4: API 響應時間過長
+displayName: "清理 API 響應時間過長"
+documentation:
+  content: |
+    ## 清理 API 響應時間過長
+
+    **說明**：/api/cron/cleanup-locks 端點響應時間 > 30 秒
+
+    **影響**：清理任務可能超時，導致過期鎖定未被清理
+
+    **處理步驟**：
+    1. 檢查 Firestore 查詢性能
+    2. 確認是否有大量過期鎖定需要清理
+    3. 考慮優化查詢：添加索引或分批處理
+    4. 檢查後端實例資源使用率
+
+conditions:
+  - displayName: "API 響應時間 > 30s"
+    conditionThreshold:
+      filter: |
+        resource.type="cloud_run_revision"
+        metric.type="run.googleapis.com/request_latencies"
+        resource.labels.service_name="your-backend-service"
+        metric.labels.route="/api/cron/cleanup-locks"
+      comparison: COMPARISON_GT
+      thresholdValue: 30000  # 30 秒（毫秒）
+      duration: 60s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_PERCENTILE_95
+
+---
+# 日誌指標定義
+#
+# 需要在 Cloud Logging 中創建以下自定義指標：
+#
+# 1. 清理任務處理數量
+# gcloud logging metrics create cleanup_locks_count \
+#   --description="清理任務處理的鎖定數量" \
+#   --log-filter='
+#     resource.type="cloud_run_revision"
+#     jsonPayload.message=~"清理任務完成"
+#   ' \
+#   --value-extractor='EXTRACT(jsonPayload.result.cleaned)'
+#
+# 2. Scheduler Job 錯誤
+# gcloud logging metrics create scheduler_job_error \
+#   --description="Scheduler Job 執行錯誤" \
+#   --log-filter='
+#     resource.type="cloud_scheduler_job"
+#     resource.labels.job_id="cleanup-upgrade-locks"
+#     severity="ERROR"
+#   '
+#
+# 3. Transaction 失敗率
+# gcloud logging metrics create membership_upgrade_transaction_failure_rate \
+#   --description="會員升級 Transaction 失敗率" \
+#   --log-filter='
+#     resource.type="cloud_run_revision"
+#     jsonPayload.message=~"Transaction 失敗"
+#   '
+
+# ==================== Dashboard 配置 ====================
+#
+# 創建自定義 Dashboard 來監控清理任務：
+#
+# Dashboard 包含：
+# 1. 清理任務執行次數（按小時）
+# 2. 清理任務處理的鎖定數量
+# 3. 清理任務失敗率
+# 4. API 響應時間
+# 5. 當前過期鎖定數量
+#
+# 使用 Cloud Console 創建：
+# https://console.cloud.google.com/monitoring/dashboards/custom
+
+# ==================== 部署指令 ====================
+#
+# 1. 創建日誌指標
+# ./scripts/create-log-metrics.sh
+#
+# 2. 創建告警策略（需要先配置通知頻道）
+# gcloud alpha monitoring policies create --policy-from-file=monitoring-alerts.yaml
+#
+# 3. 驗證告警策略
+# gcloud alpha monitoring policies list
+#
+# 4. 測試告警（手動觸發錯誤）
+# curl -X POST https://your-backend.run.app/api/cron/cleanup-locks \
+#   -H "Authorization: Bearer $(gcloud auth print-identity-token)"
+
+# ==================== 手動監控查詢 ====================
+#
+# 查看清理任務日誌：
+# gcloud logging read '
+#   resource.type="cloud_scheduler_job"
+#   resource.labels.job_id="cleanup-upgrade-locks"
+# ' --limit=50 --format=json
+#
+# 查看清理 API 日誌：
+# gcloud logging read '
+#   resource.type="cloud_run_revision"
+#   jsonPayload.message=~"鎖定清理"
+# ' --limit=50 --format=json
+#
+# 查看當前過期鎖定（需要查詢 Firestore）：
+# node scripts/cleanup-upgrade-locks.js --dry-run

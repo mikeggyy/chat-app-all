@@ -6,7 +6,9 @@ validateEnvOrExit();
 
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { db, auth } from "./firebase/index.js";
+import { setCsrfToken, getCsrfTokenHandler, csrfProtection } from "../../../shared/backend-utils/csrfProtection.js";
 
 // ✅ 導入角色快取服務（複用主應用的實現）
 import { initializeCharactersCache } from "../../../chat-app/backend/src/services/character/characterCache.service.js";
@@ -42,11 +44,30 @@ app.use(cors({
   },
   credentials: true, // 允許攜帶憑證（Cookies）
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'] // 添加 CSRF header
 }));
 
+// 🔒 P0 優化（2025-01）：請求大小限制
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// 🔒 P0 優化（2025-01）：CSRF 保護
+app.use(cookieParser());
+app.use(setCsrfToken());
+
+// CSRF Token 獲取端點
+app.get('/api/csrf-token', getCsrfTokenHandler);
+
+// 對所有 POST/PUT/DELETE 請求應用 CSRF 保護
+app.use((req, res, next) => {
+  const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
+
+  if (isWriteMethod) {
+    return csrfProtection()(req, res, next);
+  }
+
+  next();
+});
 
 // 日誌中間件
 app.use((req, res, next) => {
@@ -132,6 +153,7 @@ app.use((err, req, res, next) => {
 ║   Port: ${PORT.toString().padEnd(38)} ║
 ║   CORS: ${(process.env.CORS_ORIGIN || "*").padEnd(38)} ║
 ║   角色快取: ✅ 已啟用                          ║
+║   CSRF 保護: ✅ 已啟用                        ║
 ╚═══════════════════════════════════════════════╝
       `);
     });
@@ -143,4 +165,3 @@ app.use((err, req, res, next) => {
 
 // 導出 db 和 auth 供其他模組使用
 export { db, auth };
-

@@ -8,6 +8,13 @@ const membershipState = ref(null);
 const isLoading = ref(false);
 const error = ref(null);
 
+// ✅ P1-1 修復：升級進度狀態
+const isUpgrading = ref(false);
+const upgradeProgress = ref({
+  step: '', // 'validating', 'processing', 'finalizing', 'completed'
+  message: '',
+});
+
 /**
  * 會員系統 composable
  * 管理用戶的會員資訊、等級、功能權限等
@@ -44,6 +51,7 @@ export function useMembership() {
 
   /**
    * 升級會員等級
+   * ✅ P1-1 修復：添加進度提示，防止用戶在升級期間操作
    * @param {string} userId - 用戶 ID
    * @param {string} targetTier - 目標等級 ('vip' | 'vvip')
    * @param {object} options - 選項
@@ -59,12 +67,26 @@ export function useMembership() {
       throw new Error('無效的會員等級');
     }
 
+    // ✅ P1-1 修復：設置升級中狀態
     isLoading.value = true;
+    isUpgrading.value = true;
     error.value = null;
 
     try {
+      // 步驟 1: 驗證中
+      upgradeProgress.value = {
+        step: 'validating',
+        message: '正在驗證會員資格...',
+      };
+
       // 生成冪等性鍵，防止重複升級
       const idempotencyKey = generateIdempotencyKey();
+
+      // 步驟 2: 處理中
+      upgradeProgress.value = {
+        step: 'processing',
+        message: '正在處理升級請求，請稍候...',
+      };
 
       const data = await apiJson(`/api/membership/${encodeURIComponent(userId)}/upgrade`, {
         method: 'POST',
@@ -79,6 +101,12 @@ export function useMembership() {
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
 
+      // 步驟 3: 完成中
+      upgradeProgress.value = {
+        step: 'finalizing',
+        message: '正在更新會員資料...',
+      };
+
       // 檢查是否為重複請求（來自緩存）
       if (data._idempotent || data._cached) {
         logger.log('[會員升級] 檢測到重複請求，返回了緩存結果');
@@ -91,10 +119,25 @@ export function useMembership() {
       }
 
       membershipState.value = data.membership || data;
+
+      // 步驟 4: 完成
+      upgradeProgress.value = {
+        step: 'completed',
+        message: '升級成功！',
+      };
+
+      // 短暫延遲後清除進度狀態
+      setTimeout(() => {
+        upgradeProgress.value = { step: '', message: '' };
+      }, 1500);
+
       return data;
     } catch (err) {
       // ✅ 升級失敗後，重新載入會員資訊以確保 UI 顯示最新狀態
       logger.error('[會員升級] 升級失敗，重新載入會員資訊', err);
+
+      // 清除進度狀態
+      upgradeProgress.value = { step: '', message: '' };
 
       try {
         // 靜默重新載入（不顯示 loading，不覆蓋錯誤訊息）
@@ -109,6 +152,7 @@ export function useMembership() {
       throw err;
     } finally {
       isLoading.value = false;
+      isUpgrading.value = false;
     }
   };
 
@@ -214,6 +258,10 @@ export function useMembership() {
     membership: membershipState,
     isLoading,
     error,
+
+    // ✅ P1-1 修復：升級進度狀態
+    isUpgrading,
+    upgradeProgress,
 
     // Actions
     loadMembership,

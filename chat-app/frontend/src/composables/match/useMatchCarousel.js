@@ -20,7 +20,7 @@
  * carousel.goToPrevious();
  */
 
-import { ref, computed, onBeforeUnmount } from 'vue';
+import { ref, computed, onBeforeUnmount, watch } from 'vue';
 
 /**
  * 創建輪播控制
@@ -42,6 +42,13 @@ export function useMatchCarousel(options = {}) {
 
   // 動畫定時器
   let resetTimerId;
+
+  // ✅ P1 優化（2025-01）：智能預加載下一張圖片
+  const preloadImage = (url) => {
+    if (!url || typeof url !== 'string') return;
+    const img = new Image();
+    img.src = url;
+  };
 
   /**
    * 計算輪播項目（包含前、當前、後三張）
@@ -202,6 +209,26 @@ export function useMatchCarousel(options = {}) {
       showMatchByIndex(0);
     }
   };
+
+  // ✅ P1 優化（2025-01）：監聽索引變化，智能預加載相鄰圖片
+  watch(currentIndex, (newIndex) => {
+    const len = matches?.value?.length || 0;
+    if (len <= 2) return; // 少於 3 張時無需預加載
+
+    // 預加載下一張圖片
+    const nextIdx = (newIndex + 1) % len;
+    const nextUrl = matches.value[nextIdx]?.portraitUrl;
+    if (nextUrl) {
+      preloadImage(nextUrl);
+    }
+
+    // 也預加載前一張（雙向滑動支援）
+    const prevIdx = (newIndex - 1 + len) % len;
+    const prevUrl = matches.value[prevIdx]?.portraitUrl;
+    if (prevUrl) {
+      preloadImage(prevUrl);
+    }
+  });
 
   // 清理資源
   onBeforeUnmount(() => {

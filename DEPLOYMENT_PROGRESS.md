@@ -49,53 +49,61 @@ Project Console: https://console.firebase.google.com/project/chat-app-3-8a7ee/ov
 
 ## ⏸️ 需要手動完成的步驟
 
-### 3. ⏸️ 後端部署到 Cloud Run
+### 3. 🔄 後端部署到 Cloud Run
 
-**狀態**: ⏸️ 需要 gcloud 認證
+**狀態**: 🔄 Docker 鏡像構建成功，但部署失敗需要環境變數
 
-**問題**: gcloud CLI 返回錯誤碼 49（未認證）
+**進展**:
+- ✅ Docker 鏡像構建成功 (Build ID: 911db35c-68e5-4ec3-872f-591dac313a2e)
+- ✅ 鏡像推送到 gcr.io/chat-app-3-8a7ee/chat-backend:latest
+- ❌ Cloud Run 部署失敗：容器無法啟動（缺少環境變數）
 
-**解決方案** - 選擇以下方式之一：
+**原因**:
+後端使用 `validateEnvOrExit()` 驗證環境變數，缺少以下必要配置時會退出：
+- OPENAI_API_KEY（AI 對話）
+- GOOGLE_AI_API_KEY（圖片生成）
+- R2_ENDPOINT、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY、R2_BUCKET_NAME、R2_PUBLIC_URL（圖片/影片儲存）
+- VIDEO_GENERATION_PROVIDER（影片生成提供者：hailuo/replicate/veo）
+- CORS_ORIGIN（生產環境必需）
 
-#### 方式 A: 使用部署腳本（推薦）
+**解決方案** - 使用環境變數部署腳本：
 
-```bash
-# 1. 登錄 gcloud
-gcloud auth login
-gcloud config set project chat-app-3-8a7ee
+#### 步驟 1: 準備環境變數配置
 
-# 2. Windows 執行部署
+```powershell
+# 1. 進入後端目錄
 cd chat-app/backend
-deploy-cloudrun.bat
 
-# 或 Linux/Mac
-cd chat-app/backend
-./deploy-cloudrun.sh
+# 2. 複製環境變數範本
+cp .env.cloudrun.template .env.cloudrun
+
+# 3. 編輯 .env.cloudrun，填寫所有必要的 API keys
+notepad .env.cloudrun
 ```
 
-#### 方式 B: 手動部署
+**必填項目**（請填寫實際值，替換 `xxxxx` 佔位符）：
+- `OPENAI_API_KEY`: OpenAI API Key（從 https://platform.openai.com/api-keys 獲取）
+- `GOOGLE_AI_API_KEY`: Google AI API Key（從 https://makersuite.google.com/app/apikey 獲取）
+- `R2_ENDPOINT`: Cloudflare R2 Storage 端點
+- `R2_ACCESS_KEY_ID`: R2 Access Key
+- `R2_SECRET_ACCESS_KEY`: R2 Secret Key
+- `R2_BUCKET_NAME`: R2 Bucket 名稱（例如：chat-app-media）
+- `R2_PUBLIC_URL`: R2 公開 URL（例如：https://media.your-domain.com）
+- `VIDEO_GENERATION_PROVIDER`: 影片生成提供者（推薦：hailuo）
+- `CORS_ORIGIN`: 前端 URL（例如：https://your-app.pages.dev）
 
-```bash
-# 1. 登錄
-gcloud auth login
-gcloud config set project chat-app-3-8a7ee
+#### 步驟 2: 執行部署
 
-# 2. 構建 Docker 鏡像
-cd chat-app/backend
-docker build -t gcr.io/chat-app-3-8a7ee/backend .
-
-# 3. 推送到 Container Registry
-docker push gcr.io/chat-app-3-8a7ee/backend
-
-# 4. 部署到 Cloud Run
-gcloud run deploy chat-app-backend \
-  --image gcr.io/chat-app-3-8a7ee/backend \
-  --platform managed \
-  --region asia-east1 \
-  --allow-unauthenticated \
-  --memory 1Gi \
-  --cpu 1
+```powershell
+# 執行部署腳本（會自動讀取 .env.cloudrun 並部署）
+.\deploy-with-env.ps1
 ```
+
+腳本會自動：
+1. 讀取 .env.cloudrun 中的所有環境變數
+2. 驗證必要的環境變數是否都已設置
+3. 部署到 Cloud Run 並設置所有環境變數
+4. 顯示部署後的服務 URL
 
 **重要**: 部署後記錄後端 URL（需要用於 Cloud Scheduler 配置）
 

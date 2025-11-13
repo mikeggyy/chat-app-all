@@ -1,5 +1,6 @@
 <script setup>
 import { HeartIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
+import LazyImage from '@/components/common/LazyImage.vue';
 
 const props = defineProps({
   profile: {
@@ -30,7 +31,12 @@ const handleKeyup = (event) => {
     @click="handleClick"
     @keyup.enter="handleKeyup"
   >
-    <img :src="profile.image" :alt="profile.name" />
+    <LazyImage
+      :src="profile.image"
+      :alt="profile.name"
+      root-margin="150px"
+      image-class="character-card-image"
+    />
     <div class="recent-body">
       <h3>{{ profile.name }}</h3>
       <div class="recent-stats">
@@ -74,7 +80,14 @@ const handleKeyup = (event) => {
     transform: translateY(-2px);
   }
 
-  img {
+  // ✅ P1 優化（2025-01）：LazyImage 支援
+  :deep(.lazy-image) {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 10px;
+  }
+
+  .character-card-image {
     width: 100%;
     aspect-ratio: 3 / 4;
     object-fit: cover;

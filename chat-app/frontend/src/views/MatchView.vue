@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
           <LazyImage
             :src="item.data?.portraitUrl || ''"
             alt=""
-            :root-margin="'100px'"
+            :root-margin="'300px'"
             :threshold="0"
             image-class="character-portrait"
           />

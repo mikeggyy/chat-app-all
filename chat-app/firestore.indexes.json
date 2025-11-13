@@ -409,6 +409,24 @@
       ]
     },
     {
+      "collectionGroup": "ad_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "claimed",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "gift_transactions",
       "queryScope": "COLLECTION",
       "fields": [

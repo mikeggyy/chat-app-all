@@ -17,6 +17,7 @@ import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { requireFirebaseAuth } from "../auth/index.js";
 import { giftRateLimiter, standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 import { IDEMPOTENCY_TTL } from "../config/limits.js"; // ✅ P2-2: 使用集中配置的 TTL
+import { validateRequest, giftSchemas } from "../middleware/validation.middleware.js";
 
 const router = express.Router();
 
@@ -25,8 +26,9 @@ const router = express.Router();
  * 送禮物給角色（支持冪等性）
  * ⚠️ 安全修復：userId 從認證 token 獲取，不從請求體讀取
  * ✅ 速率限制：15 次/分鐘，防止刷禮物
+ * ✅ 輸入驗證：使用統一的驗證中間件
  */
-router.post("/send", requireFirebaseAuth, giftRateLimiter, asyncHandler(async (req, res, next) => {
+router.post("/send", requireFirebaseAuth, validateRequest(giftSchemas.sendGift), giftRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     // 從認證信息獲取 userId，防止偽造
     const userId = req.firebaseUser.uid;

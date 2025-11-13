@@ -8,6 +8,9 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "test:env": "node ./scripts/test-env-validation.js",
+    "test:business-logic": "dotenv -e .env -- node ./scripts/test-all-business-logic.js",
+    "test:membership": "dotenv -e .env -- node ./scripts/test-membership-upgrade.js",
+    "test:unlock": "dotenv -e .env -- node ./scripts/test-character-unlock.js",
     "generate:voices": "node ./scripts/generateVoicePreviews.js",
     "import:all": "node ./scripts/import-all-data.js",
     "import:characters": "node ./scripts/import-characters-to-firestore.js",
@@ -42,11 +45,13 @@
     "@google-cloud/text-to-speech": "^6.4.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google/generative-ai": "^0.24.1",
+    "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase-admin": "^13.5.0",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "node-cache": "^5.1.2",
     "openai": "^4.104.0",
@@ -54,9 +59,11 @@
     "sharp": "^0.34.4",
     "tiktoken": "^1.0.22",
     "winston": "^3.18.3",
+    "xss": "^1.0.15",
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "dotenv-cli": "^11.0.0",
     "nodemon": "^3.1.10"
   }
 }

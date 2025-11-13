@@ -11,6 +11,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 import logger from "../utils/logger.js";
+import { compressImage } from "../utils/imageCompression.service.js";
 
 /**
  * 初始化 R2 客戶端
@@ -171,12 +172,18 @@ export const getSignedVideoUrl = async (key, expiresIn = 3600) => {
 };
 
 /**
- * 上傳圖片到 R2
+ * 上傳圖片到 R2（含智能壓縮）
  * @param {Buffer|string} imageData - 圖片 Buffer 或 base64 字串
  * @param {string} userId - 用戶 ID
  * @param {string} characterId - 角色 ID（可選，用於組織檔案結構）
- * @param {object} options - 選項 { contentType, extension }
- * @returns {Promise<object>} - 上傳結果 { url, key, size }
+ * @param {object} options - 選項
+ * @param {string} options.contentType - MIME 類型
+ * @param {string} options.extension - 檔案副檔名
+ * @param {boolean} options.compress - 是否壓縮（默認 true）
+ * @param {string} options.compressionQuality - 壓縮質量（high, standard, low, thumbnail），默認 standard
+ * @param {number} options.maxWidth - 最大寬度（覆蓋預設）
+ * @param {number} options.maxHeight - 最大高度（覆蓋預設）
+ * @returns {Promise<object>} - 上傳結果 { url, key, size, compressionStats }
  */
 export const uploadImageToR2 = async (imageData, userId, characterId = "general", options = {}) => {
   const bucketName = process.env.R2_BUCKET_NAME;
@@ -190,6 +197,14 @@ export const uploadImageToR2 = async (imageData, userId, characterId = "general"
     throw new Error("需要提供有效的圖片數據");
   }
 
+  // ✅ 壓縮選項（默認啟用）
+  const {
+    compress = true,
+    compressionQuality = "standard",
+    maxWidth = null,
+    maxHeight = null,
+  } = options;
+
   try {
     // 處理 base64 數據
     let imageBuffer;
@@ -201,6 +216,40 @@ export const uploadImageToR2 = async (imageData, userId, characterId = "general"
       imageBuffer = imageData;
     } else {
       throw new Error("不支援的圖片數據格式");
+    }
+
+    const originalSize = imageBuffer.length;
+    let compressionStats = null;
+
+    // ✅ 圖片壓縮（如果啟用）
+    if (compress) {
+      try {
+        logger.info("[R2] 壓縮圖片中...", {
+          originalSize: Math.round(originalSize / 1024) + " KB",
+          quality: compressionQuality,
+        });
+
+        const compressionResult = await compressImage(imageBuffer, {
+          format: options.extension || "webp",
+          quality: compressionQuality,
+          maxWidth,
+          maxHeight,
+        });
+
+        imageBuffer = compressionResult.buffer;
+        compressionStats = compressionResult.metadata;
+
+        logger.info("[R2] 圖片壓縮完成:", {
+          before: Math.round(originalSize / 1024) + " KB",
+          after: Math.round(imageBuffer.length / 1024) + " KB",
+          saved: compressionStats.compressionRatio + "%",
+        });
+      } catch (compressionError) {
+        // 壓縮失敗不影響上傳，使用原始圖片
+        logger.warn("[R2] 圖片壓縮失敗，使用原始圖片:", compressionError.message);
+      }
+    } else {
+      logger.debug("[R2] 跳過圖片壓縮（compress=false）");
     }
 
     const client = getR2Client();
@@ -231,12 +280,14 @@ export const uploadImageToR2 = async (imageData, userId, characterId = "general"
     logger.info("[R2] 圖片上傳成功:", {
       fileName,
       url: imageUrl,
+      finalSize: Math.round(imageBuffer.length / 1024) + " KB",
     });
 
     return {
       url: imageUrl,
       key: fileName,
       size: imageBuffer.length,
+      compressionStats,
     };
   } catch (error) {
     logger.error("[R2] 圖片上傳失敗:", error);

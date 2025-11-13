@@ -35,10 +35,12 @@ const router = express.Router();
  * 獲取金幣餘額
  * GET /api/coins/balance
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人餘額
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
 router.get(
   "/api/coins/balance",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(coinSchemas.getBalance),
   async (req, res, next) => {
   try {
@@ -57,10 +59,12 @@ router.get(
  * Body: { characterId, useTicket, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止盜用他人金幣
  * 🔒 冪等性保護：防止重複扣費（必須提供 idempotencyKey）
+ * ✅ 速率限制：10次/分鐘（購買操作）
  */
 router.post(
   "/api/coins/purchase/unlimited-chat",
   requireFirebaseAuth,
+  purchaseRateLimiter,
   validateRequest(coinSchemas.purchaseUnlimitedChat),
   async (req, res, next) => {
   try {
@@ -100,10 +104,12 @@ router.post(
  * 獲取特定功能的價格
  * GET /api/coins/pricing/:featureId
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人價格
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
 router.get(
   "/api/coins/pricing/:featureId",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(coinSchemas.getFeaturePricing),
   async (req, res, next) => {
   try {
@@ -121,10 +127,12 @@ router.get(
  * 獲取所有功能的價格列表
  * GET /api/coins/pricing
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人價格
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
 router.get(
   "/api/coins/pricing",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(coinSchemas.getAllPricing),
   async (req, res, next) => {
   try {
@@ -142,10 +150,12 @@ router.get(
  * GET /api/coins/transactions
  * Query: ?limit=50&offset=0
  * 🔒 安全增強：從認證 token 獲取 userId，防止查看他人交易記錄
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
 router.get(
   "/api/coins/transactions",
   requireFirebaseAuth,
+  relaxedRateLimiter,
   validateRequest(coinSchemas.getTransactions),
   async (req, res) => {
   try {
@@ -173,9 +183,11 @@ router.get(
  * 獲取金幣充值套餐列表
  * GET /api/coins/packages
  * ⚠️ 此端點無需身份驗證（公開套餐列表）
+ * ✅ 速率限制：60次/分鐘（讀取操作）
  */
 router.get(
   "/api/coins/packages",
+  relaxedRateLimiter,
   validateRequest(coinSchemas.getPackages),
   async (req, res) => {
   try {
@@ -196,10 +208,12 @@ router.get(
  * Body: { packageId, paymentInfo, idempotencyKey }
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人購買金幣
  * 🔒 冪等性保護：防止重複扣款和發放
+ * ✅ 速率限制：10次/分鐘（購買操作）
  */
 router.post(
   "/api/coins/purchase/package",
   requireFirebaseAuth,
+  purchaseRateLimiter,
   validateRequest(coinSchemas.purchasePackage),
   async (req, res) => {
   try {
@@ -284,10 +298,12 @@ router.post(
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人充值金幣
  * 🔒 冪等性保護：防止重複充值（必須提供 idempotencyKey）
  * ⚠️ 此端點僅供測試帳號使用
+ * ✅ 速率限制：10次/分鐘（購買操作）
  */
 router.post(
   "/api/coins/recharge",
   requireFirebaseAuth,
+  purchaseRateLimiter,
   validateRequest(coinSchemas.rechargeCoins),
   async (req, res) => {
   try {
@@ -353,10 +369,12 @@ router.post(
  * Body: { balance }
  * 🔒 安全增強：從認證 token 獲取 userId，只能設置自己的餘額
  * ⚠️ 此端點僅供測試帳號使用，用於快速設定金幣數量進行測試
+ * ✅ 速率限制：10次/分鐘（購買操作）
  */
 router.post(
   "/api/coins/set-balance",
   requireFirebaseAuth,
+  purchaseRateLimiter,
   validateRequest(coinSchemas.setBalance),
   async (req, res) => {
   try {

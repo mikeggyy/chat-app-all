@@ -11,15 +11,20 @@ import { grantTickets } from "./unlockTickets.service.js";
 import { addCoins, TRANSACTION_TYPES } from "../payment/coins.service.js";
 import { createTransactionInTx } from "../payment/transaction.service.js";
 import { getFirestoreDb } from "../firebase/index.js";
+import { FieldValue } from "firebase-admin/firestore";
 import { clearCache } from "../utils/firestoreCache.js";
+import { CacheManager } from "../utils/CacheManager.js";
 import logger from "../utils/logger.js";
 
 // ============================================
 // 會員配置快取系統（優化版）
 // ============================================
-// 使用 Map 儲存各個 tier 的配置和獨立過期時間
-const membershipConfigCache = new Map(); // tier -> { config, expiresAt }
-const CACHE_TTL = 1 * 60 * 1000; // ✅ Quick Win #4: 1 分鐘緩存（降低配置更新延遲）
+// ✅ 優化：使用統一的 CacheManager 替代自定義 Map 緩存
+const membershipConfigCache = new CacheManager({
+  name: "MembershipConfig",
+  ttl: 1 * 60 * 1000, // 1 分鐘緩存
+  enableAutoCleanup: true,
+});
 
 /**
  * 清除會員配置快取
@@ -27,10 +32,8 @@ const CACHE_TTL = 1 * 60 * 1000; // ✅ Quick Win #4: 1 分鐘緩存（降低配
  */
 export const clearMembershipConfigCache = (tier = null) => {
   if (tier) {
-    const deleted = membershipConfigCache.delete(tier);
-    if (deleted) {
-      logger.info(`[會員服務] 已清除會員配置快取: ${tier}`);
-    }
+    membershipConfigCache.delete(tier);
+    logger.info(`[會員服務] 已清除會員配置快取: ${tier}`);
   } else {
     membershipConfigCache.clear();
     logger.info(`[會員服務] 已清除所有會員配置快取`);
@@ -39,17 +42,16 @@ export const clearMembershipConfigCache = (tier = null) => {
 
 /**
  * 從 Firestore 獲取會員配置（帶快取）
+ * ✅ P1-2 優化：增強 fallback 降級策略，使用漸進式重試
  * @param {string} tier - 會員等級 (free, vip, vvip)
  * @returns {Promise<Object>} 會員配置
  */
 const getMembershipConfigFromFirestore = async (tier) => {
-  const now = Date.now();
-
-  // 檢查快取
+  // ✅ 優化：使用 CacheManager 的 get 方法（自動處理過期檢查）
   const cached = membershipConfigCache.get(tier);
-  if (cached && now < cached.expiresAt) {
-    logger.debug(`[會員服務] 使用快取的會員配置: ${tier} (剩餘 ${Math.round((cached.expiresAt - now) / 1000)}秒)`);
-    return cached.config;
+  if (cached) {
+    logger.debug(`[會員服務] 使用快取的會員配置: ${tier}`);
+    return cached;
   }
 
   try {
@@ -59,11 +61,11 @@ const getMembershipConfigFromFirestore = async (tier) => {
     if (doc.exists) {
       const config = doc.data();
 
-      // 更新快取（每個 tier 獨立的過期時間）
-      membershipConfigCache.set(tier, {
-        config,
-        expiresAt: now + CACHE_TTL,
-      });
+      // ✅ 優化：使用 CacheManager 的 set 方法（自動處理過期時間）
+      membershipConfigCache.set(tier, config);
+
+      // ✅ P1-2 優化：成功後清除失敗計數
+      membershipConfigCache.delete(`${tier}:failures`);
 
       logger.debug(`[會員服務] 從 Firestore 讀取會員配置: ${tier}，已更新快取`);
       return config;
@@ -72,16 +74,44 @@ const getMembershipConfigFromFirestore = async (tier) => {
     logger.warn(`[會員服務] 從 Firestore 讀取會員配置失敗: ${error.message}`);
   }
 
-  // 如果 Firestore 中沒有，使用代碼中的默認值
+  // ✅ P1-2 優化：如果 Firestore 讀取失敗，使用漸進式退避策略
   const fallbackConfig = MEMBERSHIP_TIERS[tier];
 
-  // 也將 fallback 放入快取，但使用較短的 TTL（1 分鐘）
-  membershipConfigCache.set(tier, {
-    config: fallbackConfig,
-    expiresAt: now + 60 * 1000,
-  });
+  // 獲取失敗次數（如果有）
+  // ⚠️ 並發行為說明：
+  // 以下 get-calculate-set 操作不是原子的，在高並發場景下可能導致失敗計數略有偏差。
+  // 這是一個**可接受的風險**，原因如下：
+  // 1. 會員配置讀取頻率較低（每個等級首次訪問 + 緩存過期時），並發衝突機率極低
+  // 2. 失敗計數的輕微不準確只會影響緩存過期時間（5-30分鐘），不影響核心功能
+  // 3. 最壞情況是緩存過期時間略有偏差，對用戶體驗無明顯影響
+  // 4. 實現原子操作需要額外的同步機制（如分佈式鎖），增加複雜度且收益有限
+  //
+  // 如果未來需要提升精確度，可考慮：
+  // - 使用 Firestore Atomic Counter（需額外集合）
+  // - 使用 Redis 的 INCR 命令（需引入 Redis）
+  const failureCount = membershipConfigCache.get(`${tier}:failures`) || 0;
 
-  logger.debug(`[會員服務] 使用代碼中的會員配置: ${tier}（fallback）`);
+  // 計算退避時間：基礎 5 分鐘 × 2^failureCount，最大 30 分鐘
+  const BASE_FALLBACK_TTL = 5 * 60 * 1000; // 5 分鐘
+  const MAX_FALLBACK_TTL = 30 * 60 * 1000; // 30 分鐘
+  const backoffTtl = Math.min(
+    BASE_FALLBACK_TTL * Math.pow(2, failureCount),
+    MAX_FALLBACK_TTL
+  );
+
+  // 緩存 fallback 配置
+  membershipConfigCache.set(tier, fallbackConfig, backoffTtl);
+
+  // 增加失敗計數（也使用相同的 TTL）
+  membershipConfigCache.set(`${tier}:failures`, failureCount + 1, backoffTtl);
+
+  logger.warn(
+    `[會員服務] 降級模式啟用 - tier: ${tier}, ` +
+    `失敗次數: ${failureCount + 1}, ` +
+    `緩存時間: ${Math.round(backoffTtl / 1000)}秒, ` +
+    `使用代碼默認配置`
+  );
+
   return fallbackConfig;
 };
 /**
@@ -271,12 +301,16 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
   //    - 這確保了拍照次數計算的準確性，即使用戶同時在拍照
   let result = null;
   let transactionAttempts = 0;
-  const MAX_ATTEMPTS = 5;
+  const MAX_ATTEMPTS = 3; // ✅ 修復：外層重試最多 3 次
+  let lastError = null;
 
-  try {
-    await db.runTransaction(async (transaction) => {
+  // ✅ 修復：添加外層重試循環（指數退避策略）
+  while (transactionAttempts < MAX_ATTEMPTS) {
+    try {
       transactionAttempts++;
       logger.debug(`[會員服務] Transaction 嘗試 ${transactionAttempts}/${MAX_ATTEMPTS}`);
+
+      await db.runTransaction(async (transaction) => {
 
       // 1. 在 Transaction 內重新讀取用戶（確保使用最新數據）
       const freshUserDoc = await transaction.get(userRef);
@@ -299,17 +333,43 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
             const usageLimitsData = usageLimitsDoc.data();
             const photoData = usageLimitsData.photos || {};
 
-            // ✅ P1-1 修復：檢查是否已經在升級中
+            // ✅ P1-1 修復：檢查是否已經在升級中（帶自動過期保護）
             if (photoData.upgrading) {
-              logger.warn(`[會員服務] 用戶 ${userId} 正在升級中，拒絕重複升級操作`);
-              throw new Error("會員升級處理中，請稍後再試");
+              // 處理 upgradingAt 時間戳（支持 Firestore Timestamp 和普通 Date）
+              let upgradingAt;
+              if (photoData.upgradingAt?.toDate) {
+                upgradingAt = photoData.upgradingAt.toDate();
+              } else if (photoData.upgradingAt) {
+                upgradingAt = new Date(photoData.upgradingAt);
+              } else {
+                // 如果沒有時間戳，認為是舊數據，強制解鎖
+                logger.warn(`[會員服務] 檢測到無時間戳的升級鎖定（舊數據），強制解鎖`);
+                upgradingAt = null;
+              }
+
+              // 如果有有效的時間戳，檢查是否過期
+              if (upgradingAt && !isNaN(upgradingAt.getTime())) {
+                const elapsedMs = Date.now() - upgradingAt.getTime();
+
+                // 超過 5 分鐘自動解鎖（防止極端情況下的永久鎖定）
+                if (elapsedMs < 5 * 60 * 1000) {
+                  logger.warn(`[會員服務] 用戶 ${userId} 正在升級中（${Math.round(elapsedMs / 1000)}秒前），拒絕重複升級操作`);
+                  throw new Error("會員升級處理中，請稍後再試");
+                }
+
+                logger.warn(`[會員服務] 檢測到過期的升級鎖定 (${Math.round(elapsedMs / 1000)}秒)，自動解鎖並繼續`);
+              }
+              // 無論如何都繼續執行，讓後續的 transaction.update 覆蓋掉過期的鎖定
             }
 
             // ✅ P1-1 修復：設置升級鎖定標記
-            transaction.update(usageLimitsRef, {
-              'photos.upgrading': true,
-              'photos.upgradingAt': FieldValue.serverTimestamp()
-            });
+            // 注意：使用 set() 配合 merge: true，無論文檔是否存在都能正常工作
+            transaction.set(usageLimitsRef, {
+              photos: {
+                upgrading: true,
+                upgradingAt: new Date().toISOString()
+              }
+            }, { merge: true });
 
             // 免費用戶的基礎額度是 3 次終生
             const FREE_PHOTO_LIMIT = 3;
@@ -324,6 +384,14 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
             // 如果沒有使用記錄，給予完整的 3 次
             bonusPhotoCards = 3;
             logger.info(`[會員服務] 🔒 免費用戶無使用記錄，給予完整額度 3 次拍照卡`);
+
+            // ✅ P1-1 修復：即使文檔不存在，也需要設置升級鎖定標記
+            transaction.set(usageLimitsRef, {
+              photos: {
+                upgrading: true,
+                upgradingAt: new Date().toISOString()
+              }
+            }, { merge: true });
           }
         } catch (error) {
           logger.error("在 Transaction 內獲取免費用戶剩餘拍照次數失敗:", error);
@@ -375,14 +443,15 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
         usageHistory: [...existingHistory, newGrantRecord],
       };
 
-      // 3.2 發放創建角色卡（直接更新用戶 assets）
-      if (features.characterCreationCards > 0) {
-        const currentAssets = freshUser.assets || {};
-        membershipUpdate.assets = {
-          ...currentAssets,
-          createCards: (currentAssets.createCards || 0) + features.characterCreationCards,
-        };
-      }
+      // 3.2 ✅ P2-1 修復：同時更新 assets.* （向後兼容）
+      const currentAssets = freshUser.assets || {};
+      membershipUpdate.assets = {
+        ...currentAssets,
+        characterUnlockCards: (currentAssets.characterUnlockCards || 0) + (features.characterUnlockCards || 0),
+        photoUnlockCards: (currentAssets.photoUnlockCards || 0) + photoCardsToGrant,
+        videoUnlockCards: (currentAssets.videoUnlockCards || 0) + (features.videoUnlockCards || 0),
+        createCards: (currentAssets.createCards || 0) + (features.characterCreationCards || 0),
+      };
 
       // 3.3 發放金幣（直接更新用戶金幣餘額）
       if (features.monthlyCoinsBonus > 0) {
@@ -433,10 +502,13 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
     // 5. ✅ P1-1 修復：清除升級鎖定標記（如果有設置）
     if (isNewActivation && currentTier === "free" && bonusPhotoCards >= 0) {
       const usageLimitsRef = db.collection("usage_limits").doc(userId);
-      transaction.update(usageLimitsRef, {
-        'photos.upgrading': false,
-        'photos.upgradeCompletedAt': FieldValue.serverTimestamp()
-      });
+      // 使用 set() 配合 merge: true，確保無論文檔是否存在都能正常工作
+      transaction.set(usageLimitsRef, {
+        photos: {
+          upgrading: false,
+          upgradeCompletedAt: new Date().toISOString()
+        }
+      }, { merge: true });
     }
 
     // 6. 記錄會員變更歷史（可選，用於審計）
@@ -452,40 +524,83 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
       timestamp: now.toISOString(),
     });
 
-    result = { success: true, tier: targetTier };
-  });
+        result = { success: true, tier: targetTier };
+      });
 
-    // ✅ Transaction 成功完成
-    logger.info(`[會員服務] Transaction 成功完成（嘗試次數: ${transactionAttempts}）`);
-  } catch (error) {
-    // 🔒 P0-1: Transaction 失敗處理
-    logger.error(`[會員服務] Transaction 失敗（嘗試次數: ${transactionAttempts}）:`, error);
+      // ✅ Transaction 成功完成
+      logger.info(`[會員服務] Transaction 成功完成（嘗試次數: ${transactionAttempts}）`);
+      break; // 成功後跳出重試循環
 
-    // ✅ P1-1 Critical 修復：Transaction 失敗後清除升級鎖定
-    // 雖然 Transaction 會回滾，但為了絕對安全（防止極端邊緣情況），手動清除鎖定
+    } catch (error) {
+      // 🔒 P0-1: Transaction 失敗處理
+      lastError = error;
+      logger.error(`[會員服務] Transaction 失敗（嘗試次數: ${transactionAttempts}/${MAX_ATTEMPTS}）:`, error);
+
+      // ✅ 判斷是否應該重試
+      const shouldRetry = transactionAttempts < MAX_ATTEMPTS && (
+        error.code === 10 || // Firestore ABORTED (衝突)
+        error.code === 'ABORTED' ||
+        error.code === 4 || // DEADLINE_EXCEEDED
+        error.code === 14 || // UNAVAILABLE
+        error.message?.includes('ABORTED') ||
+        error.message?.includes('deadline') ||
+        error.message?.includes('unavailable')
+      );
+
+      if (!shouldRetry) {
+        // 不可重試的錯誤，立即清理並拋出
+        logger.error(`[會員服務] Transaction 失敗，錯誤不可重試: ${error.message}`);
+
+        // 清除升級鎖定
+        if (isNewActivation && currentTier === "free") {
+          try {
+            const usageLimitsRef = db.collection("usage_limits").doc(userId);
+            await usageLimitsRef.update({
+              'photos.upgrading': false,
+              'photos.upgradingFailedAt': new Date().toISOString(),
+              'photos.lastUpgradeError': error.message || 'Unknown error'
+            });
+            logger.info(`[會員服務] ✅ 已清除 Transaction 失敗後的升級鎖定標記`);
+          } catch (cleanupError) {
+            logger.error(`[會員服務] ⚠️ 清除升級鎖定標記失敗:`, cleanupError);
+          }
+        }
+
+        throw error;
+      }
+
+      // ✅ 可重試的錯誤，使用指數退避延遲後重試
+      const backoffMs = Math.min(100 * Math.pow(2, transactionAttempts - 1), 1000);
+      logger.warn(`[會員服務] Transaction 將在 ${backoffMs}ms 後重試...`);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  // ✅ 所有重試都失敗
+  if (!result) {
+    logger.error(`[會員服務] Transaction 在 ${MAX_ATTEMPTS} 次嘗試後仍然失敗`);
+
+    // 最後清除升級鎖定
     if (isNewActivation && currentTier === "free") {
       try {
         const usageLimitsRef = db.collection("usage_limits").doc(userId);
         await usageLimitsRef.update({
           'photos.upgrading': false,
-          'photos.upgradingFailedAt': FieldValue.serverTimestamp(),
-          'photos.lastUpgradeError': error.message || 'Unknown error'
+          'photos.upgradingFailedAt': new Date().toISOString(),
+          'photos.lastUpgradeError': lastError?.message || 'Unknown error after retries'
         });
-        logger.info(`[會員服務] ✅ 已清除 Transaction 失敗後的升級鎖定標記`);
+        logger.info(`[會員服務] ✅ 已清除所有重試失敗後的升級鎖定標記`);
       } catch (cleanupError) {
-        // 清理失敗不應該影響原始錯誤的拋出
         logger.error(`[會員服務] ⚠️ 清除升級鎖定標記失敗:`, cleanupError);
       }
     }
 
-    // 檢查是否為 Firestore 衝突錯誤（ABORTED）
-    if (error.code === 10 || error.message.includes('ABORTED')) {
-      logger.warn(`[會員服務] Transaction 因資料衝突而失敗，可能用戶正在同時進行其他操作（如拍照）`);
+    // 拋出友好的錯誤消息
+    if (lastError?.code === 10 || lastError?.message?.includes('ABORTED')) {
       throw new Error("升級失敗：系統繁忙，請稍後再試");
     }
 
-    // 其他錯誤直接拋出
-    throw error;
+    throw lastError || new Error("升級失敗：未知錯誤");
   }
 
   // ✅ Transaction 完成後清除緩存

@@ -8,6 +8,8 @@ validateEnvOrExit();
 
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import logger, { httpLogger } from "./utils/logger.js";
 import { setCsrfToken, getCsrfTokenHandler, csrfProtection } from "../../../shared/backend-utils/csrfProtection.js";
@@ -45,6 +47,7 @@ import { getConversationCacheStats } from "./conversation/index.js";
 import { initializeCharactersCache, getCacheStats as getCharacterCacheStats } from "./services/character/characterCache.service.js";
 import { startCacheStatsMonitoring, getCacheStats as getUserCacheStats } from "./user/userProfileCache.service.js";
 import { errorHandlerMiddleware } from "../../../shared/utils/errorFormatter.js";
+import { errorHandler } from "./utils/AppError.js";
 
 const app = express();
 const port = process.env.PORT ?? 4000;
@@ -77,6 +80,58 @@ app.use(
     credentials: true,
   })
 );
+
+// 🔒 安全性優化（2025-01）：Security Headers（防止 XSS、Clickjacking 等攻擊）
+app.use(helmet({
+  // Content Security Policy - 防止 XSS 攻擊
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // 允許內聯腳本（根據需要調整）
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"], // 允許外部圖片
+      connectSrc: ["'self'"], // 允許 API 請求
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  // X-Frame-Options - 防止點擊劫持
+  frameguard: { action: 'deny' },
+  // X-Content-Type-Options - 防止 MIME 類型嗅探
+  noSniff: true,
+  // X-XSS-Protection - 啟用瀏覽器的 XSS 防護
+  xssFilter: true,
+  // Referrer-Policy - 控制 Referer 標頭
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  // HSTS - 強制使用 HTTPS（生產環境）
+  hsts: process.env.NODE_ENV === 'production' ? {
+    maxAge: 31536000, // 1 年
+    includeSubDomains: true,
+    preload: true,
+  } : false,
+  // 隱藏 X-Powered-By 標頭
+  hidePoweredBy: true,
+}));
+
+// ⚡ 性能優化（2025-01）：gzip 壓縮響應數據（減少 60-80% 傳輸量）
+app.use(compression({
+  // 只壓縮可壓縮的內容類型
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      // 允許客戶端禁用壓縮
+      return false;
+    }
+    // 使用 compression 的默認過濾器
+    return compression.filter(req, res);
+  },
+  // 壓縮級別 (0-9)，6 是平衡速度和壓縮率的最佳選擇
+  level: 6,
+  // 只壓縮大於 1KB 的響應
+  threshold: 1024
+}));
+
 // HTTP 請求日誌
 app.use(httpLogger);
 
@@ -84,6 +139,10 @@ app.use(httpLogger);
 // 調整為 10MB（足夠支持 base64 圖片，但更安全）
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// 🔒 安全性優化（2025-01）：XSS 輸入清理（清理所有請求中的潛在 XSS 攻擊）
+import { xssSanitizer } from "./middleware/xssSanitizer.js";
+app.use(xssSanitizer);
 
 // 🔒 P0 優化（2025-01）：CSRF 保護
 app.use(cookieParser());
@@ -205,7 +264,8 @@ app.post("/auth/test", (_, res) => {
 });
 
 // ⚠️ 全局錯誤處理中間件（必須在所有路由之後）
-app.use(errorHandlerMiddleware);
+// ✅ 優化：使用統一的 AppError 錯誤處理器
+app.use(errorHandler);
 
 app.listen(port, async () => {
   logger.info(`API 伺服器已啟動於 http://localhost:${port}`);
@@ -228,6 +288,14 @@ app.listen(port, async () => {
 
   // 設置定時清理任務以防止記憶體洩漏
   setupMemoryCleanup();
+
+  // ✅ P2-5 優化：啟動定時任務調度器（開發環境）
+  try {
+    const { startScheduler } = await import('./utils/scheduler.js');
+    await startScheduler();
+  } catch (error) {
+    logger.error('❌ 定時任務調度器啟動失敗:', error);
+  }
 });
 
 /**

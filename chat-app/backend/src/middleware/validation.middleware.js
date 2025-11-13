@@ -446,7 +446,10 @@ export const coinSchemas = {
   // 充值金幣（測試）
   rechargeCoins: {
     body: z.object({
-      amount: commonSchemas.amount,
+      amount: z.coerce.number()
+        .positive("金額必須為正數")
+        .int("金額必須為整數")
+        .max(100000, "單次充值金額不得超過 100,000"),
       idempotencyKey: commonSchemas.idempotencyKey,
     }),
   },
@@ -454,7 +457,10 @@ export const coinSchemas = {
   // 設定金幣餘額（測試帳號）
   setBalance: {
     body: z.object({
-      balance: z.coerce.number().int().nonnegative("金幣數量必須為非負整數"),
+      balance: z.coerce.number()
+        .int("金幣數量必須為整數")
+        .nonnegative("金幣數量不得為負數")
+        .max(1000000, "金幣數量不得超過 1,000,000"),
     }),
   },
 };

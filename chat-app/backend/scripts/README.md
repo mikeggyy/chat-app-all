@@ -126,8 +126,32 @@ cd backend && npm run cleanup:conversations
 
 ### 測試工具
 
+#### 商業邏輯測試（2025-01-13 新增）
+
 ```bash
-cd backend && npm run test:add-coins
+cd backend
+
+# 運行所有商業邏輯測試（推薦）
+npm run test:business-logic
+
+# 或單獨運行
+npm run test:membership    # 會員升級測試（5 個場景）
+npm run test:unlock        # 角色解鎖購買測試（6 個場景）
+```
+
+**測試內容**：
+- ✅ 會員升級流程（鎖定機制、並發控制、過期鎖定）
+- ✅ 角色解鎖購買（解鎖票、金幣、數據遷移）
+- ✅ Transaction 完整性
+- ✅ 數據一致性
+
+詳細說明請參考：[TEST_GUIDE.md](TEST_GUIDE.md)
+
+#### 其他測試工具
+
+```bash
+# 添加測試金幣
+npm run test:add-coins
 ```
 
 添加測試金幣到指定用戶。
@@ -137,12 +161,19 @@ cd backend && npm run test:add-coins
 ```
 backend/scripts/
 ├── README.md                           # 本文檔
+├── TEST_GUIDE.md                       # 🧪 商業邏輯測試指南（新增）
+│
 ├── import-all-data.js                  # 🔥 整合導入腳本（執行所有導入）
 ├── import-characters-to-firestore.js   # AI 角色導入
 ├── import-configs-to-firestore.js      # 系統配置導入
 ├── import-membership-configs.js        # 會員方案導入
 ├── import-character-styles.js          # 角色風格導入
 ├── seed-test-data.js                   # 測試資料導入
+│
+├── test-all-business-logic.js          # 🧪 運行所有商業邏輯測試（新增）
+├── test-membership-upgrade.js          # 🧪 會員升級測試（新增）
+├── test-character-unlock.js            # 🧪 角色解鎖購買測試（新增）
+│
 ├── generateVoicePreviews.js            # 語音預覽生成
 ├── clean-invalid-usage-limits.js       # 清理無效使用限制數據
 └── add-test-coins.js                   # 測試金幣工具

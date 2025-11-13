@@ -3,7 +3,7 @@
  * 管理聊天操作功能：拍照、禮物、語音播放
  */
 
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, onBeforeUnmount } from 'vue';
 import { apiJson } from '../../utils/api';
 import { writeCachedHistory } from '../../utils/conversationCache';
 import { requestAiReply } from '../../utils/conversation';
@@ -434,6 +434,47 @@ export function useChatActions({
 
   const playingVoiceMessageId = ref(null);
 
+  // ✅ 音頻元素引用，用於清理
+  const currentAudio = ref(null);
+  const currentAudioUrl = ref(null);
+
+  /**
+   * 清理音頻資源
+   * 移除事件監聽器、停止播放、釋放 blob URL
+   */
+  const cleanupAudio = () => {
+    if (currentAudio.value) {
+      // 移除事件監聽器
+      currentAudio.value.onended = null;
+      currentAudio.value.onerror = null;
+
+      // 停止播放
+      try {
+        currentAudio.value.pause();
+        currentAudio.value.currentTime = 0;
+      } catch (error) {
+        // 忽略停止播放時的錯誤
+      }
+
+      currentAudio.value = null;
+    }
+
+    // 釋放 blob URL
+    if (currentAudioUrl.value) {
+      try {
+        URL.revokeObjectURL(currentAudioUrl.value);
+      } catch (error) {
+        // 忽略 URL 釋放錯誤
+      }
+      currentAudioUrl.value = null;
+    }
+  };
+
+  // ✅ 組件卸載時清理音頻資源，防止內存洩漏
+  onBeforeUnmount(() => {
+    cleanupAudio();
+  });
+
   /**
    * 播放語音
    * @param {Object} message - 消息物件
@@ -543,20 +584,29 @@ export function useChatActions({
         throw new Error('語音生成失敗');
       }
 
+      // ✅ 播放音頻前先清理舊的音頻資源
+      cleanupAudio();
+
       // 播放音頻
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
 
+      // ✅ 存儲音頻引用和 URL，以便後續清理
+      currentAudio.value = audio;
+      currentAudioUrl.value = audioUrl;
+
       audio.onended = () => {
         playingVoiceMessageId.value = null;
-        URL.revokeObjectURL(audioUrl);
+        // ✅ 播放結束後清理資源
+        cleanupAudio();
       };
 
       audio.onerror = () => {
         playingVoiceMessageId.value = null;
-        URL.revokeObjectURL(audioUrl);
         toast.error('語音播放失敗');
+        // ✅ 播放錯誤後清理資源
+        cleanupAudio();
       };
 
       await audio.play();
@@ -578,9 +628,11 @@ export function useChatActions({
 
   /**
    * 停止語音播放
+   * ✅ 修復：現在會真正停止音頻並清理資源
    */
   const stopVoice = () => {
     playingVoiceMessageId.value = null;
+    cleanupAudio();
   };
 
   return {

@@ -157,4 +157,98 @@ router.post("/test", (req, res) => {
   });
 });
 
+// ============================================
+// ✅ P2-5 優化：新增定時任務端點
+// ============================================
+
+/**
+ * POST /api/cron/expired-memberships
+ * 檢查並降級過期會員
+ *
+ * Cloud Scheduler 配置：
+ * - 執行頻率：每日凌晨 2:00
+ * - 用途：自動檢查付費會員是否過期，並降級到免費會員
+ */
+router.post("/expired-memberships", validateCronRequest, async (req, res) => {
+  logger.info("[Cron] 開始執行過期會員檢查任務");
+
+  try {
+    const { runExpiredMembershipCheck } = await import("../utils/scheduler.js");
+    const result = await runExpiredMembershipCheck();
+
+    if (result.success) {
+      logger.info("[Cron] 過期會員檢查任務完成", {
+        totalChecked: result.totalChecked,
+        expired: result.expired,
+        downgraded: result.downgraded,
+        errors: result.errors,
+        duration: result.duration,
+      });
+
+      res.json({
+        success: true,
+        task: "expired-memberships",
+        timestamp: new Date().toISOString(),
+        result: {
+          totalChecked: result.totalChecked,
+          expired: result.expired,
+          downgraded: result.downgraded,
+          errors: result.errors,
+          duration: result.duration,
+        },
+      });
+    } else {
+      throw new Error(result.error || "Unknown error");
+    }
+  } catch (error) {
+    logger.error("[Cron] 過期會員檢查任務失敗", error);
+
+    res.status(500).json({
+      success: false,
+      task: "expired-memberships",
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
+ * POST /api/cron/idempotency-cleanup
+ * 清理過期的冪等性記錄
+ *
+ * Cloud Scheduler 配置：
+ * - 執行頻率：每小時
+ * - 用途：清理 Firestore 中過期的冪等性記錄
+ */
+router.post("/idempotency-cleanup", validateCronRequest, async (req, res) => {
+  logger.info("[Cron] 開始執行冪等性清理任務");
+
+  try {
+    const { runIdempotencyCleanup } = await import("../utils/scheduler.js");
+    const result = await runIdempotencyCleanup();
+
+    if (result.success) {
+      logger.info("[Cron] 冪等性清理任務完成", result.stats);
+
+      res.json({
+        success: true,
+        task: "idempotency-cleanup",
+        timestamp: new Date().toISOString(),
+        result: result.stats,
+      });
+    } else {
+      throw new Error(result.error || "Unknown error");
+    }
+  } catch (error) {
+    logger.error("[Cron] 冪等性清理任務失敗", error);
+
+    res.status(500).json({
+      success: false,
+      task: "idempotency-cleanup",
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 export default router;

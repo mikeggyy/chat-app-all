@@ -45,12 +45,17 @@ export function useVoiceAudioPlayer() {
     const audio = new Audio(previewUrl);
     audio.preload = 'auto';
 
-    audio.addEventListener('ended', () => {
+    // ✅ 修復：存儲事件處理器以便後續移除
+    const handleEnded = () => {
       if (isPlayingId.value === voiceId) {
         isPlayingId.value = '';
       }
+      // 清理時移除事件監聽器
+      audio.removeEventListener('ended', handleEnded);
       audioPlayers.delete(voiceId);
-    });
+    };
+
+    audio.addEventListener('ended', handleEnded);
 
     audio
       .play()
@@ -60,16 +65,22 @@ export function useVoiceAudioPlayer() {
       })
       .catch(() => {
         isPlayingId.value = '';
+        // ✅ 播放失敗時也清理監聽器
+        audio.removeEventListener('ended', handleEnded);
       });
   };
 
   /**
    * 停止所有音頻播放並清理
+   * ✅ 修復：現在也會移除所有事件監聽器
    */
   const cleanupAudio = () => {
     audioPlayers.forEach((player) => {
       try {
         player.pause();
+        // ✅ 清除所有事件監聽器（設為 null）
+        player.onended = null;
+        player.onerror = null;
       } catch {}
     });
     audioPlayers.clear();

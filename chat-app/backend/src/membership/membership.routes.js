@@ -25,6 +25,7 @@ import {
 import logger from "../utils/logger.js";
 import { purchaseRateLimiter, relaxedRateLimiter, standardRateLimiter } from "../middleware/rateLimiterConfig.js";
 import { validateDevModeBypass } from "../utils/devModeHelper.js";
+import { validateRequest, membershipSchemas } from "../middleware/validation.middleware.js";
 
 const router = express.Router();
 
@@ -52,8 +53,9 @@ router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("use
  * POST /api/membership/:userId/upgrade
  * Body: { tier: "vip" | "vvip", durationMonths?: number, autoRenew?: boolean, idempotencyKey: string }
  * 🔒 冪等性保護：防止重複升級和發放獎勵
+ * ✅ 輸入驗證：使用統一的驗證中間件
  */
-router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), purchaseRateLimiter, async (req, res, next) => {
+router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwnership("userId"), validateRequest(membershipSchemas.upgradeMembership), purchaseRateLimiter, async (req, res, next) => {
   try {
     const { userId } = req.params;
     const { tier, durationMonths, autoRenew, idempotencyKey } = req.body;

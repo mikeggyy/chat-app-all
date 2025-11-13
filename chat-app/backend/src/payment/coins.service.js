@@ -22,25 +22,32 @@ import {
 } from "./transaction.service.js";
 import { getFirestoreDb } from "../firebase/index.js";
 import { FieldValue } from "firebase-admin/firestore";
+import { CacheManager } from "../utils/CacheManager.js";
 import logger from "../utils/logger.js";
 
-// 緩存 AI 功能價格和金幣套餐（避免重複查詢 Firestore）
-const aiFeaturePricesCache = new Map();
-const coinPackagesCache = [];
-let pricesCacheExpiry = 0;
-let packagesCacheExpiry = 0;
-const CACHE_TTL = 60 * 1000; // 1 分鐘緩存
+// ✅ 優化：使用統一的 CacheManager 替代自定義緩存
+const aiFeaturePricesCache = new CacheManager({
+  name: "AIFeaturePrices",
+  ttl: 60 * 1000, // 1 分鐘緩存
+  enableAutoCleanup: true,
+});
+
+const coinPackagesCache = new CacheManager({
+  name: "CoinPackages",
+  ttl: 60 * 1000, // 1 分鐘緩存
+  enableAutoCleanup: true,
+});
 
 /**
  * 從 Firestore 獲取 AI 功能價格
  * @returns {Promise<Object>} AI 功能價格配置
  */
 const getAiFeaturePricesFromFirestore = async () => {
-  const now = Date.now();
-
-  // 檢查緩存
-  if (aiFeaturePricesCache.size > 0 && now < pricesCacheExpiry) {
-    return Object.fromEntries(aiFeaturePricesCache);
+  // ✅ 優化：使用 CacheManager（鍵為固定值 "all"）
+  const cached = aiFeaturePricesCache.get("all");
+  if (cached) {
+    logger.debug(`[金幣服務] 使用快取的 AI 功能價格`);
+    return cached;
   }
 
   try {
@@ -48,14 +55,16 @@ const getAiFeaturePricesFromFirestore = async () => {
     const snapshot = await db.collection("ai_feature_prices").get();
 
     if (!snapshot.empty) {
-      aiFeaturePricesCache.clear();
+      const prices = {};
       snapshot.forEach(doc => {
-        const data = doc.data();
-        aiFeaturePricesCache.set(doc.id, data);
+        prices[doc.id] = doc.data();
       });
-      pricesCacheExpiry = now + CACHE_TTL;
-      logger.debug(`[金幣服務] 從 Firestore 讀取 AI 功能價格: ${aiFeaturePricesCache.size} 個`);
-      return Object.fromEntries(aiFeaturePricesCache);
+
+      // ✅ 優化：使用 CacheManager 存儲
+      aiFeaturePricesCache.set("all", prices);
+
+      logger.debug(`[金幣服務] 從 Firestore 讀取 AI 功能價格: ${Object.keys(prices).length} 個`);
+      return prices;
     }
   } catch (error) {
     logger.warn(`[金幣服務] 從 Firestore 讀取 AI 功能價格失敗: ${error.message}`);
@@ -71,11 +80,11 @@ const getAiFeaturePricesFromFirestore = async () => {
  * @returns {Promise<Array>} 金幣套餐列表
  */
 const getCoinPackagesFromFirestore = async () => {
-  const now = Date.now();
-
-  // 檢查緩存
-  if (coinPackagesCache.length > 0 && now < packagesCacheExpiry) {
-    return coinPackagesCache;
+  // ✅ 優化：使用 CacheManager（鍵為固定值 "all"）
+  const cached = coinPackagesCache.get("all");
+  if (cached) {
+    logger.debug(`[金幣服務] 使用快取的金幣套餐`);
+    return cached;
   }
 
   try {
@@ -83,21 +92,25 @@ const getCoinPackagesFromFirestore = async () => {
     const snapshot = await db.collection("coin_packages").where("status", "==", "active").get();
 
     if (!snapshot.empty) {
-      coinPackagesCache.length = 0;
+      const packages = [];
       snapshot.forEach(doc => {
-        coinPackagesCache.push(doc.data());
+        packages.push(doc.data());
       });
-      packagesCacheExpiry = now + CACHE_TTL;
-      logger.debug(`[金幣服務] 從 Firestore 讀取金幣套餐: ${coinPackagesCache.length} 個`);
-      return coinPackagesCache;
+
+      // ✅ 優化：使用 CacheManager 存儲
+      coinPackagesCache.set("all", packages);
+
+      logger.debug(`[金幣服務] 從 Firestore 讀取金幣套餐: ${packages.length} 個`);
+      return packages;
     }
   } catch (error) {
     logger.warn(`[金幣服務] 從 Firestore 讀取金幣套餐失敗: ${error.message}`);
   }
 
   // 如果 Firestore 中沒有，使用代碼中的默認值
+  const defaultPackages = Object.values(COIN_PACKAGES);
   logger.debug(`[金幣服務] 使用代碼中的金幣套餐`);
-  return Object.values(COIN_PACKAGES);
+  return defaultPackages;
 };
 
 /**
@@ -262,7 +275,8 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
   }
 
   // 檢查是否使用解鎖票（在 Transaction 外）
-  const ticketBalance = await getTicketBalance(userId);
+  const characterUnlockCards = user?.assets?.characterUnlockCards ||
+                                user?.unlockTickets?.characterUnlockCards || 0;
   const useTicket = options.useTicket !== false; // 預設使用解鎖票
 
   // ✅ P1-3 Critical 修復：使用 Transaction 確保原子性
@@ -294,18 +308,22 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
     }
 
     // 3. 使用解鎖票或金幣
-    if (useTicket && ticketBalance.characterUnlockCards > 0) {
+    if (useTicket && characterUnlockCards > 0) {
       // 使用解鎖票（在 Transaction 內扣除）
       const userRef = db.collection("users").doc(userId);
       const userDoc = await transaction.get(userRef);
       const userData = userDoc.data();
 
-      const currentTickets = userData.unlockTickets?.characterUnlockCards || 0;
+      // ✅ Quick Win #2: 統一從 assets.* 讀取（向後兼容 unlockTickets.*）
+      const currentTickets = userData.assets?.characterUnlockCards ||
+                            userData.unlockTickets?.characterUnlockCards || 0;
       if (currentTickets < 1) {
         throw new Error("解鎖票不足");
       }
 
+      // ✅ 同時更新兩個位置（向後兼容）
       transaction.update(userRef, {
+        "assets.characterUnlockCards": currentTickets - 1,
         "unlockTickets.characterUnlockCards": currentTickets - 1,
         updatedAt: new Date().toISOString(),
       });
@@ -342,12 +360,14 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
       const transactionRef = db.collection("transactions").doc();
       transaction.set(transactionRef, {
         userId,
-        type: "purchase",
-        amount: -feature.basePrice,
-        description: `${feature.description} - ${characterId}`,
+        type: TRANSACTION_TYPES.SPEND,  // ✅ 統一使用 SPEND 類型（消費金幣）
+        amount: feature.basePrice,      // ✅ 使用絕對值（符合 P1-3 修復規範）
+        description: `角色解鎖票 - ${characterId}`,
         metadata: {
           featureId: feature.id,
           characterId,
+          itemType: "character_unlock_ticket",  // ✅ 明確記錄購買的商品類型
+          paymentMethod: "coins",
         },
         balanceBefore: currentBalance,
         balanceAfter: newBalance,
@@ -604,8 +624,27 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
     });
 
     // 8. 回滾資產（如果有）
-    const assetType = originalTx.metadata?.assetType;
-    const quantity = originalTx.metadata?.quantity || 1;
+    // ✅ P1-1 優化：完整的資產回滾邏輯
+    // ✅ Risk Fix: 添加 metadata 完整性驗證
+    const metadata = originalTx.metadata || {};
+    const assetType = metadata.assetType;
+    const quantity = metadata.quantity || 1;
+    const characterId = metadata.characterId;
+    const itemType = metadata.itemType;
+
+    // 防禦性檢查：對於需要資產回滾的交易類型，驗證 metadata 是否存在
+    const ASSET_REQUIRED_TYPES = [
+      TRANSACTION_TYPES.UNLOCK,    // 解鎖交易通常涉及解鎖券
+      TRANSACTION_TYPES.PURCHASE,  // 購買交易可能涉及資產
+    ];
+
+    if (ASSET_REQUIRED_TYPES.includes(originalTx.type) && !assetType) {
+      logger.warn(
+        `[退款] ⚠️ 交易 ${transactionId} (類型: ${originalTx.type}) 缺少 metadata.assetType，` +
+        `可能無法完整回滾資產。Metadata: ${JSON.stringify(metadata)}`
+      );
+      // 繼續執行退款（至少退還金幣），但記錄警告
+    }
 
     if (assetType) {
       const currentAssets = user.assets || {};
@@ -618,12 +657,37 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
         // 這裡選擇部分回滾（扣除當前所有資產）
         transaction.update(userRef, {
           [`assets.${assetType}`]: 0,
+          [`unlockTickets.${assetType}`]: 0, // ✅ 同步更新 unlockTickets（向後兼容）
         });
       } else {
         // 完整回滾
+        const newQuantity = currentQuantity - quantity;
         transaction.update(userRef, {
-          [`assets.${assetType}`]: currentQuantity - quantity,
+          [`assets.${assetType}`]: newQuantity,
+          [`unlockTickets.${assetType}`]: newQuantity, // ✅ 同步更新 unlockTickets（向後兼容）
         });
+      }
+
+      // ✅ P1-1 優化：如果是角色解鎖券，撤銷永久解鎖狀態
+      if (itemType === 'character_unlock_ticket' && characterId) {
+        const limitRef = db.collection('usage_limits').doc(userId);
+        const limitDoc = await transaction.get(limitRef);
+
+        if (limitDoc.exists) {
+          const limitData = limitDoc.data();
+          const conversationLimit = limitData.conversation?.[characterId];
+
+          // 只有在確實是永久解鎖的情況下才撤銷
+          if (conversationLimit?.permanentUnlock) {
+            transaction.update(limitRef, {
+              [`conversation.${characterId}.permanentUnlock`]: false,
+              [`conversation.${characterId}.refundedAt`]: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+
+            logger.info(`[退款] ✅ 已撤銷用戶 ${userId} 對角色 ${characterId} 的永久解鎖`);
+          }
+        }
       }
     }
 

@@ -328,44 +328,25 @@ userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id")
       .map((conv) => conv.characterId || conv.conversationId)
       .filter(Boolean);
 
-    // 首先從內存獲取基本信息（批量查詢，避免 N+1 問題）
+    // ✅ 性能優化：從內存緩存批量獲取完整角色信息（包括統計數據）
+    // 避免 N+1 查詢問題，所有數據都從角色緩存讀取
     const { matches: characters } = await getMatchesByIds(characterIds);
     const charactersMap = new Map(characters.map((char) => [char.id, char]));
 
-    // 從 Firestore 獲取統計信息（totalChatUsers, totalFavorites）
-    const db = getFirestoreDb();
-    const statsPromises = characterIds.map(async (charId) => {
-      try {
-        const charDoc = await db.collection("characters").doc(charId).get();
-        if (charDoc.exists) {
-          const data = charDoc.data();
-          return {
-            id: charId,
-            totalChatUsers: data.totalChatUsers || 0,
-            totalFavorites: data.totalFavorites || 0,
-          };
-        }
-      } catch (error) {
-        logger.warn(`獲取角色 ${charId} 統計信息失敗:`, error);
-      }
-      return { id: charId, totalChatUsers: 0, totalFavorites: 0 };
-    });
-
-    const statsResults = await Promise.all(statsPromises);
-    const statsMap = new Map(statsResults.map((stat) => [stat.id, stat]));
-
+    // ✅ 優化：直接使用緩存中的統計信息，無需額外查詢 Firestore
+    // 角色緩存已經包含 totalChatUsers 和 totalFavorites
     const enrichedConversations = conversations.map((conv) => {
       const characterId = conv.characterId || conv.conversationId;
       const character = charactersMap.get(characterId);
-      const stats = statsMap.get(characterId);
 
       return {
         ...conv,
         character: character
           ? {
               ...character,
-              messageCount: stats?.totalChatUsers || 0,
-              totalFavorites: stats?.totalFavorites || 0,
+              // 統計信息直接從緩存中獲取
+              messageCount: character.totalChatUsers || 0,
+              totalFavorites: character.totalFavorites || 0,
             }
           : conv.character || null,
       };

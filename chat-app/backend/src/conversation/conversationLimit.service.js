@@ -102,19 +102,37 @@ export const unlockByAd = async (userId, characterId, adId) => {
       throw new Error("無效的廣告 ID 格式");
     }
 
-    // 5. 檢查 adId 是否已使用過（防止重放攻擊）
+    // 5. ✅ 驗證 adId 時間戳（防止使用過期或未來的廣告ID）
+    const adTimestamp = parseInt(adId.split('-')[1], 10);
+    const now = Date.now();
+    const AD_VALID_WINDOW = 5 * 60 * 1000; // 廣告ID有效期：5分鐘
+    const timeDiff = now - adTimestamp;
+
+    // ✅ Critical Fix: 明確拒絕未來時間戳和過期時間戳
+    if (isNaN(adTimestamp) || timeDiff < 0 || timeDiff > AD_VALID_WINDOW) {
+      if (timeDiff < 0) {
+        logger.warn(`[廣告解鎖] ⚠️ 檢測到未來時間戳: ${adId}, timestamp: ${adTimestamp}, now: ${now}`);
+        throw new Error("無效的廣告 ID（時間異常），請重新觀看廣告");
+      }
+      logger.warn(`[廣告解鎖] ⚠️ 廣告時間戳已過期: ${adId}, timestamp: ${adTimestamp}, now: ${now}`);
+      throw new Error("廣告 ID 已過期，請重新觀看廣告");
+    }
+
+    // 6. ✅ 檢查 adId 重複使用（防止重放攻擊）
+    // ⚠️ 注意：Transaction 提供樂觀鎖定和自動衝突檢測，無需手動二次讀取
     const usedAdIds = statsData.usedAdIds || [];
     if (usedAdIds.includes(adId)) {
+      logger.warn(`[廣告解鎖] ⚠️ 檢測到重複 adId: ${adId.substring(0, 20)}...`);
       throw new Error("該廣告獎勵已領取，請勿重複領取");
     }
 
-    // 6. 在 Transaction 內記錄廣告觀看
+    // 7. 在 Transaction 內記錄廣告觀看
     transaction.set(
       adStatsRef,
       {
         [today]: todayCount + 1,
         lastWatchTime: Date.now(),
-        usedAdIds: [...usedAdIds.slice(-100), adId], // 只保留最近 100 個 adId
+        usedAdIds: [...usedAdIds.slice(-100), adId], // ✅ 使用 statsData 的 usedAdIds
         lastAdId: adId,
         lastCharacterId: characterId,
         totalAdsWatched: (statsData.totalAdsWatched || 0) + 1,
@@ -135,7 +153,7 @@ export const unlockByAd = async (userId, characterId, adId) => {
       unlockedAmount,
     });
 
-    // 7. 在 Transaction 內解鎖對話
+    // 8. 在 Transaction 內解鎖對話
     const limitRef = db.collection("usage_limits").doc(userId);
     const limitDoc = await transaction.get(limitRef);
     const limitData = limitDoc.exists ? limitDoc.data() : {};

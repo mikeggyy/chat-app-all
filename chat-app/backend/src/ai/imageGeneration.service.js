@@ -88,13 +88,12 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
     if (portraitPath.startsWith("http://") || portraitPath.startsWith("https://")) {
       logger.info(`[圖片生成] 從遠端下載角色照片: ${portraitPath}`);
 
-      // 從 URL 下載圖片（帶超時控制）
+      // ✅ P0 優化：從 URL 下載圖片（帶完整超時控制）
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000); // 10秒超時
+      const timeout = setTimeout(() => controller.abort(), 15000); // 15秒超時（包含下載和讀取）
 
       try {
         const response = await fetch(portraitPath, { signal: controller.signal });
-        clearTimeout(timeout);
 
         if (!response.ok) {
           throw new Error(`下載失敗: ${response.status} ${response.statusText}`);
@@ -107,9 +106,13 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
           throw new Error(`角色圖片過大 (${Math.round(parseInt(contentLength) / 1024 / 1024)} MB)，請使用小於 5MB 的圖片`);
         }
 
-        // 獲取圖片數據
+        // ✅ P0 優化：arrayBuffer() 也在 AbortController 保護下（同一個 signal）
+        // 這樣可以確保整個下載過程（包括讀取響應體）都有超時保護
         const arrayBuffer = await response.arrayBuffer();
         imageBuffer = Buffer.from(arrayBuffer);
+
+        // ✅ 成功後清除 timeout
+        clearTimeout(timeout);
 
         // ✅ 再次檢查實際下載的圖片大小
         if (imageBuffer.length > MAX_IMAGE_SIZE) {
@@ -134,7 +137,7 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
       } catch (fetchError) {
         clearTimeout(timeout);
         if (fetchError.name === 'AbortError') {
-          throw new Error('下載超時（10秒）');
+          throw new Error('下載超時（15秒），請檢查網絡連接或使用更小的圖片');
         }
         throw fetchError;
       }
@@ -187,20 +190,36 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
   const selectedScenario = promptResult.selectedScenario;
 
   try {
-    // 使用 Gemini 2.5 Flash Image (Nano Banana) 生成圖片
-    // 支援 2:3 比例，保持角色一致性
-    const geminiResult = await generateGeminiImage(characterImageBase64, prompt, {
-      styleName: "Disney Charactor", // 使用迪士尼風格
-      aspectRatio: "2:3", // 2:3 比例（832x1248 或類似尺寸）
-      selectedScenario: selectedScenario, // 🔥 傳遞選中的場景給 Gemini
-    });
+    let imageDataUrl;
+    let usageMetadata = { promptTokenCount: 0, candidatesTokenCount: 0, totalTokenCount: 0 };
 
-    if (!geminiResult || !geminiResult.imageDataUrl) {
-      throw new Error("圖片生成失敗，未返回圖片 URL");
+    // 🔧 測試模式：返回測試圖片，不消耗 LLM API 配額
+    if (process.env.USE_MOCK_IMAGE_GENERATION === 'true') {
+      logger.info(`[圖片生成] 🧪 測試模式啟用，使用測試圖片替代 Gemini API 調用`);
+
+      // 讀取測試圖片並轉為 base64
+      const testImagePath = join(__dirname, "..", "..", "..", "frontend", "public", "test", "test.webp");
+      const testImageBuffer = readFileSync(testImagePath);
+      const testImageBase64 = testImageBuffer.toString("base64");
+      imageDataUrl = `data:image/webp;base64,${testImageBase64}`;
+
+      logger.info(`[圖片生成] 🧪 測試圖片載入成功，大小: ${Math.round(testImageBase64.length / 1024)} KB`);
+    } else {
+      // 正常模式：使用 Gemini 2.5 Flash Image (Nano Banana) 生成圖片
+      // 支援 2:3 比例，保持角色一致性
+      const geminiResult = await generateGeminiImage(characterImageBase64, prompt, {
+        styleName: "Disney Charactor", // 使用迪士尼風格
+        aspectRatio: "2:3", // 2:3 比例（832x1248 或類似尺寸）
+        selectedScenario: selectedScenario, // 🔥 傳遞選中的場景給 Gemini
+      });
+
+      if (!geminiResult || !geminiResult.imageDataUrl) {
+        throw new Error("圖片生成失敗，未返回圖片 URL");
+      }
+
+      imageDataUrl = geminiResult.imageDataUrl;
+      usageMetadata = geminiResult.usageMetadata;
     }
-
-    const imageDataUrl = geminiResult.imageDataUrl;
-    const usageMetadata = geminiResult.usageMetadata;
 
     // 記錄圖片生成的 token 使用情況
     logger.info(`[圖片生成] Token 使用情況: userId=${userId}, characterId=${characterId}`, {

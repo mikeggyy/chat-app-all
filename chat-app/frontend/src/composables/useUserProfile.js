@@ -9,9 +9,10 @@ const baseState = reactive({
   user: null,
 });
 
-// ✅ 添加 TTL 的用戶資料緩存（2 分鐘過期）
+// ✅ P1 優化：增加用戶資料緩存 TTL（10 分鐘）
+// 用戶資料變化不頻繁，可以使用更長的緩存時間減少 API 請求
 const profileCache = new Map(); // 存儲格式: { data: userData, timestamp: Date.now() }
-const CACHE_TTL = 2 * 60 * 1000; // 2 分鐘 = 120000ms
+const CACHE_TTL = 10 * 60 * 1000; // 10 分鐘 = 600000ms（原本 2 分鐘）
 const firebaseAuth = useFirebaseAuth();
 
 const normalizeUser = (payload = {}) => {

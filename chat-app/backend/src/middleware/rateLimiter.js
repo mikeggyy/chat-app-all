@@ -1,3 +1,5 @@
+import logger from "../utils/logger.js";
+
 const createRateLimiter = ({
   windowMs = 60000,
   maxRequests = 60,
@@ -20,9 +22,9 @@ const createRateLimiter = ({
       }
     }
 
-    // 僅在開發環境記錄清理日誌
-    if (deletedCount > 0 && process.env.NODE_ENV === 'development') {
-      console.log(`[RateLimiter] 清理了 ${deletedCount} 個過期的 bucket，剩餘 ${buckets.size} 個`);
+    // ✅ P2 優化：使用 logger 替代 console.log
+    if (deletedCount > 0) {
+      logger.debug(`[RateLimiter] 清理了 ${deletedCount} 個過期的 bucket，剩餘 ${buckets.size} 個`);
     }
   };
 

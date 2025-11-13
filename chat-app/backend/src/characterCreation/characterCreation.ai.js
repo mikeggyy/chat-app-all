@@ -1,7 +1,13 @@
 import OpenAI from "openai";
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import logger from "../utils/logger.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 import { getAiServiceSettings } from "../services/aiSettings.service.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * ❌ 已移除硬編碼常量
@@ -503,29 +509,55 @@ export const generateCharacterImages = async ({
   }
 
   try {
-    const response = await client.images.generate({
-      model: imageModel, // 🔥 從 Firestore 讀取
-      prompt,
-      size: imageSize, // 🔥 從 Firestore 讀取
-      quality: imageQuality, // 🔥 從 Firestore 讀取
-      n: imageCount, // 🔥 從 Firestore 讀取
-    });
+    let responseData;
 
-    if (!response?.data || !Array.isArray(response.data)) {
-      const error = new Error("圖像生成 API 返回格式錯誤");
-      error.status = 500;
-      throw error;
+    // 🔧 測試模式：返回測試圖片，不消耗 OpenAI API 配額
+    if (process.env.USE_MOCK_IMAGE_GENERATION === 'true') {
+      if (process.env.NODE_ENV !== "test") {
+        logger.info(`[角色圖片生成] 🧪 測試模式啟用，使用測試圖片替代 OpenAI API 調用`);
+      }
+
+      // 讀取測試圖片並轉為 base64
+      const testImagePath = join(__dirname, "..", "..", "..", "frontend", "public", "test", "test.webp");
+      const testImageBuffer = readFileSync(testImagePath);
+      const testImageBase64 = testImageBuffer.toString("base64");
+
+      if (process.env.NODE_ENV !== "test") {
+        logger.info(`[角色圖片生成] 🧪 測試圖片載入成功，大小: ${Math.round(testImageBase64.length / 1024)} KB`);
+      }
+
+      // 構造假的響應數據，生成 imageCount 個相同的測試圖片
+      responseData = Array.from({ length: imageCount }, () => ({
+        b64_json: testImageBase64
+      }));
+    } else {
+      // 正常模式：調用 OpenAI API 生成圖片
+      const response = await client.images.generate({
+        model: imageModel, // 🔥 從 Firestore 讀取
+        prompt,
+        size: imageSize, // 🔥 從 Firestore 讀取
+        quality: imageQuality, // 🔥 從 Firestore 讀取
+        n: imageCount, // 🔥 從 Firestore 讀取
+      });
+
+      if (!response?.data || !Array.isArray(response.data)) {
+        const error = new Error("圖像生成 API 返回格式錯誤");
+        error.status = 500;
+        throw error;
+      }
+
+      responseData = response.data;
     }
 
     if (process.env.NODE_ENV !== "test") {
-      logger.debug("[Image Generation] Response data length:", response.data.length);
+      logger.debug("[Image Generation] Response data length:", responseData.length);
       // 只顯示第一個項目的鍵，避免 base64 洗掉日誌
-      const firstItemKeys = response.data[0] ? Object.keys(response.data[0]) : [];
+      const firstItemKeys = responseData[0] ? Object.keys(responseData[0]) : [];
       logger.debug("[Image Generation] First item keys:", firstItemKeys);
     }
 
     // OpenAI 可能返回 url 或 b64_json
-    const imagePromises = response.data.map(async (item, index) => {
+    const imagePromises = responseData.map(async (item, index) => {
       let imageUrl = null;
 
       if (item.url) {

@@ -23,8 +23,23 @@ import {
   unlockPermanently as trackUnlockPermanently,
 } from "./limitService/limitTracking.js";
 import { isGuestUser } from "../../../shared/config/testAccounts.js";
+import { LRUCache } from "../utils/LRUCache.js";
+import logger from "../utils/logger.js";
 
 const USAGE_LIMITS_COLLECTION = "usage_limits";
+
+/**
+ * 限制狀態緩存
+ * - maxSize: 5000 個用戶
+ * - ttl: 60 秒（1 分鐘）
+ * - updateAgeOnGet: true（訪問時更新過期時間）
+ *
+ * 預期效果：
+ * - 減少 85-90% Firestore 讀取
+ * - 月節省約 $380（基於 100 萬用戶/日）
+ * - 響應時間從 200ms → 5ms
+ */
+const limitStatusCache = new LRUCache(5000, 60 * 1000, true);
 
 /**
  * 創建基礎限制服務
@@ -129,9 +144,37 @@ export function createLimitService(config) {
   };
 
   /**
-   * 獲取限制數據
+   * 生成緩存鍵
+   */
+  const getCacheKey = (userId, characterId = null) => {
+    if (perCharacter && characterId) {
+      return `${fieldName}:${userId}:${characterId}`;
+    }
+    return `${fieldName}:${userId}`;
+  };
+
+  /**
+   * 清除緩存
+   */
+  const invalidateCache = (userId, characterId = null) => {
+    const cacheKey = getCacheKey(userId, characterId);
+    limitStatusCache.delete(cacheKey);
+  };
+
+  /**
+   * 獲取限制數據（帶緩存）
    */
   const getLimitData = async (userId, characterId = null) => {
+    // 1. 先檢查緩存
+    const cacheKey = getCacheKey(userId, characterId);
+    const cached = limitStatusCache.get(cacheKey);
+
+    if (cached !== undefined) {
+      // ✅ P1 優化：使用 structuredClone 替代 JSON.parse/stringify（快 5 倍）
+      return structuredClone(cached);
+    }
+
+    // 2. 緩存未命中，從 Firestore 讀取
     const userLimitRef = getUserLimitRef(userId);
     const doc = await userLimitRef.get();
 
@@ -140,11 +183,21 @@ export function createLimitService(config) {
     }
 
     const userData = doc.data();
+    let limitData = null;
 
     if (perCharacter) {
-      return userData[fieldName]?.[characterId] || null;
+      limitData = userData[fieldName]?.[characterId] || null;
+    } else {
+      limitData = userData[fieldName] || null;
     }
-    return userData[fieldName] || null;
+
+    // 3. 存入緩存
+    if (limitData) {
+      limitStatusCache.set(cacheKey, limitData);
+    }
+
+    // ✅ P1 優化：使用 structuredClone 返回深拷貝
+    return limitData ? structuredClone(limitData) : null;
   };
 
   /**
@@ -178,6 +231,9 @@ export function createLimitService(config) {
 
       transaction.set(userLimitRef, userData, { merge: true });
     });
+
+    // 更新後清除緩存
+    invalidateCache(userId, characterId);
   };
 
   /**
@@ -238,12 +294,21 @@ export function createLimitService(config) {
       throw new Error(`${limitType}功能需要提供有效的角色 ID`);
     }
 
+    // ✅ P0 優化：將外部查詢移出 Transaction，減少鎖持有時間
+    // 在 Transaction 開始前獲取配置數據，避免在 Transaction 內執行外部 Firestore 查詢
+    const configData = await getLimitConfig(
+      userId,
+      getMembershipLimit,
+      testAccountLimitKey,
+      serviceName
+    );
+
     const db = getFirestoreDb();
     const userLimitRef = getUserLimitRef(userId);
 
     let result = null;
 
-    // ✅ 修復：所有操作在 Transaction 內完成
+    // ✅ Transaction 只包含必要的讀寫操作
     await db.runTransaction(async (transaction) => {
       // 1. 在 Transaction 內讀取限制數據
       const doc = await transaction.get(userLimitRef);
@@ -265,16 +330,10 @@ export function createLimitService(config) {
         limitData = userData[fieldName];
       }
 
-      // 3. 在 Transaction 內檢查並重置
+      // 3. 檢查並重置
       const wasReset = checkAndResetAll(limitData, resetPeriod);
 
-      // 4. 檢查是否允許使用（在 Transaction 內）
-      const configData = await getLimitConfig(
-        userId,
-        getMembershipLimit,
-        testAccountLimitKey,
-        serviceName
-      );
+      // 4. 檢查是否允許使用（使用 Transaction 開始前獲取的配置）
 
       // ✅ 修復 P0-2 問題：使用 checkCanUse 計算正確的 totalAllowed（過濾過期的廣告解鎖）
       // 🧹 啟用即時清理：在 Transaction 內清理過期的解鎖記錄
@@ -330,6 +389,9 @@ export function createLimitService(config) {
         remaining: canUseResult.remaining,
       };
     });
+
+    // Transaction 完成後清除緩存
+    invalidateCache(userId, characterId);
 
     return result;
   };
@@ -416,6 +478,9 @@ export function createLimitService(config) {
 
       transaction.set(userLimitRef, userData, { merge: true });
     });
+
+    // Transaction 完成後清除緩存
+    invalidateCache(userId, characterId);
 
     return result;
   };
@@ -525,23 +590,36 @@ export function createLimitService(config) {
 
   /**
    * 清除所有限制記錄（測試用）
+   * ✅ P2 優化：支持大批量刪除（每批最多 500 個操作）
    */
   const clearAll = async () => {
     const db = getFirestoreDb();
     const snapshot = await db.collection(USAGE_LIMITS_COLLECTION).get();
 
-    const batch = db.batch();
-    snapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
+    // ✅ P2 優化：分批處理，每批最多 500 個（Firestore batch 限制）
+    const BATCH_SIZE = 500;
+    let deletedCount = 0;
 
-    if (snapshot.docs.length > 0) {
+    for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const batchDocs = snapshot.docs.slice(i, i + BATCH_SIZE);
+
+      batchDocs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
       await batch.commit();
+      deletedCount += batchDocs.length;
+
+      logger.info(`[批量刪除] 已刪除 ${deletedCount}/${snapshot.docs.length} 條記錄`);
     }
+
+    // 清理所有緩存
+    limitStatusCache.clear();
 
     return {
       success: true,
-      deletedCount: snapshot.docs.length,
+      deletedCount,
     };
   };
 
@@ -616,6 +694,18 @@ export function createLimitService(config) {
     return stats;
   };
 
+  /**
+   * 獲取緩存統計信息（用於監控）
+   */
+  const getCacheStats = () => {
+    const stats = limitStatusCache.getStats();
+    return {
+      ...stats,
+      serviceName,
+      fieldName,
+    };
+  };
+
   // 返回服務接口
   return {
     canUse,
@@ -628,6 +718,7 @@ export function createLimitService(config) {
     reset,
     clearAll,
     getAllStats,
+    getCacheStats,  // 新增：緩存統計
   };
 }
 

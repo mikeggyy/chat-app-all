@@ -6,34 +6,65 @@
 import logger from "./logger.js";
 
 /**
- * LRU 緩存類
+ * LRU 緩存類（支持 TTL）
  */
 export class LRUCache {
   /**
    * 創建 LRU 緩存
    * @param {number} maxSize - 最大緩存項目數
+   * @param {number} ttl - 緩存過期時間（毫秒），0 表示永不過期
+   * @param {boolean} updateAgeOnGet - 獲取時是否更新過期時間
    */
-  constructor(maxSize = 100) {
+  constructor(maxSize = 100, ttl = 0, updateAgeOnGet = false) {
     this.maxSize = maxSize;
+    this.ttl = ttl;
+    this.updateAgeOnGet = updateAgeOnGet;
     this.cache = new Map();
+    this.hits = 0;
+    this.misses = 0;
+  }
+
+  /**
+   * 檢查緩存項是否過期
+   * @private
+   */
+  _isExpired(entry) {
+    if (this.ttl === 0) return false;
+    return Date.now() - entry.timestamp > this.ttl;
   }
 
   /**
    * 獲取緩存項
    * @param {string} key - 緩存鍵
-   * @returns {*} 緩存值，如果不存在則返回 undefined
+   * @returns {*} 緩存值，如果不存在或已過期則返回 undefined
    */
   get(key) {
     if (!this.cache.has(key)) {
+      this.misses++;
       return undefined;
     }
 
-    // 移動到最前面（最近使用）
-    const value = this.cache.get(key);
-    this.cache.delete(key);
-    this.cache.set(key, value);
+    const entry = this.cache.get(key);
 
-    return value;
+    // 檢查是否過期
+    if (this._isExpired(entry)) {
+      this.cache.delete(key);
+      this.misses++;
+      return undefined;
+    }
+
+    this.hits++;
+
+    // 更新訪問時間（如果啟用）
+    if (this.updateAgeOnGet) {
+      entry.timestamp = Date.now();
+    }
+
+    // 移動到最前面（最近使用）
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+
+    return entry.value;
   }
 
   /**
@@ -53,16 +84,29 @@ export class LRUCache {
       this.cache.delete(oldestKey);
     }
 
-    this.cache.set(key, value);
+    this.cache.set(key, {
+      value,
+      timestamp: Date.now(),
+    });
   }
 
   /**
-   * 檢查緩存中是否存在某個鍵
+   * 檢查緩存中是否存在某個鍵（且未過期）
    * @param {string} key - 緩存鍵
    * @returns {boolean}
    */
   has(key) {
-    return this.cache.has(key);
+    if (!this.cache.has(key)) {
+      return false;
+    }
+
+    const entry = this.cache.get(key);
+    if (this._isExpired(entry)) {
+      this.cache.delete(key);
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -79,6 +123,8 @@ export class LRUCache {
    */
   clear() {
     this.cache.clear();
+    this.hits = 0;
+    this.misses = 0;
   }
 
   /**
@@ -94,10 +140,17 @@ export class LRUCache {
    * @returns {Object}
    */
   getStats() {
+    const totalRequests = this.hits + this.misses;
+    const hitRate = totalRequests > 0 ? (this.hits / totalRequests) * 100 : 0;
+
     return {
       size: this.cache.size,
       maxSize: this.maxSize,
       usage: (this.cache.size / this.maxSize) * 100,
+      hits: this.hits,
+      misses: this.misses,
+      totalRequests,
+      hitRate: hitRate.toFixed(2) + '%',
     };
   }
 }
@@ -105,8 +158,15 @@ export class LRUCache {
 /**
  * 創建圖片緩存實例
  * 用於緩存角色圖片、生成的圖片等
+ * maxSize: 200 個圖片
+ * ttl: 1 小時（✅ P1 優化：添加 TTL 防止內存洩漏）
+ * updateAgeOnGet: true（訪問時更新過期時間，常用圖片會保留更久）
  */
-export const imageCache = new LRUCache(200);
+export const imageCache = new LRUCache(
+  200,                    // maxSize: 200 個圖片
+  60 * 60 * 1000,        // ttl: 1 小時
+  true                    // updateAgeOnGet: 訪問時更新過期時間
+);
 
 /**
  * 預載入角色圖片

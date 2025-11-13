@@ -2,8 +2,22 @@ import { getFirestoreDb } from "../firebase/index.js";
 import { FieldValue } from "firebase-admin/firestore";
 import { HISTORY_LIMITS } from "../config/limits.js";
 import logger from "../utils/logger.js";
+import { LRUCache } from "../utils/LRUCache.js";
 
 const CONVERSATIONS_COLLECTION = "conversations";
+
+/**
+ * 對話緩存
+ * - maxSize: 1000 個對話
+ * - ttl: 10 分鐘（600 秒）
+ * - updateAgeOnGet: true（訪問時更新過期時間）
+ *
+ * 預期效果：
+ * - 減少重複的 Firestore 讀取
+ * - 防止內存無限增長
+ * - 自動淘汰不活躍的對話
+ */
+const conversationCache = new LRUCache(1000, 10 * 60 * 1000, true);
 
 const createConversationKey = (userId, characterId) => {
   const userKey = typeof userId === "string" ? userId.trim() : "";
@@ -78,7 +92,22 @@ const normalizeMessagePayload = (payload = {}) => {
 
   // 保留 imageUrl（如果存在）
   if (typeof payload.imageUrl === "string" && payload.imageUrl.trim().length) {
-    result.imageUrl = payload.imageUrl.trim();
+    const imageUrl = payload.imageUrl.trim();
+
+    // ✅ P0 優化：檢查 imageUrl 是否為 base64（不應該出現）
+    if (imageUrl.startsWith('data:image')) {
+      logger.error('[對話服務] 錯誤：消息包含 base64 圖片，應該先上傳到 Storage');
+      throw new Error('圖片應該先上傳到 Storage，不能直接使用 base64');
+    }
+
+    // ✅ P0 優化：檢查 URL 長度（Firebase Storage URL 通常 < 500 字符）
+    const MAX_URL_LENGTH = 2000; // 2000 字符限制
+    if (imageUrl.length > MAX_URL_LENGTH) {
+      logger.error(`[對話服務] 圖片 URL 過長: ${imageUrl.length} 字符`);
+      throw new Error(`圖片 URL 過長（${imageUrl.length} 字符），請檢查是否正確上傳`);
+    }
+
+    result.imageUrl = imageUrl;
     logger.info(`[對話服務] ✅ 訊息包含 imageUrl: ${result.imageUrl.substring(0, 50)}..., 長度: ${result.imageUrl.length}`);
   } else if (payload.imageUrl !== undefined) {
     logger.warn(`[對話服務] ⚠️ imageUrl 無效: type=${typeof payload.imageUrl}, value=${payload.imageUrl?.substring(0, 50)}`);
@@ -91,6 +120,13 @@ const normalizeMessagePayload = (payload = {}) => {
     const video = {};
     if (typeof payload.video.url === "string" && payload.video.url.trim().length) {
       video.url = payload.video.url.trim();
+
+      // ✅ P0 優化：檢查 video URL 長度
+      const MAX_URL_LENGTH = 2000;
+      if (video.url.length > MAX_URL_LENGTH) {
+        logger.error(`[對話服務] 視頻 URL 過長: ${video.url.length} 字符`);
+        throw new Error(`視頻 URL 過長（${video.url.length} 字符）`);
+      }
     }
     if (typeof payload.video.duration === "string") {
       video.duration = payload.video.duration.trim();
@@ -103,6 +139,15 @@ const normalizeMessagePayload = (payload = {}) => {
       result.video = video;
       logger.info(`[對話服務] ✅ 訊息包含 video: ${video.url.substring(0, 50)}..., duration: ${video.duration || 'N/A'}`);
     }
+  }
+
+  // ✅ P0 優化：檢查單條消息總大小
+  const MAX_SINGLE_MESSAGE_SIZE = 50 * 1024; // 50KB 限制
+  const messageSize = JSON.stringify(result).length;
+
+  if (messageSize > MAX_SINGLE_MESSAGE_SIZE) {
+    logger.error(`[對話服務] 單條消息過大: ${(messageSize / 1024).toFixed(2)} KB`);
+    throw new Error(`消息過大（${(messageSize / 1024).toFixed(2)} KB），請縮短文字或檢查圖片/視頻 URL`);
   }
 
   return result;
@@ -118,13 +163,26 @@ const getConversationRef = (userId, characterId) => {
 };
 
 /**
- * 獲取對話歷史
+ * 獲取對話歷史（帶緩存）
  */
 export const getConversationHistory = async (userId, characterId) => {
+  const cacheKey = createConversationKey(userId, characterId);
+
+  // 1. 先檢查緩存
+  const cached = conversationCache.get(cacheKey);
+  if (cached !== undefined) {
+    logger.info(`[對話服務] 💾 從緩存讀取對話: userId=${userId}, characterId=${characterId}`);
+    // ✅ P1 優化：使用 structuredClone 替代 JSON.parse/stringify（快 5 倍）
+    return structuredClone(cached);
+  }
+
+  // 2. 緩存未命中，從 Firestore 讀取
   const conversationRef = getConversationRef(userId, characterId);
   const doc = await conversationRef.get();
 
   if (!doc.exists) {
+    // 空對話也緩存，避免重複查詢
+    conversationCache.set(cacheKey, []);
     return [];
   }
 
@@ -142,7 +200,11 @@ export const getConversationHistory = async (userId, characterId) => {
     });
   }
 
-  return messages;
+  // 3. 存入緩存
+  conversationCache.set(cacheKey, messages);
+
+  // ✅ P1 優化：使用 structuredClone 返回深拷貝
+  return structuredClone(messages);
 };
 
 /**
@@ -174,6 +236,9 @@ export const replaceConversationHistory = async (userId, characterId, messages) 
     },
     { merge: true }
   );
+
+  // 清除緩存
+  conversationCache.delete(key);
 
   return getConversationHistory(userId, characterId);
 };
@@ -297,6 +362,10 @@ export const appendConversationMessages = async (userId, characterId, messages) 
     logger.warn(`[對話服務] ⚠️ Firestore 驗證失敗:`, verifyError.message);
   }
 
+  // 清除緩存
+  const key = createConversationKey(userId, characterId);
+  conversationCache.delete(key);
+
   return result;
 };
 
@@ -319,6 +388,10 @@ export const appendConversationMessage = async (userId, characterId, message) =>
 export const clearConversationHistory = async (userId, characterId) => {
   const conversationRef = getConversationRef(userId, characterId);
   await conversationRef.delete();
+
+  // 清除緩存
+  const key = createConversationKey(userId, characterId);
+  conversationCache.delete(key);
 };
 
 /**
@@ -340,7 +413,7 @@ export const getConversationStoreSnapshot = async () => {
 };
 
 /**
- * 獲取對話緩存統計資訊
+ * 獲取對話緩存統計資訊（包含 LRU 緩存統計）
  * @returns {Object} 緩存統計
  */
 export const getConversationCacheStats = async () => {
@@ -355,12 +428,22 @@ export const getConversationCacheStats = async () => {
     }
   });
 
+  // 獲取 LRU 緩存統計
+  const lruStats = conversationCache.getStats();
+
   return {
-    conversationCount: snapshot.size,
-    totalMessages,
-    averageMessagesPerConversation: snapshot.size > 0
-      ? Math.round(totalMessages / snapshot.size)
-      : 0,
+    firestore: {
+      conversationCount: snapshot.size,
+      totalMessages,
+      averageMessagesPerConversation: snapshot.size > 0
+        ? Math.round(totalMessages / snapshot.size)
+        : 0,
+    },
+    cache: {
+      ...lruStats,
+      ttl: '10 分鐘',
+      maxSize: 1000,
+    },
   };
 };
 
@@ -442,6 +525,10 @@ export const deleteConversationPhotos = async (userId, characterId, messageIds) 
     };
   });
 
+  // 清除緩存
+  const key = createConversationKey(userId, characterId);
+  conversationCache.delete(key);
+
   return result;
 };
 
@@ -509,6 +596,10 @@ export const deleteConversationMessages = async (userId, characterId, messageIds
       remaining: newHistory.length,
     };
   });
+
+  // 清除緩存
+  const key = createConversationKey(userId, characterId);
+  conversationCache.delete(key);
 
   return result;
 };

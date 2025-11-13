@@ -1,0 +1,104 @@
+name: 測試套件
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  test-frontend:
+    name: 前端測試 (Frontend Tests)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./chat-app/frontend
+
+    steps:
+    - name: Checkout 代碼
+      uses: actions/checkout@v4
+
+    - name: 設置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: chat-app/frontend/package-lock.json
+
+    - name: 安裝依賴
+      run: npm ci
+
+    - name: 運行 Composable 測試
+      run: npm run test:run -- src/composables/**/*.spec.js
+
+    - name: 生成覆蓋率報告
+      run: npm run test:coverage
+      continue-on-error: true
+
+    - name: 上傳覆蓋率報告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: frontend-coverage
+        path: chat-app/frontend/coverage
+        retention-days: 30
+
+  test-backend:
+    name: 後端測試 (Backend API Tests)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./chat-app/backend
+
+    steps:
+    - name: Checkout 代碼
+      uses: actions/checkout@v4
+
+    - name: 設置 Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: chat-app/backend/package-lock.json
+
+    - name: 安裝依賴
+      run: npm ci
+
+    - name: 運行 API 路由測試
+      run: npm run test:run -- src/**/*.spec.js
+      env:
+        NODE_ENV: test
+        FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    - name: 生成覆蓋率報告
+      run: npm run test:coverage
+      continue-on-error: true
+      env:
+        NODE_ENV: test
+
+    - name: 上傳覆蓋率報告
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: backend-coverage
+        path: chat-app/backend/coverage
+        retention-days: 30
+
+  test-summary:
+    name: 測試總結 (Test Summary)
+    runs-on: ubuntu-latest
+    needs: [test-frontend, test-backend]
+    if: always()
+
+    steps:
+    - name: 生成測試總結
+      run: |
+        echo "## 測試結果總結 🎯" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- 前端測試: ${{ needs.test-frontend.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- 後端測試: ${{ needs.test-backend.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "詳細報告請查看各個 Job 的輸出。" >> $GITHUB_STEP_SUMMARY

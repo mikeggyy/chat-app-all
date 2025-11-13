@@ -10,6 +10,7 @@ import { getUserById } from "../user/user.service.js";
 import { getFirestoreDb } from "../firebase/index.js";
 import { FieldValue } from "firebase-admin/firestore";
 import logger from "../utils/logger.js";
+import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 
 // 券類型常量
 export const TICKET_TYPES = {
@@ -165,7 +166,22 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
     // 7. 更新用戶資料（在 Transaction 內）
     transaction.update(userRef, updateData);
 
-    // 7. 設置解鎖限制（在 Transaction 內）
+    // 7.5 ✅ P2-7 新增：記錄到 unlockedCharacters 欄位（快速查詢已解鎖角色）
+    // 用途：
+    // - 快速查詢用戶已解鎖哪些角色
+    // - 防止重複購買已解鎖的角色
+    // - 提供更好的用戶體驗（顯示已解鎖列表）
+    const unlockedCharactersUpdate = {
+      [`unlockedCharacters.${characterId}`]: {
+        unlockedAt: FieldValue.serverTimestamp(),
+        unlockedBy: "ticket", // ticket | vvip | purchase
+        expiresAt: unlockUntil.toISOString(), // 臨時解鎖的過期時間
+        unlockDays, // 解鎖天數
+      },
+    };
+    transaction.update(userRef, unlockedCharactersUpdate);
+
+    // 8. 設置解鎖限制（在 Transaction 內）
     const limitRef = db.collection("usage_limits").doc(userId);
     const limitDoc = await transaction.get(limitRef);
 
@@ -437,4 +453,186 @@ export const useVoiceUnlockCard = async (userId, characterId) => {
   logger.info(`[語音卡] 用戶 ${userId} 使用語音解鎖卡，剩餘 ${result.remaining} 張`);
 
   return result;
+};
+
+/**
+ * 獲取用戶已解鎖的角色列表
+ * ✅ P2-7 新增：快速查詢已解鎖角色
+ * ✅ P1-5 優化：使用用戶緩存減少 Firestore 查詢
+ *
+ * @param {string} userId - 用戶 ID
+ * @returns {Promise<Array>} 已解鎖角色列表
+ */
+export const getUserUnlockedCharacters = async (userId) => {
+  // ✅ P1-5 修復：使用緩存獲取用戶資料，減少 Firestore 讀取
+  const user = await getUserProfileWithCache(userId);
+  if (!user) {
+    throw new Error("找不到用戶");
+  }
+
+  const unlockedCharacters = user.unlockedCharacters || {};
+  const now = new Date();
+  const result = [];
+
+  // 過濾有效的解鎖記錄
+  for (const [characterId, unlockData] of Object.entries(unlockedCharacters)) {
+    // ✅ P2-6 優化：數據驗證增強
+    // 檢查邏輯矛盾：permanent=true 但 expiresAt 有值
+    if (unlockData.permanent && unlockData.expiresAt) {
+      logger.warn(
+        `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 解鎖數據存在邏輯矛盾：` +
+        `permanent=true 但 expiresAt=${unlockData.expiresAt}，將以 permanent 為準`
+      );
+      // 以 permanent 為準，忽略 expiresAt
+    }
+
+    // 檢查是否過期
+    let isValid = false;
+
+    if (unlockData.permanent) {
+      // 永久解鎖永遠有效
+      isValid = true;
+    } else if (unlockData.expiresAt) {
+      // ✅ P2-6 優化：添加日期解析錯誤處理
+      try {
+        // 檢查臨時解鎖是否過期
+        const expiresAt = new Date(unlockData.expiresAt);
+
+        // 驗證日期是否有效
+        if (isNaN(expiresAt.getTime())) {
+          logger.error(
+            `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 解鎖數據包含無效日期：` +
+            `expiresAt=${unlockData.expiresAt}`
+          );
+          isValid = false;
+        } else {
+          isValid = expiresAt > now;
+        }
+      } catch (error) {
+        logger.error(
+          `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 日期解析失敗：` +
+          `expiresAt=${unlockData.expiresAt}`,
+          error
+        );
+        isValid = false;
+      }
+    } else {
+      // ✅ P2-6 優化：檢查缺少必要字段
+      logger.warn(
+        `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 解鎖數據不完整：` +
+        `permanent=false 但缺少 expiresAt 字段`
+      );
+      isValid = false;
+    }
+
+    if (isValid) {
+      result.push({
+        characterId,
+        ...unlockData,
+        isExpired: false,
+      });
+    }
+  }
+
+  return result;
+};
+
+/**
+ * 檢查用戶是否已解鎖特定角色
+ * ✅ P2-7 新增：快速檢查單個角色解鎖狀態
+ * ✅ P1-5 優化：使用用戶緩存減少 Firestore 查詢
+ *
+ * @param {string} userId - 用戶 ID
+ * @param {string} characterId - 角色 ID
+ * @returns {Promise<Object>} 解鎖狀態
+ */
+export const checkCharacterUnlocked = async (userId, characterId) => {
+  // ✅ P1-5 修復：使用緩存獲取用戶資料，減少 Firestore 讀取
+  const user = await getUserProfileWithCache(userId);
+  if (!user) {
+    return { unlocked: false, reason: "user_not_found" };
+  }
+
+  // 檢查 VVIP 用戶（所有角色免費解鎖）
+  if (user.membershipTier === "vvip") {
+    return {
+      unlocked: true,
+      reason: "vvip",
+      permanent: true,
+      unlockedBy: "vvip",
+    };
+  }
+
+  const unlockedCharacters = user.unlockedCharacters || {};
+  const unlockData = unlockedCharacters[characterId];
+
+  if (!unlockData) {
+    return { unlocked: false, reason: "not_unlocked" };
+  }
+
+  // ✅ P2-6 優化：數據驗證增強
+  // 檢查邏輯矛盾：permanent=true 但 expiresAt 有值
+  if (unlockData.permanent && unlockData.expiresAt) {
+    logger.warn(
+      `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 解鎖數據存在邏輯矛盾：` +
+      `permanent=true 但 expiresAt=${unlockData.expiresAt}，將以 permanent 為準`
+    );
+    // 以 permanent 為準，忽略 expiresAt
+  }
+
+  // 檢查是否過期
+  if (unlockData.permanent) {
+    return {
+      unlocked: true,
+      ...unlockData,
+      isExpired: false,
+    };
+  }
+
+  if (unlockData.expiresAt) {
+    // ✅ P2-6 優化：添加日期解析錯誤處理
+    try {
+      const expiresAt = new Date(unlockData.expiresAt);
+      const now = new Date();
+
+      // 驗證日期是否有效
+      if (isNaN(expiresAt.getTime())) {
+        logger.error(
+          `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 解鎖數據包含無效日期：` +
+          `expiresAt=${unlockData.expiresAt}`
+        );
+        return { unlocked: false, reason: "invalid_date_format" };
+      }
+
+      if (expiresAt > now) {
+        return {
+          unlocked: true,
+          ...unlockData,
+          isExpired: false,
+          remainingDays: Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24)),
+        };
+      } else {
+        return {
+          unlocked: false,
+          reason: "expired",
+          isExpired: true,
+          expiredAt: unlockData.expiresAt,
+        };
+      }
+    } catch (error) {
+      logger.error(
+        `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 日期解析失敗：` +
+        `expiresAt=${unlockData.expiresAt}`,
+        error
+      );
+      return { unlocked: false, reason: "date_parse_error" };
+    }
+  }
+
+  // ✅ P2-6 優化：檢查缺少必要字段
+  logger.warn(
+    `[數據驗證] 用戶 ${userId} 的角色 ${characterId} 解鎖數據不完整：` +
+    `permanent=false 但缺少 expiresAt 字段`
+  );
+  return { unlocked: false, reason: "invalid_unlock_data" };
 };

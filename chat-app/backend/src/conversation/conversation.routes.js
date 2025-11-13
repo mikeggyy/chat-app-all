@@ -24,6 +24,8 @@ import { FieldValue } from "firebase-admin/firestore";
 
 import logger from "../utils/logger.js";
 import { standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
+import { applySelector } from "../utils/responseOptimizer.js";
+
 export const conversationRouter = Router();
 
 // 獲取對話歷史 - 需要身份驗證且只能訪問自己的對話
@@ -36,7 +38,13 @@ conversationRouter.get(
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
     const messages = await getConversationHistory(userId, characterId);
-    res.json({ messages });
+
+    // ✅ 響應優化：應用 message 選擇器
+    // 只保留必要的消息字段（id, role, text, imageUrl, videoUrl, createdAt）
+    // 移除元數據和不必要的字段
+    const optimizedMessages = applySelector(messages, 'message');
+
+    res.json({ messages: optimizedMessages });
   })
 );
 

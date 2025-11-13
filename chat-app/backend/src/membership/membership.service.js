@@ -67,6 +67,19 @@ const getMembershipConfigFromFirestore = async (tier) => {
       // ✅ P1-2 優化：成功後清除失敗計數
       membershipConfigCache.delete(`${tier}:failures`);
 
+      // ✅ 原子性優化：同時清除 Firestore 的失敗計數
+      try {
+        const statsRef = db.collection('cache_failure_stats').doc(`membership_config:${tier}`);
+        await statsRef.set({
+          failureCount: 0,
+          lastSuccess: FieldValue.serverTimestamp(),
+          tier,
+        }, { merge: true });
+      } catch (cleanupError) {
+        // 清除失敗不影響主流程
+        logger.debug(`[會員服務] 清除 Firestore 失敗計數時出錯: ${cleanupError.message}`);
+      }
+
       logger.debug(`[會員服務] 從 Firestore 讀取會員配置: ${tier}，已更新快取`);
       return config;
     }
@@ -77,19 +90,34 @@ const getMembershipConfigFromFirestore = async (tier) => {
   // ✅ P1-2 優化：如果 Firestore 讀取失敗，使用漸進式退避策略
   const fallbackConfig = MEMBERSHIP_TIERS[tier];
 
-  // 獲取失敗次數（如果有）
-  // ⚠️ 並發行為說明：
-  // 以下 get-calculate-set 操作不是原子的，在高並發場景下可能導致失敗計數略有偏差。
-  // 這是一個**可接受的風險**，原因如下：
-  // 1. 會員配置讀取頻率較低（每個等級首次訪問 + 緩存過期時），並發衝突機率極低
-  // 2. 失敗計數的輕微不準確只會影響緩存過期時間（5-30分鐘），不影響核心功能
-  // 3. 最壞情況是緩存過期時間略有偏差，對用戶體驗無明顯影響
-  // 4. 實現原子操作需要額外的同步機制（如分佈式鎖），增加複雜度且收益有限
-  //
-  // 如果未來需要提升精確度，可考慮：
-  // - 使用 Firestore Atomic Counter（需額外集合）
-  // - 使用 Redis 的 INCR 命令（需引入 Redis）
-  const failureCount = membershipConfigCache.get(`${tier}:failures`) || 0;
+  // ✅ 原子性優化：使用 Firestore Atomic Counter 替代內存計數
+  // 優勢：
+  // 1. 完全原子操作，無並發競爭
+  // 2. 分佈式環境下多實例共享失敗計數
+  // 3. 持久化存儲，重啟不丟失
+  let failureCount = 0;
+  try {
+    const statsRef = db.collection('cache_failure_stats').doc(`membership_config:${tier}`);
+    const statsDoc = await statsRef.get();
+
+    if (statsDoc.exists) {
+      failureCount = statsDoc.data().failureCount || 0;
+    }
+
+    // ✅ 使用 FieldValue.increment() 實現原子自增
+    await statsRef.set({
+      failureCount: FieldValue.increment(1),
+      lastFailure: FieldValue.serverTimestamp(),
+      tier,
+    }, { merge: true });
+
+    failureCount += 1; // 本地變量用於計算 TTL
+  } catch (counterError) {
+    // 如果連 Firestore 寫入計數器都失敗，回退到內存計數（原有邏輯）
+    logger.warn(`[會員服務] Firestore 計數器寫入失敗，回退到內存計數: ${counterError.message}`);
+    failureCount = membershipConfigCache.get(`${tier}:failures`) || 0;
+    membershipConfigCache.set(`${tier}:failures`, failureCount + 1);
+  }
 
   // 計算退避時間：基礎 5 分鐘 × 2^failureCount，最大 30 分鐘
   const BASE_FALLBACK_TTL = 5 * 60 * 1000; // 5 分鐘
@@ -102,12 +130,9 @@ const getMembershipConfigFromFirestore = async (tier) => {
   // 緩存 fallback 配置
   membershipConfigCache.set(tier, fallbackConfig, backoffTtl);
 
-  // 增加失敗計數（也使用相同的 TTL）
-  membershipConfigCache.set(`${tier}:failures`, failureCount + 1, backoffTtl);
-
   logger.warn(
     `[會員服務] 降級模式啟用 - tier: ${tier}, ` +
-    `失敗次數: ${failureCount + 1}, ` +
+    `失敗次數: ${failureCount}, ` +
     `緩存時間: ${Math.round(backoffTtl / 1000)}秒, ` +
     `使用代碼默認配置`
   );
@@ -351,8 +376,11 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
               if (upgradingAt && !isNaN(upgradingAt.getTime())) {
                 const elapsedMs = Date.now() - upgradingAt.getTime();
 
-                // 超過 5 分鐘自動解鎖（防止極端情況下的永久鎖定）
-                if (elapsedMs < 5 * 60 * 1000) {
+                // ✅ P0-2 修復：縮短升級鎖定時間為 30 秒（原為 5 分鐘）
+                // 理由：5 分鐘過長，可能導致用戶體驗不佳。30 秒足以防止重複提交，同時快速釋放鎖定
+                const UPGRADE_LOCK_TIMEOUT_MS = 30 * 1000; // 30 秒
+
+                if (elapsedMs < UPGRADE_LOCK_TIMEOUT_MS) {
                   logger.warn(`[會員服務] 用戶 ${userId} 正在升級中（${Math.round(elapsedMs / 1000)}秒前），拒絕重複升級操作`);
                   throw new Error("會員升級處理中，請稍後再試");
                 }

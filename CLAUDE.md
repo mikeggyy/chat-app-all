@@ -26,6 +26,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **2025-01**: 冪等性系統優化 - 統一 TTL 配置
 - **2024**: Cloudflare Pages 部署支援（快速指南：[docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md)）
 
+## 首次設置檢查清單
+
+在開始開發之前，請確保完成以下步驟：
+
+- [ ] **安裝 Node.js** (需要 ESM 支援，建議使用 Node.js 18+)
+- [ ] **安裝 Firebase CLI**: `npm install -g firebase-tools`
+- [ ] **Firebase 登入**: `firebase login`
+- [ ] **複製環境變數文件**:
+  ```bash
+  # 主應用
+  cp chat-app/frontend/.env.example chat-app/frontend/.env
+  cp chat-app/backend/.env.example chat-app/backend/.env
+
+  # 管理後臺
+  cp chat-app-admin/frontend/.env.example chat-app-admin/frontend/.env
+  cp chat-app-admin/backend/.env.example chat-app-admin/backend/.env
+  ```
+- [ ] **配置環境變數**: 填寫必要的配置
+  - Firebase 配置（Project ID, API Key 等）
+  - OpenAI API Key (`OPENAI_API_KEY`)
+  - Gemini API Key (`GEMINI_API_KEY`)
+  - 其他第三方服務 API Key
+- [ ] **驗證環境配置**: `cd chat-app && npm run test:env`
+- [ ] **安裝依賴**: `npm install && npm run install:all`
+- [ ] **驗證端口配置**: `npm run verify-config`
+- [ ] **選擇開發模式**:
+  - 🔧 **Emulator 模式**（推薦首次使用）: `cd chat-app && npm run dev:with-emulator`
+  - 🌐 **生產模式**: `npm run dev`（連接真實的 Firebase）
+
+**⚠️ 重要提醒**: 預設情況下，開發環境會連接到**生產環境 Firebase**。如果要測試新功能或進行實驗性修改，請使用 Emulator 模式。
+
 ## 快速開始
 
 ### 一鍵啟動所有服務（推薦）
@@ -80,6 +111,19 @@ chat-app-all/            # 根目錄
 │   ├── frontend/          # Vue 3 + Element Plus 前端 (port 5174)
 │   ├── backend/           # Node.js + Express 後端 (port 4001)
 │   └── README.md          # 管理後臺完整文檔 ⭐
+│
+├── shared/                # 跨應用共享資源（主應用 + 管理後臺）
+│   ├── config/            # 共享配置
+│   │   └── testAccounts.js  # 統一的測試帳號配置
+│   ├── utils/             # 共享工具函數
+│   │   ├── errorFormatter.js  # 錯誤格式化工具
+│   │   ├── errorCodes.js      # 統一錯誤碼定義
+│   │   └── imageProcessor.js  # 圖片處理工具
+│   └── backend-utils/     # 後端共享工具
+│       ├── firebase.js        # Firebase 初始化
+│       ├── logger.js          # 日誌工具
+│       ├── sanitizer.js       # 日誌脫敏工具
+│       └── csrfProtection.js  # CSRF 保護
 │
 ├── docs/                  # 共享文檔（部署、會員機制、TTS 等）
 ├── scripts/               # 根目錄工具腳本
@@ -713,6 +757,311 @@ npm run install:all
 - 主應用：[chat-app/CLAUDE.md](chat-app/CLAUDE.md)
 - 管理後臺：[chat-app-admin/README.md](chat-app-admin/README.md)
 
+## 調試技巧
+
+### 後端調試
+
+**查看詳細日誌**:
+```bash
+cd chat-app/backend
+npm run dev  # 開發環境會顯示詳細日誌
+
+# 日誌會自動脫敏，敏感信息已被過濾
+# 實現：backend/src/utils/sanitizer.js
+```
+
+**查看 Firestore 數據**:
+```bash
+# Firebase Emulator 模式
+npm run dev:with-emulator
+# 訪問 Emulator UI: http://localhost:4001
+
+# 生產環境
+# 訪問 Firebase Console: https://console.firebase.google.com
+```
+
+**監控端點**:
+```bash
+# 健康檢查
+curl http://localhost:4000/api/monitoring/health
+
+# 系統統計
+curl http://localhost:4000/api/monitoring/stats
+
+# 緩存統計
+# 後端啟動時會自動輸出緩存命中率
+```
+
+**調試速率限制**:
+```bash
+# 查看速率限制配置
+cat chat-app/backend/src/middleware/rateLimiterConfig.js
+
+# 測試速率限制
+# 快速發送多個請求，觀察 429 錯誤
+```
+
+### 前端調試
+
+**Vue DevTools**:
+- 安裝瀏覽器擴展：[Vue.js devtools](https://devtools.vuejs.org/)
+- 查看組件狀態、Pinia store、路由等
+
+**API 請求調試**:
+```javascript
+// API 調用已集成錯誤處理
+// 位置：frontend/src/utils/api.js
+
+// 查看網絡請求
+// 瀏覽器開發者工具 -> Network 標籤
+```
+
+**Composable 狀態調試**:
+```javascript
+// 在組件中添加 watchEffect 觀察狀態
+import { watchEffect } from 'vue';
+import { useUserProfile } from '@/composables/useUserProfile';
+
+const { profile, coins } = useUserProfile();
+
+watchEffect(() => {
+  console.log('Profile:', profile.value);
+  console.log('Coins:', coins.value);
+});
+```
+
+**LocalStorage 調試**:
+```javascript
+// 查看存儲的數據
+console.log('Auth:', localStorage.getItem('auth'));
+console.log('User:', localStorage.getItem('user'));
+
+// 清除所有數據（重新登入）
+localStorage.clear();
+```
+
+### 常見問題排查
+
+**Firebase 權限錯誤**:
+```bash
+# 1. 檢查 .env 配置
+cat chat-app/backend/.env | grep FIREBASE
+
+# 2. 檢查 Firestore Rules
+cat chat-app/firestore.rules
+
+# 3. 驗證環境變數
+cd chat-app && npm run test:env
+```
+
+**API 429 錯誤（速率限制）**:
+```bash
+# 查看觸發的限制器
+# 日誌會顯示：Rate limit exceeded for [endpoint]
+
+# 臨時解決：等待 1 分鐘後重試
+
+# 永久解決：調整速率限制配置
+# 編輯：backend/src/middleware/rateLimiterConfig.js
+```
+
+**金幣餘額不正確**:
+```bash
+# 1. 檢查 Firestore Transaction 日誌
+# Firebase Console -> Firestore -> users/{userId}
+
+# 2. 查看冪等性記錄
+# Collection: idempotency_keys
+
+# 3. 檢查交易記錄
+# Collection: user_transactions/{userId}/transactions
+
+# 4. 驗證商業邏輯
+node chat-app/backend/scripts/test-user-assets.js
+```
+
+**緩存未更新**:
+```javascript
+// 後端手動清除用戶緩存
+import { invalidateUserCache } from './user/userProfileCache.service.js';
+invalidateUserCache(userId);
+
+// 後端重新加載角色緩存
+import { reloadAllCharacters } from './services/character/characterCache.service.js';
+await reloadAllCharacters();
+
+// 或重啟服務
+npm run dev
+```
+
+**前端狀態不同步**:
+```javascript
+// 強制刷新用戶資料
+import { useUserProfile } from '@/composables/useUserProfile';
+const { fetchProfile } = useUserProfile();
+await fetchProfile();
+
+// 或刷新頁面
+window.location.reload();
+```
+
+### 調試工具推薦
+
+**後端**:
+- **VSCode Debugger** - 設置斷點調試 Node.js
+- **Postman/Thunder Client** - 測試 API 端點
+- **Firebase Emulator UI** - 查看本地 Firestore 數據
+
+**前端**:
+- **Vue DevTools** - Vue 組件和狀態調試
+- **React DevTools** (如適用)
+- **瀏覽器 DevTools** - Network, Console, Application 標籤
+
+**數據庫**:
+- **Firebase Console** - 生產環境數據管理
+- **Firestore Emulator** - 本地數據測試
+- **NoSQL Booster** (可選) - 更強大的查詢工具
+
+### 性能調試
+
+**前端性能**:
+```javascript
+// 使用 Vue DevTools Performance 標籤
+// 查看組件渲染時間
+
+// 使用瀏覽器 Performance 工具
+// DevTools -> Performance -> 錄製
+
+// 檢查虛擬滾動是否生效
+// composables/useChatVirtualScroll.js
+```
+
+**後端性能**:
+```bash
+# 查看緩存命中率
+# 啟動時自動輸出：
+# Character cache hit rate: 98.5%
+# User profile cache hit rate: 87.2%
+
+# 查看 API 響應時間
+# 日誌中會記錄每個請求的執行時間
+```
+
+**Firestore 優化**:
+```bash
+# 查看讀取次數
+# Firebase Console -> Usage
+
+# 檢查索引
+cat chat-app/firestore.indexes.json
+
+# 優化查詢
+# 確保使用緩存而非重複查詢
+```
+
+## 測試
+
+### 現有測試
+
+代碼庫包含以下測試類型：
+
+**單元測試**:
+- `chat-app/backend/src/utils/CacheManager.test.js` - 緩存管理器測試
+- `chat-app/backend/src/utils/security.test.js` - 安全功能測試
+- `chat-app-admin/frontend/src/composables/useVariableEditor.test.js` - 前端 composable 測試
+
+**功能測試腳本** (位於 `chat-app/backend/scripts/test-*.js`):
+- `test-business-logic-fixes.js` - 商業邏輯修復驗證
+- `test-membership-upgrade.js` - 會員升級流程測試
+- `test-potion-system.js` - 藥水系統測試
+- `test-user-assets.js` - 用戶資產管理測試
+- `test-character-unlock.js` - 角色解鎖測試
+- `test-api-optimization.js` - API 優化測試
+- `test-response-optimizer.js` - 響應優化器測試
+- 更多測試腳本...
+
+**系統驗證**:
+- `test-env-validation.js` - 環境變數驗證
+- `test-all-business-logic.js` - 完整商業邏輯測試
+- `test-2025-01-13-fixes.js`, `test-2025-01-14-fixes.js` - 特定修復驗證
+
+### 運行測試
+
+**運行單元測試**:
+```bash
+# 後端單元測試
+cd chat-app/backend/src/utils
+node CacheManager.test.js
+node security.test.js
+
+# 前端單元測試
+cd chat-app-admin/frontend/src/composables
+node useVariableEditor.test.js
+```
+
+**運行功能測試**:
+```bash
+# 進入後端目錄
+cd chat-app/backend
+
+# 運行特定測試
+node scripts/test-membership-upgrade.js
+node scripts/test-potion-system.js
+node scripts/test-user-assets.js
+
+# 運行完整商業邏輯測試
+node scripts/test-all-business-logic.js
+
+# 驗證環境配置
+node scripts/test-env-validation.js
+```
+
+**使用 Firebase Emulator 測試**:
+```bash
+# 啟動 Emulator 模式（自動導入測試數據）
+cd chat-app
+npm run dev:with-emulator
+
+# 或手動運行測試數據導入
+npm run import:test-data
+```
+
+### 測試策略
+
+**環境選擇**:
+- ✅ **新功能測試**: 使用 Firebase Emulator (`npm run dev:with-emulator`)
+- ✅ **Bug 修復驗證**: 可以使用生產環境測試帳號
+- ✅ **商業邏輯測試**: 使用測試腳本 + Emulator
+- ⚠️ **生產環境測試**: 僅使用 `shared/config/testAccounts.js` 中定義的測試帳號
+
+**測試帳號**:
+```javascript
+// 從共享配置獲取測試帳號
+import { TEST_ACCOUNTS, isGuestUser, isDevUser } from '../../../../shared/config/testAccounts.js';
+
+// 可用測試帳號
+TEST_ACCOUNTS.GUEST_USER_ID  // "test-user" - 訪客測試帳號
+TEST_ACCOUNTS.DEV_USER_ID    // "6FXftJp96WeXYqAO4vRYs52EFXN2" - 開發者測試帳號
+```
+
+**監控和調試**:
+```bash
+# 訪問監控端點
+curl http://localhost:4000/api/monitoring/health
+curl http://localhost:4000/api/monitoring/stats
+
+# 查看監控路由
+# 後端：backend/src/routes/monitoring.routes.js
+```
+
+### 測試最佳實踐
+
+1. **使用 Emulator 進行破壞性測試** - 避免影響生產數據
+2. **測試前備份重要數據** - Firestore Console 導出功能
+3. **使用測試帳號** - 不要使用真實用戶帳號測試
+4. **驗證修復** - 每次修復後運行相關測試腳本
+5. **測試邊界情況** - 包括空值、極限值、錯誤輸入
+
 ## 部署
 
 詳細的部署指南請參閱：
@@ -802,6 +1151,125 @@ npm run dev:with-emulator  # 使用 Firebase Emulator + 自動導入測試數據
 npm run verify-config
 # 3. 重啟相關服務
 ```
+
+### 代碼組織決策指南
+
+在開發新功能時，遵循以下指南確保代碼組織的一致性：
+
+**何時創建新的 Service**:
+- ✅ 需要直接訪問 Firestore 或外部 API
+- ✅ 包含複雜的商業邏輯（會員系統、交易處理等）
+- ✅ 需要被多個路由或其他 service 共享
+- ✅ 需要維護內部狀態或緩存
+- 📂 **位置**: `backend/src/services/`, `backend/src/{feature}/`
+- 📝 **命名**: `{feature}.service.js` (如 `user.service.js`, `payment.service.js`)
+- 🔍 **示例**:
+  - `backend/src/services/limitService/` - 限制追蹤服務
+  - `backend/src/ai/gemini.service.js` - AI 圖片生成服務
+  - `backend/src/user/userAssets.service.js` - 用戶資產管理
+
+**何時創建新的 Composable**:
+- ✅ 需要在多個 Vue 組件間共享邏輯
+- ✅ 包含響應式狀態管理（ref, reactive, computed）
+- ✅ 處理 API 調用、錯誤處理、加載狀態
+- ✅ 可重用的 UI 邏輯（彈窗、表單驗證等）
+- 📂 **位置**: `frontend/src/composables/`
+- 📝 **命名**: `use{Feature}.js` (如 `useUserProfile.js`, `useCoins.js`)
+- 🔍 **示例**:
+  - `useUserProfile.js` - 用戶資料和認證狀態
+  - `useConversationLimit.js` - 對話限制查詢
+  - `useChatMessages.js` - 聊天消息管理
+
+**何時創建新的 Middleware**:
+- ✅ 需要在多個路由前執行的邏輯
+- ✅ 認證、授權檢查
+- ✅ 請求參數驗證
+- ✅ 速率限制、冪等性檢查
+- ✅ 日誌記錄、性能監控
+- 📂 **位置**: `backend/src/middleware/`, `backend/src/auth/`
+- 📝 **命名**: `{purpose}.middleware.js` 或 `{purpose}.js`
+- 🔍 **示例**:
+  - `firebaseAuth.middleware.js` - Firebase 認證驗證
+  - `idempotency.js` - 冪等性中間件
+  - `rateLimiterConfig.js` - 速率限制配置
+
+**何時創建新的 Route**:
+- ✅ 新增 API 端點或端點組
+- ✅ 將相關端點分組（用戶、對話、支付等）
+- ✅ 路由邏輯超過 50 行，需要拆分
+- 📂 **位置**: `backend/src/{feature}/{feature}.routes.js`
+- 📝 **命名**: `{feature}.routes.js` (如 `user.routes.js`, `conversation.routes.js`)
+- 🔍 **模式**:
+  ```javascript
+  import express from 'express';
+  import { authMiddleware } from '../auth/firebaseAuth.middleware.js';
+  import { rateLimiter } from '../middleware/rateLimiterConfig.js';
+
+  const router = express.Router();
+
+  // 所有路由都需要認證
+  router.use(authMiddleware);
+
+  // 具體端點
+  router.get('/:id', rateLimiter, getHandler);
+  router.post('/', rateLimiter, createHandler);
+
+  export default router;
+  ```
+
+**何時創建新的 Component**:
+- ✅ UI 元素需要在多處重用（按鈕、卡片、表單等）
+- ✅ 單個頁面組件超過 500 行，需要拆分
+- ✅ 具有獨立職責的 UI 模塊
+- 📂 **位置**: `frontend/src/components/`, `frontend/src/views/`
+- 📝 **命名**:
+  - 頁面：`{Name}View.vue` (如 `ChatView.vue`, `ProfileView.vue`)
+  - 組件：`{Name}.vue` (如 `MessageBubble.vue`, `UserCard.vue`)
+- 🔍 **拆分策略**: 查看 `ChatView.vue` + `composables/chat/` 的拆分模式
+
+**何時使用 Helper/Utility**:
+- ✅ 純函數工具（無狀態、無副作用）
+- ✅ 數據格式化、驗證、轉換
+- ✅ 常量定義、配置管理
+- 📂 **位置**:
+  - `backend/src/utils/` - 後端工具
+  - `frontend/src/utils/` - 前端工具
+  - `shared/utils/` - 跨應用共享工具
+- 📝 **命名**: `{purpose}.js` 或 `{purpose}.helpers.js`
+- 🔍 **示例**:
+  - `sanitizer.js` - 日誌脫敏工具
+  - `errorCodes.js` - 錯誤碼定義
+  - `membershipUtils.js` - 會員工具函數
+
+**文件命名規範**:
+
+| 類型 | 命名格式 | 示例 |
+|-----|---------|------|
+| Service | `{feature}.service.js` | `user.service.js` |
+| Route | `{feature}.routes.js` | `conversation.routes.js` |
+| Middleware | `{purpose}.middleware.js` | `auth.middleware.js` |
+| Composable | `use{Feature}.js` | `useUserProfile.js` |
+| Component (Page) | `{Name}View.vue` | `ChatView.vue` |
+| Component (Reusable) | `{Name}.vue` | `MessageBubble.vue` |
+| Utility | `{purpose}.js` | `logger.js` |
+| Config | `{feature}.config.js` 或 `{feature}.js` | `limits.js` |
+| Schema | `{feature}.schemas.js` | `user.schemas.js` |
+
+**Firestore 集合命名規範**:
+- ✅ 使用小寫 + 下劃線：`user_conversations`, `user_favorites`
+- ✅ 配置類集合：單數形式 `membership_tiers`, `gift_rarities`
+- ✅ 用戶數據：使用子集合 `users/{userId}/conversations/{characterId}`
+- ✅ 時間戳欄位：統一使用 `createdAt`, `updatedAt`, `expiresAt`
+- 🔍 **詳細架構**: 查看 [chat-app/docs/firestore-collections.md](chat-app/docs/firestore-collections.md)
+
+**代碼組織最佳實踐**:
+
+1. **單一職責原則** - 每個文件只做一件事
+2. **依賴注入** - 通過參數傳遞依賴，而非硬編碼
+3. **配置集中化** - 使用 `config/` 目錄，避免魔法數字
+4. **錯誤處理標準化** - 使用統一的錯誤碼系統
+5. **文檔完整性** - 複雜邏輯添加 JSDoc 註釋
+6. **測試覆蓋** - 關鍵業務邏輯編寫測試腳本
 
 ### 功能開發
 

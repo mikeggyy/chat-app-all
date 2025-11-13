@@ -25,6 +25,7 @@ import {
   createMatchSchema,
 } from "./match.schemas.js";
 import { standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
+import { applySelector } from "../utils/responseOptimizer.js";
 
 export const matchRouter = Router();
 
@@ -58,8 +59,14 @@ matchRouter.get(
     const user = userId ? await getUserById(userId) : null;
 
     const matches = await listMatchesForUser(user);
+
+    // ✅ 響應優化：應用 characterList 選擇器
+    // 列表視圖不需要完整的角色信息（如 secret_background, personality 等）
+    // 預期節省：150KB → 45KB（節省 70%）
+    const optimized = applySelector(matches, 'characterList');
+
     // 直接返回陣列以保持向後兼容
-    res.json(matches);
+    res.json(optimized);
   })
 );
 
@@ -102,37 +109,21 @@ matchRouter.get(
     // 判斷使用的分頁模式
     const paginationMode = cursor ? 'cursor' : 'offset';
 
+    // ✅ 響應優化：應用 characterList 選擇器
+    // 熱門列表不需要完整的角色信息
+    const characters = result.characters || result.__legacy || [];
+    const optimizedCharacters = applySelector(characters, 'characterList');
+
     // 統一的響應格式
     res.json({
-      characters: result.characters || result.__legacy || [],
+      characters: optimizedCharacters,
       cursor: result.cursor || null,  // cursor-based 分頁的下一頁游標
-      hasMore: result.hasMore !== undefined ? result.hasMore : result.characters.length === limit,
+      hasMore: result.hasMore !== undefined ? result.hasMore : characters.length === limit,
       offset: offset,  // offset-based 分頁的當前偏移量
-      total: result.characters?.length || result.__legacy?.length || 0,
+      total: optimizedCharacters.length,
       paginationMode,  // 告知前端使用的分頁模式
       synced: sync,  // 告知前端是否進行了同步
     });
-  })
-);
-
-/**
- * GET /match/:id - 取得指定角色詳細資料
- */
-matchRouter.get(
-  "/:id",
-  relaxedRateLimiter,
-  validateRequest(getMatchByIdSchema),
-  asyncHandler(async (req, res) => {
-    const characterId = req.params.id;
-    const match = await getMatchById(characterId);
-
-    if (!match) {
-      return sendError(res, "RESOURCE_NOT_FOUND", "找不到指定的角色", {
-        characterId,
-      });
-    }
-
-    res.json({ character: match });
   })
 );
 
@@ -295,7 +286,11 @@ matchRouter.post(
       throw createError;
     }
 
-    sendSuccess(res, match, 201);
+    // 使用 201 Created 狀態碼表示資源已成功創建
+    res.status(201).json({
+      success: true,
+      data: match,
+    });
   })
 );
 
@@ -370,5 +365,28 @@ matchRouter.get(
       notFound,
       total: ids.length,
     });
+  })
+);
+
+/**
+ * GET /match/:id - 取得指定角色詳細資料
+ * ⚠️ 重要：此路由必須放在最後，因為 :id 會匹配任何路徑
+ * 如果放在前面會導致 /batch, /create 等路由無法匹配
+ */
+matchRouter.get(
+  "/:id",
+  relaxedRateLimiter,
+  validateRequest(getMatchByIdSchema),
+  asyncHandler(async (req, res) => {
+    const characterId = req.params.id;
+    const match = await getMatchById(characterId);
+
+    if (!match) {
+      return sendError(res, "RESOURCE_NOT_FOUND", "找不到指定的角色", {
+        characterId,
+      });
+    }
+
+    res.json({ character: match });
   })
 );

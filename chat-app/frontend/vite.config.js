@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import net from "node:net";
 import { fileURLToPath, URL } from 'node:url';
@@ -103,6 +103,22 @@ export default defineConfig(async () => {
       },
       // 調整 chunk 大小警告閾值
       chunkSizeWarningLimit: 1000, // 1MB
+    },
+    // Vitest 測試配置
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./src/tests/setup.js'],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'json', 'html'],
+        exclude: [
+          'node_modules/',
+          'src/tests/',
+        ],
+      },
+      include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+      exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
     },
   };
 });

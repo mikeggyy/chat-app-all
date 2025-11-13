@@ -39,6 +39,7 @@ import assetPackagesRouter from "./user/assetPackages.routes.js";
 import shopRouter from "./shop/shop.routes.js";
 import aiSettingsRouter from "./ai/aiSettings.routes.js";
 import cronRouter from "./routes/cron.routes.js";
+import monitoringRouter from "./routes/monitoring.routes.js";
 import { cleanupInactiveUsers, getAllUsers } from "./user/user.service.js";
 import { conversationLimitService } from "./conversation/conversationLimit.service.js";
 import { voiceLimitService } from "./ai/voiceLimit.service.js";
@@ -201,6 +202,19 @@ app.use(shopRouter);
 
 // 定時任務路由（Cloud Scheduler）
 app.use("/api/cron", cronRouter);
+
+// ✅ 監控增強路由（2025-01-13 優化）
+app.use("/api/monitoring", monitoringRouter);
+
+// 🐛 調試路由（僅開發環境）
+if (process.env.NODE_ENV !== 'production') {
+  import('./routes/debug.routes.js').then(({ default: debugRouter }) => {
+    app.use("/api/debug", debugRouter);
+    logger.info('[Debug] 調試路由已啟用: /api/debug');
+  }).catch(err => {
+    logger.warn('[Debug] 調試路由加載失敗:', err.message);
+  });
+}
 
 app.get("/health", (_, res) => {
   res.json({ status: "ok" });

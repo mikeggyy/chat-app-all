@@ -69,10 +69,24 @@ const FIELD_SELECTORS = {
     exclude: ['userId', 'characterId', 'metadata'],
   },
 
-  // 對話歷史 - 簡化版本
+  // 對話歷史 - 簡化版本（用於對話列表）
   conversationHistory: {
-    include: ['id', 'characterId', 'lastMessage', 'lastMessageAt', 'unreadCount'],
-    exclude: ['userId', 'messages', 'createdAt', 'updatedAt'],
+    include: [
+      'id',
+      'characterId',
+      'character', // 保留角色信息（會進一步優化）
+      'lastMessage',
+      'lastMessageAt',
+      'partnerLastMessage',
+      'partnerLastRepliedAt',
+      'unreadCount',
+      'updatedAt', // 用於排序
+    ],
+    // ✅ 移除 exclude：白名單模式（include）已經只保留指定字段，exclude 是冗餘的
+    // ✅ 嵌套字段自動優化：character 字段自動應用 characterList 選擇器
+    nested: {
+      character: 'characterList', // 自動優化嵌套的 character 對象
+    },
   },
 };
 
@@ -208,6 +222,18 @@ export function applySelector(data, selectorName) {
   // 再應用 exclude（如果有）
   if (selector.exclude && Array.isArray(selector.exclude)) {
     result = omit(result, selector.exclude);
+  }
+
+  // ✅ 自動處理嵌套字段優化
+  if (selector.nested && typeof selector.nested === 'object') {
+    Object.keys(selector.nested).forEach((fieldName) => {
+      const nestedSelector = selector.nested[fieldName];
+
+      // 如果該字段存在，應用嵌套選擇器
+      if (result[fieldName]) {
+        result[fieldName] = applySelector(result[fieldName], nestedSelector);
+      }
+    });
   }
 
   return result;

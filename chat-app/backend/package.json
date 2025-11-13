@@ -11,6 +11,11 @@
     "test:business-logic": "dotenv -e .env -- node ./scripts/test-all-business-logic.js",
     "test:membership": "dotenv -e .env -- node ./scripts/test-membership-upgrade.js",
     "test:unlock": "dotenv -e .env -- node ./scripts/test-character-unlock.js",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:api": "vitest run --grep \"API\"",
     "generate:voices": "node ./scripts/generateVoicePreviews.js",
     "import:all": "node ./scripts/import-all-data.js",
     "import:characters": "node ./scripts/import-characters-to-firestore.js",
@@ -63,7 +68,10 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@vitest/ui": "^4.0.8",
     "dotenv-cli": "^11.0.0",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4",
+    "vitest": "^4.0.8"
   }
 }

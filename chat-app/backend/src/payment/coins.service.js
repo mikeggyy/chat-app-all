@@ -403,6 +403,17 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
       { merge: true }
     );
 
+    // 4.5 ✅ P2-7 新增：記錄到 unlockedCharacters 欄位（快速查詢已解鎖角色）
+    const unlockedCharactersUpdate = {
+      [`unlockedCharacters.${characterId}`]: {
+        unlockedAt: FieldValue.serverTimestamp(),
+        unlockedBy: useTicket && characterUnlockCards > 0 ? "ticket" : "coins",
+        permanent: true, // 永久解鎖
+        expiresAt: null, // 永久解鎖無過期時間
+      },
+    };
+    transaction.update(userRef, unlockedCharactersUpdate);
+
     logger.info(`[角色解鎖] ✅ Transaction 完成 - 用戶 ${userId} 永久解鎖角色 ${characterId}`);
   });
 
@@ -547,16 +558,31 @@ export const refundCoins = (userId, amount, reason) => {
  * - 更新原交易狀態
  * - 創建退款交易記錄
  *
+ * ⚠️ 安全警告：
+ * - forceRefund 參數應該僅限管理員使用
+ * - 在路由層面必須使用 requireAdmin 中間件保護此功能
+ * - 強制退款會繞過時間限制和資產使用檢查，可能導致商業損失
+ *
  * @param {string} userId - 用戶 ID
  * @param {string} transactionId - 原交易 ID
  * @param {string} reason - 退款原因
  * @param {Object} options - 選項
  * @param {number} options.refundDaysLimit - 退款期限（天數），默認 7 天
- * @param {boolean} options.forceRefund - 是否強制退款（跳過時間檢查），默認 false
+ * @param {boolean} options.forceRefund - 是否強制退款（跳過時間和資產使用檢查），默認 false
+ *                                        ⚠️ 僅供管理員使用，需要在路由層驗證管理員權限
  * @returns {Promise<Object>} 退款結果
  */
 export const refundPurchase = async (userId, transactionId, reason, options = {}) => {
   const { refundDaysLimit = 7, forceRefund = false } = options;
+
+  // ✅ P0-1 安全檢查：記錄強制退款操作（便於審計）
+  if (forceRefund) {
+    logger.warn(
+      `[退款] ⚠️ 強制退款模式已啟用 - 用戶: ${userId}, 交易: ${transactionId}, ` +
+      `原因: ${reason}。此操作應僅由管理員執行。`
+    );
+  }
+
   const db = getFirestoreDb();
 
   return await db.runTransaction(async (transaction) => {
@@ -614,16 +640,7 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
     const user = userDoc.data();
     const currentBalance = getWalletBalance(user);
 
-    // 7. 退還金幣
-    const refundAmount = Math.abs(originalTx.amount);
-    const newBalance = currentBalance + refundAmount;
-
-    transaction.update(userRef, {
-      ...createWalletUpdate(newBalance),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    // 8. 回滾資產（如果有）
+    // 7. 提前解析 metadata（用於判斷是否需要讀取 limitRef）
     // ✅ P1-1 優化：完整的資產回滾邏輯
     // ✅ Risk Fix: 添加 metadata 完整性驗證
     const metadata = originalTx.metadata || {};
@@ -631,6 +648,19 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
     const quantity = metadata.quantity || 1;
     const characterId = metadata.characterId;
     const itemType = metadata.itemType;
+
+    // 8. ✅ Transaction 優化：提前讀取 limitRef（如果需要）
+    // 將讀取操作移到所有寫入操作之前，符合 Transaction 最佳實踐
+    let limitDoc = null;
+    if (itemType === 'character_unlock_ticket' && characterId) {
+      const limitRef = db.collection('usage_limits').doc(userId);
+      limitDoc = await transaction.get(limitRef);
+    }
+
+    // 9. 計算初始退款金額（稍後可能因資產已使用而調整）
+    const refundAmount = Math.abs(originalTx.amount);
+
+    // 10. 回滾資產（如果有）
 
     // 防禦性檢查：對於需要資產回滾的交易類型，驗證 metadata 是否存在
     const ASSET_REQUIRED_TYPES = [
@@ -646,21 +676,77 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
       // 繼續執行退款（至少退還金幣），但記錄警告
     }
 
+    // ✅ P0-1 修復：增強退款驗證，防止先用後退漏洞
+    let actualRefundAmount = refundAmount; // 實際退款金額（可能因資產已使用而減少）
+    let usedAssetValue = 0; // 已使用資產的價值
+
     if (assetType) {
       const currentAssets = user.assets || {};
       const currentQuantity = currentAssets[assetType] || 0;
 
       // ⚠️ 檢查用戶是否還有足夠的資產可以扣除
       if (currentQuantity < quantity) {
-        logger.warn(`[退款] 用戶 ${userId} 的 ${assetType} 不足，無法完全回滾（需要 ${quantity}，當前 ${currentQuantity}）`);
-        // 決策：部分回滾或拒絕退款
-        // 這裡選擇部分回滾（扣除當前所有資產）
+        const usedQuantity = quantity - currentQuantity;
+        logger.warn(
+          `[退款] 用戶 ${userId} 的 ${assetType} 已使用 ${usedQuantity}/${quantity}，` +
+          `當前剩餘 ${currentQuantity}`
+        );
+
+        // ✅ P0-1 修復：計算已使用資產的價值（按市價扣除）
+        // 從原交易金額中推算單個資產的價值
+        // 使用 Math.floor() 向下取整，避免退款金額超過原購買金額
+        const unitPrice = Math.floor(refundAmount / quantity);
+        usedAssetValue = usedQuantity * unitPrice;
+
+        // ✅ 修復：實施部分退款機制
+        // 已使用的資產不退款，只退還未使用資產的價值
+        actualRefundAmount = currentQuantity * unitPrice;
+
+        // ✅ P0-1 安全檢查：確保退款金額不超過原購買金額
+        if (actualRefundAmount > refundAmount) {
+          logger.warn(
+            `[退款] 計算的退款金額 ${actualRefundAmount} 超過原購買金額 ${refundAmount}，` +
+            `已調整為原購買金額`
+          );
+          actualRefundAmount = refundAmount;
+        }
+
+        // 檢查退款冷靜期（24 小時內可忽略已使用資產）
+        const txTime = originalTx.createdAt?.toDate?.() || new Date(originalTx.createdAt);
+        const hoursSincePurchase = (now - txTime) / (1000 * 60 * 60);
+
+        if (hoursSincePurchase <= 24 && !forceRefund) {
+          // 24 小時內允許全額退款（冷靜期政策）
+          logger.info(`[退款] 購買在 24 小時內（${hoursSincePurchase.toFixed(1)}h），適用冷靜期政策，允許全額退款`);
+          actualRefundAmount = refundAmount;
+          usedAssetValue = 0;
+        } else if (currentQuantity === 0) {
+          // ✅ 修復：如果資產已完全使用，拒絕退款（除非強制）
+          if (!forceRefund) {
+            throw new Error(
+              `無法退款：購買的資產已完全使用（${usedQuantity}/${quantity}）。` +
+              `如需協助，請聯繫客服。`
+            );
+          }
+          logger.warn(`[退款] ⚠️ 強制退款模式：資產已完全使用但仍允許全額退款`);
+          actualRefundAmount = refundAmount;
+          usedAssetValue = 0;
+        } else {
+          // 部分退款
+          logger.info(
+            `[退款] 實施部分退款 - 原價: ${refundAmount}, ` +
+            `已使用價值: ${usedAssetValue}, ` +
+            `實際退款: ${actualRefundAmount}`
+          );
+        }
+
+        // 扣除剩餘的所有資產
         transaction.update(userRef, {
           [`assets.${assetType}`]: 0,
           [`unlockTickets.${assetType}`]: 0, // ✅ 同步更新 unlockTickets（向後兼容）
         });
       } else {
-        // 完整回滾
+        // 完整回滾（資產未使用或使用量在可接受範圍內）
         const newQuantity = currentQuantity - quantity;
         transaction.update(userRef, {
           [`assets.${assetType}`]: newQuantity,
@@ -669,9 +755,9 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
       }
 
       // ✅ P1-1 優化：如果是角色解鎖券，撤銷永久解鎖狀態
-      if (itemType === 'character_unlock_ticket' && characterId) {
+      // ✅ Transaction 優化：使用提前讀取的 limitDoc（Line 628-632）
+      if (itemType === 'character_unlock_ticket' && characterId && limitDoc) {
         const limitRef = db.collection('usage_limits').doc(userId);
-        const limitDoc = await transaction.get(limitRef);
 
         if (limitDoc.exists) {
           const limitData = limitDoc.data();
@@ -691,25 +777,39 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
       }
     }
 
-    // 9. 更新原交易狀態
+    // 11. ✅ 修復：使用實際退款金額更新用戶餘額
+    const newBalance = currentBalance + actualRefundAmount;
+
+    transaction.update(userRef, {
+      ...createWalletUpdate(newBalance),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 12. 更新原交易狀態
     transaction.update(txRef, {
       status: "refunded",
       refundedAt: FieldValue.serverTimestamp(),
       refundReason: reason,
     });
 
-    // 10. 創建退款交易記錄
+    // 13. 創建退款交易記錄
     const refundTxRef = db.collection("transactions").doc();
     transaction.set(refundTxRef, {
       id: refundTxRef.id,
       userId,
       type: TRANSACTION_TYPES.REFUND,
-      amount: refundAmount,
-      description: `退款：${reason}`,
+      amount: actualRefundAmount, // ✅ 使用實際退款金額
+      description: actualRefundAmount < refundAmount
+        ? `部分退款：${reason}（已使用 ${usedAssetValue} 金幣的資產）`
+        : `退款：${reason}`,
       metadata: {
         originalTransactionId: transactionId,
+        originalAmount: refundAmount,
+        actualRefundAmount,
+        usedAssetValue,
         reason,
-        refundedAsset: assetType ? { type: assetType, quantity } : null,
+        refundedAsset: assetType ? { type: assetType, quantity, remainingQuantity: currentAssets?.[assetType] || 0 } : null,
+        isPartialRefund: actualRefundAmount < refundAmount,
       },
       balanceBefore: currentBalance,
       balanceAfter: newBalance,
@@ -719,9 +819,17 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
 
     return {
       success: true,
-      refundAmount,
+      refundAmount: actualRefundAmount, // ✅ 返回實際退款金額
+      originalAmount: refundAmount, // 原始交易金額
+      usedAssetValue, // 已使用資產的價值
+      isPartialRefund: actualRefundAmount < refundAmount,
       newBalance,
-      refundedAsset: assetType ? { type: assetType, quantity } : null,
+      refundedAsset: assetType ? {
+        type: assetType,
+        quantity,
+        remainingQuantity: currentAssets?.[assetType] || 0,
+        usedQuantity: assetType ? quantity - (currentAssets?.[assetType] || 0) : 0
+      } : null,
       originalTransaction: {
         id: transactionId,
         amount: originalTx.amount,

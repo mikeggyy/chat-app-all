@@ -4,6 +4,9 @@
  */
 
 import logger from "../../utils/logger.js";
+import limitReset from "./limitReset.js";
+
+const { getUTC8Date } = limitReset;
 
 /**
  * 檢查是否可以使用
@@ -150,41 +153,62 @@ export const recordUse = (limitData, metadata = {}) => {
 
 /**
  * 解鎖額外次數（通過廣告）
- * ✅ 修復：添加過期時間，避免依賴每日重置導致提前失效
+ * ✅ P1-3 修復：使用 24 小時滾動窗口機制，不依賴每日重置
+ * ✅ P1-1 修復：統一使用 UTC+8 時區（台灣時間）
+ *
+ * 改進說明：
+ * - 舊系統：使用 lastAdResetDate 每日清零，導致接近午夜看的廣告提前失效
+ * - 新系統：每次解鎖獨立設置 24 小時過期時間（滾動窗口）
+ * - 清理機制：在每日重置時清理已過期的記錄（不影響未過期的）
+ * - 時區處理：統一使用 UTC+8 時區，確保與項目其他部分一致
  *
  * @param {Object} limitData - 限制數據
  * @param {number} amount - 解鎖數量
  * @returns {Object} 解鎖結果
  */
 export const unlockByAd = (limitData, amount) => {
+  // ✅ P1-1 修復：使用 UTC+8 時間（與項目其他部分一致）
   const now = new Date();
+  const utc8Offset = 8 * 60 * 60 * 1000;
+  const nowUTC8 = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + utc8Offset);
 
-  // ✅ 設置過期時間為 24 小時後
-  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  // ✅ 設置過期時間為 24 小時後（滾動窗口，基於 UTC+8）
+  const expiresAt = new Date(nowUTC8.getTime() + 24 * 60 * 60 * 1000);
 
   // 初始化解鎖歷史（如果不存在）
   if (!Array.isArray(limitData.unlockHistory)) {
     limitData.unlockHistory = [];
   }
 
-  // 記錄這次廣告解鎖（包含過期時間）
+  // 記錄這次廣告解鎖（包含獨立的過期時間）
   limitData.unlockHistory.push({
     amount,
-    unlockedAt: now.toISOString(),
-    expiresAt: expiresAt.toISOString(),
+    unlockedAt: nowUTC8.toISOString(), // ✅ P1-1: 使用 UTC+8 時間
+    expiresAt: expiresAt.toISOString(), // ✅ 關鍵：獨立的過期時間（UTC+8 + 24小時）
     unlockType: 'ad',
   });
 
-  // ⚠️ 保留舊的 unlocked 字段用於向後兼容（但不再使用）
+  // ✅ P1-6 修復：限制 unlockHistory 數組大小，防止無限增長
+  // 只保留最近 100 條記錄（超過則刪除最舊的）
+  const MAX_UNLOCK_HISTORY = 100;
+  if (limitData.unlockHistory.length > MAX_UNLOCK_HISTORY) {
+    limitData.unlockHistory = limitData.unlockHistory.slice(-MAX_UNLOCK_HISTORY);
+    logger.debug(
+      `[限制追蹤] unlockHistory 超過 ${MAX_UNLOCK_HISTORY} 條，已截斷保留最近記錄`
+    );
+  }
+
+  // ⚠️ 保留舊的 unlocked 字段用於向後兼容（但不再用於計算次數）
+  // 新系統使用 unlockHistory 數組 + expiresAt 進行精確控制
   limitData.unlocked = (limitData.unlocked || 0) + amount;
 
   limitData.adsWatchedToday += 1;
-  limitData.lastAdTime = now.toISOString();
+  limitData.lastAdTime = nowUTC8.toISOString(); // ✅ P1-1: 使用 UTC+8 時間
 
   return {
     success: true,
     unlockedAmount: amount,
-    totalUnlocked: limitData.unlocked,
+    totalUnlocked: limitData.unlocked, // ⚠️ 向後兼容字段
     adsWatchedToday: limitData.adsWatchedToday,
     expiresAt: expiresAt.toISOString(),
   };

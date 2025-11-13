@@ -1,45 +1,18 @@
 /**
  * Chat 頁面統一設置 Composable
  * 整合所有 Chat 相關的 composables，簡化 ChatView.vue
+ *
+ * 架構：使用模組化設計，將不同關注點分離到獨立模組
  */
 
-import { computed, ref } from 'vue';
-import { useRoute } from 'vue-router';
-
-// Core Composables
-import { useUserProfile } from '../useUserProfile';
-import { useFirebaseAuth } from '../useFirebaseAuth';
-import { useConversationLimit } from '../useConversationLimit';
-import { useVoiceLimit } from '../useVoiceLimit';
-import { usePhotoLimit } from '../usePhotoLimit';
-import { useToast } from '../useToast';
-import { useGuestGuard } from '../useGuestGuard';
-import { useCoins } from '../useCoins';
-import { useUnlockTickets } from '../useUnlockTickets';
-
-// Chat Composables
-import { useChatMessages } from './useChatMessages';
-import { useSuggestions } from './useSuggestions';
-import { useChatActions } from './useChatActions';
-import { useModalManager } from './useModalManager';
-import { useVideoGeneration } from './useVideoGeneration';
-import { usePotionManagement } from './usePotionManagement';
-import { useSelfieGeneration } from './useSelfieGeneration';
-import { useCharacterUnlock } from './useCharacterUnlock';
-import { useVoiceManagement } from './useVoiceManagement';
-import { useConversationLimitActions } from './useConversationLimitActions';
-import { useGiftManagement } from './useGiftManagement';
-import { useFavoriteManagement } from './useFavoriteManagement';
-import { useShareFunctionality } from './useShareFunctionality';
-import { useConversationReset } from './useConversationReset';
-import { usePhotoVideoHandler } from './usePhotoVideoHandler';
-import { usePartner } from './usePartner';
-import { useMenuActions } from './useMenuActions';
-import { useSendMessage } from './useSendMessage';
-import { useEventHandlers } from './useEventHandlers';
+// Modular Setup Composables
+import { useChatCore } from './setup/useChatCore';
+import { useChatLimits } from './setup/useChatLimits';
+import { useChatModals } from './setup/useChatModals';
+import { useChatFeatures } from './setup/useChatFeatures';
+import { useChatHandlers } from './setup/useChatHandlers';
 
 // Utils
-import { appendCachedHistory } from '../../utils/conversationCache';
 import {
   rollbackUserMessage,
   createLimitModalData,
@@ -63,101 +36,79 @@ import {
  * @returns {Object} 所有 Chat 相關的狀態和方法
  */
 export function useChatSetup({ router, chatContentRef, chatPageRef, draft }) {
-  const route = useRoute();
-
   // ====================
-  // Core Services
+  // 1. Core Services (核心服務)
   // ====================
-  const { user, setUserProfile, addConversationHistory } = useUserProfile();
-  const firebaseAuth = useFirebaseAuth();
-  const { success, error: showError } = useToast();
-
-  // Partner Data
-  const partnerId = computed(() => route.params.id);
+  const core = useChatCore();
   const {
+    user,
+    partnerId,
     partner,
     partnerDisplayName,
     partnerBackground,
     backgroundStyle,
+    currentUserId,
+    isFavorited,
+    firebaseAuth,
+    messages,
+    isReplying,
+    isLoadingHistory,
+    suggestionOptions,
+    isLoadingSuggestions,
+    suggestionError,
+    success,
+    showError,
+    setUserProfile,
+    addConversationHistory,
     loadPartner,
-  } = usePartner({ partnerId });
-
-  const currentUserId = computed(() => user.value?.id || '');
-
-  // Favorite State
-  const isFavorited = computed(() => {
-    const favoritesList = Array.isArray(user.value?.favorites)
-      ? user.value.favorites
-      : [];
-    return favoritesList.includes(partnerId.value);
-  });
+    loadHistory,
+    sendMessageToApi,
+    requestReply,
+    resetConversationApi,
+    cleanupMessages,
+    loadSuggestions,
+    invalidateSuggestions,
+  } = core;
 
   // ====================
-  // Limits
+  // 2. Limits (限制服務)
   // ====================
-  const { checkLimit, unlockByAd, getLimitState } = useConversationLimit();
+  const limits = useChatLimits();
   const {
+    checkLimit,
+    unlockByAd,
+    getLimitState,
     checkVoiceLimit,
-    unlockByAd: unlockVoiceByAd,
+    unlockVoiceByAd: unlockVoiceByAdFromLimit,
     loadVoiceStats,
-  } = useVoiceLimit();
-  const {
     fetchPhotoStats,
     canGeneratePhoto,
-    remaining: photoRemaining,
-  } = usePhotoLimit();
-
-  // ====================
-  // Guest & Balance
-  // ====================
-  const {
+    photoRemaining,
     isGuest,
     requireLogin,
     canGuestSendMessage,
     incrementGuestMessageCount,
     guestRemainingMessages,
-  } = useGuestGuard();
-
-  const { balance, loadBalance } = useCoins();
-
-  const {
-    loadBalance: loadTicketsBalance,
+    balance,
+    loadBalance,
     characterTickets,
     hasCharacterTickets,
     voiceCards,
     photoCards,
     videoCards,
     createCards,
-  } = useUnlockTickets();
+    loadTicketsBalance,
+  } = limits;
 
   // ====================
-  // Chat Messages
+  // 3. Modals (模態框管理)
   // ====================
-  const {
-    messages,
-    isReplying,
-    isLoadingHistory,
-    loadHistory,
-    sendMessage: sendMessageToApi,
-    requestReply,
-    resetConversation: resetConversationApi,
-    cleanup: cleanupMessages,
-  } = useChatMessages(partnerId);
+  const modalsSetup = useChatModals({
+    unlockByAd,
+    unlockVoiceByAd: unlockVoiceByAdFromLimit,
+    loadTicketsBalance,
+  });
 
-  // ====================
-  // Suggestions
-  // ====================
-  const {
-    suggestionOptions,
-    isLoadingSuggestions,
-    suggestionError,
-    loadSuggestions,
-    invalidateSuggestions,
-  } = useSuggestions(messages, partner, firebaseAuth, currentUserId);
-
-  // ====================
-  // Modal Manager
-  // ====================
   const {
     modals,
     showConversationLimit,
@@ -189,51 +140,44 @@ export function useChatSetup({ router, chatContentRef, chatPageRef, draft }) {
     showGiftAnimation,
     closeGiftAnimation,
     setLoading,
-    update: updateModal,
-  } = useModalManager();
+    updateModal,
+    handleWatchAd,
+    handleUseUnlockCard,
+  } = modalsSetup;
 
   // ====================
-  // Chat Actions
+  // 4. Features (功能管理)
   // ====================
-  const {
-    isRequestingSelfie,
-    requestSelfie,
-    showGiftSelector,
-    isSendingGift,
-    openGiftSelector,
-    closeGiftSelector,
-    sendGift,
-    playingVoiceMessageId,
-    playVoice,
-  } = useChatActions({
-    messages,
-    partner,
+  const features = useChatFeatures({
+    partnerId,
     currentUserId,
+    partner,
     firebaseAuth,
-    toast: { success, error: showError },
-    requireLogin,
-    scrollToBottom: () => chatContentRef.value?.messageListRef?.scrollToBottom(),
-    appendCachedHistory: (entries) => {
-      const matchId = partner.value?.id ?? '';
-      const userId = currentUserId.value ?? '';
-      if (!matchId || !userId) return;
-      appendCachedHistory(userId, matchId, entries);
-    },
-  });
-
-  // ====================
-  // Video Generation
-  // ====================
-  const {
-    isRequestingVideo,
-    generateVideo,
-    handleRequestVideo,
-  } = useVideoGeneration({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partner.value?.id,
-    getFirebaseAuth: () => firebaseAuth,
     messages,
-    messageListRef: computed(() => chatContentRef.value?.messageListRef),
+    chatContentRef,
+    modals,
+    requireLogin,
+    canGeneratePhoto,
+    fetchPhotoStats,
+    checkVoiceLimit,
+    loadVoiceStats,
+    loadTicketsBalance,
+    closeConversationLimit,
+    closeVoiceLimit,
+    closePhotoLimit,
+    closePotionLimit,
+    closeUnlockConfirm,
+    closePotionConfirm,
+    showPhotoLimit,
+    showVoiceLimit,
+    showVideoLimit,
+    showPhotoSelector,
+    showGiftAnimation,
+    closeGiftAnimation,
+    setLoading,
+    loadBalance,
+    showError,
+    success,
     rollbackUserMessage: (userId, matchId, messageId) =>
       rollbackUserMessage({
         userId,
@@ -243,12 +187,7 @@ export function useChatSetup({ router, chatContentRef, chatPageRef, draft }) {
         messages,
         showError,
       }),
-    requireLogin,
-    showVideoLimit,
-    showPhotoSelector,
     createLimitModalData,
-    showError,
-    showSuccess: success,
     config: {
       MESSAGE_ID_PREFIXES,
       VIDEO_CONFIG,
@@ -257,222 +196,57 @@ export function useChatSetup({ router, chatContentRef, chatPageRef, draft }) {
     },
   });
 
-  // ====================
-  // Potion Management
-  // ====================
   const {
     userPotions,
     activePotionEffects,
     activeMemoryBoost,
     activeBrainBoost,
-    loadPotions,
-    loadActivePotions,
-    handleConfirmUsePotion,
-  } = usePotionManagement({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partnerId.value,
-    getPotionType: () => modals.potionConfirm.type,
-    closePotionConfirm,
-    setLoading,
-    showError,
-    showSuccess: success,
-  });
-
-  // ====================
-  // Selfie Generation
-  // ====================
-  const {
-    handleRequestSelfie,
-    handleUsePhotoUnlockCard,
-  } = useSelfieGeneration({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partnerId.value,
-    getFirebaseAuth: () => firebaseAuth,
-    messages,
-    messageListRef: computed(() => chatContentRef.value?.messageListRef),
-    rollbackUserMessage: (userId, matchId, messageId) =>
-      rollbackUserMessage({
-        userId,
-        matchId,
-        messageId,
-        firebaseAuth,
-        messages,
-        showError,
-      }),
-    requireLogin,
-    canGeneratePhoto,
-    fetchPhotoStats,
-    showPhotoLimit,
-    createLimitModalData,
-    requestSelfie,
-    closePhotoLimit,
-    loadTicketsBalance,
-    showError,
-    showSuccess: success,
-    config: {
-      MESSAGE_ID_PREFIXES,
-    },
-  });
-
-  // ====================
-  // Character Unlock
-  // ====================
-  const {
     activeUnlockEffects,
     activeCharacterUnlock,
     isCharacterUnlocked,
+    playingVoiceMessageId,
+    isRequestingSelfie,
+    isRequestingVideo,
+    isSendingGift,
+    showGiftSelector,
+    isFavoriteMutating,
+    loadPotions,
+    loadActivePotions,
     loadActiveUnlocks,
+    handleConfirmUsePotion,
     handleConfirmUnlockCharacter,
     resetUnlockDataLoadedState,
-  } = useCharacterUnlock({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partnerId.value,
-    getFirebaseAuth: () => firebaseAuth,
-    getPartnerDisplayName: () => partnerDisplayName.value,
-    closeUnlockConfirm,
-    loadTicketsBalance,
-    setLoading,
-    showError,
-    showSuccess: success,
-  });
-
-  // ====================
-  // Voice Management
-  // ====================
-  const {
     handlePlayVoice,
     handleWatchVoiceAd: watchVoiceAd,
     handleUseVoiceUnlockCard,
-  } = useVoiceManagement({
-    getCurrentUserId: () => currentUserId.value,
-    playVoice,
-    loadVoiceStats,
-    checkVoiceLimit,
-    unlockVoiceByAd,
-    loadTicketsBalance,
-    showVoiceLimit,
-    closeVoiceLimit,
-    getVoiceLimitPendingMessage: () => modals.voiceLimit.pending,
-    showError,
-    showSuccess: success,
-  });
-
-  // ====================
-  // Conversation Limit Actions
-  // ====================
-  const {
-    handleWatchAd,
-    handleUseUnlockCard,
-  } = useConversationLimitActions({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partner.value?.id,
-    getPartnerDisplayName: () => partnerDisplayName.value,
-    getFirebaseAuth: () => firebaseAuth,
-    unlockByAd,
-    getLimitState,
-    loadTicketsBalance,
-    closeConversationLimit,
-    updateModal,
-    showError,
-    showSuccess: success,
-  });
-
-  // ====================
-  // Gift Management
-  // ====================
-  const {
+    handleRequestSelfie,
+    handleUsePhotoUnlockCard,
+    generateVideo,
+    handleRequestVideo,
     handleOpenGiftSelector,
     handleSelectGift,
-  } = useGiftManagement({
-    getCurrentUserId: () => currentUserId.value,
-    openGiftSelector,
-    sendGift,
-    loadBalance,
-    showGiftAnimation,
-    closeGiftAnimation,
-  });
-
-  // ====================
-  // Favorite Management
-  // ====================
-  const {
-    isFavoriteMutating,
     toggleFavorite,
-  } = useFavoriteManagement({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partnerId.value,
-    getUser: () => user.value,
-    getFirebaseAuth: () => firebaseAuth,
-    setUserProfile,
-    requireLogin,
-    showError,
-    showSuccess: success,
-  });
+    openGiftSelector,
+    closeGiftSelector,
+    requestSelfie,
+    playVoice,
+    sendGift,
+  } = features;
 
   // ====================
-  // Share Functionality
+  // 5. Handlers (事件處理器)
   // ====================
-  const {
-    handleShare,
-  } = useShareFunctionality({
-    getChatPageRef: () => chatPageRef.value,
-    getPartnerDisplayName: () => partnerDisplayName.value,
-    showError,
-    showSuccess: success,
-  });
-
-  // ====================
-  // Conversation Reset
-  // ====================
-  const {
-    confirmResetConversation,
-    cancelResetConversation,
-  } = useConversationReset({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partner.value?.id,
-    getPartner: () => partner.value,
-    getMessages: () => messages.value,
-    getDraft: () => draft.value,
-    setDraft: (value) => { draft.value = value; },
-    resetConversationApi,
-    invalidateSuggestions,
-    closeResetConfirm,
-    setLoading,
-    showError,
-    showSuccess: success,
-    config: { MESSAGE_ID_PREFIXES },
-  });
-
-  // ====================
-  // Photo Video Handler
-  // ====================
-  const {
-    handlePhotoSelect,
-    handleUseVideoUnlockCard,
-    handleUpgradeFromVideoModal,
-  } = usePhotoVideoHandler({
-    getCurrentUserId: () => currentUserId.value,
-    getPhotoSelectorModal: () => modals.photoSelector,
-    generateVideo,
-    loadTicketsBalance,
-    closePhotoSelector,
-    closeVideoLimit,
-    showPhotoSelector,
-    navigateToMembership: () => router.push('/membership'),
-    showError,
-  });
-
-  // ====================
-  // Send Message Handler
-  // ====================
-  const { handleSendMessage } = useSendMessage({
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partner.value?.id,
-    getPartnerDisplayName: () => partnerDisplayName.value,
-    getDraft: () => draft.value,
-    setDraft: (value) => { draft.value = value; },
-    getMessageInputRef: () => chatContentRef.value?.messageInputRef,
-    getCharacterTickets: () => characterTickets.value,
+  const handlers = useChatHandlers({
+    currentUserId,
+    partner,
+    partnerDisplayName,
+    partnerId,
+    messages,
+    draft,
+    chatContentRef,
+    characterTickets,
+    userPotions,
+    hasCharacterTickets,
     isGuest,
     canGuestSendMessage,
     requireLogin,
@@ -481,49 +255,45 @@ export function useChatSetup({ router, chatContentRef, chatPageRef, draft }) {
     showConversationLimit,
     sendMessageToApi,
     invalidateSuggestions,
+    loadSuggestions,
+    resetConversationApi,
+    showImageViewer,
+    showBuffDetails,
+    showResetConfirm,
+    showCharacterInfo,
+    showUnlockLimit,
+    showUnlockConfirm,
+    showPotionLimit,
+    showPotionConfirm,
+    closeResetConfirm,
+    closePhotoSelector,
+    closeVideoLimit,
+    setLoading,
+    generateVideo,
+    loadTicketsBalance,
+    showPhotoSelector,
+    watchVoiceAd,
+    router,
     showError,
+    success,
+    MESSAGE_ID_PREFIXES,
   });
 
-  // ====================
-  // Event Handlers
-  // ====================
   const {
+    handleSendMessage,
     handleImageClick,
     handleViewBuffDetails,
     handleBack,
-    handleWatchVoiceAd,
     handleSuggestionClick,
     handleRequestSuggestions,
-  } = useEventHandlers({
-    showImageViewer,
-    showBuffDetails,
-    router,
-    watchVoiceAd,
-    getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partner.value?.id,
-    loadSuggestions,
-    handleSendMessage,
-  });
-
-  // ====================
-  // Menu Actions
-  // ====================
-  const { handleMenuAction } = useMenuActions({
-    modals: {
-      showResetConfirm,
-      showCharacterInfo,
-      showUnlockLimit,
-      showUnlockConfirm,
-      showPotionLimit,
-      showPotionConfirm,
-    },
-    userPotions,
-    unlockTickets: {
-      hasCharacterTickets: computed(() => hasCharacterTickets.value),
-      characterTickets: computed(() => characterTickets.value),
-    },
+    handleMenuAction,
+    cancelResetConversation,
+    confirmResetConversation,
+    handlePhotoSelect,
+    handleUseVideoUnlockCard,
+    handleUpgradeFromVideoModal,
     handleShare,
-  });
+  } = handlers;
 
   // ====================
   // 返回所有需要的狀態和方法

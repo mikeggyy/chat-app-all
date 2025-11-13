@@ -176,11 +176,14 @@ export const createLimitData = (resetPeriod) => {
 
   return {
     count: 0, // 基礎使用次數
-    unlocked: 0, // 廣告解鎖的額外次數
+    unlocked: 0, // ⚠️ 已廢棄，保留向後兼容（新系統使用 unlockHistory）
+    unlockHistory: [], // ✅ 使用新的解鎖記錄系統（支持獨立過期時間）
     cards: 0, // ⚠️ 已廢棄，保留向後兼容
     resetPeriod,
     lastResetDate: currentDate,
     lastResetAt: now.toISOString(),
+    lifetimeCount: 0, // 終生使用次數（永不重置）
+    history: [], // 使用歷史記錄
     // 廣告相關
     adsWatchedToday: 0,
     lastAdTime: null,
@@ -198,4 +201,6 @@ export default {
   checkAndResetAdUnlocks,
   checkAndResetAll,
   createLimitData,
+  getUTC8Date, // ✅ P1-1: 導出 UTC+8 時間函數供其他模組使用
+  getUTC8Month,
 };

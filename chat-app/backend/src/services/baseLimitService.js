@@ -121,11 +121,14 @@ export function createLimitService(config) {
               updatedAt: FieldValue.serverTimestamp(),
             });
           } else {
+            // ✅ 修復：深拷貝現有數據以避免 ServerTimestampTransform 污染
+            const cleanExistingData = structuredClone(existingData);
+
             // 補充缺失的欄位（處理舊數據）
             const defaultData = createLimitData(resetPeriod);
             limitData = {
               ...defaultData,
-              ...existingData,
+              ...cleanExistingData,
             };
             // 檢查是否有新欄位需要補充
             if (Object.keys(defaultData).some(key => !(key in existingData))) {
@@ -146,11 +149,14 @@ export function createLimitService(config) {
               updatedAt: FieldValue.serverTimestamp(),
             });
           } else {
+            // ✅ 修復：深拷貝現有數據以避免 ServerTimestampTransform 污染
+            const cleanExistingData = structuredClone(existingData);
+
             // 補充缺失的欄位（處理舊數據）
             const defaultData = createLimitData(resetPeriod);
             limitData = {
               ...defaultData,
-              ...existingData,
+              ...cleanExistingData,
             };
             // 檢查是否有新欄位需要補充
             if (Object.keys(defaultData).some(key => !(key in existingData))) {
@@ -352,13 +358,21 @@ export function createLimitService(config) {
 
       let limitData;
 
-      // 2. 初始化限制數據（避免讀取和重用 doc.data()）
+      // 2. 初始化限制數據（✅ 修復：深拷貝以避免 ServerTimestampTransform 污染）
       if (doc.exists) {
         const existingData = doc.data();
+        let rawData;
         if (perCharacter) {
-          limitData = existingData[fieldName]?.[characterId] || createLimitData(resetPeriod);
+          rawData = existingData[fieldName]?.[characterId];
         } else {
-          limitData = existingData[fieldName] || createLimitData(resetPeriod);
+          rawData = existingData[fieldName];
+        }
+
+        // 深拷貝以避免 Firestore 特殊對象
+        if (!rawData) {
+          limitData = createLimitData(resetPeriod);
+        } else {
+          limitData = structuredClone(rawData);
         }
       } else {
         // 新文檔，創建新的限制數據
@@ -494,13 +508,21 @@ export function createLimitService(config) {
 
       let limitData;
 
-      // 2. 初始化限制數據（避免讀取和重用 doc.data()）
+      // 2. 初始化限制數據（✅ 修復：深拷貝以避免 ServerTimestampTransform 污染）
       if (doc.exists) {
         const existingData = doc.data();
+        let rawData;
         if (perCharacter) {
-          limitData = existingData[fieldName]?.[characterId] || createLimitData(resetPeriod);
+          rawData = existingData[fieldName]?.[characterId];
         } else {
-          limitData = existingData[fieldName] || createLimitData(resetPeriod);
+          rawData = existingData[fieldName];
+        }
+
+        // 深拷貝以避免 Firestore 特殊對象
+        if (!rawData) {
+          limitData = createLimitData(resetPeriod);
+        } else {
+          limitData = structuredClone(rawData);
         }
       } else {
         // 新文檔，創建新的限制數據
@@ -627,10 +649,20 @@ export function createLimitService(config) {
       } else {
         // 現有文檔：讀取並檢查重置
         const existingData = doc.data();
+        let rawData;
         if (perCharacter) {
-          data = existingData[fieldName]?.[characterId] || createLimitData(resetPeriod);
+          rawData = existingData[fieldName]?.[characterId];
         } else {
-          data = existingData[fieldName] || createLimitData(resetPeriod);
+          rawData = existingData[fieldName];
+        }
+
+        // ✅ 修復：深拷貝以避免 ServerTimestampTransform 對象污染
+        // 如果數據不存在，創建新的；否則深拷貝現有數據
+        if (!rawData) {
+          data = createLimitData(resetPeriod);
+        } else {
+          // 使用 structuredClone 深拷貝，確保不會有 Firestore 特殊對象
+          data = structuredClone(rawData);
         }
 
         // 檢查並重置

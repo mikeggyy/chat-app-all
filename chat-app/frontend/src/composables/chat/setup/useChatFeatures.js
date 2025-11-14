@@ -3,6 +3,7 @@
  * 管理禮物、自拍、視頻、藥水、解鎖等功能
  */
 
+import { useChatActions } from '../useChatActions';
 import { usePotionManagement } from '../usePotionManagement';
 import { useSelfieGeneration } from '../useSelfieGeneration';
 import { useVideoGeneration } from '../useVideoGeneration';
@@ -20,28 +21,75 @@ export function useChatFeatures(options) {
   const {
     partnerId,
     currentUserId,
-    characterTickets,
+    partner,
+    firebaseAuth,
+    messages,
+    chatContentRef,
+    requireLogin,
+    canGeneratePhoto,
+    fetchPhotoStats,
+    photoRemaining,
+    checkVoiceLimit,
+    loadVoiceStats,
+    loadTicketsBalance,
+    closeConversationLimit,
+    closeVoiceLimit,
+    closePhotoLimit,
+    closePotionLimit,
+    closeUnlockConfirm,
+    closePotionConfirm,
     showPotionConfirm,
     showPotionLimit,
-    closePotionConfirm,
-    closePotionLimit,
     showUnlockConfirm,
     showUnlockLimit,
-    closeUnlockConfirm,
-    closeUnlockLimit,
-    showVoiceLimit,
     showPhotoLimit,
+    showVoiceLimit,
     showVideoLimit,
-    closePhotoSelector,
-    closeVideoLimit,
+    showPhotoSelector,
     showGiftSelector,
     closeGiftSelector,
-    showPhotoSelector,
-    loadTicketsBalance,
-    setUserProfile,
-    router,
+    closePhotoSelector,
+    closeVideoLimit,
+    showGiftAnimation,
+    closeGiftAnimation,
+    setLoading,
+    loadBalance,
     showError,
+    success,
+    rollbackUserMessage,
+    createLimitModalData,
+    setUserProfile,
+    config,
   } = options;
+
+  // ==========================================
+  // 創建 Chat Actions（核心動作函數）
+  // ==========================================
+  const chatActions = useChatActions({
+    messages,
+    partner,
+    currentUserId,
+    firebaseAuth,
+    toast: {
+      success,
+      error: showError,
+    },
+    requireLogin,
+    scrollToBottom: () => chatContentRef.value?.scrollToBottom?.(),
+    appendCachedHistory: () => {}, // TODO: 如果需要可以從 options 傳入
+  });
+
+  const {
+    isRequestingSelfie,
+    requestSelfie,
+    playVoice,
+    showGiftSelector: showGiftSelectorState,
+    isSendingGift,
+    openGiftSelector,
+    closeGiftSelector: closeGiftSelectorFromActions,
+    sendGift,
+    playingVoiceMessageId,
+  } = chatActions;
 
   // Potion Management
   const {
@@ -55,10 +103,12 @@ export function useChatFeatures(options) {
     handleConfirmUsePotion,
   } = usePotionManagement({
     getCurrentUserId: () => currentUserId.value,
-    showPotionConfirm,
-    showPotionLimit,
+    getPartnerId: () => partnerId.value,
+    getPotionType: () => null, // TODO: 從 modals 或其他地方獲取
     closePotionConfirm,
-    closePotionLimit,
+    setLoading,
+    showError,
+    showSuccess: success,
   });
 
   // Character Unlock
@@ -71,37 +121,56 @@ export function useChatFeatures(options) {
   } = useCharacterUnlock({
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
-    getCharacterTickets: () => characterTickets.value,
-    activeCharacterUnlock,
-    loadActiveUnlocks,
-    showUnlockConfirm,
-    showUnlockLimit,
+    getFirebaseAuth: () => firebaseAuth,
+    getPartnerDisplayName: () => partner.value?.name || partner.value?.displayName,
     closeUnlockConfirm,
-    closeUnlockLimit,
     loadTicketsBalance,
-    setUserProfile,
+    setLoading,
+    showError,
+    showSuccess: success,
   });
 
   // Voice Management
   const {
-    playingVoiceMessageId,
     handlePlayVoice,
+    handleWatchVoiceAd,
+    handleUseVoiceUnlockCard,
   } = useVoiceManagement({
     getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partnerId.value,
+    playVoice,
+    loadVoiceStats,
+    checkVoiceLimit,
+    unlockVoiceByAd: () => {}, // TODO: 從 useChatLimits 獲取
+    loadTicketsBalance,
     showVoiceLimit,
+    closeVoiceLimit,
+    getVoiceLimitPendingMessage: () => null, // TODO: 實現
+    showError,
+    showSuccess: success,
   });
 
   // Selfie Generation
   const {
-    isRequestingSelfie,
-    photoRemaining,
     handleRequestSelfie,
+    handleUsePhotoUnlockCard,
   } = useSelfieGeneration({
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
+    getFirebaseAuth: () => firebaseAuth,
+    messages,
+    messageListRef: chatContentRef,
+    rollbackUserMessage,
+    requireLogin,
+    canGeneratePhoto,
+    fetchPhotoStats,
     showPhotoLimit,
-    showPhotoSelector,
+    createLimitModalData,
+    requestSelfie,
+    closePhotoLimit,
+    loadTicketsBalance,
+    showError,
+    showSuccess: success,
+    config,
   });
 
   // Video Generation
@@ -112,20 +181,30 @@ export function useChatFeatures(options) {
   } = useVideoGeneration({
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
+    getFirebaseAuth: () => firebaseAuth,
+    messages,
+    messageListRef: chatContentRef,
+    rollbackUserMessage,
+    requireLogin,
     showVideoLimit,
+    showPhotoSelector,
+    createLimitModalData,
+    showError,
+    showSuccess: success,
+    config,
   });
 
   // Gift Management
   const {
-    isSendingGift,
     handleOpenGiftSelector,
     handleSelectGift,
   } = useGiftManagement({
     getCurrentUserId: () => currentUserId.value,
-    getPartnerId: () => partnerId.value,
-    showGiftSelector,
-    closeGiftSelector,
-    showError,
+    openGiftSelector,
+    sendGift,
+    loadBalance,
+    showGiftAnimation,
+    closeGiftAnimation,
   });
 
   // Favorite Management
@@ -135,7 +214,12 @@ export function useChatFeatures(options) {
   } = useFavoriteManagement({
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
+    getUser: () => null, // TODO: 從 useChatCore 獲取
+    getFirebaseAuth: () => firebaseAuth,
     setUserProfile,
+    requireLogin,
+    showError,
+    showSuccess: success,
   });
 
   return {
@@ -159,11 +243,16 @@ export function useChatFeatures(options) {
     // Voice
     playingVoiceMessageId,
     handlePlayVoice,
+    handleWatchVoiceAd,
+    handleUseVoiceUnlockCard,
+    playVoice, // 底層函數
 
     // Selfie
-    isRequestingSelfie,
-    photoRemaining,
-    handleRequestSelfie,
+    isRequestingSelfie, // 從 chatActions
+    photoRemaining, // 從 options
+    handleRequestSelfie, // 從 useSelfieGeneration
+    handleUsePhotoUnlockCard, // 從 useSelfieGeneration
+    requestSelfie, // 底層函數從 chatActions
 
     // Video
     isRequestingVideo,
@@ -171,9 +260,13 @@ export function useChatFeatures(options) {
     generateVideo,
 
     // Gift
-    isSendingGift,
-    handleOpenGiftSelector,
-    handleSelectGift,
+    isSendingGift, // 從 chatActions
+    showGiftSelector: showGiftSelectorState, // 從 chatActions (ref 狀態)
+    handleOpenGiftSelector, // 從 useGiftManagement
+    handleSelectGift, // 從 useGiftManagement
+    openGiftSelector, // 底層函數從 chatActions
+    closeGiftSelector: closeGiftSelectorFromActions, // 底層函數從 chatActions
+    sendGift, // 底層函數從 chatActions
 
     // Favorite
     isFavoriteMutating,

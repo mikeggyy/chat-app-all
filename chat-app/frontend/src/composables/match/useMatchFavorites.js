@@ -38,8 +38,8 @@ import { logger } from '../../utils/logger';
 export function useMatchFavorites(options = {}) {
   const { user, firebaseAuth, onUpdateProfile, requireLogin } = options;
 
-  // 收藏狀態
-  const favoriteIds = ref(new Set());
+  // 收藏狀態（使用數組而非 Set，確保 Vue 響應式系統能正確追蹤）
+  const favoriteIds = ref([]);
   const favoriteMutating = ref(false);
   const favoriteError = ref('');
 
@@ -50,12 +50,12 @@ export function useMatchFavorites(options = {}) {
   });
 
   /**
-   * 同步收藏 Set
+   * 同步收藏列表
    * @param {Array<string>} favorites - 收藏列表
    */
   const syncFavoriteSet = (favorites) => {
     const list = Array.isArray(favorites) ? favorites : [];
-    favoriteIds.value = new Set(list);
+    favoriteIds.value = [...list]; // 創建新數組確保響應式更新
   };
 
   /**
@@ -115,8 +115,10 @@ export function useMatchFavorites(options = {}) {
         }
       );
 
-      const favorites = Array.isArray(response?.favorites)
-        ? response.favorites
+      // ✅ 修復：favorites 在 response.data 裡面
+      const responseData = response?.data || response;
+      const favorites = Array.isArray(responseData?.favorites)
+        ? responseData.favorites
         : [];
 
       const currentProfile = user?.value;
@@ -198,18 +200,19 @@ export function useMatchFavorites(options = {}) {
 
     favoriteMutating.value = true;
     const requestUserId = currentProfile.id; // 保存請求時的用戶 ID
-    const wasFavorited = favoriteIds.value.has(matchId);
-    const previousSet = new Set(favoriteIds.value);
-    const optimisticSet = new Set(previousSet);
+    const wasFavorited = favoriteIds.value.includes(matchId);
+    const previousList = [...favoriteIds.value]; // 保存舊列表
 
     // Optimistic UI 更新
     if (wasFavorited) {
-      optimisticSet.delete(matchId);
+      favoriteIds.value = favoriteIds.value.filter(id => id !== matchId);
+      logger.log(`[收藏] Optimistic 移除: ${matchId}`);
     } else {
-      optimisticSet.add(matchId);
+      favoriteIds.value = [...favoriteIds.value, matchId];
+      logger.log(`[收藏] Optimistic 添加: ${matchId}`);
     }
 
-    favoriteIds.value = optimisticSet;
+    logger.log(`[收藏] favoriteIds 已更新, length: ${favoriteIds.value.length}, list:`, favoriteIds.value);
 
     try {
       const endpoint = wasFavorited
@@ -227,6 +230,8 @@ export function useMatchFavorites(options = {}) {
         skipGlobalLoading: true,
       });
 
+      logger.log('[收藏] 完整 API 響應:', response);
+
       // 檢查競態條件：如果請求完成時用戶已切換，忽略響應數據
       if (user?.value?.id !== requestUserId) {
         logger.warn('用戶已切換，忽略過期的收藏更新');
@@ -234,11 +239,14 @@ export function useMatchFavorites(options = {}) {
         return false;
       }
 
-      const favoritesList = Array.isArray(response?.favorites)
-        ? response.favorites
+      // ✅ 修復：favorites 在 response.data 裡面，不是在 response 根部
+      const responseData = response?.data || response; // 兼容不同的響應格式
+      const favoritesList = Array.isArray(responseData?.favorites)
+        ? responseData.favorites
         : [];
 
-      favoriteIds.value = new Set(favoritesList);
+      favoriteIds.value = [...favoritesList];
+      logger.log(`[收藏] API 成功，更新 favoriteIds, length: ${favoriteIds.value.length}, list:`, favoritesList);
 
       // 使用最新的用戶資料，並保護回調執行
       if (onUpdateProfile) {
@@ -265,7 +273,7 @@ export function useMatchFavorites(options = {}) {
       }
 
       // 錯誤時回滾（僅當用戶未切換時）
-      favoriteIds.value = previousSet;
+      favoriteIds.value = previousList;
       favoriteError.value =
         requestError instanceof Error
           ? requestError.message
@@ -283,7 +291,7 @@ export function useMatchFavorites(options = {}) {
    * @returns {boolean} 是否已收藏
    */
   const isFavorited = (matchId) => {
-    return favoriteIds.value.has(matchId);
+    return favoriteIds.value.includes(matchId);
   };
 
   /**

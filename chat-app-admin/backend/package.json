@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:env": "node scripts/test-env-validation.js",
     "create-admin": "node scripts/create-admin-user.js"
   },
@@ -27,6 +29,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.9",
-    "tough-cookie": "^6.0.0"
+    "supertest": "^7.1.4",
+    "tough-cookie": "^6.0.0",
+    "vitest": "^4.0.8"
   }
 }

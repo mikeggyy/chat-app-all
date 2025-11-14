@@ -28,7 +28,8 @@ export const csrfProtection = (options = {}) => {
     cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      // ✅ 修復：開發環境使用 'lax'，生產環境使用 'strict'
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: 3600000, // 1 小時
     },
   } = options;
@@ -87,9 +88,9 @@ export const setCsrfToken = (options = {}) => {
   const {
     cookieName = '_csrf',
     cookieOptions = {
-      httpOnly: true,
+      httpOnly: false, // ✅ 修復：設為 false 讓 JavaScript 可以讀取
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: 3600000, // 1 小時
     },
   } = options;

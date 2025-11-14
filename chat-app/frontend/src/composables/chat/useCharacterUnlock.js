@@ -86,22 +86,26 @@ export function useCharacterUnlock(deps) {
   /**
    * 加載活躍的解鎖效果
    * @returns {Promise<void>}
+   * TODO: 後端需要添加 /api/unlock-tickets/active 端點
    */
   const loadActiveUnlocks = async () => {
     const userId = getCurrentUserId();
-    if (!userId) return;
+    if (!userId) {
+      isUnlockDataLoaded.value = true;
+      return;
+    }
 
     // 先清空舊數據，避免閃爍
     activeUnlockEffects.value = [];
 
     try {
-      const data = await apiJson(`/api/unlock-tickets/active`, {
-        skipGlobalLoading: true,
-      });
-
-      if (data && data.unlocks) {
-        activeUnlockEffects.value = data.unlocks;
-      }
+      // TODO: 暫時禁用，等待後端實現 /api/unlock-tickets/active 端點
+      // const data = await apiJson(`/api/unlock-tickets/active`, {
+      //   skipGlobalLoading: true,
+      // });
+      // if (data && data.unlocks) {
+      //   activeUnlockEffects.value = data.unlocks;
+      // }
     } catch (error) {
       // Silent fail - 不影響用戶體驗
     } finally {

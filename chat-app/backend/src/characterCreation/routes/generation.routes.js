@@ -354,7 +354,6 @@ generationRouter.post(
       }
 
       // 獲取用戶 ID 並檢查創建資源
-      const userId = currentFlow.userId;
       let shouldRecordCreation = false;
       let needsCreateCard = false;
 

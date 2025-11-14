@@ -136,7 +136,8 @@ export const ensureAuthState = () => {
               `/api/users/${encodeURIComponent(firebaseUser.uid)}`
             );
             // ✅ 成功獲取後端數據，使用最新的完整資料
-            setUserProfile(existing);
+            // ⚠️ 修復：後端返回 { success: true, data: {...} }，需要取出 data
+            setUserProfile(existing.data || existing);
             return;
           } catch (error) {
             const notFound = error?.status === 404;
@@ -165,7 +166,8 @@ export const ensureAuthState = () => {
                   },
                 });
                 // ✅ 使用後端返回的新建用戶資料（包含所有正確的預設值）
-                setUserProfile(created);
+                // ⚠️ 修復：後端返回 { success: true, data: {...} }，需要取出 data
+                setUserProfile(created.data || created);
                 return;
               } catch (createError) {
                 // 創建失敗，不設置錯誤的 fallbackProfile

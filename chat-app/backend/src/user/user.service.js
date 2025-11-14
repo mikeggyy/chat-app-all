@@ -13,6 +13,7 @@ import {
   setCachedUserProfile,
   deleteCachedUserProfile,
 } from "./userProfileCache.service.js";
+import logger from "../utils/logger.js";
 
 const USERS_COLLECTION = "users";
 
@@ -262,10 +263,11 @@ export const updateUserPhoto = async (id, photoURL) => {
 
   const db = getFirestoreDb();
   const userRef = db.collection(USERS_COLLECTION).doc(id);
+  const nowIso = new Date().toISOString();
 
   const updated = {
     photoURL,
-    updatedAt: FieldValue.serverTimestamp(),
+    updatedAt: nowIso,
   };
 
   await userRef.update(updated);
@@ -273,7 +275,7 @@ export const updateUserPhoto = async (id, photoURL) => {
   const updatedUser = {
     ...existing,
     photoURL,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso,
   };
 
   // 刪除舊緩存，下次讀取時會重新緩存
@@ -382,14 +384,27 @@ export const updateUserProfileFields = async (id, updates = {}) => {
   const db = getFirestoreDb();
   const userRef = db.collection(USERS_COLLECTION).doc(id);
 
-  const updateData = {
-    displayName: nextDisplayName,
-    gender: nextGender,
-    age: nextAge,
-    hasCompletedOnboarding: nextHasCompletedOnboarding,
-    defaultPrompt: nextDefaultPrompt,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
+  // ✅ 修復：只更新有變更的欄位，並單獨處理 updatedAt
+  const updateData = {};
+
+  if (nextDisplayName !== existingName) {
+    updateData.displayName = nextDisplayName;
+  }
+  if (nextGender !== existingGender) {
+    updateData.gender = nextGender;
+  }
+  if (nextAge !== existingAge) {
+    updateData.age = nextAge;
+  }
+  if (nextHasCompletedOnboarding !== existingHasCompletedOnboarding) {
+    updateData.hasCompletedOnboarding = nextHasCompletedOnboarding;
+  }
+  if (nextDefaultPrompt !== existingPrompt) {
+    updateData.defaultPrompt = nextDefaultPrompt;
+  }
+
+  // 總是更新 updatedAt（使用 ISO 字串而非 serverTimestamp）
+  updateData.updatedAt = new Date().toISOString();
 
   await userRef.update(updateData);
 
@@ -450,16 +465,20 @@ const updateUserFavorites = async (id, buildFavorites) => {
 
   const db = getFirestoreDb();
   const userRef = db.collection(USERS_COLLECTION).doc(id);
+  const nowIso = new Date().toISOString();
 
   await userRef.update({
     favorites: uniqueFavorites,
-    updatedAt: FieldValue.serverTimestamp(),
+    updatedAt: nowIso,
   });
+
+  // ✅ 清除緩存，確保下次讀取時獲取最新數據
+  deleteCachedUserProfile(id);
 
   return {
     ...existing,
     favorites: uniqueFavorites,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso,
   };
 };
 
@@ -479,6 +498,36 @@ export const addFavoriteForUser = async (id, favoriteId) => {
     return alreadyExists ? favorites : [...favorites, favoriteId];
   });
 
+  logger.info('[addFavoriteForUser] updateUserFavorites 返回:', {
+    favorites: user?.favorites,
+    favoritesLength: user?.favorites?.length,
+    id: user?.id
+  });
+
+  // ✅ 如果是首次收藏，更新角色的 totalFavorites
+  if (isNewFavorite) {
+    try {
+      const db = getFirestoreDb();
+      const characterRef = db.collection("characters").doc(favoriteId);
+
+      await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(characterRef);
+        if (doc.exists) {
+          const currentCount = doc.data().totalFavorites || 0;
+          transaction.update(characterRef, {
+            totalFavorites: currentCount + 1,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      logger.info(`[收藏計數] 角色 ${favoriteId} 的 totalFavorites +1（用戶 ${id}）`);
+    } catch (error) {
+      logger.error(`[收藏計數] 更新失敗:`, error);
+      // 不影響收藏操作
+    }
+  }
+
   return {
     ...user,
     isNewFavorite, // 返回是否為新增的喜歡
@@ -490,9 +539,42 @@ export const removeFavoriteForUser = async (id, favoriteId) => {
     throw new Error("移除收藏時需要提供 favoriteId");
   }
 
-  return updateUserFavorites(id, (favorites) =>
+  // 檢查用戶是否真的有這個收藏
+  let wasRemoved = false;
+  const existingUser = await getUserById(id);
+  if (existingUser?.favorites?.includes(favoriteId)) {
+    wasRemoved = true;
+  }
+
+  const user = await updateUserFavorites(id, (favorites) =>
     favorites.filter((value) => value !== favoriteId)
   );
+
+  // ✅ 如果確實移除了收藏，減少角色的 totalFavorites
+  if (wasRemoved) {
+    try {
+      const db = getFirestoreDb();
+      const characterRef = db.collection("characters").doc(favoriteId);
+
+      await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(characterRef);
+        if (doc.exists) {
+          const currentCount = doc.data().totalFavorites || 0;
+          transaction.update(characterRef, {
+            totalFavorites: Math.max(0, currentCount - 1), // 防止負數
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+
+      logger.info(`[收藏計數] 角色 ${favoriteId} 的 totalFavorites -1（用戶 ${id}）`);
+    } catch (error) {
+      logger.error(`[收藏計數] 減少失敗:`, error);
+      // 不影響取消收藏操作
+    }
+  }
+
+  return user;
 };
 
 const updateUserConversations = async (id, buildConversations) => {
@@ -560,16 +642,20 @@ const updateUserConversations = async (id, buildConversations) => {
 
   const db = getFirestoreDb();
   const userRef = db.collection(USERS_COLLECTION).doc(id);
+  const nowIso = new Date().toISOString();
 
   await userRef.update({
     conversations: uniqueConversations,
-    updatedAt: FieldValue.serverTimestamp(),
+    updatedAt: nowIso,
   });
+
+  // ✅ 清除緩存，確保下次讀取時獲取最新數據
+  deleteCachedUserProfile(id);
 
   return {
     ...existing,
     conversations: uniqueConversations,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso,
   };
 };
 

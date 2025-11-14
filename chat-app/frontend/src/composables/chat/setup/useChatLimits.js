@@ -27,7 +27,12 @@ export function useChatLimits() {
   } = useVoiceLimit();
 
   // Photo Limit
-  const { checkPhotoLimit, fetchPhotoStats } = usePhotoLimit();
+  const {
+    checkPhotoLimit,
+    fetchPhotoStats,
+    canGeneratePhoto,
+    remaining: photoRemaining,
+  } = usePhotoLimit();
 
   // Guest Guard
   const {
@@ -35,6 +40,7 @@ export function useChatLimits() {
     canGuestSendMessage,
     requireLogin,
     incrementGuestMessageCount,
+    guestRemainingMessages,
   } = useGuestGuard();
 
   // Coins & Balance
@@ -47,7 +53,8 @@ export function useChatLimits() {
     voiceCards,
     photoCards,
     videoCards,
-    loadTicketsBalance,
+    createCards,
+    loadBalance: loadTicketsBalance,
   } = useUnlockTickets();
 
   return {
@@ -65,12 +72,15 @@ export function useChatLimits() {
     // Photo Limit
     checkPhotoLimit,
     fetchPhotoStats,
+    canGeneratePhoto,
+    photoRemaining,
 
     // Guest Guard
     isGuest,
     canGuestSendMessage,
     requireLogin,
     incrementGuestMessageCount,
+    guestRemainingMessages,
 
     // Coins & Balance
     balance,
@@ -82,6 +92,7 @@ export function useChatLimits() {
     voiceCards,
     photoCards,
     videoCards,
+    createCards,
     loadTicketsBalance,
   };
 }

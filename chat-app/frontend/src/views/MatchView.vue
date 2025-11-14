@@ -105,7 +105,10 @@ const favorites = useMatchFavorites({
   requireLogin,
 });
 
-const isFavorited = computed(() => favorites.isFavorited(match.id));
+// 當前角色是否已收藏（響應式 - 使用數組確保 Vue 能正確追蹤變化）
+const isFavorited = computed(() => {
+  return favorites.favoriteIds.value.includes(match.id);
+});
 
 // 背景對話框
 const backgroundDialog = reactive({

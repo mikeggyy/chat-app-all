@@ -273,30 +273,29 @@ userRouter.post(
     const targetFavoriteId = matchId ?? favoriteId ?? "";
     const includeMatches = shouldIncludeMatches(req.query);
 
-    const user = await addFavoriteForUser(id, targetFavoriteId);
-
-    // 檢查是否是首次喜歡，如果是則增加角色的 totalFavorites
-    if (user?.isNewFavorite) {
-      try {
-        const db = getFirestoreDb();
-        const characterRef = db.collection("characters").doc(targetFavoriteId);
-        await characterRef.update({
-          totalFavorites: FieldValue.increment(1),
-          updatedAt: new Date().toISOString()
-        });
-
-        if (process.env.NODE_ENV !== "test") {
-          logger.info(`[喜歡數量] 角色 ${targetFavoriteId} 的 totalFavorites +1（用戶 ${id} 首次喜歡）`);
-        }
-      } catch (incrementError) {
-        if (process.env.NODE_ENV !== "test") {
-          logger.error(`[喜歡數量] 更新失敗:`, incrementError);
-        }
-        // 增量失敗不影響收藏操作
-      }
+    // ✅ 參數驗證
+    if (!targetFavoriteId || typeof targetFavoriteId !== 'string') {
+      return sendError(res, 'VALIDATION_ERROR', '請提供有效的角色 ID', {
+        field: 'matchId 或 favoriteId',
+        received: targetFavoriteId
+      });
     }
 
-    sendSuccess(res, await buildFavoritesPayload(user, includeMatches), 201);
+    if (targetFavoriteId.length > 100) {
+      return sendError(res, 'VALIDATION_ERROR', '角色 ID 長度不得超過 100 個字符', {
+        field: 'matchId 或 favoriteId',
+        maxLength: 100
+      });
+    }
+
+    const user = await addFavoriteForUser(id, targetFavoriteId);
+    // ✅ totalFavorites 更新邏輯已移至 service 層
+
+    logger.info('[POST favorites] user 對象:', { favorites: user?.favorites, isNewFavorite: user?.isNewFavorite });
+    const payload = await buildFavoritesPayload(user, includeMatches);
+    logger.info('[POST favorites] payload:', payload);
+
+    sendSuccess(res, payload, 201);
   })
 );
 
@@ -309,7 +308,24 @@ userRouter.delete(
     const { id, favoriteId } = req.params;
     const includeMatches = shouldIncludeMatches(req.query);
 
+    // ✅ 參數驗證
+    if (!favoriteId || typeof favoriteId !== 'string') {
+      return sendError(res, 'VALIDATION_ERROR', '請提供有效的角色 ID', {
+        field: 'favoriteId',
+        received: favoriteId
+      });
+    }
+
+    if (favoriteId.length > 100) {
+      return sendError(res, 'VALIDATION_ERROR', '角色 ID 長度不得超過 100 個字符', {
+        field: 'favoriteId',
+        maxLength: 100
+      });
+    }
+
     const user = await removeFavoriteForUser(id, favoriteId);
+    // ✅ totalFavorites 更新邏輯已移至 service 層
+
     sendSuccess(res, await buildFavoritesPayload(user, includeMatches));
   })
 );

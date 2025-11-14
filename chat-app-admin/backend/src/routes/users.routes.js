@@ -442,6 +442,8 @@ router.delete("/:userId", requireRole("super_admin"), strictAdminRateLimiter, as
   try {
     const { userId } = req.params;
 
+    console.log(`[管理後台] 開始刪除用戶: ${userId}`);
+
     // 檢查用戶是否存在
     try {
       await auth.getUser(userId);
@@ -456,26 +458,40 @@ router.delete("/:userId", requireRole("super_admin"), strictAdminRateLimiter, as
     const deletionStats = {
       conversations: 0,
       photos: 0,
+      potions: 0,
+      transactions: 0,
+      orders: 0,
+      videos: 0,
+      characterCreationFlows: 0,
+      idempotencyKeys: 0,
+      usageLimits: 0,
+      users: 0,
     };
 
     // 1. 刪除所有對話記錄（文檔 ID 格式：userId::characterId）
     try {
+      console.log(`[管理後台] 刪除對話記錄...`);
       const conversationsSnapshot = await db
         .collection("conversations")
         .where("__name__", ">=", `${userId}::`)
         .where("__name__", "<", `${userId}::\uf8ff`)
         .get();
 
-      const conversationDeletePromises = conversationsSnapshot.docs.map(doc => doc.ref.delete());
-      await Promise.all(conversationDeletePromises);
-      deletionStats.conversations = conversationsSnapshot.size;
+      if (!conversationsSnapshot.empty) {
+        const conversationDeletePromises = conversationsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(conversationDeletePromises);
+        deletionStats.conversations = conversationsSnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.conversations} 個對話記錄`);
+      }
     } catch (error) {
+      console.error(`[管理後台] 刪除對話記錄失敗:`, error.message);
       // 繼續執行，不中斷整個刪除流程
     }
 
     // 2. 刪除用戶照片相簿（user_photos/{userId}/photos 子集合）
     // 同時刪除 Firestore 記錄和 Cloudflare R2 圖片
     try {
+      console.log(`[管理後台] 刪除用戶照片...`);
       const photosSnapshot = await db
         .collection("user_photos")
         .doc(userId)
@@ -507,33 +523,176 @@ router.delete("/:userId", requireRole("super_admin"), strictAdminRateLimiter, as
         const photoDeletePromises = photosSnapshot.docs.map(doc => doc.ref.delete());
         await Promise.all(photoDeletePromises);
         deletionStats.photos = photosSnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.photos} 張照片記錄`);
       }
 
       // 刪除用戶照片文檔本身
       await db.collection("user_photos").doc(userId).delete();
     } catch (error) {
-      console.error(`[管理後台] 刪除用戶照片失敗: userId=${userId}`, error);
+      console.error(`[管理後台] 刪除用戶照片失敗:`, error.message);
       // 繼續執行
     }
 
-    // 3. 刪除用戶的使用限制數據
-    await db.collection("usage_limits").doc(userId).delete();
+    // 3. ✅ 刪除用戶藥水數據（user_potions/{userId}/potions 子集合）
+    try {
+      console.log(`[管理後台] 刪除用戶藥水數據...`);
+      const potionsSnapshot = await db
+        .collection("user_potions")
+        .doc(userId)
+        .collection("potions")
+        .get();
 
-    // 4. 刪除 Firestore 用戶數據
-    await db.collection("users").doc(userId).delete();
+      if (!potionsSnapshot.empty) {
+        const potionDeletePromises = potionsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(potionDeletePromises);
+        deletionStats.potions = potionsSnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.potions} 個藥水記錄`);
+      }
 
-    // 5. 刪除 Firebase Auth 用戶（最後刪除，確保前面的操作能完成）
-    await auth.deleteUser(userId);
+      // 刪除用戶藥水文檔本身
+      await db.collection("user_potions").doc(userId).delete();
+    } catch (error) {
+      console.error(`[管理後台] 刪除用戶藥水失敗:`, error.message);
+      // 繼續執行
+    }
+
+    // 4. ✅ 刪除用戶交易記錄（transactions 集合，根據 userId 查詢）
+    try {
+      console.log(`[管理後台] 刪除交易記錄...`);
+      const transactionsSnapshot = await db
+        .collection("transactions")
+        .where("userId", "==", userId)
+        .get();
+
+      if (!transactionsSnapshot.empty) {
+        const transactionDeletePromises = transactionsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(transactionDeletePromises);
+        deletionStats.transactions = transactionsSnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.transactions} 筆交易記錄`);
+      }
+    } catch (error) {
+      console.error(`[管理後台] 刪除交易記錄失敗:`, error.message);
+      // 繼續執行
+    }
+
+    // 5. ✅ 刪除用戶訂單記錄（orders 集合，根據 userId 查詢）
+    try {
+      console.log(`[管理後台] 刪除訂單記錄...`);
+      const ordersSnapshot = await db
+        .collection("orders")
+        .where("userId", "==", userId)
+        .get();
+
+      if (!ordersSnapshot.empty) {
+        const orderDeletePromises = ordersSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(orderDeletePromises);
+        deletionStats.orders = ordersSnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.orders} 筆訂單記錄`);
+      }
+    } catch (error) {
+      console.error(`[管理後台] 刪除訂單記錄失敗:`, error.message);
+      // 繼續執行
+    }
+
+    // 6. ✅ 刪除用戶生成的影片記錄（generatedVideos 集合，根據 userId 查詢）
+    try {
+      console.log(`[管理後台] 刪除影片記錄...`);
+      const videosSnapshot = await db
+        .collection("generatedVideos")
+        .where("userId", "==", userId)
+        .get();
+
+      if (!videosSnapshot.empty) {
+        const videoDeletePromises = videosSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(videoDeletePromises);
+        deletionStats.videos = videosSnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.videos} 個影片記錄`);
+      }
+    } catch (error) {
+      console.error(`[管理後台] 刪除影片記錄失敗:`, error.message);
+      // 繼續執行
+    }
+
+    // 7. ✅ 刪除角色創建流程記錄（character_creation_flows 集合，根據 userId 查詢）
+    try {
+      console.log(`[管理後台] 刪除角色創建流程...`);
+      const flowsSnapshot = await db
+        .collection("character_creation_flows")
+        .where("userId", "==", userId)
+        .get();
+
+      if (!flowsSnapshot.empty) {
+        const flowDeletePromises = flowsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(flowDeletePromises);
+        deletionStats.characterCreationFlows = flowsSnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.characterCreationFlows} 個角色創建流程`);
+      }
+    } catch (error) {
+      console.error(`[管理後台] 刪除角色創建流程失敗:`, error.message);
+      // 繼續執行
+    }
+
+    // 8. ✅ 刪除冪等性鍵記錄（idempotency_keys 集合，文檔 ID 以 userId 開頭）
+    try {
+      console.log(`[管理後台] 刪除冪等性鍵...`);
+      const idempotencySnapshot = await db
+        .collection("idempotency_keys")
+        .where("__name__", ">=", `${userId}:`)
+        .where("__name__", "<", `${userId}:\uf8ff`)
+        .get();
+
+      if (!idempotencySnapshot.empty) {
+        const idempotencyDeletePromises = idempotencySnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(idempotencyDeletePromises);
+        deletionStats.idempotencyKeys = idempotencySnapshot.size;
+        console.log(`[管理後台] 已刪除 ${deletionStats.idempotencyKeys} 個冪等性鍵`);
+      }
+    } catch (error) {
+      console.error(`[管理後台] 刪除冪等性鍵失敗:`, error.message);
+      // 繼續執行
+    }
+
+    // 9. 刪除用戶的使用限制數據
+    try {
+      console.log(`[管理後台] 刪除使用限制數據...`);
+      await db.collection("usage_limits").doc(userId).delete();
+      deletionStats.usageLimits = 1;
+    } catch (error) {
+      console.error(`[管理後台] 刪除使用限制數據失敗:`, error.message);
+    }
+
+    // 10. 刪除 Firestore 用戶數據
+    try {
+      console.log(`[管理後台] 刪除用戶基本資料...`);
+      await db.collection("users").doc(userId).delete();
+      deletionStats.users = 1;
+    } catch (error) {
+      console.error(`[管理後台] 刪除用戶基本資料失敗:`, error.message);
+    }
+
+    // 11. 刪除 Firebase Auth 用戶（最後刪除，確保前面的操作能完成）
+    try {
+      console.log(`[管理後台] 刪除 Firebase Auth 用戶...`);
+      await auth.deleteUser(userId);
+      console.log(`[管理後台] ✅ 用戶刪除完成: ${userId}`);
+    } catch (error) {
+      console.error(`[管理後台] 刪除 Firebase Auth 用戶失敗:`, error.message);
+      throw error; // Auth 刪除失敗時拋出錯誤
+    }
+
+    // 計算總刪除數量
+    const totalDeleted = Object.values(deletionStats).reduce((sum, count) => sum + count, 0);
+    console.log(`[管理後台] 刪除統計:`, deletionStats);
+    console.log(`[管理後台] 總計刪除: ${totalDeleted} 筆記錄`);
 
     res.json({
       message: "用戶刪除成功",
       userId,
-      deletionStats: {
-        conversations: deletionStats.conversations,
-        photos: deletionStats.photos,
-      },
+      deletionStats,
+      totalDeleted,
     });
   } catch (error) {
+    console.error(`[管理後台] 刪除用戶失敗: userId=${req.params.userId}`, error);
     res.status(500).json({ error: "刪除用戶失敗", message: error.message });
   }
 });

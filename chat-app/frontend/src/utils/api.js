@@ -207,8 +207,23 @@ const isJsonBody = (value) =>
   !(value instanceof Blob) &&
   !(value instanceof ArrayBuffer);
 
+/**
+ * 從 Cookie 中獲取 CSRF Token
+ * @returns {string|null} CSRF Token 或 null
+ */
+const getCsrfTokenFromCookie = () => {
+  if (typeof document === 'undefined') return null;
+
+  const match = document.cookie.match(/(?:^|;\s*)_csrf=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
 const buildRequestInit = async (options = {}) => {
-  const init = { method: "GET", ...options };
+  const init = {
+    method: "GET",
+    credentials: 'include', // ✅ 修復：允許跨域發送和接收 Cookie
+    ...options
+  };
   init.headers = {
     Accept: "application/json",
     ...init.headers,
@@ -218,6 +233,15 @@ const buildRequestInit = async (options = {}) => {
   const token = await getCachedToken();
   if (token) {
     init.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // ✅ 自動添加 CSRF Token（對於寫操作）
+  const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(init.method.toUpperCase());
+  if (isWriteMethod) {
+    const csrfToken = getCsrfTokenFromCookie();
+    if (csrfToken) {
+      init.headers['x-csrf-token'] = csrfToken;
+    }
   }
 
   if (isJsonBody(init.body)) {

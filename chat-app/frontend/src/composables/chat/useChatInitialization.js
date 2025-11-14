@@ -48,17 +48,53 @@ export const useChatInitialization = ({
       // 1. Load partner data first
       await loadPartner(matchId);
 
-      // 2. Load unlock tickets (統一管道獲取所有卡片)
-      await loadTicketsBalance(userId, { skipGlobalLoading: true });
+      // 2. Load unlock tickets (統一管道獲取所有卡片，跳過訪客用戶)
+      if (!isGuestUser(userId)) {
+        try {
+          await loadTicketsBalance(userId, { skipGlobalLoading: true });
+        } catch (error) {
+          // 靜默失敗，不影響用戶體驗
+          if (import.meta.env.DEV) {
+            logger.warn("加載解鎖卡餘額失敗:", error);
+          }
+        }
+      }
 
-      // 3. Load potions
-      await loadPotions();
+      // 3. Load potions (跳過訪客用戶)
+      if (!isGuestUser(userId)) {
+        try {
+          await loadPotions();
+        } catch (error) {
+          // 靜默失敗，不影響用戶體驗
+          if (import.meta.env.DEV) {
+            logger.warn("加載藥水失敗:", error);
+          }
+        }
+      }
 
-      // 4. Load active potion effects
-      await loadActivePotions();
+      // 4. Load active potion effects (跳過訪客用戶)
+      if (!isGuestUser(userId)) {
+        try {
+          await loadActivePotions();
+        } catch (error) {
+          // 靜默失敗，不影響用戶體驗
+          if (import.meta.env.DEV) {
+            logger.warn("加載活躍藥水效果失敗:", error);
+          }
+        }
+      }
 
-      // 5. Load active unlock effects
-      await loadActiveUnlocks();
+      // 5. Load active unlock effects (跳過訪客用戶)
+      if (!isGuestUser(userId)) {
+        try {
+          await loadActiveUnlocks();
+        } catch (error) {
+          // 靜默失敗，不影響用戶體驗
+          if (import.meta.env.DEV) {
+            logger.warn("加載活躍解鎖效果失敗:", error);
+          }
+        }
+      }
 
       // 6. Load conversation history
       await loadHistory(userId, matchId);
@@ -78,14 +114,39 @@ export const useChatInitialization = ({
 
       // 9. Load voice stats (跳過訪客用戶)
       if (!isGuestUser(userId)) {
-        await loadVoiceStats(userId, { skipGlobalLoading: true });
+        try {
+          await loadVoiceStats(userId, { skipGlobalLoading: true });
+        } catch (error) {
+          // 靜默失敗，不影響用戶體驗
+          if (import.meta.env.DEV) {
+            logger.warn("加載語音統計失敗:", error);
+          }
+        }
       }
 
-      // 10. Load photo stats
-      await fetchPhotoStats();
+      // 10. Load photo stats (跳過訪客用戶)
+      if (!isGuestUser(userId)) {
+        try {
+          await fetchPhotoStats();
+        } catch (error) {
+          // 靜默失敗，不影響用戶體驗
+          if (import.meta.env.DEV) {
+            logger.warn("加載照片統計失敗:", error);
+          }
+        }
+      }
 
-      // 11. Load balance
-      await loadBalance(userId, { skipGlobalLoading: true });
+      // 11. Load balance (跳過訪客用戶)
+      if (!isGuestUser(userId)) {
+        try {
+          await loadBalance(userId, { skipGlobalLoading: true });
+        } catch (error) {
+          // 靜默失敗，不影響用戶體驗
+          if (import.meta.env.DEV) {
+            logger.warn("加載金幣餘額失敗:", error);
+          }
+        }
+      }
 
       // 12. Scroll to bottom
       await nextTick();

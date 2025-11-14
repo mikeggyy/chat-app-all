@@ -63,7 +63,7 @@ router.post("/api/assets/purchase", requireFirebaseAuth, purchaseRateLimiter, as
     if (assetId) {
       logger.warn(`[資產購買API] 使用舊版 API - assetId: ${assetId}, quantity: ${quantity || 1}`);
 
-      if (quantity && (quantity < 1 || quantity > 100)) {
+      if (quantity !== undefined && (quantity < 1 || quantity > 100)) {
         return sendError(res, "VALIDATION_ERROR", "購買數量必須在 1-100 之間", {
           quantity,
           validRange: "1-100",
@@ -114,7 +114,7 @@ router.post("/api/assets/purchase/bundle", requireFirebaseAuth, purchaseRateLimi
 
     // 驗證所有項目
     for (const item of items) {
-      if (!item.assetId || !item.quantity) {
+      if (!item.assetId || item.quantity === undefined) {
         return sendError(res, "VALIDATION_ERROR", "每個項目必須包含 assetId 和 quantity", {
           invalidItem: item,
         });

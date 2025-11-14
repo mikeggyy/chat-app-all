@@ -88,54 +88,81 @@ export function createLimitService(config) {
     const result = await db.runTransaction(async (transaction) => {
       const doc = await transaction.get(userLimitRef);
 
-      let userData = {};
-      if (doc.exists) {
-        userData = doc.data();
-      }
-
       let limitData;
+      let needsUpdate = false;
 
-      if (perCharacter) {
-        // 按角色追蹤（如 voice, conversation）
-        if (!userData[fieldName]) {
-          userData[fieldName] = {};
-        }
-        if (!userData[fieldName][characterId]) {
-          userData[fieldName][characterId] = createLimitData(resetPeriod);
-        }
-        limitData = userData[fieldName][characterId];
-
-        // 補充缺失的欄位（處理舊數據）
-        const defaultData = createLimitData(resetPeriod);
-        limitData = {
-          ...defaultData,
-          ...limitData,
-        };
-        userData[fieldName][characterId] = limitData;
-      } else {
-        // 不按角色追蹤（如 photos, character_creation）
-        if (!userData[fieldName]) {
-          userData[fieldName] = createLimitData(resetPeriod);
-        }
-        limitData = userData[fieldName];
-
-        // 補充缺失的欄位（處理舊數據）
-        const defaultData = createLimitData(resetPeriod);
-        limitData = {
-          ...defaultData,
-          ...limitData,
-        };
-        userData[fieldName] = limitData;
-      }
-
-      // 更新到 Firestore
       if (!doc.exists) {
-        userData.userId = userId;
-        userData.createdAt = FieldValue.serverTimestamp();
-      }
-      userData.updatedAt = FieldValue.serverTimestamp();
+        // ✅ 新文檔：創建完整的數據結構
+        limitData = createLimitData(resetPeriod);
+        const newData = {
+          userId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        };
 
-      transaction.set(userLimitRef, userData, { merge: true });
+        if (perCharacter) {
+          newData[fieldName] = { [characterId]: limitData };
+        } else {
+          newData[fieldName] = limitData;
+        }
+
+        transaction.set(userLimitRef, newData);
+      } else {
+        // ✅ 現有文檔：檢查是否需要初始化缺失的字段
+        const userData = doc.data();
+
+        if (perCharacter) {
+          const existingData = userData[fieldName]?.[characterId];
+          if (!existingData) {
+            // 需要為這個角色創建新的限制數據
+            limitData = createLimitData(resetPeriod);
+            transaction.update(userLimitRef, {
+              [`${fieldName}.${characterId}`]: limitData,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          } else {
+            // 補充缺失的欄位（處理舊數據）
+            const defaultData = createLimitData(resetPeriod);
+            limitData = {
+              ...defaultData,
+              ...existingData,
+            };
+            // 檢查是否有新欄位需要補充
+            if (Object.keys(defaultData).some(key => !(key in existingData))) {
+              needsUpdate = true;
+              transaction.update(userLimitRef, {
+                [`${fieldName}.${characterId}`]: limitData,
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+            }
+          }
+        } else {
+          const existingData = userData[fieldName];
+          if (!existingData) {
+            // 需要創建新的限制數據
+            limitData = createLimitData(resetPeriod);
+            transaction.update(userLimitRef, {
+              [fieldName]: limitData,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          } else {
+            // 補充缺失的欄位（處理舊數據）
+            const defaultData = createLimitData(resetPeriod);
+            limitData = {
+              ...defaultData,
+              ...existingData,
+            };
+            // 檢查是否有新欄位需要補充
+            if (Object.keys(defaultData).some(key => !(key in existingData))) {
+              needsUpdate = true;
+              transaction.update(userLimitRef, {
+                [fieldName]: limitData,
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+            }
+          }
+        }
+      }
 
       return limitData;
     });
@@ -210,26 +237,36 @@ export function createLimitService(config) {
     await db.runTransaction(async (transaction) => {
       const doc = await transaction.get(userLimitRef);
 
-      let userData = {};
-      if (doc.exists) {
-        userData = doc.data();
-      } else {
-        userData.userId = userId;
-        userData.createdAt = FieldValue.serverTimestamp();
-      }
+      if (!doc.exists) {
+        // ✅ 新文檔：創建完整的數據結構
+        const newData = {
+          userId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        };
 
-      if (perCharacter) {
-        if (!userData[fieldName]) {
-          userData[fieldName] = {};
+        if (perCharacter) {
+          newData[fieldName] = { [characterId]: limitData };
+        } else {
+          newData[fieldName] = limitData;
         }
-        userData[fieldName][characterId] = limitData;
+
+        transaction.set(userLimitRef, newData);
       } else {
-        userData[fieldName] = limitData;
+        // ✅ 更新現有文檔：只更新需要的字段，避免觸碰可能有問題的字段
+        const updateFields = {
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+
+        if (perCharacter) {
+          // 使用點符號路徑更新嵌套字段，不需要讀取和合併整個對象
+          updateFields[`${fieldName}.${characterId}`] = limitData;
+        } else {
+          updateFields[fieldName] = limitData;
+        }
+
+        transaction.update(userLimitRef, updateFields);
       }
-
-      userData.updatedAt = FieldValue.serverTimestamp();
-
-      transaction.set(userLimitRef, userData, { merge: true });
     });
 
     // 更新後清除緩存
@@ -313,21 +350,19 @@ export function createLimitService(config) {
       // 1. 在 Transaction 內讀取限制數據
       const doc = await transaction.get(userLimitRef);
 
-      let userData = doc.exists ? doc.data() : { userId };
-
-      // 2. 初始化限制數據
       let limitData;
-      if (perCharacter) {
-        if (!userData[fieldName]) userData[fieldName] = {};
-        if (!userData[fieldName][characterId]) {
-          userData[fieldName][characterId] = createLimitData(resetPeriod);
+
+      // 2. 初始化限制數據（避免讀取和重用 doc.data()）
+      if (doc.exists) {
+        const existingData = doc.data();
+        if (perCharacter) {
+          limitData = existingData[fieldName]?.[characterId] || createLimitData(resetPeriod);
+        } else {
+          limitData = existingData[fieldName] || createLimitData(resetPeriod);
         }
-        limitData = userData[fieldName][characterId];
       } else {
-        if (!userData[fieldName]) {
-          userData[fieldName] = createLimitData(resetPeriod);
-        }
-        limitData = userData[fieldName];
+        // 新文檔，創建新的限制數據
+        limitData = createLimitData(resetPeriod);
       }
 
       // 3. 檢查並重置
@@ -367,16 +402,36 @@ export function createLimitService(config) {
         }
       }
 
-      // 6. 在 Transaction 內更新數據
-      if (perCharacter) {
-        userData[fieldName][characterId] = limitData;
+      // 6. 在 Transaction 內更新數據（✅ 修復：避免 ServerTimestampTransform 序列化錯誤）
+      if (!doc.exists) {
+        // 新文檔：使用 set() 創建
+        const newData = {
+          userId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+
+        if (perCharacter) {
+          newData[fieldName] = { [characterId]: limitData };
+        } else {
+          newData[fieldName] = limitData;
+        }
+
+        transaction.set(userLimitRef, newData);
       } else {
-        userData[fieldName] = limitData;
+        // 現有文檔：使用 update() 更新特定欄位
+        const updateFields = {
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+
+        if (perCharacter) {
+          updateFields[`${fieldName}.${characterId}`] = limitData;
+        } else {
+          updateFields[fieldName] = limitData;
+        }
+
+        transaction.update(userLimitRef, updateFields);
       }
-
-      userData.updatedAt = FieldValue.serverTimestamp();
-
-      transaction.set(userLimitRef, userData, { merge: true });
 
       // 7. 設置返回結果
       result = {
@@ -437,29 +492,19 @@ export function createLimitService(config) {
       // 1. 在 Transaction 內讀取限制數據
       const doc = await transaction.get(userLimitRef);
 
-      let userData = {};
-      if (doc.exists) {
-        userData = doc.data();
-      } else {
-        userData.userId = userId;
-        userData.createdAt = FieldValue.serverTimestamp();
-      }
-
-      // 2. 初始化限制數據
       let limitData;
-      if (perCharacter) {
-        if (!userData[fieldName]) {
-          userData[fieldName] = {};
+
+      // 2. 初始化限制數據（避免讀取和重用 doc.data()）
+      if (doc.exists) {
+        const existingData = doc.data();
+        if (perCharacter) {
+          limitData = existingData[fieldName]?.[characterId] || createLimitData(resetPeriod);
+        } else {
+          limitData = existingData[fieldName] || createLimitData(resetPeriod);
         }
-        if (!userData[fieldName][characterId]) {
-          userData[fieldName][characterId] = createLimitData(resetPeriod);
-        }
-        limitData = userData[fieldName][characterId];
       } else {
-        if (!userData[fieldName]) {
-          userData[fieldName] = createLimitData(resetPeriod);
-        }
-        limitData = userData[fieldName];
+        // 新文檔，創建新的限制數據
+        limitData = createLimitData(resetPeriod);
       }
 
       // 3. 檢查並重置（如果需要）
@@ -468,15 +513,36 @@ export function createLimitService(config) {
       // 4. 記錄廣告解鎖
       result = trackUnlockByAd(limitData, amount);
 
-      // 5. 更新數據到 Firestore
-      if (perCharacter) {
-        userData[fieldName][characterId] = limitData;
-      } else {
-        userData[fieldName] = limitData;
-      }
-      userData.updatedAt = FieldValue.serverTimestamp();
+      // 5. 更新數據到 Firestore（✅ 修復：避免 ServerTimestampTransform 序列化錯誤）
+      if (!doc.exists) {
+        // 新文檔：使用 set() 創建
+        const newData = {
+          userId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        };
 
-      transaction.set(userLimitRef, userData, { merge: true });
+        if (perCharacter) {
+          newData[fieldName] = { [characterId]: limitData };
+        } else {
+          newData[fieldName] = limitData;
+        }
+
+        transaction.set(userLimitRef, newData);
+      } else {
+        // 現有文檔：使用 update() 更新特定欄位
+        const updateFields = {
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+
+        if (perCharacter) {
+          updateFields[`${fieldName}.${characterId}`] = limitData;
+        } else {
+          updateFields[fieldName] = limitData;
+        }
+
+        transaction.update(userLimitRef, updateFields);
+      }
     });
 
     // Transaction 完成後清除緩存
@@ -534,14 +600,60 @@ export function createLimitService(config) {
       return await getAllStats(userId);
     }
 
-    const limitData = await initUserLimit(userId, characterId);
+    // ✅ 修復：將初始化和重置合併到單一 transaction，避免連續 transactions 導致的 ServerTimestampTransform 問題
+    const userLimitRef = getUserLimitRef(userId);
+    const db = getFirestoreDb();
 
-    const wasReset = checkAndReset(limitData, resetPeriod);
+    const limitData = await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(userLimitRef);
+      let data;
 
-    // 如果發生了重置，更新到 Firestore
-    if (wasReset) {
-      await updateLimitData(userId, characterId, limitData);
-    }
+      if (!doc.exists) {
+        // 新文檔：創建並立即初始化
+        data = createLimitData(resetPeriod);
+        const newDoc = {
+          userId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+
+        if (perCharacter) {
+          newDoc[fieldName] = { [characterId]: data };
+        } else {
+          newDoc[fieldName] = data;
+        }
+
+        transaction.set(userLimitRef, newDoc);
+      } else {
+        // 現有文檔：讀取並檢查重置
+        const existingData = doc.data();
+        if (perCharacter) {
+          data = existingData[fieldName]?.[characterId] || createLimitData(resetPeriod);
+        } else {
+          data = existingData[fieldName] || createLimitData(resetPeriod);
+        }
+
+        // 檢查並重置
+        const wasReset = checkAndReset(data, resetPeriod);
+
+        // 如果發生了重置，在同一 transaction 中更新
+        if (wasReset) {
+          const updateFields = {
+            updatedAt: FieldValue.serverTimestamp(),
+          };
+
+          if (perCharacter) {
+            updateFields[`${fieldName}.${characterId}`] = data;
+          } else {
+            updateFields[fieldName] = data;
+          }
+
+          transaction.update(userLimitRef, updateFields);
+        }
+      }
+
+      return data;
+    });
 
     const configData = await getLimitConfig(
       userId,
@@ -569,7 +681,8 @@ export function createLimitService(config) {
       cards: limitData.cards,
       adsWatchedToday: limitData.adsWatchedToday,
       lifetimeUsed: limitData.lifetimeCount,
-      lastResetDate: limitData.lastResetDate,
+      // ✅ 修復：將 Firestore Timestamp 轉換為 ISO 字符串以支持序列化
+      lastResetDate: limitData.lastResetDate?.toDate ? limitData.lastResetDate.toDate().toISOString() : limitData.lastResetDate,
     };
 
     return result;

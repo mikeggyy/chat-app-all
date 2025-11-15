@@ -7,11 +7,11 @@
  * 2. 使用 → 扣除庫存 → 激活 activePotionEffects（綁定角色，30天有效期）
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import { getUserById, upsertUser } from "../user/user.service.js";
 import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 import { POTION_CONFIG } from "../config/limits.js";
-import { FieldValue } from "firebase-admin/firestore";
+
 import logger from "../utils/logger.js";
 
 const db = getFirestoreDb();

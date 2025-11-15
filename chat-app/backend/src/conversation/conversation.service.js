@@ -1,5 +1,4 @@
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import { HISTORY_LIMITS } from "../config/limits.js";
 import logger from "../utils/logger.js";
 import { LRUCache } from "../utils/LRUCache.js";

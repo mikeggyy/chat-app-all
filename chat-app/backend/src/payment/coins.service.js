@@ -20,8 +20,7 @@ import {
   getUserTransactionStats,
   TRANSACTION_TYPES as TX_TYPES
 } from "./transaction.service.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import { CacheManager } from "../utils/CacheManager.js";
 import logger from "../utils/logger.js";
 

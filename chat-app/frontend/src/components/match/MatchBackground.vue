@@ -1,9 +1,10 @@
 <template>
   <div class="background-wrapper">
     <div class="background-track" :style="backgroundTrackStyle">
+      <!-- ✅ 修復閃爍問題：使用穩定的 slot 作為 key，重用 DOM 元素 -->
       <div
         v-for="item in carouselMatches"
-        :key="`bg-${item.key}`"
+        :key="`bg-${item.slot}`"
         class="background-slide"
       >
         <LazyImage

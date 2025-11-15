@@ -3,8 +3,7 @@
  * 記錄系統關鍵錯誤，用於審計和故障排查
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "./logger.js";
 
 const CRITICAL_ERRORS_COLLECTION = "critical_errors";

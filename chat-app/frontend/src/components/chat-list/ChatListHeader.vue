@@ -48,8 +48,9 @@ defineEmits(['change-tab']);
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--bg-primary, #ffffff);
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background: rgba(2, 6, 23, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .chat-list-tabs {
@@ -62,22 +63,35 @@ defineEmits(['change-tab']);
   padding: 1rem;
   font-size: 1rem;
   font-weight: 500;
-  color: var(--text-secondary, #6b7280);
+  color: rgba(226, 232, 240, 0.6);
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .chat-list-tab:hover {
-  color: var(--text-primary, #111827);
-  background: var(--bg-hover, #f9fafb);
+  color: rgba(226, 232, 240, 0.9);
+  background: rgba(226, 232, 240, 0.08);
 }
 
 .chat-list-tab--active {
-  color: var(--primary-color, #3b82f6);
-  border-bottom-color: var(--primary-color, #3b82f6);
+  color: #f8fafc;
+  background: rgba(236, 72, 153, 0.12);
+  border-bottom-color: #ec4899;
+}
+
+.chat-list-tab--active::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ec4899, #f472b6);
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.5);
 }
 
 .chat-list-tab:focus-visible {

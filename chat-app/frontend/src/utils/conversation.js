@@ -15,7 +15,8 @@ export const fetchConversationHistory = async (userId, characterId, options = {}
     }
   );
 
-  return Array.isArray(response?.messages) ? response.messages : [];
+  // ✅ 修復：正確解析 API 響應格式 { success, data: { messages } }
+  return Array.isArray(response?.data?.messages) ? response.data.messages : [];
 };
 
 export const appendConversationMessages = async (
@@ -57,9 +58,10 @@ export const appendConversationMessages = async (
     }
   );
 
+  // ✅ 修復：正確解析 API 響應格式 { success, data: { appended, messages } }
   return {
-    appended: Array.isArray(response?.appended) ? response.appended : [],
-    messages: Array.isArray(response?.messages) ? response.messages : [],
+    appended: Array.isArray(response?.data?.appended) ? response.data.appended : [],
+    messages: Array.isArray(response?.data?.messages) ? response.data.messages : [],
   };
 };
 
@@ -112,9 +114,10 @@ export const requestAiReply = async (
     }
   );
 
+  // ✅ 修復：正確解析 API 響應格式 { success, data: { message, messages } }
   return {
-    message: response?.message ?? null,
-    messages: Array.isArray(response?.messages) ? response.messages : [],
+    message: response?.data?.message ?? null,
+    messages: Array.isArray(response?.data?.messages) ? response.data.messages : [],
   };
 };
 
@@ -155,12 +158,13 @@ export const requestAiSuggestions = async (
     }
   );
 
+  // ✅ 修復：正確解析 API 響應格式 { success, data: { suggestions, fallback, message } }
   return {
-    suggestions: Array.isArray(response?.suggestions)
-      ? response.suggestions
+    suggestions: Array.isArray(response?.data?.suggestions)
+      ? response.data.suggestions
       : [],
-    fallback: Boolean(response?.fallback),
+    fallback: Boolean(response?.data?.fallback),
     message:
-      typeof response?.message === "string" ? response.message : undefined,
+      typeof response?.data?.message === "string" ? response.data.message : undefined,
   };
 };

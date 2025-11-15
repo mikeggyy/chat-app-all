@@ -1,6 +1,5 @@
 import { aiMatches } from "./match.data.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldPath } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldPath } from "../firebase/index.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 import logger from "../utils/logger.js";
 import { getCharacterById, getAllCharacters, characterExists } from "../services/character/characterCache.service.js";

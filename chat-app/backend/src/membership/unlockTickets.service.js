@@ -7,8 +7,7 @@
  */
 
 import { getUserById } from "../user/user.service.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 

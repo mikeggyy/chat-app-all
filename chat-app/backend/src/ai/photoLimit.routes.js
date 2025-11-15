@@ -71,9 +71,13 @@ photoLimitRouter.get(
     const userId = req.firebaseUser.uid;
 
     try {
+      console.log('[PhotoLimit Stats] 開始獲取照片統計，userId:', userId);
       const result = await getPhotoStats(userId);
+      console.log('[PhotoLimit Stats] 成功獲取照片統計:', JSON.stringify(result, null, 2));
       sendSuccess(res, result);
     } catch (error) {
+      console.error('[PhotoLimit Stats] 獲取照片統計失敗:', error);
+      console.error('[PhotoLimit Stats] 錯誤堆棧:', error.stack);
       const status = getLimitErrorStatus(error);
       sendError(res, error, status);
     }

@@ -114,8 +114,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import LazyImage from '../common/LazyImage.vue';
+import { ref, computed } from "vue";
+import LazyImage from "../common/LazyImage.vue";
 
 const props = defineProps({
   thread: {
@@ -140,7 +140,15 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['select', 'favorite', 'delete', 'swipe-start', 'swipe-move', 'swipe-end', 'swipe-cancel']);
+const emit = defineEmits([
+  "select",
+  "favorite",
+  "delete",
+  "swipe-start",
+  "swipe-move",
+  "swipe-end",
+  "swipe-cancel",
+]);
 
 // 滑動相關常量
 const SWIPE_ACTION_WIDTH = 140;
@@ -155,7 +163,7 @@ const pointerId = ref(null);
 
 // 截斷預覽文字
 const truncatedPreview = computed(() => {
-  const text = props.thread.lastMessage || '';
+  const text = props.thread.lastMessage || "";
   const maxLength = 15;
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 });
@@ -166,61 +174,77 @@ const onSwipeStart = (event) => {
   swipeStartX.value = event.clientX;
   pointerId.value = event.pointerId;
 
-  if (event.currentTarget && typeof event.currentTarget.setPointerCapture === 'function') {
+  if (
+    event.currentTarget &&
+    typeof event.currentTarget.setPointerCapture === "function"
+  ) {
     event.currentTarget.setPointerCapture(pointerId.value);
   }
 
-  emit('swipe-start', props.thread.id);
+  emit("swipe-start", props.thread.id);
 };
 
 const onSwipeMove = (event) => {
   if (!isDragging.value) return;
 
   const delta = event.clientX - swipeStartX.value;
-  const clampedOffset = Math.min(Math.max(delta, -SWIPE_ACTION_WIDTH), SWIPE_MAX_RIGHT_OFFSET);
+  const clampedOffset = Math.min(
+    Math.max(delta, -SWIPE_ACTION_WIDTH),
+    SWIPE_MAX_RIGHT_OFFSET
+  );
   swipeOffset.value = clampedOffset;
 
-  if (typeof event.preventDefault === 'function') {
+  if (typeof event.preventDefault === "function") {
     event.preventDefault();
   }
 
-  emit('swipe-move', props.thread.id, clampedOffset);
+  emit("swipe-move", props.thread.id, clampedOffset);
 };
 
 const onSwipeEnd = (event) => {
   if (!isDragging.value) return;
 
   const delta = event.clientX - swipeStartX.value;
-  const shouldOpen = delta < -SWIPE_TRIGGER_THRESHOLD || swipeOffset.value <= -SWIPE_TRIGGER_THRESHOLD;
+  const shouldOpen =
+    delta < -SWIPE_TRIGGER_THRESHOLD ||
+    swipeOffset.value <= -SWIPE_TRIGGER_THRESHOLD;
   swipeOffset.value = shouldOpen ? -SWIPE_ACTION_WIDTH : 0;
 
-  if (event.currentTarget && typeof event.currentTarget.releasePointerCapture === 'function' && pointerId.value !== null) {
+  if (
+    event.currentTarget &&
+    typeof event.currentTarget.releasePointerCapture === "function" &&
+    pointerId.value !== null
+  ) {
     event.currentTarget.releasePointerCapture(pointerId.value);
   }
 
   isDragging.value = false;
   pointerId.value = null;
 
-  emit('swipe-end', props.thread.id, shouldOpen);
+  emit("swipe-end", props.thread.id, shouldOpen);
 };
 
 const onSwipeCancel = (event) => {
   swipeOffset.value = 0;
   isDragging.value = false;
 
-  if (event.currentTarget && typeof event.currentTarget.releasePointerCapture === 'function' && pointerId.value !== null) {
+  if (
+    event.currentTarget &&
+    typeof event.currentTarget.releasePointerCapture === "function" &&
+    pointerId.value !== null
+  ) {
     event.currentTarget.releasePointerCapture(pointerId.value);
   }
 
   pointerId.value = null;
-  emit('swipe-cancel', props.thread.id);
+  emit("swipe-cancel", props.thread.id);
 };
 
 const handleClick = () => {
   if (props.shouldBlockClick || Math.abs(swipeOffset.value) > 6) {
     return;
   }
-  emit('select', props.thread);
+  emit("select", props.thread);
 };
 
 // 暴露方法供父組件調用
@@ -237,8 +261,8 @@ defineExpose({
   position: relative;
   display: flex;
   align-items: stretch;
-  background: var(--bg-primary, #ffffff);
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background: rgba(15, 23, 42, 0.5);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
   cursor: pointer;
   user-select: none;
   touch-action: pan-y;
@@ -246,7 +270,7 @@ defineExpose({
 }
 
 .chat-thread:hover {
-  background: var(--bg-hover, #f9fafb);
+  background: rgba(30, 41, 59, 0.6);
 }
 
 .chat-thread--dragging {
@@ -254,7 +278,7 @@ defineExpose({
 }
 
 .chat-thread--active {
-  background: var(--bg-hover, #f9fafb);
+  background: rgba(30, 41, 59, 0.6);
 }
 
 .chat-thread__content {
@@ -279,7 +303,7 @@ defineExpose({
   height: 3.5rem;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--bg-secondary, #f3f4f6);
+  background: rgba(51, 65, 85, 0.5);
 }
 
 .chat-thread__avatar .lazy-image {
@@ -312,7 +336,7 @@ defineExpose({
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary, #111827);
+  color: #f8fafc;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -321,13 +345,13 @@ defineExpose({
 .chat-thread__header time {
   flex-shrink: 0;
   font-size: 0.75rem;
-  color: var(--text-tertiary, #9ca3af);
+  color: rgba(148, 163, 184, 0.7);
 }
 
 .chat-thread__preview {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #6b7280);
+  color: rgba(226, 232, 240, 0.7);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -367,18 +391,18 @@ defineExpose({
 }
 
 .chat-thread__action--favorite {
-  background: var(--favorite-bg, #fef3c7);
-  color: var(--favorite-color, #d97706);
+  background: rgba(15, 23, 42, 0.5);
+  color: #fbbf24;
 }
 
 .chat-thread__action--favorite.is-active {
-  background: var(--favorite-active-bg, #fbbf24);
-  color: var(--favorite-active-color, #ffffff);
+  background: rgba(15, 23, 42, 0.5);
+  color: #fcd34d;
 }
 
 .chat-thread__action--delete {
-  background: var(--delete-bg, #fee2e2);
-  color: var(--delete-color, #dc2626);
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
 }
 
 .chat-thread__icon {

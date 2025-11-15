@@ -3,8 +3,7 @@ import { getPotionInventory } from '../payment/potion.service.js';
 import { logAssetChange } from './assetAuditLog.service.js';
 import { getWalletBalance } from './walletHelpers.js';
 import logger from '../utils/logger.js';
-import { getFirestoreDb } from '../firebase/index.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 
 /**
  * 獲取用戶的資產信息

@@ -139,6 +139,11 @@ const emit = defineEmits([
   'close-gift-selector',
   'select-gift',
 ]);
+
+// Methods
+const handleCloseGiftSelector = () => {
+  emit('close-gift-selector');
+};
 </script>
 
 <template>
@@ -293,7 +298,7 @@ const emit = defineEmits([
     :character-name="partnerDisplayName"
     :balance="balance"
     :membership-tier="membershipTier"
-    @close="emit('close-gift-selector')"
+    @close="handleCloseGiftSelector"
     @select="emit('select-gift', $event)"
   />
 

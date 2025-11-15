@@ -1,5 +1,4 @@
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import {
   getDocument,
   setDocument,

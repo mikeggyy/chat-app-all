@@ -45,11 +45,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import TextInput from './input/TextInput.vue';
-import ActionButtons from './input/ActionButtons.vue';
-import SuggestionMenu from './input/SuggestionMenu.vue';
-import MediaMenu from './input/MediaMenu.vue';
+import { ref, computed } from "vue";
+import TextInput from "./input/TextInput.vue";
+import ActionButtons from "./input/ActionButtons.vue";
+import SuggestionMenu from "./input/SuggestionMenu.vue";
+import MediaMenu from "./input/MediaMenu.vue";
 
 /**
  * MessageInput - 訊息輸入組件（重構後）
@@ -64,7 +64,7 @@ import MediaMenu from './input/MediaMenu.vue';
 const props = defineProps({
   modelValue: {
     type: String,
-    default: '',
+    default: "",
   },
   disabled: {
     type: Boolean,
@@ -102,13 +102,13 @@ const props = defineProps({
 
 // Emits
 const emit = defineEmits([
-  'update:modelValue',
-  'send',
-  'suggestion-click',
-  'request-suggestions',
-  'gift-click',
-  'selfie-click',
-  'video-click',
+  "update:modelValue",
+  "send",
+  "suggestion-click",
+  "request-suggestions",
+  "gift-click",
+  "selfie-click",
+  "video-click",
 ]);
 
 // Refs
@@ -117,7 +117,7 @@ const textInputRef = ref(null);
 // Computed
 const inputValue = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
+  set: (value) => emit("update:modelValue", value),
 });
 
 const hasContent = computed(() => {
@@ -129,14 +129,14 @@ const hasContent = computed(() => {
  */
 const handleSend = () => {
   if (!hasContent.value || props.disabled) return;
-  emit('send', inputValue.value.trim());
+  emit("send", inputValue.value.trim());
 };
 
 /**
  * 處理建議點擊
  */
 const handleSuggestionClick = (suggestion) => {
-  emit('suggestion-click', suggestion);
+  emit("suggestion-click", suggestion);
 };
 
 /**
@@ -152,12 +152,20 @@ defineExpose({ focus });
 
 <style scoped>
 .chat-input {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
-  align-items: flex-end;
-  gap: 0.75rem;
-  padding: 1rem;
-  background-color: var(--bg-primary, #ffffff);
-  border-top: 1px solid var(--border-color, #e5e7eb);
+  align-items: center;
+  gap: var(--spacing-md, 0.75rem);
+  padding: var(--spacing-lg, 1rem);
+  background: linear-gradient(180deg, #1a1d3a 0%, #0f1628 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 10; /* 確保在其他內容之上 */
 }
 
 .chat-input__field {
@@ -166,20 +174,24 @@ defineExpose({ focus });
   flex: 1;
   align-items: center;
   min-width: 0;
-  background-color: var(--bg-secondary, #f9fafb);
-  border-radius: 1.5rem;
-  transition: background-color 0.2s ease;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-2xl, 1.5rem);
+  transition: all var(--transition-base, 0.2s ease);
 }
 
 .chat-input__field:focus-within {
-  background-color: var(--bg-hover, #f3f4f6);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
 }
 
 /* 響應式設計 */
 @media (max-width: 540px) {
   .chat-input {
-    gap: 0.5rem;
-    padding: 0.75rem;
+    gap: var(--spacing-sm, 0.5rem);
+    padding: var(--spacing-md, 0.75rem);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04), 0 -1px 4px rgba(0, 0, 0, 0.02);
   }
 }
 </style>

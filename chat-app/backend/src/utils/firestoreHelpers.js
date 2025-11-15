@@ -1,5 +1,49 @@
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
+
+/**
+ * 序列化 Firestore 數據，確保所有 Timestamp 和特殊對象都被轉換
+ * @param {any} data - 要序列化的數據
+ * @returns {any} 序列化後的數據
+ */
+export function serializeFirestoreData(data) {
+  if (data === null || data === undefined) {
+    return data;
+  }
+
+  // 處理 Firestore Timestamp 對象
+  if (data && typeof data.toDate === 'function') {
+    try {
+      return data.toDate().toISOString();
+    } catch (e) {
+      // 如果轉換失敗，返回 null
+      return null;
+    }
+  }
+
+  // 處理數組
+  if (Array.isArray(data)) {
+    return data.map(serializeFirestoreData);
+  }
+
+  // 處理對象
+  if (typeof data === 'object' && data !== null) {
+    // 檢查是否是 FieldValue（包括 ServerTimestampTransform）
+    if (data.constructor && data.constructor.name &&
+        (data.constructor.name.includes('FieldValue') ||
+         data.constructor.name.includes('Transform'))) {
+      // 返回 null 而不是嘗試序列化這些特殊對象
+      return null;
+    }
+
+    const serialized = {};
+    for (const [key, value] of Object.entries(data)) {
+      serialized[key] = serializeFirestoreData(value);
+    }
+    return serialized;
+  }
+
+  return data;
+}
 
 /**
  * 獲取 Firestore 文檔
@@ -16,9 +60,13 @@ export async function getDocument(collection, docId) {
     return null;
   }
 
+  // ✅ 修復：序列化數據以避免 ServerTimestampTransform 問題
+  const data = doc.data();
+  const serialized = serializeFirestoreData(data);
+
   return {
     id: doc.id,
-    ...doc.data(),
+    ...serialized,
   };
 }
 
@@ -133,10 +181,15 @@ export async function queryCollection(collection, options = {}) {
   }
 
   const snapshot = await query.get();
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  return snapshot.docs.map((doc) => {
+    // ✅ 修復：序列化數據以避免 ServerTimestampTransform 問題
+    const data = doc.data();
+    const serialized = serializeFirestoreData(data);
+    return {
+      id: doc.id,
+      ...serialized,
+    };
+  });
 }
 
 /**

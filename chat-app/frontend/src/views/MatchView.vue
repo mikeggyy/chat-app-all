@@ -281,9 +281,10 @@ onBeforeUnmount(() => {
     <!-- 內容輪播 -->
     <div class="content-wrapper" ref="carouselContainerRef">
       <div class="carousel-track" :style="carousel.trackStyle.value">
+        <!-- ✅ 修復閃爍問題：使用穩定的 slot 作為 key，重用 DOM 元素 -->
         <MatchCard
           v-for="item in carousel.carouselMatches.value"
-          :key="item.key"
+          :key="`card-${item.slot}`"
           :match="item.data"
           :is-active="item.data?.id === match.id"
           :is-favorited="item.data?.id === match.id && isFavorited"

@@ -42,7 +42,12 @@
         :alt="message.text || '自拍照片'"
         class="chat-bubble__image"
         loading="lazy"
-        @click="$emit('image-click', { url: message.imageUrl, alt: message.text || '自拍照片' })"
+        @click="
+          $emit('image-click', {
+            url: message.imageUrl,
+            alt: message.text || '自拍照片',
+          })
+        "
       />
     </div>
 
@@ -68,9 +73,16 @@
         >
           您的瀏覽器不支持影片播放。
         </video>
-        <div v-if="message.video.duration || message.video.resolution" class="chat-bubble__video-info">
-          <span v-if="message.video.duration" class="video-info-badge">{{ message.video.duration }}</span>
-          <span v-if="message.video.resolution" class="video-info-badge">{{ message.video.resolution }}</span>
+        <div
+          v-if="message.video.duration || message.video.resolution"
+          class="chat-bubble__video-info"
+        >
+          <span v-if="message.video.duration" class="video-info-badge">{{
+            message.video.duration
+          }}</span>
+          <span v-if="message.video.resolution" class="video-info-badge">{{
+            message.video.resolution
+          }}</span>
         </div>
       </template>
     </div>
@@ -78,7 +90,12 @@
     <!-- 文字內容 -->
     <!-- 打字動畫效果（當 pending 且角色回覆且內容為 '...' 時） -->
     <p
-      v-if="message.text && message.state === 'pending' && message.role === 'partner' && message.text === '...'"
+      v-if="
+        message.text &&
+        message.state === 'pending' &&
+        message.role === 'partner' &&
+        message.text === '...'
+      "
       class="chat-bubble__typing-text"
       aria-hidden="true"
     >
@@ -92,7 +109,7 @@
 </template>
 
 <script setup>
-import { PlayIcon } from '@heroicons/vue/24/outline';
+import { PlayIcon } from "@heroicons/vue/24/outline";
 
 // Props
 const props = defineProps({
@@ -107,7 +124,7 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(['play-voice', 'image-click']);
+const emit = defineEmits(["play-voice", "image-click"]);
 </script>
 
 <style scoped lang="scss">
@@ -127,11 +144,6 @@ const emit = defineEmits(['play-voice', 'image-click']);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-
-  /* 性能優化：使用 content-visibility 讓瀏覽器跳過渲染不在視口內的元素 */
-  content-visibility: auto;
-  /* 為 content-visibility 提供預估高度，避免滾動條跳動 */
-  contain-intrinsic-size: auto 100px;
 
   &--partner {
     background: rgba(148, 163, 184, 0.2);

@@ -10,8 +10,7 @@ import { getGiftById, isValidGift, getGiftList } from "../config/gifts.js";
 import { getUserById } from "../user/user.service.js";
 import { deductCoins } from "../payment/coins.service.js";
 import { getUserTier } from "../utils/membershipUtils.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 
 /**

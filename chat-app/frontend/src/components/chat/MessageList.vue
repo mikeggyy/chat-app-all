@@ -14,7 +14,10 @@
     </div>
 
     <!-- 已加載全部消息提示 -->
-    <div v-else-if="!hasMore && messages.length > initialMessageCount" class="all-loaded-indicator">
+    <div
+      v-else-if="!hasMore && messages.length > initialMessageCount"
+      class="all-loaded-indicator"
+    >
       <span>已載入全部訊息</span>
     </div>
 
@@ -23,7 +26,13 @@
       <Message
         v-for="message in visibleMessages"
         :key="message.id"
-        v-memo="[message.id, message.text, message.imageUrl, message.video, playingVoiceMessageId === message.id]"
+        v-memo="[
+          message.id,
+          message.text,
+          message.imageUrl,
+          message.video,
+          playingVoiceMessageId === message.id,
+        ]"
         :message="message"
         :is-playing="playingVoiceMessageId === message.id"
         @play-voice="$emit('play-voice', $event)"
@@ -163,8 +172,13 @@ watch(
  * 組件掛載時滾動到底部
  */
 onMounted(() => {
-  // 首次載入時不使用動畫
-  scrollToBottom(false);
+  // 首次載入時立即滾動到底部，不使用動畫
+  // 使用 requestAnimationFrame 確保 DOM 已經渲染
+  requestAnimationFrame(() => {
+    if (messageListRef.value) {
+      messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
+    }
+  });
 });
 
 // 暴露方法給父組件
@@ -273,9 +287,6 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-
-  /* 性能優化：使用 contain 提示瀏覽器 */
-  contain: layout style paint;
 }
 
 /* 打字指示器樣式 */

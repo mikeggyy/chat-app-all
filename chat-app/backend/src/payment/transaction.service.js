@@ -3,8 +3,7 @@
  * 處理所有金幣交易的記錄和查詢
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 
 const TRANSACTIONS_COLLECTION = "transactions";

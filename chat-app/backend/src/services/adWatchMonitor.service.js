@@ -13,8 +13,7 @@
  * 4. adId 格式異常（不符合預期格式）
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 
 // 異常行為閾值配置

@@ -65,7 +65,7 @@ defineEmits(['send-click', 'gift-click']);
 .action-buttons {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-sm, 0.5rem);
 }
 
 .action-buttons__send,
@@ -76,22 +76,26 @@ defineEmits(['send-click', 'gift-click']);
   width: 2.75rem;
   height: 2.75rem;
   padding: 0;
-  color: var(--primary-color, #8b5cf6);
-  background-color: transparent;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius-full, 50%);
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base, 0.2s ease);
 }
 
 .action-buttons__send:hover:not(:disabled),
 .action-buttons__gift:hover:not(:disabled) {
-  background-color: var(--primary-light, rgba(139, 92, 246, 0.1));
-  transform: scale(1.05);
+  background: linear-gradient(135deg, #f472b6 0%, #a78bfa 100%);
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.4);
+  transform: scale(1.08);
 }
 
 .action-buttons__send:active:not(:disabled),
 .action-buttons__gift:active:not(:disabled) {
+  background: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
+  box-shadow: 0 2px 10px rgba(236, 72, 153, 0.2);
   transform: scale(0.95);
 }
 
@@ -100,11 +104,19 @@ defineEmits(['send-click', 'gift-click']);
 .action-buttons__gift:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+  transform: none !important;
+  box-shadow: none;
 }
 
 .icon {
   width: 1.5rem;
   height: 1.5rem;
+  transition: transform var(--transition-fast, 0.15s ease);
+}
+
+.action-buttons__send:hover:not(:disabled) .icon,
+.action-buttons__gift:hover:not(:disabled) .icon {
+  transform: scale(1.1);
 }
 
 /* 響應式設計 */

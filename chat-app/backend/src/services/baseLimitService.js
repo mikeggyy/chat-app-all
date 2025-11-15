@@ -9,8 +9,7 @@
  * - limitTracking.js - 追蹤邏輯
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import { RESET_PERIOD } from "./limitService/constants.js";
 import { getLimitConfig } from "./limitService/limitConfig.js";
 import { checkAndResetAll, checkAndResetAdUnlocks, createLimitData } from "./limitService/limitReset.js";
@@ -24,6 +23,7 @@ import {
 } from "./limitService/limitTracking.js";
 import { isGuestUser } from "../../../shared/config/testAccounts.js";
 import { LRUCache } from "../utils/LRUCache.js";
+import { serializeFirestoreData } from "../utils/firestoreHelpers.js";
 import logger from "../utils/logger.js";
 
 const USAGE_LIMITS_COLLECTION = "usage_limits";
@@ -110,9 +110,11 @@ export function createLimitService(config) {
       } else {
         // ✅ 現有文檔：檢查是否需要初始化缺失的字段
         const userData = doc.data();
+        // ✅ 修復：序列化 Firestore 數據以避免 ServerTimestampTransform 污染
+        const serializedUserData = serializeFirestoreData(userData);
 
         if (perCharacter) {
-          const existingData = userData[fieldName]?.[characterId];
+          const existingData = serializedUserData[fieldName]?.[characterId];
           if (!existingData) {
             // 需要為這個角色創建新的限制數據
             limitData = createLimitData(resetPeriod);
@@ -121,14 +123,11 @@ export function createLimitService(config) {
               updatedAt: FieldValue.serverTimestamp(),
             });
           } else {
-            // ✅ 修復：深拷貝現有數據以避免 ServerTimestampTransform 污染
-            const cleanExistingData = structuredClone(existingData);
-
             // 補充缺失的欄位（處理舊數據）
             const defaultData = createLimitData(resetPeriod);
             limitData = {
               ...defaultData,
-              ...cleanExistingData,
+              ...existingData,
             };
             // 檢查是否有新欄位需要補充
             if (Object.keys(defaultData).some(key => !(key in existingData))) {
@@ -140,7 +139,7 @@ export function createLimitService(config) {
             }
           }
         } else {
-          const existingData = userData[fieldName];
+          const existingData = serializedUserData[fieldName];
           if (!existingData) {
             // 需要創建新的限制數據
             limitData = createLimitData(resetPeriod);
@@ -149,14 +148,11 @@ export function createLimitService(config) {
               updatedAt: FieldValue.serverTimestamp(),
             });
           } else {
-            // ✅ 修復：深拷貝現有數據以避免 ServerTimestampTransform 污染
-            const cleanExistingData = structuredClone(existingData);
-
             // 補充缺失的欄位（處理舊數據）
             const defaultData = createLimitData(resetPeriod);
             limitData = {
               ...defaultData,
-              ...cleanExistingData,
+              ...existingData,
             };
             // 檢查是否有新欄位需要補充
             if (Object.keys(defaultData).some(key => !(key in existingData))) {
@@ -216,12 +212,14 @@ export function createLimitService(config) {
     }
 
     const userData = doc.data();
+    // ✅ 修復：序列化 Firestore 數據以避免 ServerTimestampTransform 污染
+    const serializedUserData = serializeFirestoreData(userData);
     let limitData = null;
 
     if (perCharacter) {
-      limitData = userData[fieldName]?.[characterId] || null;
+      limitData = serializedUserData[fieldName]?.[characterId] || null;
     } else {
-      limitData = userData[fieldName] || null;
+      limitData = serializedUserData[fieldName] || null;
     }
 
     // 3. 存入緩存
@@ -229,7 +227,7 @@ export function createLimitService(config) {
       limitStatusCache.set(cacheKey, limitData);
     }
 
-    // ✅ P1 優化：使用 structuredClone 返回深拷貝
+    // 返回深拷貝（如果需要）
     return limitData ? structuredClone(limitData) : null;
   };
 
@@ -358,21 +356,24 @@ export function createLimitService(config) {
 
       let limitData;
 
-      // 2. 初始化限制數據（✅ 修復：深拷貝以避免 ServerTimestampTransform 污染）
+      // 2. 初始化限制數據（✅ 修復：序列化以避免 ServerTimestampTransform 污染）
       if (doc.exists) {
         const existingData = doc.data();
+        // ✅ 修復：序列化 Firestore 數據
+        const serializedData = serializeFirestoreData(existingData);
+
         let rawData;
         if (perCharacter) {
-          rawData = existingData[fieldName]?.[characterId];
+          rawData = serializedData[fieldName]?.[characterId];
         } else {
-          rawData = existingData[fieldName];
+          rawData = serializedData[fieldName];
         }
 
-        // 深拷貝以避免 Firestore 特殊對象
+        // 如果數據不存在，創建新的；否則使用序列化後的數據
         if (!rawData) {
           limitData = createLimitData(resetPeriod);
         } else {
-          limitData = structuredClone(rawData);
+          limitData = rawData;
         }
       } else {
         // 新文檔，創建新的限制數據
@@ -508,21 +509,24 @@ export function createLimitService(config) {
 
       let limitData;
 
-      // 2. 初始化限制數據（✅ 修復：深拷貝以避免 ServerTimestampTransform 污染）
+      // 2. 初始化限制數據（✅ 修復：序列化以避免 ServerTimestampTransform 污染）
       if (doc.exists) {
         const existingData = doc.data();
+        // ✅ 修復：序列化 Firestore 數據
+        const serializedData = serializeFirestoreData(existingData);
+
         let rawData;
         if (perCharacter) {
-          rawData = existingData[fieldName]?.[characterId];
+          rawData = serializedData[fieldName]?.[characterId];
         } else {
-          rawData = existingData[fieldName];
+          rawData = serializedData[fieldName];
         }
 
-        // 深拷貝以避免 Firestore 特殊對象
+        // 如果數據不存在，創建新的；否則使用序列化後的數據
         if (!rawData) {
           limitData = createLimitData(resetPeriod);
         } else {
-          limitData = structuredClone(rawData);
+          limitData = rawData;
         }
       } else {
         // 新文檔，創建新的限制數據
@@ -622,51 +626,47 @@ export function createLimitService(config) {
       return await getAllStats(userId);
     }
 
-    // ✅ 修復：將初始化和重置合併到單一 transaction，避免連續 transactions 導致的 ServerTimestampTransform 問題
+    // ✅ 修復：getStats 不應該創建文檔，只讀取和重置現有文檔
+    // 如果文檔不存在，直接返回默認統計信息
     const userLimitRef = getUserLimitRef(userId);
     const db = getFirestoreDb();
 
-    const limitData = await db.runTransaction(async (transaction) => {
-      const doc = await transaction.get(userLimitRef);
-      let data;
+    // 先檢查文檔是否存在
+    const docSnapshot = await userLimitRef.get();
 
-      if (!doc.exists) {
-        // 新文檔：創建並立即初始化
-        data = createLimitData(resetPeriod);
-        const newDoc = {
-          userId,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        };
+    let limitData;
 
-        if (perCharacter) {
-          newDoc[fieldName] = { [characterId]: data };
-        } else {
-          newDoc[fieldName] = data;
-        }
+    if (!docSnapshot.exists) {
+      // 文檔不存在，返回默認數據（不創建文檔）
+      console.log('[baseLimitService getStats] 文檔不存在，返回默認統計');
+      limitData = createLimitData(resetPeriod);
+    } else {
+      // 文檔存在，使用 transaction 讀取並可能重置
+      limitData = await db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(userLimitRef);
 
-        transaction.set(userLimitRef, newDoc);
-      } else {
         // 現有文檔：讀取並檢查重置
         const existingData = doc.data();
+        // ✅ 修復：序列化 Firestore 數據以避免 ServerTimestampTransform 污染
+        const serializedData = serializeFirestoreData(existingData);
+
         let rawData;
         if (perCharacter) {
-          rawData = existingData[fieldName]?.[characterId];
+          rawData = serializedData[fieldName]?.[characterId];
         } else {
-          rawData = existingData[fieldName];
+          rawData = serializedData[fieldName];
         }
 
-        // ✅ 修復：深拷貝以避免 ServerTimestampTransform 對象污染
-        // 如果數據不存在，創建新的；否則深拷貝現有數據
+        // 如果數據不存在，創建新的；否則使用序列化後的數據
+        let data;
         if (!rawData) {
           data = createLimitData(resetPeriod);
         } else {
-          // 使用 structuredClone 深拷貝，確保不會有 Firestore 特殊對象
-          data = structuredClone(rawData);
+          data = rawData;
         }
 
         // 檢查並重置
-        const wasReset = checkAndReset(data, resetPeriod);
+        const wasReset = checkAndResetAll(data, resetPeriod);
 
         // 如果發生了重置，在同一 transaction 中更新
         if (wasReset) {
@@ -674,18 +674,21 @@ export function createLimitService(config) {
             updatedAt: FieldValue.serverTimestamp(),
           };
 
+          // ✅ 修復：深拷貝 data 以避免引用問題
+          const dataToWrite = structuredClone(data);
+
           if (perCharacter) {
-            updateFields[`${fieldName}.${characterId}`] = data;
+            updateFields[`${fieldName}.${characterId}`] = dataToWrite;
           } else {
-            updateFields[fieldName] = data;
+            updateFields[fieldName] = dataToWrite;
           }
 
           transaction.update(userLimitRef, updateFields);
         }
-      }
 
-      return data;
-    });
+        return data;
+      });
+    }
 
     const configData = await getLimitConfig(
       userId,
@@ -789,7 +792,9 @@ export function createLimitService(config) {
       }
 
       const userData = doc.data();
-      const characterData = userData[fieldName] || {};
+      // ✅ 修復：序列化 Firestore 數據
+      const serializedUserData = serializeFirestoreData(userData);
+      const characterData = serializedUserData[fieldName] || {};
 
       const configData = await getLimitConfig(
         userId,
@@ -830,9 +835,11 @@ export function createLimitService(config) {
     const stats = [];
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
+      // ✅ 修復：序列化 Firestore 數據
+      const serializedData = serializeFirestoreData(data);
       stats.push({
         userId: doc.id,
-        [fieldName]: data[fieldName] || null,
+        [fieldName]: serializedData[fieldName] || null,
       });
     });
 

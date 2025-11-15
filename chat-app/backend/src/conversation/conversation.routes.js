@@ -19,8 +19,7 @@ import {
 } from "./conversation.helpers.js";
 import { validateRequest, conversationSchemas } from "../middleware/validation.middleware.js";
 import { getCharacterById } from "../services/character/characterCache.service.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 
 import logger from "../utils/logger.js";
 import { standardRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";

@@ -82,7 +82,7 @@ const hasDiscount = computed(() => {
         aria-labelledby="gift-modal-title"
         @click="handleOverlayClick"
       >
-        <div class="gift-modal__content">
+        <div class="gift-modal__content" @click.stop>
           <!-- 標題 -->
           <div class="gift-modal__header">
             <h2 id="gift-modal-title" class="gift-modal__title">
@@ -92,7 +92,7 @@ const hasDiscount = computed(() => {
               type="button"
               class="gift-modal__close"
               aria-label="關閉"
-              @click="handleClose"
+              @click.stop="handleClose"
             >
               <XMarkIcon class="icon" aria-hidden="true" />
             </button>
@@ -207,6 +207,8 @@ const hasDiscount = computed(() => {
   cursor: pointer;
   transition: background-color 0.2s;
   color: white;
+  position: relative;
+  z-index: 10;
 }
 
 .gift-modal__close:hover {

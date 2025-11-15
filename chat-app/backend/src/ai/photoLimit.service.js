@@ -148,16 +148,31 @@ export const purchasePhotoCards = async (userId, quantity = 1, paymentInfo = {})
  * 獲取用戶拍照使用統計
  */
 export const getPhotoStats = async (userId) => {
+  console.log('[getPhotoStats] 開始獲取照片統計，userId:', userId);
+
   const stats = await photoLimitService.getStats(userId);
+  console.log('[getPhotoStats] photoLimitService.getStats 返回:', JSON.stringify(stats, null, 2));
 
   // 獲取 unlockTickets 中的照片卡
   const photoCards = await getPhotoUnlockCards(userId);
+  console.log('[getPhotoStats] photoCards:', photoCards);
 
   // 整合計算：基礎次數 + unlockTickets 照片卡
   const totalWithCards = stats.total === -1 ? -1 : (stats.total + photoCards);
   const remainingWithCards = stats.total === -1 ? -1 : Math.max(0, totalWithCards - stats.used);
 
   const resetPeriod = getResetPeriod(stats.tier);
+
+  // ✅ 修復：確保 lastResetDate 是字符串或 null
+  let lastResetDate = stats.lastResetDate;
+  if (lastResetDate && typeof lastResetDate.toDate === 'function') {
+    try {
+      lastResetDate = lastResetDate.toDate().toISOString();
+    } catch (e) {
+      console.error('[getPhotoStats] lastResetDate 轉換失敗:', e);
+      lastResetDate = null;
+    }
+  }
 
   // 保持向後兼容的格式
   const result = {
@@ -170,9 +185,10 @@ export const getPhotoStats = async (userId) => {
     lifetimeUsed: stats.lifetimeUsed,
     remaining: remainingWithCards,
     photoCards, // ✅ 修復：與 canGeneratePhoto 保持一致，使用 photoCards 而不是 cards
-    lastResetDate: stats.lastResetDate,
+    lastResetDate,
   };
 
+  console.log('[getPhotoStats] 最終結果:', JSON.stringify(result, null, 2));
   return result;
 };
 

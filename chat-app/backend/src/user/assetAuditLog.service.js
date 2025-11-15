@@ -3,8 +3,7 @@
  * 記錄所有資產的增加和消耗操作，用於審計和數據分析
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 
 const ASSET_AUDIT_LOGS_COLLECTION = "asset_audit_logs";

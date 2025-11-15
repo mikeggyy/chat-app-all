@@ -598,27 +598,33 @@ const handleThreadSelect = (thread) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--bg-primary, #ffffff);
+  background: transparent;
   overflow: hidden;
 }
 
 .chat-list-backdrop {
   position: fixed;
   inset: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: radial-gradient(
+      circle at top,
+      rgba(30, 64, 175, 0.35),
+      transparent
+    ),
+    radial-gradient(circle at bottom, rgba(236, 72, 153, 0.18), transparent),
+    #020617;
   z-index: -1;
 }
 
 .chat-list-title-wrapper {
   padding: 1rem 1rem 0.5rem;
-  background: var(--bg-primary, #ffffff);
+  background: transparent;
 }
 
 .chat-list-title {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text-primary, #111827);
+  color: #f8fafc;
 }
 
 .chat-thread-scroll {

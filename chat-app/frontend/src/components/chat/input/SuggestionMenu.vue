@@ -55,10 +55,7 @@
         </button>
 
         <!-- 空狀態 -->
-        <p
-          v-if="!suggestions.length && !error"
-          class="suggestion-menu__empty"
-        >
+        <p v-if="!suggestions.length && !error" class="suggestion-menu__empty">
           目前沒有建議內容
         </p>
       </template>
@@ -67,8 +64,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { SparklesIcon } from '@heroicons/vue/24/outline';
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import { SparklesIcon } from "@heroicons/vue/24/outline";
 
 /**
  * SuggestionMenu - 建議回覆選單組件
@@ -96,7 +93,7 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(['suggestion-click', 'request-suggestions']);
+const emit = defineEmits(["suggestion-click", "request-suggestions"]);
 
 // Refs
 const buttonRef = ref(null);
@@ -113,7 +110,7 @@ const toggleMenu = () => {
 
   // 打開選單時請求建議
   if (isMenuOpen.value && props.suggestions.length === 0 && !props.isLoading) {
-    emit('request-suggestions');
+    emit("request-suggestions");
   }
 };
 
@@ -121,7 +118,7 @@ const toggleMenu = () => {
  * 選擇建議
  */
 const handleSelect = (item) => {
-  emit('suggestion-click', item);
+  emit("suggestion-click", item);
   isMenuOpen.value = false;
 };
 
@@ -142,37 +139,35 @@ const handleClickOutside = (event) => {
 
 // 生命週期
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside);
+  document.addEventListener("click", handleClickOutside);
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener("click", handleClickOutside);
 });
 </script>
 
 <style scoped>
-.suggestion-wrapper {
-  position: relative;
-}
-
 .suggestion-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
   padding: 0;
-  color: var(--text-secondary, #6b7280);
-  background-color: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base, 0.2s ease);
 }
 
 .suggestion-button:hover:not(:disabled) {
-  color: var(--primary-color, #8b5cf6);
-  background-color: var(--primary-light, rgba(139, 92, 246, 0.1));
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
 }
 
 .suggestion-button:disabled {

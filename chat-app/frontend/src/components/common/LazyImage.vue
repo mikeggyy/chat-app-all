@@ -120,13 +120,17 @@ onBeforeUnmount(() => {
 });
 
 // 監聽 src 變化，重置狀態
+// ✅ 修復閃爍問題：不立即重置 isLoaded，讓新圖片可以交叉淡入
 watch(() => props.src, () => {
-  isLoaded.value = false;
+  // 只重置錯誤狀態，保持 isLoaded 讓舊圖保持顯示
   hasError.value = false;
+
+  // 如果圖片還未可見，重新初始化觀察器
   if (!isVisible.value) {
     cleanup();
     initObserver();
   }
+  // 圖片已可見時，直接加載新圖片（onLoad 會更新 isLoaded）
 });
 </script>
 
@@ -142,7 +146,8 @@ watch(() => props.src, () => {
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.3s ease-in-out;
+  /* ✅ 修復閃爍問題：縮短過渡時間，並改用 ease-out 讓淡入更自然 */
+  transition: opacity 0.15s ease-out;
 }
 
 .lazy-image.is-loaded img {

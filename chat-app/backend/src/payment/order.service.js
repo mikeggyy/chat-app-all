@@ -3,8 +3,7 @@
  * 處理會員訂閱、金幣購買等訂單
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 
 const ORDERS_COLLECTION = "orders";

@@ -21,7 +21,7 @@ const props = defineProps({
     default: "重新連線",
   },
   badgeIcon: {
-    type: Object,
+    type: [Object, Function],
     default: () => HeartIcon,
   },
   description: {

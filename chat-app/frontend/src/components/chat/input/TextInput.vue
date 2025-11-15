@@ -74,7 +74,7 @@ defineExpose({ focus });
   padding: 0.875rem 1rem;
   font-size: 1rem;
   line-height: 1.5;
-  color: var(--text-primary, #1a1a1a);
+  color: #ffffff;
   background-color: transparent;
   border: none;
   outline: none;
@@ -82,7 +82,7 @@ defineExpose({ focus });
 }
 
 .text-input::placeholder {
-  color: var(--text-tertiary, #9ca3af);
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .text-input:disabled {
@@ -91,6 +91,6 @@ defineExpose({ focus });
 }
 
 .text-input:focus {
-  background-color: var(--bg-hover, rgba(0, 0, 0, 0.02));
+  background-color: transparent;
 }
 </style>

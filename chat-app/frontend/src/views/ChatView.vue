@@ -181,6 +181,13 @@ onMounted(async () => {
 });
 
 // ====================
+// Event Handlers (Additional)
+// ====================
+const handleCloseGiftSelector = () => {
+  closeGiftSelector();
+};
+
+// ====================
 // Cleanup
 // ====================
 onBeforeUnmount(() => {
@@ -283,7 +290,7 @@ onBeforeUnmount(() => {
       @close-photo-selector="closePhotoSelector"
       @photo-select="handlePhotoSelect"
       @close-image-viewer="closeImageViewer"
-      @close-gift-selector="closeGiftSelector"
+      @close-gift-selector="handleCloseGiftSelector"
       @select-gift="handleSelectGift"
     />
   </div>

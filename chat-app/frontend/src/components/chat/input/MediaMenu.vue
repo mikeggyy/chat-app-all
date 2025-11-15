@@ -159,17 +159,25 @@ onBeforeUnmount(() => {
   width: 2.75rem;
   height: 2.75rem;
   padding: 0;
-  color: var(--text-secondary, #6b7280);
-  background-color: transparent;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
   border: none;
-  border-radius: 50%;
+  border-radius: var(--radius-full, 50%);
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base, 0.2s ease);
 }
 
 .media-button:hover:not(:disabled) {
-  color: var(--primary-color, #8b5cf6);
-  background-color: var(--primary-light, rgba(139, 92, 246, 0.1));
+  background: linear-gradient(135deg, #f472b6 0%, #a78bfa 100%);
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.4);
+  transform: scale(1.08);
+}
+
+.media-button:active:not(:disabled) {
+  background: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
+  box-shadow: 0 2px 10px rgba(236, 72, 153, 0.2);
+  transform: scale(0.95);
 }
 
 .media-button.is-loading {
@@ -179,6 +187,8 @@ onBeforeUnmount(() => {
 .media-button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+  transform: none !important;
+  box-shadow: none;
 }
 
 @keyframes pulse {
@@ -194,45 +204,75 @@ onBeforeUnmount(() => {
 .icon {
   width: 1.5rem;
   height: 1.5rem;
+  transition: transform var(--transition-fast, 0.15s ease);
 }
 
-/* Badge */
+.media-button:hover:not(:disabled) .icon {
+  transform: scale(1.1);
+}
+
+/* Badge - 剩餘次數徽章 */
 .media-button__badge {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -2px;
+  right: -2px;
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 1.25rem;
   height: 1.25rem;
-  padding: 0 0.25rem;
+  padding: 0 var(--spacing-xs, 0.25rem);
   font-size: 0.625rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #ffffff;
-  background-color: var(--primary-color, #8b5cf6);
+  background: linear-gradient(135deg, var(--primary-color, #8b5cf6) 0%, var(--primary-active, #6d28d9) 100%);
   border: 2px solid var(--bg-primary, #ffffff);
-  border-radius: 9999px;
+  border-radius: var(--radius-full, 9999px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+  animation: badge-appear 0.3s ease;
+}
+
+@keyframes badge-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* 選單樣式 */
 .media-menu {
   position: absolute;
-  bottom: calc(100% + 0.5rem);
+  bottom: calc(100% + var(--spacing-sm, 0.5rem));
   right: 0;
   z-index: 50;
   min-width: 12rem;
   background-color: var(--bg-primary, #ffffff);
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1.5px solid var(--border-color, #e5e7eb);
+  border-radius: var(--radius-lg, 0.75rem);
+  box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04));
+  animation: menu-appear 0.2s ease;
+  overflow: hidden;
+}
+
+@keyframes menu-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .media-menu__item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--spacing-md, 0.75rem);
   width: 100%;
   padding: 0.875rem 1rem;
   font-size: 0.875rem;
@@ -240,17 +280,29 @@ onBeforeUnmount(() => {
   text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--border-light, #f3f4f6);
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all var(--transition-base, 0.2s ease);
 }
 
 .media-menu__item:last-child {
   border-bottom: none;
+  border-bottom-left-radius: var(--radius-lg, 0.75rem);
+  border-bottom-right-radius: var(--radius-lg, 0.75rem);
+}
+
+.media-menu__item:first-child {
+  border-top-left-radius: var(--radius-lg, 0.75rem);
+  border-top-right-radius: var(--radius-lg, 0.75rem);
 }
 
 .media-menu__item:hover:not(:disabled) {
-  background-color: var(--bg-hover, #f9fafb);
+  background-color: var(--primary-light, rgba(139, 92, 246, 0.05));
+  color: var(--primary-color, #8b5cf6);
+}
+
+.media-menu__item:active:not(:disabled) {
+  background-color: var(--primary-light, rgba(139, 92, 246, 0.1));
 }
 
 .media-menu__item:disabled {
@@ -262,6 +314,11 @@ onBeforeUnmount(() => {
   width: 1.25rem;
   height: 1.25rem;
   flex-shrink: 0;
+  transition: transform var(--transition-fast, 0.15s ease);
+}
+
+.media-menu__item:hover:not(:disabled) .media-menu__icon {
+  transform: scale(1.1);
 }
 
 /* 響應式設計 */

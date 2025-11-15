@@ -3,8 +3,7 @@
  * 獨立存儲照片，不依賴對話歷史
  */
 
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 
 const PHOTOS_COLLECTION = "user_photos";

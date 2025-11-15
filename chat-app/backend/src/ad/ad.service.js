@@ -10,8 +10,7 @@
 import { AD_CONFIG } from "../membership/membership.config.js";
 import { unlockByAd } from "../conversation/conversationLimit.service.js";
 import { getUserById } from "../user/user.service.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 
 // 緩存廣告配置（避免重複查詢 Firestore）

@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node start-all.js",
+    "dev": "npm run cleanup-ports && node start-all.js",
     "dev:concurrently": "concurrently --kill-others-on-fail -n \"app-backend,app-frontend,admin-backend,admin-frontend\" -c \"blue,green,magenta,cyan\" \"npm run dev:app-backend\" \"npm run dev:app-frontend\" \"npm run dev:admin-backend\" \"npm run dev:admin-frontend\"",
     "dev:app-backend": "cd chat-app/backend && npm run dev",
     "dev:app-frontend": "cd chat-app/frontend && npm run dev",

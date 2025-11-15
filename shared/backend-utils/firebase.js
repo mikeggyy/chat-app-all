@@ -5,7 +5,7 @@
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, FieldPath } from "firebase-admin/firestore";
 
 const requiredEnv = [
   "FIREBASE_ADMIN_PROJECT_ID",
@@ -79,5 +79,5 @@ export const getFirestoreDb = () => {
 export const db = getFirestoreDb();
 export const auth = getFirebaseAdminAuth();
 
-// 導出 FieldValue 用於 Firestore 操作
-export { FieldValue };
+// 導出 FieldValue 和 FieldPath 用於 Firestore 操作
+export { FieldValue, FieldPath };

@@ -25,8 +25,7 @@ import {
   getMatchesByIds,
   listMatchesByCreator,
 } from "../match/match.service.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 import {
   sendSuccess,

@@ -10,8 +10,7 @@
  */
 
 import logger from "./logger.js";
-import { getFirestoreDb } from "../firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 
 /**
  * 本地處理鎖（防止同一服務器的重複請求）

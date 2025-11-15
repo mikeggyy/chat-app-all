@@ -196,9 +196,11 @@ export function useChatMessages(partnerId) {
       // 移除待同步隊列
       removePendingMessagesById(userId, charId, [userMessageId]);
 
-      // 3. 更新快取
-      if (result && result.history) {
-        writeCachedHistory(userId, charId, result.history);
+      // 3. 更新消息列表和快取（✅ 修復：同時更新界面顯示）
+      if (result && result.messages && Array.isArray(result.messages)) {
+        // ⭐ 關鍵修復：更新界面上的消息列表
+        messages.value = result.messages;
+        writeCachedHistory(userId, charId, result.messages);
       }
 
       // 4. 請求 AI 回覆
@@ -229,7 +231,11 @@ export function useChatMessages(partnerId) {
             syncMessageAndGetReply(userId, charId, text, userMessageId, retryCount + 1);
           }, delay);
         } else {
-          console.error('[useChatMessages] 已達最大重試次數，消息發送失敗');
+          // ✅ 修復：達到最大重試次數後，從列表中刪除失敗的消息
+          console.error('[useChatMessages] 已達最大重試次數，從列表中刪除失敗消息');
+          messages.value = messages.value.filter(m => m.id !== userMessageId);
+          // 同時從待同步隊列中刪除
+          removePendingMessagesById(userId, charId, [userMessageId]);
         }
       }
 
@@ -251,23 +257,21 @@ export function useChatMessages(partnerId) {
 
       const reply = await requestAiReply(userId, charId, { token });
 
-      if (reply && reply.message) {
-        // 添加 AI 回覆到消息列表
+      // ⭐ 修復：優先檢查完整的消息歷史（更安全的邏輯）
+      if (reply && reply.messages && Array.isArray(reply.messages)) {
+        // 服務器返回了完整的對話歷史，直接使用
+        messages.value = reply.messages;
+        writeCachedHistory(userId, charId, reply.messages);
+      } else if (reply && reply.message) {
+        // Fallback: 只返回了單條 AI 回覆，手動添加到列表
         const aiMessage = {
           id: reply.message.id || `ai-${Date.now()}`,
           role: 'partner',
           text: reply.message.text,
           createdAt: reply.message.createdAt || new Date().toISOString(),
         };
-
         messages.value.push(aiMessage);
-
-        // 更新快取
-        if (reply.history) {
-          writeCachedHistory(userId, charId, reply.history);
-        } else {
-          appendCachedHistory(userId, charId, [aiMessage]);
-        }
+        appendCachedHistory(userId, charId, [aiMessage]);
       }
 
     } catch (error) {
@@ -319,21 +323,14 @@ export function useChatMessages(partnerId) {
       // 批量發送
       const result = await appendConversationMessages(userId, charId, messagesToSync, { token });
 
-      // 更新消息狀態
-      const pendingIds = pending.map(m => m.id);
-      messages.value = messages.value.map(m => {
-        if (pendingIds.includes(m.id)) {
-          return { ...m, state: 'sent' };
-        }
-        return m;
-      });
-
       // 清除待同步隊列
       clearPendingMessages(userId, charId);
 
-      // 更新快取
-      if (result && result.history) {
-        writeCachedHistory(userId, charId, result.history);
+      // 更新消息列表和快取（✅ 修復：使用服務器返回的完整歷史）
+      if (result && result.messages && Array.isArray(result.messages)) {
+        // ⭐ 關鍵修復：使用服務器返回的完整消息列表替換本地列表
+        messages.value = result.messages;
+        writeCachedHistory(userId, charId, result.messages);
       }
     } catch (error) {
       // 重試
@@ -454,9 +451,12 @@ export function useChatMessages(partnerId) {
     // 方法
     loadHistory,
     sendMessage,
+    sendMessageToApi: sendMessage, // ✅ 修復：添加別名以兼容 useChatCore
     requestReply,
     retryFailedMessage, // ✅ 新增：手動重試方法
     resetConversation,
+    resetConversationApi: resetConversation, // ✅ 修復：添加別名以兼容 useChatCore
     cleanup,
+    cleanupMessages: cleanup, // ✅ 修復：添加別名以兼容 useChatCore 的解構
   };
 }

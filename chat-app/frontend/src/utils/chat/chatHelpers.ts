@@ -6,14 +6,7 @@
 import { apiJson } from '../api.js';
 import { writeCachedHistory } from '../conversationCache.js';
 import type { Ref } from 'vue';
-
-/**
- * 訊息介面
- */
-interface Message {
-  id: string;
-  [key: string]: unknown;
-}
+import type { Message } from '../../types';
 
 /**
  * Firebase Auth 介面

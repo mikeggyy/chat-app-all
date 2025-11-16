@@ -1,9 +1,4 @@
-interface Message {
-  id?: string;
-  imageUrl?: string;
-  hadImage?: boolean;
-  [key: string]: unknown;
-}
+import type { Message } from '../types';
 
 interface StorageUsage {
   total: number;

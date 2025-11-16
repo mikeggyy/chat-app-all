@@ -1,14 +1,8 @@
 import { apiJson } from "./api.js";
 import { generateIdempotencyKey } from "./idempotency.js";
+import type { Message } from '../types';
 
 const encodeSegment = (value: string | null | undefined): string => encodeURIComponent(value ?? "");
-
-interface Message {
-  role: string;
-  content: string;
-  timestamp?: number;
-  [key: string]: any;
-}
 
 interface ApiResponse<T> {
   success: boolean;

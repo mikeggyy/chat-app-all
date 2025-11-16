@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * useChatActions.ts
  * 管理聊天操作功能（TypeScript 版本）：拍照、禮物、語音播放

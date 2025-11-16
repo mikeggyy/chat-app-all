@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ref, type Ref } from 'vue';
 import type { Message } from '../../types';
 

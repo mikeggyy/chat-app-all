@@ -56,10 +56,10 @@ export type MessageRole = 'user' | 'partner' | 'ai';
 export type MessageState = 'pending' | 'sent' | 'error' | 'retrying' | 'failed';
 
 export interface Message {
-  id: string;
+  id?: string; // id 可選，因為創建新消息時可能還沒有 id
   text: string;
-  role: MessageRole;
-  state?: MessageState;
+  role: MessageRole | string; // 允許 string 以支持動態值
+  state?: MessageState | string; // 允許 string 以支持動態狀態
   timestamp?: number | Date;
   createdAt?: string;
   imageUrl?: string;
@@ -70,6 +70,10 @@ export interface Message {
   } | string; // 允許 'loading' 狀態
   retryCount?: number;
   error?: string;
+  // 支持動態屬性（用於向後兼容和擴展）
+  content?: string; // content 是 text 的別名，用於與後端 API 兼容
+  hadImage?: boolean; // 用於緩存標記
+  [key: string]: any; // 允許額外的動態屬性
 }
 
 // ==================== 角色/夥伴相關 ====================

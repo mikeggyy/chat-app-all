@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Chat 初始化邏輯 Composable（TypeScript 版本）
  * 處理 ChatView 掛載時的所有初始化流程

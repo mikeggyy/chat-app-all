@@ -1,64 +1,47 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from "vue";
 import { PencilSquareIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  profile: {
-    type: Object,
-    required: true,
-  },
-  avatarPreview: {
-    type: String,
-    default: "",
-  },
-  isAvatarImageLoading: {
-    type: Boolean,
-    default: false,
-  },
-  displayedId: {
-    type: String,
-    default: "",
-  },
-  tier: {
-    type: String,
-    default: "free",
-  },
-  tierName: {
-    type: String,
-    default: "免費會員",
-  },
-  isVIP: {
-    type: Boolean,
-    default: false,
-  },
-  isVVIP: {
-    type: Boolean,
-    default: false,
-  },
-  isPaidMember: {
-    type: Boolean,
-    default: false,
-  },
-  formattedExpiryDate: {
-    type: String,
-    default: "",
-  },
-  daysUntilExpiry: {
-    type: Number,
-    default: 0,
-  },
-  isExpiringSoon: {
-    type: Boolean,
-    default: false,
-  },
+interface UserProfile {
+  displayName?: string;
+  [key: string]: any;
+}
+
+interface Props {
+  profile: UserProfile;
+  avatarPreview?: string;
+  isAvatarImageLoading?: boolean;
+  displayedId?: string;
+  tier?: string;
+  tierName?: string;
+  isVIP?: boolean;
+  isVVIP?: boolean;
+  isPaidMember?: boolean;
+  formattedExpiryDate?: string;
+  daysUntilExpiry?: number;
+  isExpiringSoon?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  avatarPreview: "",
+  isAvatarImageLoading: false,
+  displayedId: "",
+  tier: "free",
+  tierName: "免費會員",
+  isVIP: false,
+  isVVIP: false,
+  isPaidMember: false,
+  formattedExpiryDate: "",
+  daysUntilExpiry: 0,
+  isExpiringSoon: false,
 });
 
-const emit = defineEmits([
-  "open-avatar-editor",
-  "open-profile-editor",
-  "avatar-load",
-  "avatar-error",
-]);
+const emit = defineEmits<{
+  "open-avatar-editor": [];
+  "open-profile-editor": [];
+  "avatar-load": [];
+  "avatar-error": [];
+}>();
 
 const vipBadgeClass = computed(() => {
   if (props.isVVIP) return "vvip";

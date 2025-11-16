@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from "vue";
 import { getAssetCardsList, getPotionsList } from "../config/assets";
 
@@ -8,98 +8,81 @@ import TierBadge from "./stats/TierBadge.vue";
 import CoinCard from "./stats/CoinCard.vue";
 import AssetCard from "./stats/AssetCard.vue";
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  balance: {
-    type: Number,
-    default: 0,
-  },
-  formattedBalance: {
-    type: String,
-    default: "0",
-  },
-  // 各種解鎖卡
-  characterUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  photoUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  videoUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  voiceUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  createCards: {
-    type: Number,
-    default: 0,
-  },
-  // 藥水
-  potions: {
-    type: Object,
-    default: () => ({
-      memoryBoost: 0, // 記憶增強藥水
-      brainBoost: 0, // 腦力激盪藥水
-    }),
-  },
-  // VIP 資訊
-  tier: {
-    type: String,
-    default: "free",
-  },
-  tierName: {
-    type: String,
-    default: "免費會員",
-  },
-  isPaidMember: {
-    type: Boolean,
-    default: false,
-  },
-  formattedExpiryDate: {
-    type: String,
-    default: null,
-  },
-  daysUntilExpiry: {
-    type: Number,
-    default: null,
-  },
-  isExpiringSoon: {
-    type: Boolean,
-    default: false,
-  },
-  // 當前使用量
-  currentPhotoUsage: {
-    type: Number,
-    default: 0,
-  },
-  currentCharacterCreations: {
-    type: Number,
-    default: 0,
-  },
+interface Potions {
+  memoryBoost?: number;
+  brainBoost?: number;
+}
+
+interface Props {
+  isOpen: boolean;
+  balance?: number;
+  formattedBalance?: string;
+  characterUnlockCards?: number;
+  photoUnlockCards?: number;
+  videoUnlockCards?: number;
+  voiceUnlockCards?: number;
+  createCards?: number;
+  potions?: Potions;
+  tier?: string;
+  tierName?: string;
+  isPaidMember?: boolean;
+  formattedExpiryDate?: string | null;
+  daysUntilExpiry?: number | null;
+  isExpiringSoon?: boolean;
+  currentPhotoUsage?: number;
+  currentCharacterCreations?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  balance: 0,
+  formattedBalance: "0",
+  characterUnlockCards: 0,
+  photoUnlockCards: 0,
+  videoUnlockCards: 0,
+  voiceUnlockCards: 0,
+  createCards: 0,
+  potions: () => ({
+    memoryBoost: 0,
+    brainBoost: 0,
+  }),
+  tier: "free",
+  tierName: "免費會員",
+  isPaidMember: false,
+  formattedExpiryDate: null,
+  daysUntilExpiry: null,
+  isExpiringSoon: false,
+  currentPhotoUsage: 0,
+  currentCharacterCreations: 0,
 });
 
-const emit = defineEmits(["close", "buy-unlock-card", "use-unlock-card", "use-potion"]);
+const emit = defineEmits<{
+  close: [];
+  'buy-unlock-card': [cardType: string];
+  'use-unlock-card': [cardType: string];
+  'use-potion': [potionType: string];
+}>();
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit("close");
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   if (event.target === event.currentTarget) {
     handleClose();
   }
 };
 
 // 限制配置
-const LIMITS = {
+interface LimitConfig {
+  free: number;
+  vip: number;
+  vvip: number;
+}
+
+const LIMITS: {
+  PHOTO: LimitConfig;
+  CHARACTER_CREATION: LimitConfig;
+} = {
   PHOTO: {
     free: 3,
     vip: 10,
@@ -114,12 +97,12 @@ const LIMITS = {
 
 // 計算當前上限
 const photoLimit = computed(() => {
-  return LIMITS.PHOTO[props.tier] || LIMITS.PHOTO.free;
+  return LIMITS.PHOTO[props.tier as keyof LimitConfig] || LIMITS.PHOTO.free;
 });
 
 const characterCreationLimit = computed(() => {
   return (
-    LIMITS.CHARACTER_CREATION[props.tier] || LIMITS.CHARACTER_CREATION.free
+    LIMITS.CHARACTER_CREATION[props.tier as keyof LimitConfig] || LIMITS.CHARACTER_CREATION.free
   );
 });
 
@@ -133,18 +116,18 @@ const isCharacterCreationLimitReached = computed(() => {
 });
 
 // 處理購買解鎖卡
-const handleBuyUnlockCard = (cardType) => {
+const handleBuyUnlockCard = (cardType: string): void => {
   emit("buy-unlock-card", cardType);
   handleClose();
 };
 
 // 處理使用解鎖卡
-const handleUseUnlockCard = (cardType) => {
+const handleUseUnlockCard = (cardType: string): void => {
   emit("use-unlock-card", cardType);
 };
 
 // 處理使用藥水
-const handleUsePotion = (potionType) => {
+const handleUsePotion = (potionType: string): void => {
   emit("use-potion", potionType);
 };
 

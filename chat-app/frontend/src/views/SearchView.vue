@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { useRouter } from "vue-router";
 import { useUserProfile } from "../composables/useUserProfile";
 import { useSearchLogic } from "../composables/search/useSearchLogic";
@@ -12,6 +12,12 @@ import RecentConversationsPanel from "../components/search/RecentConversationsPa
 import PopularRankingPanel from "../components/search/PopularRankingPanel.vue";
 import SearchResults from "../components/search/SearchResults.vue";
 import RecordDetailPanel from "../components/search/RecordDetailPanel.vue";
+
+// Types
+interface CharacterProfile {
+  matchId?: string;
+  [key: string]: any;
+}
 
 const router = useRouter();
 const { user } = useUserProfile();
@@ -58,7 +64,7 @@ const {
 );
 
 // 打開聊天
-const openChat = (profile) => {
+const openChat = (profile: CharacterProfile | null): void => {
   if (!profile?.matchId) return;
   router.push({ name: "chat", params: { id: profile.matchId } });
 };

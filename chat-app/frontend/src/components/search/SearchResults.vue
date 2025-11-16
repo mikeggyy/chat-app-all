@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import LazyImage from '@/components/common/LazyImage.vue';
 
 const props = defineProps({

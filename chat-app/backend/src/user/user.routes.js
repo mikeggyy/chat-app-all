@@ -91,22 +91,10 @@ userRouter.get("/:id", requireFirebaseAuth, requireOwnership("id"), relaxedRateL
   try {
     let user = await getUserById(req.params.id);
 
-    // 如果用戶不存在，為測試用戶自動創建基本記錄
+    // ✅ 修復：GET 請求不應該創建用戶，直接返回 404
+    // 用戶應該通過 POST /api/users 創建，這樣才能從 Firebase Auth 獲取正確的 displayName
     if (!user) {
-      const newUser = {
-        id: req.params.id,
-        uid: req.params.id,
-        displayName: "測試使用者",
-        conversations: [],
-        favorites: [],
-        hasCompletedOnboarding: false,  // 明確設置預設值
-      };
-      await upsertUser(newUser);
-      user = await getUserById(req.params.id);
-
-      if (!user) {
-        throw new ApiError("USER_NOT_FOUND", "找不到指定的使用者資料", { userId: req.params.id });
-      }
+      throw new ApiError("USER_NOT_FOUND", "找不到指定的使用者資料", { userId: req.params.id });
     }
 
     // ✅ 關鍵修復：經過 normalizeUser 規範化，確保返回完整且一致的數據格式
@@ -224,21 +212,9 @@ userRouter.get("/:id/favorites", requireFirebaseAuth, requireOwnership("id"), re
   try {
     let user = await getUserById(req.params.id);
 
-    // 如果用戶不存在，為測試用戶自動創建基本記錄
+    // ✅ 修復：不自動創建用戶
     if (!user) {
-      const newUser = {
-        id: req.params.id,
-        uid: req.params.id,
-        displayName: "測試使用者",
-        conversations: [],
-        favorites: [],
-      };
-      await upsertUser(newUser);
-      user = await getUserById(req.params.id);
-
-      if (!user) {
-        throw new ApiError("USER_NOT_FOUND", "找不到指定的使用者資料", { userId: req.params.id });
-      }
+      throw new ApiError("USER_NOT_FOUND", "找不到指定的使用者資料", { userId: req.params.id });
     }
 
     const includeMatches = shouldIncludeMatches(req.query);

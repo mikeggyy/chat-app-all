@@ -8,6 +8,7 @@ import { useMatchCarousel } from '../composables/match/useMatchCarousel';
 import { useMatchGestures } from '../composables/match/useMatchGestures';
 import { useMatchFavorites } from '../composables/match/useMatchFavorites';
 import { useMatchData } from '../composables/match/useMatchData';
+import { useToast } from '../composables/useToast';
 import MatchBackground from '../components/match/MatchBackground.vue';
 import MatchCard from '../components/match/MatchCard.vue';
 import BackgroundDialog from '../components/match/BackgroundDialog.vue';
@@ -49,6 +50,7 @@ const router = useRouter();
 const { user, loadUserProfile, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
 const { requireLogin } = useGuestGuard();
+const toast = useToast();
 
 // 角色數據管理
 const matchData = useMatchData({ user });
@@ -160,6 +162,24 @@ const closeBackgroundDialog = (): void => {
 const handleKeydown = (event: KeyboardEvent): void => {
   if (event.key === 'Escape' && backgroundDialog.open) {
     closeBackgroundDialog();
+  }
+};
+
+// 處理收藏操作
+const handleToggleFavorite = async (): Promise<void> => {
+  const matchId = match.id;
+  const matchName = match.display_name;
+  const wasFavorited = favorites.favoriteIds.value.includes(matchId);
+
+  const success = await favorites.toggleFavorite(matchId);
+
+  if (success) {
+    // 顯示提示消息（統一使用成功提示）
+    if (wasFavorited) {
+      toast.success(`已取消收藏 ${matchName}`, { duration: 1000 });
+    } else {
+      toast.success(`已收藏 ${matchName}`, { duration: 1000 });
+    }
   }
 };
 
@@ -315,7 +335,7 @@ onBeforeUnmount(() => {
           :favorite-error="favorites.favoriteError.value"
           :is-loading="isLoading"
           :error="item.data?.id === match.id ? error : undefined"
-          @toggle-favorite="favorites.toggleFavorite(match.id)"
+          @toggle-favorite="handleToggleFavorite"
           @open-background="openBackgroundDialog"
           @enter-chat="enterChatRoom"
         />

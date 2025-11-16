@@ -1,50 +1,39 @@
-<script setup>
+<script setup lang="ts">
 import BaseLimitModal from './BaseLimitModal.vue';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  used: {
-    type: Number,
-    default: 0,
-  },
-  remaining: {
-    type: Number,
-    default: 0,
-  },
-  total: {
-    type: Number,
-    default: 0,
-  },
-  standardTotal: {
-    type: Number,
-    default: null,
-  },
-  isTestAccount: {
-    type: Boolean,
-    default: false,
-  },
-  cards: {
-    type: Number,
-    default: 0,
-  },
-  tier: {
-    type: String,
-    default: 'free',
-  },
-  resetPeriod: {
-    type: String,
-    default: 'lifetime',
-  },
-  photoUnlockCards: {
-    type: Number,
-    default: 0,
-  },
+interface Props {
+  isOpen?: boolean;
+  used?: number;
+  remaining?: number;
+  total?: number;
+  standardTotal?: number | null;
+  isTestAccount?: boolean;
+  cards?: number;
+  tier?: string;
+  resetPeriod?: string;
+  photoUnlockCards?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isOpen: false,
+  used: 0,
+  remaining: 0,
+  total: 0,
+  standardTotal: null,
+  isTestAccount: false,
+  cards: 0,
+  tier: 'free',
+  resetPeriod: 'lifetime',
+  photoUnlockCards: 0,
 });
 
-const emit = defineEmits(['close', 'purchase-cards', 'upgrade-membership', 'buyUnlockCard', 'useUnlockCard']);
+const emit = defineEmits<{
+  close: [];
+  'purchase-cards': [];
+  'upgrade-membership': [];
+  buyUnlockCard: [];
+  useUnlockCard: [];
+}>();
 </script>
 
 <template>

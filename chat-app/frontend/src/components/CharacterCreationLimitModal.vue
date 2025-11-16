@@ -1,6 +1,6 @@
-<script setup>
+<script setup lang="ts">
 import { computed, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, type Router } from 'vue-router';
 import { logger } from '@/utils/logger';
 import {
   XMarkIcon,
@@ -10,69 +10,64 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  usedCreations: {
-    type: Number,
-    default: 0,
-  },
-  totalLimit: {
-    type: Number,
-    default: 3,
-  },
-  standardTotal: {
-    type: Number,
-    default: null,
-  },
-  isTestAccount: {
-    type: Boolean,
-    default: false,
-  },
-  membershipTier: {
-    type: String,
-    default: 'free',
-  },
-  createCards: {
-    type: Number,
-    default: 0,
-  },
+interface Props {
+  isOpen: boolean;
+  usedCreations?: number;
+  totalLimit?: number;
+  standardTotal?: number | null;
+  isTestAccount?: boolean;
+  membershipTier?: string;
+  createCards?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  usedCreations: 0,
+  totalLimit: 3,
+  standardTotal: null,
+  isTestAccount: false,
+  membershipTier: 'free',
+  createCards: 0,
 });
 
-const emit = defineEmits(['close', 'upgrade', 'buyUnlockCard', 'useUnlockCard']);
+interface Emits {
+  (e: 'close'): void;
+  (e: 'upgrade'): void;
+  (e: 'buyUnlockCard'): void;
+  (e: 'useUnlockCard'): void;
+}
+
+const emit = defineEmits<Emits>();
 
 // 用於顯示的限制數量（測試帳號使用標準限制）
-const displayTotal = computed(() => {
+const displayTotal = computed<number>(() => {
   return props.standardTotal !== null ? props.standardTotal : props.totalLimit;
 });
 
-const hasUnlockCards = computed(() => {
+const hasUnlockCards = computed<boolean>(() => {
   return props.createCards > 0;
 });
 
-const router = useRouter();
+const router: Router = useRouter();
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit('close');
 };
 
-const handleUpgrade = () => {
+const handleUpgrade = (): void => {
   emit('upgrade');
   router.push({ name: 'membership' });
 };
 
-const handleBuyUnlockCard = () => {
+const handleBuyUnlockCard = (): void => {
   emit('buyUnlockCard');
   router.push({ path: '/shop', query: { category: 'create' } });
 };
 
-const handleUseUnlockCard = () => {
+const handleUseUnlockCard = (): void => {
   emit('useUnlockCard');
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   // 只有點擊背景時才關閉
   if (event.target === event.currentTarget) {
     handleClose();

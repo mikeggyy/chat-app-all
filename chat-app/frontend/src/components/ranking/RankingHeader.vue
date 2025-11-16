@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { ArrowLeftIcon, QuestionMarkCircleIcon } from "@heroicons/vue/24/outline";
 
 defineProps({

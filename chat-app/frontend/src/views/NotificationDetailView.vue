@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
@@ -8,19 +8,34 @@ import {
 } from "@heroicons/vue/24/outline";
 import { useNotifications } from "../composables/useNotifications";
 
+interface NotificationAction {
+  label: string;
+  type: 'primary' | 'secondary';
+}
+
+interface NotificationDetail {
+  id: string;
+  category: string;
+  title: string;
+  timestamp: string;
+  fullContent: string;
+  isRead: boolean;
+  actions?: NotificationAction[];
+}
+
 const router = useRouter();
 const route = useRoute();
 const { getNotificationById, markAsRead } = useNotifications();
 
-const notification = ref(null);
-const isLoading = ref(true);
+const notification = ref<NotificationDetail | null>(null);
+const isLoading = ref<boolean>(true);
 
-const notificationId = computed(() => route.params.id);
+const notificationId = computed(() => route.params.id as string);
 
-const formatDate = (dateString) => {
+const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
-  const diff = now - date;
+  const diff = now.getTime() - date.getTime();
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
@@ -41,11 +56,11 @@ const formatDate = (dateString) => {
   }
 };
 
-const handleBack = () => {
+const handleBack = (): void => {
   router.back();
 };
 
-const handleAction = (action) => {
+const handleAction = (action: NotificationAction): void => {
   // 根據不同的操作類型執行相應的邏輯
   if (action.label === "查看角色" || action.label === "查看訊息") {
     // 可以導航到相應頁面
@@ -54,13 +69,13 @@ const handleAction = (action) => {
   }
 };
 
-const loadNotification = () => {
+const loadNotification = (): void => {
   isLoading.value = true;
 
   // 模擬 API 請求
   setTimeout(() => {
     const id = notificationId.value;
-    notification.value = getNotificationById(id);
+    notification.value = getNotificationById(id) as NotificationDetail | null;
     isLoading.value = false;
 
     // 標記為已讀

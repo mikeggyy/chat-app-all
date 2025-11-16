@@ -1,49 +1,37 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from "vue";
 import { BoltIcon, SparklesIcon } from "@heroicons/vue/24/solid";
 import { ClockIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  tier: {
-    type: String,
-    default: "free",
-    validator: (value) => ["free", "vip", "vvip"].includes(value),
-  },
-  tierName: {
-    type: String,
-    default: "免費會員",
-  },
-  isVIP: {
-    type: Boolean,
-    default: false,
-  },
-  isVVIP: {
-    type: Boolean,
-    default: false,
-  },
-  isPaidMember: {
-    type: Boolean,
-    default: false,
-  },
-  formattedExpiryDate: {
-    type: String,
-    default: "",
-  },
-  daysUntilExpiry: {
-    type: Number,
-    default: null,
-  },
-  isExpiringSoon: {
-    type: Boolean,
-    default: false,
-  },
-  isGuest: {
-    type: Boolean,
-    default: false,
-  },
+type MembershipTier = "free" | "vip" | "vvip";
+
+interface Props {
+  tier?: MembershipTier;
+  tierName?: string;
+  isVIP?: boolean;
+  isVVIP?: boolean;
+  isPaidMember?: boolean;
+  formattedExpiryDate?: string;
+  daysUntilExpiry?: number | null;
+  isExpiringSoon?: boolean;
+  isGuest?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  tier: "free",
+  tierName: "免費會員",
+  isVIP: false,
+  isVVIP: false,
+  isPaidMember: false,
+  formattedExpiryDate: "",
+  daysUntilExpiry: null,
+  isExpiringSoon: false,
+  isGuest: false,
 });
 
-const emit = defineEmits(["upgrade-click"]);
+const emit = defineEmits<{
+  "upgrade-click": [];
+}>();
 
 const cardClass = computed(() => {
   if (props.isVVIP) return "vip-card--vvip";

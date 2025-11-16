@@ -1,5 +1,5 @@
-<script setup>
-import { computed, ref, onMounted } from "vue";
+<script setup lang="ts">
+import { computed, ref, onMounted, type Ref, type ComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import { logger } from "@/utils/logger";
 import {
@@ -12,16 +12,49 @@ import { useUserProfile } from "../composables/useUserProfile";
 import { useVirtualScroll } from "../composables/useVirtualScroll";
 import LazyImage from '@/components/common/LazyImage.vue';
 
+// Types
+interface RawCharacter {
+  id?: string;
+  characterId?: string;
+  name?: string;
+  display_name?: string;
+  displayName?: string;
+  likes?: number;
+  totalFavorites?: number;
+  favorites?: number;
+  collections?: number;
+  totalChatUsers?: number;
+  chats?: number;
+  portrait?: string;
+  portraitUrl?: string;
+  avatar?: string;
+  tagline?: string;
+  description?: string;
+  background?: string;
+  summary?: string;
+  [key: string]: any;
+}
+
+interface DecoratedCharacter {
+  id: string;
+  name: string;
+  likes: number;
+  collections: number;
+  portrait: string;
+  tagline: string;
+  description: string;
+}
+
 const router = useRouter();
 const { user } = useUserProfile();
 
 // 返回上一頁（固定返回 Profile 頁面）
-const handleBack = () => {
+const handleBack = (): void => {
   router.push({ name: "profile" });
 };
 
 // 跳轉到創建角色頁面
-const handleCreateCharacter = async () => {
+const handleCreateCharacter = async (): Promise<void> => {
   try {
     await router.push({ name: "character-create-gender" });
   } catch (error) {
@@ -33,7 +66,7 @@ const handleCreateCharacter = async () => {
 };
 
 // Utility functions
-const normalizeIdentifier = (value) => {
+const normalizeIdentifier = (value: unknown): string => {
   if (typeof value !== "string") {
     return "";
   }
@@ -41,7 +74,7 @@ const normalizeIdentifier = (value) => {
   return trimmed.length ? trimmed : "";
 };
 
-const toPositiveInteger = (value) => {
+const toPositiveInteger = (value: unknown): number => {
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) {
     return 0;
@@ -52,7 +85,7 @@ const toPositiveInteger = (value) => {
 const DEFAULT_CHARACTER_PORTRAIT = "/ai-role/match-role-01.webp";
 
 const metricFormatter = new Intl.NumberFormat("zh-TW");
-const formatMetric = (value) => {
+const formatMetric = (value: unknown): string => {
   const number = Number(value);
   if (!Number.isFinite(number)) {
     return "0";
@@ -60,7 +93,7 @@ const formatMetric = (value) => {
   return metricFormatter.format(number);
 };
 
-const decorateCharacter = (character, index = 0) => {
+const decorateCharacter = (character: RawCharacter | null, index: number = 0): DecoratedCharacter | null => {
   if (!character || typeof character !== "object") {
     return null;
   }
@@ -123,10 +156,10 @@ const decorateCharacter = (character, index = 0) => {
 };
 
 // Character data
-const userCharactersRaw = ref([]);
-const isCharactersLoading = ref(false);
-const charactersError = ref("");
-let charactersRequestToken = 0;
+const userCharactersRaw: Ref<RawCharacter[]> = ref([]);
+const isCharactersLoading: Ref<boolean> = ref(false);
+const charactersError: Ref<string> = ref("");
+let charactersRequestToken: number = 0;
 
 const characters = computed(() => {
   return userCharactersRaw.value
@@ -153,11 +186,11 @@ const hasMoreCharacters = computed(() => {
 });
 
 // 處理滾動事件（虛擬滾動）
-const handleContentScroll = (event) => {
+const handleContentScroll = (event: Event): void => {
   virtualScroll.handleScroll(event, hasMoreCharacters.value);
 };
 
-const loadUserCharacters = async (id, options = {}) => {
+const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boolean } = {}): Promise<void> => {
   const normalizedId = normalizeIdentifier(id);
   if (!normalizedId) {
     userCharactersRaw.value = [];
@@ -194,7 +227,7 @@ const loadUserCharacters = async (id, options = {}) => {
   }
 };
 
-const resolveCharacterChatId = (character) => {
+const resolveCharacterChatId = (character: DecoratedCharacter | RawCharacter | null): string => {
   if (!character || typeof character !== "object") {
     return "";
   }
@@ -217,7 +250,7 @@ const resolveCharacterChatId = (character) => {
   return "";
 };
 
-const handleCharacterSelect = (character) => {
+const handleCharacterSelect = (character: DecoratedCharacter): void => {
   const targetId = resolveCharacterChatId(character);
   if (!targetId) {
     if (import.meta.env.DEV) {

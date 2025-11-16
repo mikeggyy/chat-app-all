@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { PlayIcon, PauseIcon } from "@heroicons/vue/24/outline";
 
 const props = defineProps({

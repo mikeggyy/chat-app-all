@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import {
   computed,
   nextTick,
@@ -7,6 +7,9 @@ import {
   ref,
   shallowRef,
   watch,
+  type Ref,
+  type ShallowRef,
+  type ComputedRef,
 } from "vue";
 import { useRouter } from "vue-router";
 import {
@@ -22,11 +25,62 @@ import RankingPeriodSelector from "../components/ranking/RankingPeriodSelector.v
 import RankingPodium from "../components/ranking/RankingPodium.vue";
 import RankingList from "../components/ranking/RankingList.vue";
 
+// Types
+interface Match {
+  id?: string;
+  display_name?: string;
+  displayName?: string;
+  portraitUrl?: string;
+  totalChatUsers?: number;
+  totalFavorites?: number;
+  [key: string]: any;
+}
+
+interface RankingEntry {
+  id?: string;
+  rank?: number;
+  chatId?: string;
+  conversationId?: string;
+  characterId?: string;
+  matchId?: string;
+  avatar?: string;
+  portraitUrl?: string;
+  name?: string;
+  displayName?: string;
+  title?: string;
+  handle?: string;
+  score?: number;
+  [key: string]: any;
+}
+
+interface Metadata {
+  totalChatUsers: number;
+  totalFavorites: number;
+  displayName: string;
+  portraitUrl: string;
+}
+
+interface DecoratedEntry {
+  chatId: string;
+  avatar: string;
+  name: string;
+  subtitle: string;
+  score: number;
+  rank?: number;
+  stats: Metadata;
+  [key: string]: any;
+}
+
+interface PeriodOption {
+  id: string;
+  label: string;
+}
+
 const router = useRouter();
 
 // ==================== 常量和工具函數 ====================
 
-const MATCH_ID_BY_AVATAR = fallbackMatches.reduce((map, match) => {
+const MATCH_ID_BY_AVATAR: Record<string, string> = fallbackMatches.reduce((map: Record<string, string>, match: any) => {
   if (!match || typeof match !== "object") {
     return map;
   }
@@ -39,12 +93,12 @@ const MATCH_ID_BY_AVATAR = fallbackMatches.reduce((map, match) => {
   return map;
 }, {});
 
-const FALLBACK_CHAT_ID =
+const FALLBACK_CHAT_ID: string | null =
   fallbackMatches
-    .find((match) => typeof match?.id === "string" && match.id.trim().length)
+    .find((match: any) => typeof match?.id === "string" && match.id.trim().length)
     ?.id.trim() ?? null;
 
-const normalizeIdentifier = (value) => {
+const normalizeIdentifier = (value: unknown): string => {
   if (typeof value !== "string") {
     return "";
   }
@@ -52,15 +106,15 @@ const normalizeIdentifier = (value) => {
   return trimmed.length ? trimmed : "";
 };
 
-const matchMetadata = ref({});
-const EMPTY_METADATA = Object.freeze({
+const matchMetadata: Ref<Record<string, Metadata>> = ref({});
+const EMPTY_METADATA: Readonly<Metadata> = Object.freeze({
   totalChatUsers: 0,
   totalFavorites: 0,
   displayName: "",
   portraitUrl: "",
 });
 
-const toPositiveInteger = (value) => {
+const toPositiveInteger = (value: unknown): number => {
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) {
     return 0;
@@ -68,8 +122,8 @@ const toPositiveInteger = (value) => {
   return Math.round(number);
 };
 
-const assignMatchMetadata = (matches) => {
-  const map = {};
+const assignMatchMetadata = (matches: Match[]): void => {
+  const map: Record<string, Metadata> = {};
 
   if (Array.isArray(matches)) {
     matches.forEach((match) => {
@@ -129,7 +183,7 @@ const loadMatchMetadata = async () => {
   }
 };
 
-const resolveEntryChatId = (entry) => {
+const resolveEntryChatId = (entry: RankingEntry | null): string | null => {
   if (!entry || typeof entry !== "object") {
     return FALLBACK_CHAT_ID;
   }
@@ -162,7 +216,7 @@ const resolveEntryChatId = (entry) => {
   return FALLBACK_CHAT_ID;
 };
 
-const getEntryMetadata = (entry) => {
+const getEntryMetadata = (entry: RankingEntry | null): Metadata => {
   if (!entry) {
     return EMPTY_METADATA;
   }
@@ -173,7 +227,7 @@ const getEntryMetadata = (entry) => {
   return matchMetadata.value[matchId] ?? EMPTY_METADATA;
 };
 
-const decorateEntry = (entry) => {
+const decorateEntry = (entry: RankingEntry | null): DecoratedEntry | null => {
   if (!entry || typeof entry !== "object") {
     return null;
   }
@@ -226,7 +280,7 @@ const decorateEntry = (entry) => {
   };
 };
 
-const handleEntryNavigate = (entry) => {
+const handleEntryNavigate = (entry: DecoratedEntry | RankingEntry): void => {
   const chatId = resolveEntryChatId(entry);
   if (chatId) {
     router.push({ name: "chat", params: { id: chatId } });
@@ -237,25 +291,25 @@ const handleEntryNavigate = (entry) => {
 
 // ==================== 狀態管理 ====================
 
-const PERIOD_OPTIONS = [
+const PERIOD_OPTIONS: readonly PeriodOption[] = [
   { id: "daily", label: "每日" },
   { id: "weekly", label: "每週" },
 ];
 
-const activePeriod = ref(PERIOD_OPTIONS[0].id);
-const podium = shallowRef([]);
-const entries = shallowRef([]);
-const updatedAt = ref("");
-const errorMessage = ref("");
-const loading = ref(false);
-const hasMore = ref(true);
-const offset = ref(0);
-const rankingListRef = ref(null);
+const activePeriod: Ref<string> = ref(PERIOD_OPTIONS[0].id);
+const podium: ShallowRef<RankingEntry[]> = shallowRef([]);
+const entries: ShallowRef<RankingEntry[]> = shallowRef([]);
+const updatedAt: Ref<string> = ref("");
+const errorMessage: Ref<string> = ref("");
+const loading: Ref<boolean> = ref(false);
+const hasMore: Ref<boolean> = ref(true);
+const offset: Ref<number> = ref(0);
+const rankingListRef: Ref<{ sentinel?: Element } | null> = ref(null);
 
-let observer = null;
-let requestToken = 0;
+let observer: IntersectionObserver | null = null;
+let requestToken: number = 0;
 
-const decorationCache = new Map();
+const decorationCache = new Map<string, DecoratedEntry>();
 
 // ==================== Computed 屬性 ====================
 
@@ -293,7 +347,7 @@ const themeName = computed(() =>
   activePeriod.value === "weekly" ? "weekly" : "daily"
 );
 
-const formatDateLine = (value) => {
+const formatDateLine = (value: string): string => {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -364,7 +418,7 @@ const isEmptyState = computed(
 
 const showErrorState = computed(() => Boolean(errorMessage.value));
 
-const formatScore = (value) => {
+const formatScore = (value: unknown): string => {
   const number = Number(value);
   if (!Number.isFinite(number)) return "-";
   if (number >= 1_000_000) {
@@ -382,7 +436,7 @@ const formatScore = (value) => {
 
 // ==================== 方法 ====================
 
-const resetState = () => {
+const resetState = (): void => {
   podium.value = [];
   entries.value = [];
   updatedAt.value = "";
@@ -392,7 +446,7 @@ const resetState = () => {
   decorationCache.clear();
 };
 
-const loadRankings = async ({ reset = false } = {}) => {
+const loadRankings = async ({ reset = false }: { reset?: boolean } = {}): Promise<void> => {
   const currentToken = ++requestToken;
 
   if (!reset && (!hasMore.value || loading.value)) {
@@ -456,14 +510,14 @@ const loadRankings = async ({ reset = false } = {}) => {
   }
 };
 
-const detachObserver = () => {
+const detachObserver = (): void => {
   if (observer) {
     observer.disconnect();
     observer = null;
   }
 };
 
-const attachObserver = () => {
+const attachObserver = (): void => {
   // 訪問 RankingList 組件暴露的 sentinel ref
   const sentinel = rankingListRef.value?.sentinel;
   if (!sentinel) {
@@ -495,7 +549,7 @@ const attachObserver = () => {
   observer.observe(sentinel);
 };
 
-const handleRetry = () => {
+const handleRetry = (): void => {
   void loadRankings({ reset: true }).then(() => {
     nextTick(() => {
       attachObserver();
@@ -503,7 +557,7 @@ const handleRetry = () => {
   });
 };
 
-const handlePeriodChange = (periodId) => {
+const handlePeriodChange = (periodId: string): void => {
   if (periodId === activePeriod.value) {
     return;
   }
@@ -511,7 +565,7 @@ const handlePeriodChange = (periodId) => {
   activePeriod.value = periodId;
 };
 
-const handleBack = () => {
+const handleBack = (): void => {
   if (
     typeof window !== "undefined" &&
     window.history &&

@@ -144,7 +144,7 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
    * @param options - 選項
    */
   const generateVideo = async (options: GenerateVideoOptions = {}): Promise<void> => {
-    const { useVideoCard = false, imageUrl = null } = options;
+    let { useVideoCard = false, imageUrl = null } = options;
     const userId = getCurrentUserId();
     const matchId = getPartnerId();
 
@@ -158,6 +158,21 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
     try {
       const firebaseAuth = getFirebaseAuth();
       const token = await firebaseAuth.getCurrentUserIdToken();
+
+      // ✅ 關鍵修復：檢查權限並自動決定是否使用影片卡
+      const limitCheckResponse: any = await apiJson(`/api/ai/video/check/${userId}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        skipGlobalLoading: true,
+      });
+      const limitCheck: VideoLimitCheckResult = limitCheckResponse.data || limitCheckResponse;
+
+      // 如果沒有基礎額度但有影片卡，自動使用影片卡
+      if (!limitCheck.allowed && limitCheck.videoCards > 0) {
+        useVideoCard = true;
+      }
 
       // 1. 先發送一條隨機的影片請求訊息
       const randomMessage = getRandomVideoRequestMessage();
@@ -345,7 +360,7 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
       const token = await firebaseAuth.getCurrentUserIdToken();
 
       // 先檢查影片生成權限
-      const limitCheck: VideoLimitCheckResult = await apiJson(`/api/ai/video/check/${userId}`, {
+      const response: any = await apiJson(`/api/ai/video/check/${userId}`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -353,9 +368,23 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         skipGlobalLoading: true,
       });
 
-      // 如果免費額度用完，顯示彈窗讓用戶決定是否使用解鎖卡
+      // ✅ 解包 sendSuccess 的響應格式 { success: true, data: {...} }
+      const limitCheck: VideoLimitCheckResult = response.data || response;
+
+      // ✅ 關鍵修復：如果有影片卡可用，直接顯示照片選擇器
+      if (limitCheck.allowedWithCard && limitCheck.videoCards > 0) {
+        showPhotoSelector();
+        return;
+      }
+
+      // 如果免費額度用完且沒有卡片，顯示彈窗
       if (!limitCheck.allowed) {
-        showVideoLimit(createLimitModalData(limitCheck, 'video'));
+        // ✅ 修復：正確傳遞 videoUnlockCards 字段名
+        const modalData = {
+          ...createLimitModalData(limitCheck, 'video'),
+          videoUnlockCards: limitCheck.videoCards || limitCheck.videoUnlockCards || limitCheck.cards || 0,
+        };
+        showVideoLimit(modalData);
         return;
       }
 

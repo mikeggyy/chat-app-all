@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -8,7 +10,7 @@ const props = defineProps({
     validator: (value) => ['ad', 'unlock', 'vip', 'disabled'].includes(value),
   },
   icon: {
-    type: Object,
+    type: [Object, Function],
     required: true,
   },
   title: {
@@ -32,7 +34,7 @@ const props = defineProps({
     default: '',
   },
   buttonIcon: {
-    type: Object,
+    type: [Object, Function],
     default: null,
   },
   disabled: {
@@ -207,6 +209,18 @@ const handleClick = () => {
 .option-button--ad:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+}
+
+.option-button--unlock {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  color: #a78bfa;
+}
+
+.option-button--unlock:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.7);
+  transform: translateY(-2px);
 }
 
 .option-button--unlock-use {

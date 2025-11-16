@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import PodiumCard from "./PodiumCard.vue";
 
 defineProps({

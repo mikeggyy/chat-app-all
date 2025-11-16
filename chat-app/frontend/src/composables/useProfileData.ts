@@ -241,15 +241,24 @@ export function useProfileData(): UseProfileDataReturn {
     isLoadingAssets.value = true;
     try {
       const { apiJson } = await import("../utils/api.js");
-      const data: AssetApiResponse = await apiJson(
+      const response: any = await apiJson(
         `/api/users/${encodeURIComponent(userId)}/assets`,
         {
           skipGlobalLoading: true,
         }
       );
 
-      // 只更新已定義的欄位，避免訪問未定義的屬性
+      logger.log('[useProfileData] 收到資產響應（原始）:', response);
+
+      // ✅ 關鍵修復：處理 sendSuccess 的響應格式
+      // sendSuccess 返回 { success: true, data: {...} }
+      const data = response.data || response;
+
+      logger.log('[useProfileData] 解析後的資產數據:', data);
+
+      // ✅ 合併：同時更新資產和金幣餘額
       if (data && typeof data === "object") {
+        // 更新資產
         userAssets.value = {
           characterUnlockCards: data.characterUnlockCards ?? 0,
           photoUnlockCards: data.photoUnlockCards ?? 0,
@@ -258,6 +267,17 @@ export function useProfileData(): UseProfileDataReturn {
           createCards: data.createCards ?? 0,
           potions: data.potions ?? userAssets.value.potions,
         };
+
+        // ✅ 同時更新金幣餘額（從同一個 API）
+        if (data.balance !== undefined) {
+          balance.value = data.balance;
+          logger.log('[useProfileData] 金幣餘額已更新:', data.balance);
+        }
+
+        logger.log('[useProfileData] 資產已更新:', userAssets.value);
+        logger.log('[useProfileData] 當前金幣餘額:', balance.value);
+      } else {
+        logger.error('[useProfileData] 收到的資產數據格式錯誤:', response);
       }
     } catch (err) {
       logger.error("[useProfileData] 加載用戶資產失敗:", err);
@@ -287,7 +307,7 @@ export function useProfileData(): UseProfileDataReturn {
   };
 
   /**
-   * 刷新用戶資料
+   * 刷新用戶資料（強制繞過緩存）
    * @param userId - 用戶 ID
    */
   const refreshProfileData = async (userId: string): Promise<void> => {
@@ -295,7 +315,7 @@ export function useProfileData(): UseProfileDataReturn {
 
     try {
       await Promise.allSettled([
-        loadUserProfile(userId),
+        loadUserProfile(userId, { force: true }), // 強制刷新，繞過緩存
         loadBalance(),
         loadUserAssets(userId),
       ]);

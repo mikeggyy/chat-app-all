@@ -1,31 +1,33 @@
-<script setup>
-import { useRouter } from 'vue-router';
+<script setup lang="ts">
+import { useRouter, type Router } from 'vue-router';
 import { ShoppingCartIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: '角色',
-  },
+interface Props {
+  isOpen: boolean;
+  characterName?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterName: '角色',
 });
 
-const emit = defineEmits(['close']);
-const router = useRouter();
+interface Emits {
+  (e: 'close'): void;
+}
 
-const handleClose = () => {
+const emit = defineEmits<Emits>();
+const router: Router = useRouter();
+
+const handleClose = (): void => {
   emit('close');
 };
 
-const handleGoToShop = () => {
+const handleGoToShop = (): void => {
   emit('close');
   router.push({ path: '/shop', query: { category: 'character-unlock' } });
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   if (event.target === event.currentTarget) {
     handleClose();
   }
@@ -65,7 +67,7 @@ const handleOverlayClick = (event) => {
             </div>
 
             <p class="unlock-description">
-              使用角色解鎖卡，可以與「{{ characterName }}」暢聊 7 天，不受任何次數限制！
+              使用角色解鎖卡,可以與「{{ characterName }}」暢聊 7 天，不受任何次數限制！
             </p>
 
             <div class="benefits-box">

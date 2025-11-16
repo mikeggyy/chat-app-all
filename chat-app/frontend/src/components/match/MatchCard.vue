@@ -10,6 +10,7 @@
           v-if="isActive"
           type="button"
           class="btn-favorite-icon"
+          :class="{ 'is-favorited': isFavorited }"
           @click="$emit('toggle-favorite')"
           :disabled="favoriteMutating"
           :aria-label="isFavorited ? '取消收藏' : '加入收藏'"
@@ -59,7 +60,9 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// Types
+
 import {
   ChatBubbleBottomCenterTextIcon,
   InformationCircleIcon,
@@ -330,11 +333,16 @@ const formatBackground = (text) => {
   border-radius: 999px;
   border: none;
   background: rgba(248, 250, 252, 0.15);
-  color: #fdf2f8;
+  color: #f8fafc;
   padding: 0;
   cursor: pointer;
-  transition: transform 150ms ease, background 150ms ease;
+  transition: transform 150ms ease, background 150ms ease, color 150ms ease;
   flex-shrink: 0;
+
+  // 已收藏狀態 - 粉紅色
+  &.is-favorited {
+    color: #ec4899;
+  }
 
   &:disabled {
     opacity: 0.7;

@@ -434,21 +434,9 @@ const updateUserFavorites = async (id, buildFavorites) => {
 
   let existing = await getUserById(id);
 
-  // 如果用戶不存在，自動創建基本用戶記錄（特別是對於測試用戶）
+  // ✅ 修復：不自動創建用戶
   if (!existing) {
-    const newUser = {
-      id,
-      uid: id,
-      displayName: "測試使用者",
-      conversations: [],
-      favorites: [],
-    };
-    await upsertUser(newUser);
-    existing = await getUserById(id);
-
-    if (!existing) {
-      throw new Error("找不到指定的使用者資料");
-    }
+    throw new Error(`用戶不存在: ${id}，請先完成註冊流程`);
   }
 
   const favorites = Array.isArray(existing.favorites)
@@ -586,21 +574,9 @@ const updateUserConversations = async (id, buildConversations) => {
 
   let existing = await getUserById(id);
 
-  // 如果用戶不存在，自動創建基本用戶記錄（特別是對於測試用戶）
+  // ✅ 修復：不自動創建用戶
   if (!existing) {
-    const newUser = {
-      id,
-      uid: id,
-      displayName: "測試使用者",
-      conversations: [],
-      favorites: [],
-    };
-    await upsertUser(newUser);
-    existing = await getUserById(id);
-
-    if (!existing) {
-      throw new Error("找不到指定的使用者資料");
-    }
+    throw new Error(`用戶不存在: ${id}，請先完成註冊流程`);
   }
 
   const conversations = Array.isArray(existing.conversations)

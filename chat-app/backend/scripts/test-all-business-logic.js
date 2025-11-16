@@ -66,6 +66,8 @@ async function runAllTests() {
   log(`環境: ${process.env.USE_FIREBASE_EMULATOR ? 'Firebase Emulator' : '生產環境 Firestore'}`, 'blue');
 
   const tests = [
+    { name: '金幣系統嚴格測試 (NEW)', script: 'test-coins-strict.js' },
+    { name: '限制服務嚴格測試 (NEW)', script: 'test-limits-strict.js' },
     { name: '會員升級測試', script: 'test-membership-upgrade.js' },
     { name: '角色解鎖購買測試', script: 'test-character-unlock.js' },
   ];

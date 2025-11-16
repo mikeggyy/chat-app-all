@@ -84,7 +84,7 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
       try {
         validateDevModeBypass(userId, {
           featureName: "會員升級",
-          requireTestAccount: true,
+          // 從環境變數讀取是否要求測試帳號
         });
 
         logger.info(`[開發模式] 升級會員：userId=${userId}, tier=${tier}`);
@@ -261,7 +261,7 @@ router.post("/api/membership/admin/clear-cache", requireFirebaseAuth, standardRa
     try {
       validateDevModeBypass(userId, {
         featureName: "清除會員配置緩存",
-        requireTestAccount: true,
+        // 從環境變數讀取是否要求測試帳號
       });
 
       logger.info(`[會員配置緩存] 手動清除緩存請求 - userId: ${userId}, tier: ${tier || 'all'}`);

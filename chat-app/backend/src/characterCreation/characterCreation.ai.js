@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import logger from "../utils/logger.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 import { getAiServiceSettings } from "../services/aiSettings.service.js";
+import { shouldUseMockMode } from "../utils/envModeHelper.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -512,7 +513,8 @@ export const generateCharacterImages = async ({
     let responseData;
 
     // 🔧 測試模式：返回測試圖片，不消耗 OpenAI API 配額
-    if (process.env.USE_MOCK_IMAGE_GENERATION === 'true') {
+    // 自動根據環境判斷：NODE_ENV, Git 分支, 主機名等
+    if (shouldUseMockMode('image')) {
       if (process.env.NODE_ENV !== "test") {
         logger.info(`[角色圖片生成] 🧪 測試模式啟用，使用測試圖片替代 OpenAI API 調用`);
       }

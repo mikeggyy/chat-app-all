@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { useGlobalLoading } from '../composables/useGlobalLoading.js'
 
 const { isGlobalLoading } = useGlobalLoading()

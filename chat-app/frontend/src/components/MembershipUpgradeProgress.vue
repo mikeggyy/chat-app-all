@@ -61,32 +61,34 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { useMembership } from '../composables/useMembership';
+
+type ProgressStep = 'validating' | 'processing' | 'finalizing' | 'completed';
 
 const { isUpgrading, upgradeProgress } = useMembership();
 
 // 進度標題
 const progressTitle = computed(() => {
-  const stepTitles = {
+  const stepTitles: Record<ProgressStep, string> = {
     validating: '驗證中',
     processing: '處理中',
     finalizing: '完成中',
     completed: '升級成功！',
   };
-  return stepTitles[upgradeProgress.value.step] || '升級中';
+  return stepTitles[upgradeProgress.value.step as ProgressStep] || '升級中';
 });
 
 // 進度百分比
 const progressPercentage = computed(() => {
-  const stepPercentages = {
+  const stepPercentages: Record<ProgressStep, number> = {
     validating: 25,
     processing: 60,
     finalizing: 90,
     completed: 100,
   };
-  return stepPercentages[upgradeProgress.value.step] || 0;
+  return stepPercentages[upgradeProgress.value.step as ProgressStep] || 0;
 });
 </script>
 

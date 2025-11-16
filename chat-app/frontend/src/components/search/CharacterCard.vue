@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { HeartIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
 import LazyImage from '@/components/common/LazyImage.vue';
 

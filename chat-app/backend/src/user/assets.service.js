@@ -31,7 +31,9 @@ export const getUserAssets = async (userId) => {
     return user?.assets?.[cardType] || 0;
   };
 
+  // ✅ 合併：統一返回所有資產，包含金幣餘額
   return {
+    balance: getWalletBalance(user), // 金幣餘額（統一使用 balance 欄位名）
     characterUnlockCards: getCardCount('characterUnlockCards'),
     photoUnlockCards: getCardCount('photoUnlockCards'),
     videoUnlockCards: getCardCount('videoUnlockCards'),
@@ -41,7 +43,6 @@ export const getUserAssets = async (userId) => {
       memoryBoost: memoryBoostCount,
       brainBoost: brainBoostCount,
     },
-    walletBalance: getWalletBalance(user),
   };
 };
 

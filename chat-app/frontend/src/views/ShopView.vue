@@ -1,5 +1,5 @@
-<script setup>
-import { ref, onMounted, watch } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, watch, type Ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { logger } from "@/utils/logger";
 import { useUserProfile } from "../composables/useUserProfile";
@@ -15,6 +15,15 @@ import { apiJson } from "../utils/api";
 import { useShopCategories } from "../composables/shop/useShopCategories";
 import { useShopItems } from "../composables/shop/useShopItems";
 import { useShopPurchase } from "../composables/shop/useShopPurchase";
+
+// Types
+interface AssetPackage {
+  [key: string]: any;
+}
+
+interface PotionPackage {
+  [key: string]: any;
+}
 
 const router = useRouter();
 const route = useRoute();
@@ -32,10 +41,10 @@ const { membership, loadMembership } = useMembership();
 const { error: showError } = useToast();
 const { dialogState, handleConfirm, handleCancel } = usePurchaseConfirm();
 
-const isCoinIconAvailable = ref(true);
-const assetPackages = ref([]);
-const potionPackages = ref([]);
-const isLoadingPackages = ref(false);
+const isCoinIconAvailable: Ref<boolean> = ref(true);
+const assetPackages: Ref<AssetPackage[]> = ref([]);
+const potionPackages: Ref<PotionPackage[]> = ref([]);
+const isLoadingPackages: Ref<boolean> = ref(false);
 
 // 使用分類管理 Composable
 const {

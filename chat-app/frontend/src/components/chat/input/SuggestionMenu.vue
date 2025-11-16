@@ -191,11 +191,13 @@ onBeforeUnmount(() => {
   max-width: 20rem;
   max-height: 20rem;
   overflow-y: auto;
-  background-color: var(--bg-primary, #ffffff);
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 0.75rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(139, 92, 246, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .suggestion-menu__loading {
@@ -241,25 +243,25 @@ onBeforeUnmount(() => {
 .suggestion-menu__state {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #6b7280);
+  color: rgba(226, 232, 240, 0.7);
   text-align: center;
 }
 
 .suggestion-menu__state--error {
-  color: var(--error-color, #ef4444);
+  color: #f87171;
 }
 
 .suggestion-menu__item {
   width: 100%;
   padding: 0.875rem 1rem;
   font-size: 0.875rem;
-  color: var(--text-primary, #1a1a1a);
+  color: #f8fafc;
   text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .suggestion-menu__item:last-child {
@@ -267,15 +269,35 @@ onBeforeUnmount(() => {
 }
 
 .suggestion-menu__item:hover {
-  background-color: var(--bg-hover, #f9fafb);
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #ffffff;
 }
 
 .suggestion-menu__empty {
   padding: 1.5rem;
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-tertiary, #9ca3af);
+  color: rgba(226, 232, 240, 0.5);
   text-align: center;
+}
+
+/* 自定義滾動條 */
+.suggestion-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.suggestion-menu::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: 3px;
+}
+
+.suggestion-menu::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 3px;
+}
+
+.suggestion-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.6);
 }
 
 /* 響應式設計 */

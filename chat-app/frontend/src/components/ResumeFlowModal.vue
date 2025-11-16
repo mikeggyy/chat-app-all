@@ -1,20 +1,22 @@
-<script setup>
+<script setup lang="ts">
 import { XMarkIcon } from "@heroicons/vue/24/outline";
 
-defineProps({
-  isVisible: {
-    type: Boolean,
-    default: false,
-  },
-});
+interface Props {
+  isVisible?: boolean;
+}
 
-const emit = defineEmits(["confirm", "cancel"]);
+defineProps<Props>();
 
-const handleConfirm = () => {
+const emit = defineEmits<{
+  confirm: [];
+  cancel: [];
+}>();
+
+const handleConfirm = (): void => {
   emit("confirm");
 };
 
-const handleCancel = () => {
+const handleCancel = (): void => {
   emit("cancel");
 };
 </script>

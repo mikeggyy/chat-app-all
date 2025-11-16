@@ -3,7 +3,7 @@
  * 從 ChatView.vue 提取，便於測試和重用
  */
 
-import { apiJson } from '../api.js';
+import { apiJson, clearApiCache } from '../api.js';
 import { writeCachedHistory } from '../conversationCache.js';
 import type { Ref } from 'vue';
 import type { Message } from '../../types';
@@ -113,6 +113,9 @@ export const rollbackUserMessage = async ({
 
     // ✅ 更新緩存
     writeCachedHistory(userId, matchId, messages.value);
+
+    // ✅ 清除對話列表的 API 緩存，確保聊天列表顯示最新的 lastMessage
+    clearApiCache(/conversations/);
 
     return true;
   } catch (error) {

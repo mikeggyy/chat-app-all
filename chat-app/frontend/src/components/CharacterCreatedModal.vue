@@ -1,26 +1,46 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from "vue";
 import { XMarkIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  character: {
-    type: Object,
-    required: true,
-  },
-  isVisible: {
-    type: Boolean,
-    default: false,
-  },
+interface Voice {
+  description?: string;
+  name?: string;
+  label?: string;
+  id?: string;
+}
+
+interface Character {
+  gender?: string;
+  voice?: Voice | string;
+  portraitUrl?: string;
+  display_name: string;
+  background?: string;
+  secret_background?: string;
+  first_message?: string;
+}
+
+interface Props {
+  character: Character;
+  isVisible?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isVisible: false,
 });
 
-const emit = defineEmits(["close", "viewCharacter"]);
+interface Emits {
+  (e: "close"): void;
+  (e: "viewCharacter"): void;
+}
 
-const genderText = computed(() => {
+const emit = defineEmits<Emits>();
+
+const genderText = computed<string>(() => {
   const gender = props.character?.gender;
   if (!gender) return "未設定";
 
   // 支援英文和繁體中文兩種格式
-  const genderMap = {
+  const genderMap: Record<string, string> = {
     // 英文格式
     male: "男性",
     female: "女性",
@@ -34,25 +54,25 @@ const genderText = computed(() => {
   return genderMap[gender] || gender;
 });
 
-const voiceText = computed(() => {
+const voiceText = computed<string>(() => {
   const voice = props.character?.voice;
   if (!voice) return "未設定";
 
   // 如果 voice 是物件，優先取 description（描述最友好）
   if (typeof voice === "object") {
     // 優先順序：description > name > label > id
-    return voice.description || voice.name || voice.label || voice.id;
+    return voice.description || voice.name || voice.label || voice.id || "未設定";
   }
 
   // 如果 voice 是字串，直接返回
   return voice;
 });
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit("close");
 };
 
-const handleViewCharacter = () => {
+const handleViewCharacter = (): void => {
   emit("viewCharacter");
 };
 </script>

@@ -1,22 +1,26 @@
-<script setup>
+<script setup lang="ts">
 import { QUICK_ACTIONS } from "../../config/profile";
+import type { QuickAction } from "../../config/profile";
 
-defineProps({
-  hasUnreadNotifications: {
-    type: Boolean,
-    default: false,
-  },
+interface Props {
+  hasUnreadNotifications?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  hasUnreadNotifications: false,
 });
 
-const emit = defineEmits(["action-select"]);
+const emit = defineEmits<{
+  "action-select": [action: QuickAction];
+}>();
 
-const handleActionClick = (action) => {
+const handleActionClick = (action: QuickAction) => {
   emit("action-select", action);
 };
 </script>
 
 <template>
-  <section class="quick-actions" aria-label="Ÿýw‘">
+  <section class="quick-actions" aria-label="ï¿½ï¿½wï¿½">
     <ul>
       <li
         v-for="action in QUICK_ACTIONS"

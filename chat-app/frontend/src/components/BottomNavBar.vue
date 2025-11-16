@@ -1,6 +1,6 @@
-<script setup>
-import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+<script setup lang="ts">
+import { computed, type Component } from "vue";
+import { useRoute, useRouter, type Router, type RouteRecordName, type RouteLocationRaw } from "vue-router";
 import {
   HomeIcon,
   MagnifyingGlassIcon,
@@ -9,17 +9,26 @@ import {
   UserIcon,
 } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  items: {
-    type: Array,
-    default: () => [],
-  },
+interface NavItem {
+  key: string;
+  label: string;
+  to: RouteLocationRaw;
+  icon: Component;
+  disabled?: boolean;
+}
+
+interface Props {
+  items?: NavItem[];
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  items: () => [],
 });
 
-const router = useRouter();
+const router: Router = useRouter();
 const route = useRoute();
 
-const defaultItems = [
+const defaultItems: NavItem[] = [
   {
     key: "match",
     label: "配對",
@@ -52,7 +61,7 @@ const defaultItems = [
   },
 ];
 
-const navItems = computed(() => {
+const navItems = computed<NavItem[]>(() => {
   if (props.items.length) {
     return props.items.map((item, index) => ({
       ...item,
@@ -62,14 +71,15 @@ const navItems = computed(() => {
   return defaultItems;
 });
 
-const isActive = (item) => {
+const isActive = (item: NavItem): boolean => {
   if (!item || !item.to) return false;
-  if (item.to.name && item.to.name === route.name) return true;
-  if (item.to.path && item.to.path === route.path) return true;
+  const routeTo = item.to as { name?: string; path?: string };
+  if (routeTo.name && routeTo.name === route.name) return true;
+  if (routeTo.path && routeTo.path === route.path) return true;
   return false;
 };
 
-const handleSelect = (item) => {
+const handleSelect = (item: NavItem): void => {
   if (!item || item.disabled || !item.to) return;
   if (isActive(item)) return;
   router.push(item.to);

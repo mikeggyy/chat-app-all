@@ -13,7 +13,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { SparklesIcon } from '@heroicons/vue/24/solid';
 
 defineProps({

@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 const props = defineProps({
   selectedGender: {
     type: String,

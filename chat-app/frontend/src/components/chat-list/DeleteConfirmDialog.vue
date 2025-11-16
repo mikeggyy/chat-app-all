@@ -45,23 +45,26 @@
   </Teleport>
 </template>
 
-<script setup>
-defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
-  displayName: {
-    type: String,
-    default: '',
-  },
-  isDeleting: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+// Types
+interface Props {
+  open?: boolean;
+  displayName?: string;
+  isDeleting?: boolean;
+}
+
+interface Emits {
+  (e: 'confirm'): void;
+  (e: 'cancel'): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  open: false,
+  displayName: '',
+  isDeleting: false,
 });
 
-defineEmits(['confirm', 'cancel']);
+defineEmits<Emits>();
 </script>
 
 <style scoped>

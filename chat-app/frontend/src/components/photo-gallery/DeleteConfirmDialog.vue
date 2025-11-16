@@ -30,7 +30,9 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// Types
+
 defineProps({
   isVisible: {
     type: Boolean,

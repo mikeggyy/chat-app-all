@@ -1,28 +1,33 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from "vue";
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  potionType: {
-    type: String, // 'memoryBoost' or 'brainBoost'
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: "",
-  },
-  remainingCount: {
-    type: Number,
-    default: 0,
-  },
+type PotionType = 'memoryBoost' | 'brainBoost';
+
+interface Props {
+  isOpen: boolean;
+  potionType: PotionType;
+  characterName?: string;
+  remainingCount?: number;
+}
+
+interface PotionInfo {
+  name: string;
+  description: string;
+  duration: string;
+  icon: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterName: "",
+  remainingCount: 0,
 });
 
-const emit = defineEmits(["close", "confirm"]);
+const emit = defineEmits<{
+  close: [];
+  confirm: [];
+}>();
 
-const potionInfo = computed(() => {
+const potionInfo = computed((): PotionInfo | null => {
   if (props.potionType === "memoryBoost") {
     return {
       name: "記憶增強藥水",
@@ -44,15 +49,15 @@ const potionInfo = computed(() => {
   return null;
 });
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit("close");
 };
 
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   emit("confirm");
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   if (event.target === event.currentTarget) {
     handleClose();
   }

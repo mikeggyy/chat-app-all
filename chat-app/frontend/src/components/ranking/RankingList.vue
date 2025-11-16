@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { ref } from "vue";
 import { ArrowPathIcon } from "@heroicons/vue/24/solid";
 import RankingItem from "./RankingItem.vue";

@@ -1,24 +1,22 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps({
-  size: {
-    type: String,
-    default: 'md',
-    validator: (value) => ['sm', 'md', 'lg', 'xl'].includes(value),
-  },
-  color: {
-    type: String,
-    default: 'primary',
-  },
-  text: {
-    type: String,
-    default: '',
-  },
+type SizeType = 'sm' | 'md' | 'lg' | 'xl';
+
+interface Props {
+  size?: SizeType;
+  color?: string;
+  text?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  size: 'md',
+  color: 'primary',
+  text: '',
 });
 
 const sizeClasses = computed(() => {
-  const sizes = {
+  const sizes: Record<SizeType, string> = {
     sm: 'spinner--sm',
     md: 'spinner--md',
     lg: 'spinner--lg',

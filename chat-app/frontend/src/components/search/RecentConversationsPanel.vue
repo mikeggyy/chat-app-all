@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { ArrowRightIcon, HeartIcon } from "@heroicons/vue/24/solid";
 import CharacterCard from "./CharacterCard.vue";
 

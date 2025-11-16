@@ -71,39 +71,36 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue';
 
-const props = defineProps({
-  title: {
-    type: String,
-    default: '確認購買',
-  },
-  message: {
-    type: String,
-    required: true,
-  },
-  confirmText: {
-    type: String,
-    default: '確認購買',
-  },
-  cancelText: {
-    type: String,
-    default: '取消',
-  },
+interface Props {
+  title?: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  title: '確認購買',
+  confirmText: '確認購買',
+  cancelText: '取消',
 });
 
-const emit = defineEmits(['confirm', 'cancel']);
+const emit = defineEmits<{
+  confirm: [];
+  cancel: [];
+}>();
 
 const messageLines = computed(() => {
-  return props.message.split('\n').filter(line => line.trim());
+  return props.message.split('\n').filter((line: string) => line.trim());
 });
 
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   emit('confirm');
 };
 
-const handleCancel = () => {
+const handleCancel = (): void => {
   emit('cancel');
 };
 

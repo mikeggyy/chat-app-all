@@ -1,50 +1,66 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { XMarkIcon, CurrencyDollarIcon } from '@heroicons/vue/24/outline';
 import { getGiftList, getGiftPrice, RARITY_CONFIG } from '../config/gifts';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  characterName: {
-    type: String,
-    default: '角色',
-  },
-  balance: {
-    type: Number,
-    default: 0,
-  },
-  userBalance: {
-    type: Number,
-    default: 0,
-  },
-  membershipTier: {
-    type: String,
-    default: 'free',
-  },
+interface Props {
+  isOpen?: boolean;
+  characterName?: string;
+  balance?: number;
+  userBalance?: number;
+  membershipTier?: string;
+}
+
+interface Gift {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  rarity: string;
+}
+
+interface PriceInfo {
+  basePrice: number;
+  finalPrice: number;
+  saved: number;
+}
+
+interface SelectEventData {
+  giftId: string;
+  gift: Gift;
+  priceInfo: PriceInfo;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isOpen: false,
+  characterName: '角色',
+  balance: 0,
+  userBalance: 0,
+  membershipTier: 'free',
 });
 
-const emit = defineEmits(['close', 'select']);
+const emit = defineEmits<{
+  close: [];
+  select: [data: SelectEventData];
+}>();
 
 const gifts = getGiftList();
 
-const getGiftPriceInfo = (giftId) => {
+const getGiftPriceInfo = (giftId: string): PriceInfo => {
   return getGiftPrice(giftId, props.membershipTier);
 };
 
-const canAfford = (giftId) => {
+const canAfford = (giftId: string): boolean => {
   const priceInfo = getGiftPriceInfo(giftId);
   const currentBalance = props.balance || props.userBalance;
   return currentBalance >= priceInfo.finalPrice;
 };
 
-const getRarityColor = (rarity) => {
+const getRarityColor = (rarity: string): string => {
   return RARITY_CONFIG[rarity]?.color || '#9CA3AF';
 };
 
-const handleSelect = (gift) => {
+const handleSelect = (gift: Gift): void => {
   const priceInfo = getGiftPriceInfo(gift.id);
   if (!canAfford(gift.id)) {
     return;
@@ -56,11 +72,11 @@ const handleSelect = (gift) => {
   });
 };
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit('close');
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   if (event.target === event.currentTarget) {
     handleClose();
   }

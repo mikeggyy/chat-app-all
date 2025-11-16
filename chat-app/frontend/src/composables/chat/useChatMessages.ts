@@ -354,18 +354,11 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     if (!userId || !charId) return;
 
     try {
-      // 獲取認證權杖
-      const token = await getAuthToken();
-
-      // 調用後端 API 清除對話歷史
-      await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/conversations/${encodeURIComponent(userId)}/${encodeURIComponent(charId)}`,
+      // 調用後端 API 清除對話歷史（使用 apiJson 自動處理 CSRF Token）
+      await apiJson(
+        `/api/conversations/${encodeURIComponent(userId)}/${encodeURIComponent(charId)}`,
         {
           method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
         }
       );
 

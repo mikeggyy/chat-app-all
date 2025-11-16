@@ -71,7 +71,10 @@ export function usePaginatedConversations(
     try {
       const response = await apiJson(
         `/api/users/${encodeURIComponent(currentUserId)}/conversations?limit=${pageSize}`,
-        { skipGlobalLoading: true }
+        {
+          skipGlobalLoading: true,
+          skipDeduplication: true, // ✅ Always fetch fresh data to show latest lastMessage
+        }
       ) as any;
 
       // ✅ 修復：處理包裝在 data 字段中的響應
@@ -103,7 +106,10 @@ export function usePaginatedConversations(
     try {
       const response = await apiJson(
         `/api/users/${encodeURIComponent(currentUserId)}/conversations?limit=${pageSize}&cursor=${nextCursor.value}`,
-        { skipGlobalLoading: true }
+        {
+          skipGlobalLoading: true,
+          skipDeduplication: true, // ✅ Always fetch fresh data for pagination
+        }
       ) as any;
 
       // ✅ 修復：處理包裝在 data 字段中的響應

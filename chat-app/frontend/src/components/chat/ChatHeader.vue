@@ -48,7 +48,8 @@
     <!-- 收藏按鈕 -->
     <button
       type="button"
-      class="chat-header__action"
+      class="chat-header__action chat-header__action--favorite"
+      :class="{ 'is-favorited': isFavorited }"
       :disabled="isFavoriteMutating"
       :aria-label="isFavorited ? '取消收藏' : '加入收藏'"
       @click="$emit('toggle-favorite')"
@@ -63,7 +64,7 @@
       ref="actionMenuButtonRef"
       class="chat-header__action"
       aria-label="更多選項"
-      @click.stop="toggleMenu"
+      @click="toggleMenu"
     >
       <EllipsisHorizontalIcon class="icon" aria-hidden="true" />
     </button>
@@ -260,7 +261,7 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(148, 163, 184, 0.4);
   color: #f8fafc;
   cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease;
+  transition: transform 120ms ease, background 120ms ease, color 120ms ease;
 
   .icon {
     width: 20px;
@@ -274,6 +275,11 @@ onBeforeUnmount(() => {
 
   &:active {
     transform: translateY(0);
+  }
+
+  // 收藏按鈕已收藏狀態 - 粉紅色
+  &--favorite.is-favorited {
+    color: #ec4899;
   }
 }
 

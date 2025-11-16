@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -12,21 +12,43 @@ import {
 import { HeartIcon } from "@heroicons/vue/24/solid";
 import { apiJson } from "../utils/api.js";
 
+interface VoiceConfig {
+  label: string;
+  description?: string;
+}
+
+interface Character {
+  id: string;
+  display_name: string;
+  gender: 'male' | 'female' | 'other';
+  voice: string | VoiceConfig;
+  background?: string;
+  secret_background?: string;
+  first_message?: string;
+  tags?: string[];
+  plot_hooks?: string[];
+  portraitUrl?: string;
+  totalChatUsers?: number;
+  totalFavorites?: number;
+  styles?: string[];
+  appearanceDescription?: string;
+}
+
 const route = useRoute();
 const router = useRouter();
 
-const characterId = computed(() => route.params.id);
-const character = ref(null);
-const isLoading = ref(false);
-const error = ref("");
+const characterId = computed(() => route.params.id as string);
+const character = ref<Character | null>(null);
+const isLoading = ref<boolean>(false);
+const error = ref<string>("");
 
 // 返回上一頁
-const handleBack = () => {
+const handleBack = (): void => {
   router.back();
 };
 
 // 開始對話
-const handleStartChat = () => {
+const handleStartChat = (): void => {
   if (!character.value?.id) {
     return;
   }
@@ -37,7 +59,7 @@ const handleStartChat = () => {
 };
 
 // 載入角色詳細資料
-const loadCharacterDetail = async () => {
+const loadCharacterDetail = async (): Promise<void> => {
   if (!characterId.value) {
     error.value = "無效的角色 ID";
     return;
@@ -49,7 +71,7 @@ const loadCharacterDetail = async () => {
   try {
     const response = await apiJson(`/api/characters/${characterId.value}`, {
       skipGlobalLoading: true,
-    });
+    }) as { character?: Character };
 
     if (response.character) {
       character.value = response.character;
@@ -57,16 +79,14 @@ const loadCharacterDetail = async () => {
       error.value = "找不到角色資料";
     }
   } catch (err) {
-    error.value = err?.message || "載入角色詳細資料失敗";
-    if (import.meta.env.DEV) {
-    }
+    error.value = (err as Error)?.message || "載入角色詳細資料失敗";
   } finally {
     isLoading.value = false;
   }
 };
 
 // 格式化數字
-const formatMetric = (value) => {
+const formatMetric = (value: number | undefined): string => {
   const number = Number(value);
   if (!Number.isFinite(number)) {
     return "0";
@@ -75,9 +95,9 @@ const formatMetric = (value) => {
 };
 
 // 性別標籤
-const genderLabel = computed(() => {
+const genderLabel = computed<string>(() => {
   if (!character.value?.gender) return "";
-  const genderMap = {
+  const genderMap: Record<string, string> = {
     male: "男性",
     female: "女性",
     other: "其他",
@@ -86,7 +106,7 @@ const genderLabel = computed(() => {
 });
 
 // 語音標籤和描述
-const voiceLabel = computed(() => {
+const voiceLabel = computed<string>(() => {
   if (!character.value?.voice) return "未設定";
 
   // 如果 voice 是物件，直接使用 label
@@ -98,7 +118,7 @@ const voiceLabel = computed(() => {
   }
 
   // 如果是字串，使用映射表
-  const voiceMap = {
+  const voiceMap: Record<string, string> = {
     alloy: "合金",
     ash: "灰燼",
     ballad: "民謠",
@@ -110,10 +130,10 @@ const voiceLabel = computed(() => {
     sage: "賢者",
     verse: "詩篇",
   };
-  return voiceMap[character.value.voice] || character.value.voice;
+  return voiceMap[character.value.voice as string] || character.value.voice;
 });
 
-const voiceDescription = computed(() => {
+const voiceDescription = computed<string>(() => {
   if (!character.value?.voice) return "";
 
   // 如果 voice 是物件，使用 description
@@ -128,7 +148,7 @@ const voiceDescription = computed(() => {
 });
 
 // 風格標籤
-const stylesText = computed(() => {
+const stylesText = computed<string>(() => {
   if (!character.value?.styles || !Array.isArray(character.value.styles)) {
     return "無";
   }

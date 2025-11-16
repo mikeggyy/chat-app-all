@@ -60,7 +60,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// Types
+
 import LazyImage from '@/components/common/LazyImage.vue';
 
 defineProps({

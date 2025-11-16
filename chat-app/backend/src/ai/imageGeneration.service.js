@@ -15,6 +15,8 @@ import { savePhotoToAlbum } from "../photoAlbum/photoAlbum.service.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 
 import logger from "../utils/logger.js";
+import { shouldUseMockMode } from "../utils/envModeHelper.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -194,7 +196,8 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
     let usageMetadata = { promptTokenCount: 0, candidatesTokenCount: 0, totalTokenCount: 0 };
 
     // 🔧 測試模式：返回測試圖片，不消耗 LLM API 配額
-    if (process.env.USE_MOCK_IMAGE_GENERATION === 'true') {
+    // 自動根據環境判斷：NODE_ENV, Git 分支, 主機名等
+    if (shouldUseMockMode('image')) {
       logger.info(`[圖片生成] 🧪 測試模式啟用，使用測試圖片替代 Gemini API 調用`);
 
       // 讀取測試圖片並轉為 base64

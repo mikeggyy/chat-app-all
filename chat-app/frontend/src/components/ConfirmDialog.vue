@@ -38,50 +38,49 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue';
 
-const props = defineProps({
-  title: {
-    type: String,
-    default: '確認操作',
-  },
-  message: {
-    type: String,
-    required: true,
-  },
-  confirmText: {
-    type: String,
-    default: '確定',
-  },
-  cancelText: {
-    type: String,
-    default: '取消',
-  },
+interface Props {
+  title?: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  title: '確認操作',
+  confirmText: '確定',
+  cancelText: '取消',
 });
 
-const emit = defineEmits(['confirm', 'cancel']);
+interface Emits {
+  (e: 'confirm'): void;
+  (e: 'cancel'): void;
+}
 
-const isOpen = ref(false);
+const emit = defineEmits<Emits>();
 
-const messageLines = computed(() => {
+const isOpen = ref<boolean>(false);
+
+const messageLines = computed<string[]>(() => {
   return props.message.split('\n');
 });
 
-const open = () => {
+const open = (): void => {
   isOpen.value = true;
 };
 
-const close = () => {
+const close = (): void => {
   isOpen.value = false;
 };
 
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   emit('confirm');
   close();
 };
 
-const handleCancel = () => {
+const handleCancel = (): void => {
   emit('cancel');
   close();
 };

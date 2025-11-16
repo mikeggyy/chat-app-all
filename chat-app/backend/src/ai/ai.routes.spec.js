@@ -419,6 +419,33 @@ describe('AI API Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
     });
+
+    it('✅ 應該正確返回有影片卡但無基礎額度的情況 (allowedWithCard)', async () => {
+      // 這是用戶的實際情境：免費用戶沒有基礎額度，但有 1 張影片卡
+      const mockResult = {
+        allowed: false,           // 沒有基礎額度
+        allowedWithCard: true,    // 可以用影片卡
+        videoCards: 1,            // 有 1 張影片卡
+        used: 0,
+        total: 0,
+        remaining: 0,
+        tier: 'free',
+      };
+
+      videoLimitService.canGenerateVideo.mockResolvedValueOnce(mockResult);
+
+      const response = await request(app)
+        .get('/api/ai/video/check/test-user-123');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+
+      // sendSuccess 將結果放在 data 字段中
+      const data = response.body.data || response.body;
+      expect(data.allowed).toBe(false);
+      expect(data.allowedWithCard).toBe(true);
+      expect(data.videoCards).toBe(1);
+    });
   });
 
   describe('GET /api/ai/video/stats/:userId - 獲取影片生成統計', () => {

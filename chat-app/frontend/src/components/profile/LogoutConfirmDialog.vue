@@ -1,24 +1,24 @@
-<script setup>
-defineProps({
-  isVisible: {
-    type: Boolean,
-    default: false,
-  },
-  isLoggingOut: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: "",
-  },
-  cancelButtonRef: {
-    type: Function,
-    default: null,
-  },
+<script setup lang="ts">
+import type { Ref } from "vue";
+
+interface Props {
+  isVisible?: boolean;
+  isLoggingOut?: boolean;
+  error?: string;
+  cancelButtonRef?: unknown;
+}
+
+withDefaults(defineProps<Props>(), {
+  isVisible: false,
+  isLoggingOut: false,
+  error: "",
+  cancelButtonRef: null,
 });
 
-const emit = defineEmits(["cancel", "confirm"]);
+const emit = defineEmits<{
+  cancel: [];
+  confirm: [];
+}>();
 </script>
 
 <template>

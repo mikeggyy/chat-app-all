@@ -1,28 +1,36 @@
-<script setup>
-import { ref, watch, onMounted } from "vue";
+<script setup lang="ts">
+import { ref, watch } from "vue";
 
-const props = defineProps({
-  show: {
-    type: Boolean,
-    default: false,
-  },
-  giftEmoji: {
-    type: String,
-    default: "🎁",
-  },
-  giftName: {
-    type: String,
-    default: "禮物",
-  },
+interface Props {
+  show?: boolean;
+  giftEmoji?: string;
+  giftName?: string;
+}
+
+interface Particle {
+  id: number;
+  emoji: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  delay: number;
+  duration: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  show: false,
+  giftEmoji: "🎁",
+  giftName: "禮物",
 });
 
-const particles = ref([]);
-const showAnimation = ref(false);
+const particles = ref<Particle[]>([]);
+const showAnimation = ref<boolean>(false);
 
 // 生成隨機粒子
-const generateParticles = () => {
+const generateParticles = (): void => {
   const particleCount = 15;
-  const newParticles = [];
+  const newParticles: Particle[] = [];
 
   for (let i = 0; i < particleCount; i++) {
     const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.5;
@@ -65,7 +73,7 @@ const generateParticles = () => {
 };
 
 // 監聽 show 屬性
-watch(() => props.show, (newValue) => {
+watch(() => props.show, (newValue: boolean) => {
   if (newValue) {
     showAnimation.value = true;
     generateParticles();

@@ -242,7 +242,7 @@ router.post(
       try {
         validateDevModeBypass(userId, {
           featureName: "金幣套餐購買",
-          requireTestAccount: true,
+          // 從環境變數讀取是否要求測試帳號
         });
 
         logger.warn(
@@ -328,7 +328,7 @@ router.post(
     try {
       validateDevModeBypass(userId, {
         featureName: "測試充值",
-        requireTestAccount: true,
+        // 從環境變數讀取是否要求測試帳號
       });
 
       logger.warn(`[測試充值] userId=${userId}, amount=${amount}`);
@@ -392,7 +392,7 @@ router.post(
     try {
       validateDevModeBypass(userId, {
         featureName: "設定金幣餘額",
-        requireTestAccount: true,
+        // 從環境變數讀取是否要求測試帳號
       });
 
       logger.warn(`[測試] 設定金幣餘額：userId=${userId}, balance=${balance}`);

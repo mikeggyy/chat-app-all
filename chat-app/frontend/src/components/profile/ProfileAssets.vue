@@ -1,19 +1,19 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { WalletIcon, ArrowRightIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  balance: {
-    type: Number,
-    required: true,
-  },
-  isGuest: {
-    type: Boolean,
-    default: false,
-  },
+interface Props {
+  balance: number;
+  isGuest?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isGuest: false,
 });
 
-const emit = defineEmits(["open-stats"]);
+const emit = defineEmits<{
+  "open-stats": [];
+}>();
 
 const COIN_ICON_PATH = "/images/icons/coin.webp";
 const isCoinIconAvailable = ref(true);
@@ -37,7 +37,7 @@ const openStatsModal = () => {
 };
 
 onMounted(() => {
-  // 	eÑc
+  // 	eï¿½c
   const img = new Image();
   img.src = COIN_ICON_PATH;
   img.onerror = () => {

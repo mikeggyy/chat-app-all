@@ -115,63 +115,68 @@
   </article>
 </template>
 
-<script setup>
-import { ref, computed } from "vue";
+<script setup lang="ts">
+import { ref, computed, type ComputedRef, type Ref } from "vue";
 import LazyImage from "../common/LazyImage.vue";
 
-const props = defineProps({
-  thread: {
-    type: Object,
-    required: true,
-  },
-  isFavoriteTab: {
-    type: Boolean,
-    default: false,
-  },
-  isFavoriting: {
-    type: Boolean,
-    default: false,
-  },
-  isDeleting: {
-    type: Boolean,
-    default: false,
-  },
-  shouldBlockClick: {
-    type: Boolean,
-    default: false,
-  },
+// Types
+interface Thread {
+  id: string;
+  displayName: string;
+  portrait: string;
+  timeLabel: string;
+  lastMessage?: string;
+  isFavorite: boolean;
+  [key: string]: any;
+}
+
+interface Props {
+  thread: Thread;
+  isFavoriteTab?: boolean;
+  isFavoriting?: boolean;
+  isDeleting?: boolean;
+  shouldBlockClick?: boolean;
+}
+
+interface Emits {
+  (e: "select", thread: Thread): void;
+  (e: "favorite", thread: Thread): void;
+  (e: "delete", thread: Thread): void;
+  (e: "swipe-start", threadId: string): void;
+  (e: "swipe-move", threadId: string, offset: number): void;
+  (e: "swipe-end", threadId: string, shouldOpen: boolean): void;
+  (e: "swipe-cancel", threadId: string): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isFavoriteTab: false,
+  isFavoriting: false,
+  isDeleting: false,
+  shouldBlockClick: false,
 });
 
-const emit = defineEmits([
-  "select",
-  "favorite",
-  "delete",
-  "swipe-start",
-  "swipe-move",
-  "swipe-end",
-  "swipe-cancel",
-]);
+const emit = defineEmits<Emits>();
 
 // 滑動相關常量
-const SWIPE_ACTION_WIDTH = 140;
-const SWIPE_TRIGGER_THRESHOLD = 48;
-const SWIPE_MAX_RIGHT_OFFSET = 22;
+const SWIPE_ACTION_WIDTH: number = 140;
+const SWIPE_TRIGGER_THRESHOLD: number = 48;
+const SWIPE_MAX_RIGHT_OFFSET: number = 22;
 
 // 滑動狀態
-const swipeOffset = ref(0);
-const isDragging = ref(false);
-const swipeStartX = ref(0);
-const pointerId = ref(null);
+const swipeOffset: Ref<number> = ref(0);
+const isDragging: Ref<boolean> = ref(false);
+const swipeStartX: Ref<number> = ref(0);
+const pointerId: Ref<number | null> = ref(null);
 
 // 截斷預覽文字
-const truncatedPreview = computed(() => {
+const truncatedPreview: ComputedRef<string> = computed(() => {
   const text = props.thread.lastMessage || "";
   const maxLength = 15;
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 });
 
 // 滑動手勢處理
-const onSwipeStart = (event) => {
+const onSwipeStart = (event: PointerEvent): void => {
   isDragging.value = true;
   swipeStartX.value = event.clientX;
   pointerId.value = event.pointerId;
@@ -186,7 +191,7 @@ const onSwipeStart = (event) => {
   emit("swipe-start", props.thread.id);
 };
 
-const onSwipeMove = (event) => {
+const onSwipeMove = (event: PointerEvent): void => {
   if (!isDragging.value) return;
 
   const delta = event.clientX - swipeStartX.value;
@@ -203,7 +208,7 @@ const onSwipeMove = (event) => {
   emit("swipe-move", props.thread.id, clampedOffset);
 };
 
-const onSwipeEnd = (event) => {
+const onSwipeEnd = (event: PointerEvent): void => {
   if (!isDragging.value) return;
 
   const delta = event.clientX - swipeStartX.value;
@@ -212,12 +217,13 @@ const onSwipeEnd = (event) => {
     swipeOffset.value <= -SWIPE_TRIGGER_THRESHOLD;
   swipeOffset.value = shouldOpen ? -SWIPE_ACTION_WIDTH : 0;
 
+  const target = event.currentTarget as HTMLElement | null;
   if (
-    event.currentTarget &&
-    typeof event.currentTarget.releasePointerCapture === "function" &&
+    target &&
+    typeof target.releasePointerCapture === "function" &&
     pointerId.value !== null
   ) {
-    event.currentTarget.releasePointerCapture(pointerId.value);
+    target.releasePointerCapture(pointerId.value);
   }
 
   isDragging.value = false;
@@ -226,23 +232,24 @@ const onSwipeEnd = (event) => {
   emit("swipe-end", props.thread.id, shouldOpen);
 };
 
-const onSwipeCancel = (event) => {
+const onSwipeCancel = (event: PointerEvent): void => {
   swipeOffset.value = 0;
   isDragging.value = false;
 
+  const target = event.currentTarget as HTMLElement | null;
   if (
-    event.currentTarget &&
-    typeof event.currentTarget.releasePointerCapture === "function" &&
+    target &&
+    typeof target.releasePointerCapture === "function" &&
     pointerId.value !== null
   ) {
-    event.currentTarget.releasePointerCapture(pointerId.value);
+    target.releasePointerCapture(pointerId.value);
   }
 
   pointerId.value = null;
   emit("swipe-cancel", props.thread.id);
 };
 
-const handleClick = () => {
+const handleClick = (): void => {
   if (props.shouldBlockClick || Math.abs(swipeOffset.value) > 6) {
     return;
   }
@@ -394,12 +401,12 @@ defineExpose({
 
 .chat-thread__action--favorite {
   background: rgba(15, 23, 42, 0.5);
-  color: #fbbf24;
+  color: #f8fafc;
 }
 
 .chat-thread__action--favorite.is-active {
   background: rgba(15, 23, 42, 0.5);
-  color: #fcd34d;
+  color: #ec4899;
 }
 
 .chat-thread__action--delete {

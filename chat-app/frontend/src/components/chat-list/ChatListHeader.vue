@@ -31,16 +31,20 @@
   </header>
 </template>
 
-<script setup>
-defineProps({
-  activeTab: {
-    type: String,
-    required: true,
-    validator: (value) => ["all", "favorite"].includes(value),
-  },
-});
+<script setup lang="ts">
+// Types
+type Tab = 'all' | 'favorite';
 
-defineEmits(["change-tab"]);
+interface Props {
+  activeTab: Tab;
+}
+
+interface Emits {
+  (e: 'change-tab', tab: Tab): void;
+}
+
+defineProps<Props>();
+defineEmits<Emits>();
 </script>
 
 <style scoped>

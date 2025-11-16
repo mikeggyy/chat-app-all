@@ -15,7 +15,9 @@
   </header>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { XMarkIcon, BoltIcon } from '@heroicons/vue/24/outline';
 
 defineEmits(['close']);

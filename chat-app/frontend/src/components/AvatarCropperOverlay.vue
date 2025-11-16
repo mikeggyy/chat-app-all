@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import {
   computed,
   nextTick,
@@ -7,37 +7,54 @@ import {
   reactive,
   ref,
   watch,
+  type Ref,
 } from "vue";
 
-const props = defineProps({
-  source: {
-    type: String,
-    required: true,
-  },
-  shape: {
-    type: String,
-    default: "circle",
-    validator: (value) => ["circle", "rounded-rect"].includes(value),
-  },
-  aspectRatio: {
-    type: Number,
-    default: 1,
-  },
+interface Props {
+  source: string;
+  shape?: "circle" | "rounded-rect";
+  aspectRatio?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  shape: "circle",
+  aspectRatio: 1,
 });
 
-const emit = defineEmits(["cancel", "confirm"]);
+interface Emits {
+  (e: "cancel"): void;
+  (e: "confirm", result: string): void;
+}
 
-const cropContainerRef = ref(null);
-const imageRef = ref(null);
+const emit = defineEmits<Emits>();
 
-const crop = reactive({
+const cropContainerRef = ref<HTMLDivElement | null>(null);
+const imageRef = ref<HTMLImageElement | null>(null);
+
+interface CropState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const crop = reactive<CropState>({
   x: 0,
   y: 0,
   width: 0,
   height: 0,
 });
 
-const imageMetrics = reactive({
+interface ImageMetrics {
+  width: number;
+  height: number;
+  naturalWidth: number;
+  naturalHeight: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+const imageMetrics = reactive<ImageMetrics>({
   width: 0,
   height: 0,
   naturalWidth: 0,
@@ -46,14 +63,25 @@ const imageMetrics = reactive({
   scaleY: 1,
 });
 
-const sliderRange = reactive({
+interface SliderRange {
+  min: number;
+  max: number;
+}
+
+const sliderRange = reactive<SliderRange>({
   min: 120,
   max: 360,
 });
 
-const sliderValue = ref(0);
-const isDragging = ref(false);
-const dragOffset = reactive({ x: 0, y: 0 });
+const sliderValue = ref<number>(0);
+const isDragging = ref<boolean>(false);
+
+interface DragOffset {
+  x: number;
+  y: number;
+}
+
+const dragOffset = reactive<DragOffset>({ x: 0, y: 0 });
 
 const isCircle = computed(() => props.shape === "circle");
 
@@ -81,9 +109,9 @@ const overlayClasses = computed(() => ({
   "is-dragging": isDragging.value,
 }));
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
 
-const drawRoundedRect = (ctx, x, y, width, height, radius) => {
+const drawRoundedRect = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void => {
   const r = clamp(radius, 0, Math.min(width, height) / 2);
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -103,7 +131,7 @@ const drawRoundedRect = (ctx, x, y, width, height, radius) => {
   ctx.closePath();
 };
 
-const resetCropState = () => {
+const resetCropState = (): void => {
   crop.x = 0;
   crop.y = 0;
   crop.width = 0;
@@ -119,13 +147,13 @@ const resetCropState = () => {
   imageMetrics.scaleY = 1;
 };
 
-const detachDragListeners = () => {
+const detachDragListeners = (): void => {
   window.removeEventListener("pointermove", onDrag);
   window.removeEventListener("pointerup", stopDrag);
   window.removeEventListener("pointercancel", stopDrag);
 };
 
-const clampCropPosition = () => {
+const clampCropPosition = (): void => {
   if (!imageMetrics.width || !imageMetrics.height) return;
   const maxX = Math.max(0, imageMetrics.width - crop.width);
   const maxY = Math.max(0, imageMetrics.height - crop.height);
@@ -133,7 +161,7 @@ const clampCropPosition = () => {
   crop.y = clamp(crop.y, 0, maxY);
 };
 
-const updateSliderBounds = () => {
+const updateSliderBounds = (): void => {
   if (!imageMetrics.width || !imageMetrics.height) return;
 
   const ratio = targetAspectRatio.value;
@@ -178,8 +206,8 @@ const updateSliderBounds = () => {
   clampCropPosition();
 };
 
-const onImageLoad = (event) => {
-  const image = event?.target;
+const onImageLoad = (event: Event): void => {
+  const image = event?.target as HTMLImageElement | null;
   const container = cropContainerRef.value;
   if (!image || !container) return;
   const rect = container.getBoundingClientRect();
@@ -194,7 +222,7 @@ const onImageLoad = (event) => {
   updateSliderBounds();
 };
 
-const startDrag = (event) => {
+const startDrag = (event: PointerEvent): void => {
   if (!crop.width || !crop.height) return;
   event.preventDefault();
   const container = cropContainerRef.value;
@@ -208,7 +236,7 @@ const startDrag = (event) => {
   window.addEventListener("pointercancel", stopDrag);
 };
 
-const onDrag = (event) => {
+const onDrag = (event: PointerEvent): void => {
   if (!isDragging.value) return;
   const container = cropContainerRef.value;
   if (!container) return;
@@ -221,13 +249,13 @@ const onDrag = (event) => {
   crop.y = clamp(nextY, 0, maxY);
 };
 
-const stopDrag = () => {
+const stopDrag = (): void => {
   if (!isDragging.value) return;
   isDragging.value = false;
   detachDragListeners();
 };
 
-const createCroppedImage = () => {
+const createCroppedImage = (): string | null => {
   const image = imageRef.value;
   if (!image || !crop.width || !crop.height) return null;
 
@@ -282,7 +310,7 @@ const createCroppedImage = () => {
   return canvas.toDataURL("image/png");
 };
 
-const confirmCrop = () => {
+const confirmCrop = (): void => {
   if (!crop.width || !crop.height) return;
   stopDrag();
   const result = createCroppedImage();
@@ -291,12 +319,12 @@ const confirmCrop = () => {
   }
 };
 
-const emitCancel = () => {
+const emitCancel = (): void => {
   stopDrag();
   emit("cancel");
 };
 
-const handleKeydown = (event) => {
+const handleKeydown = (event: KeyboardEvent): void => {
   if (event.key === "Escape") {
     emitCancel();
   }

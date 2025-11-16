@@ -29,7 +29,9 @@
   </header>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { XMarkIcon, PencilIcon } from '@heroicons/vue/24/outline';
 
 defineProps({

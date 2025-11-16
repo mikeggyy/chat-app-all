@@ -13,11 +13,11 @@ import { isDevUser } from "../../../shared/config/testAccounts.js";
  * @param {string} userId - 用戶 ID
  * @param {Object} options - 選項
  * @param {string} options.featureName - 功能名稱（用於日誌）
- * @param {boolean} options.requireTestAccount - 是否要求測試帳號（默認 true）
+ * @param {boolean} options.requireTestAccount - 是否要求測試帳號（默認從環境變數讀取）
  * @throws {Error} 如果不符合安全條件
  */
 export const validateDevModeBypass = (userId, options = {}) => {
-  const { featureName = "未知功能", requireTestAccount = true } = options;
+  const { featureName = "未知功能" } = options;
 
   // ✅ 1. 檢查環境變數
   const isDevBypassEnabled = process.env.ENABLE_DEV_PURCHASE_BYPASS === "true";
@@ -36,7 +36,13 @@ export const validateDevModeBypass = (userId, options = {}) => {
     throw new Error("生產環境不允許使用開發模式繞過");
   }
 
-  // ✅ 3. 檢查是否為測試帳號（可選）
+  // ✅ 3. 檢查是否為測試帳號（可選，從環境變數讀取）
+  // 生產環境自動要求測試帳號，開發環境可配置
+  const requireTestAccountFromEnv = process.env.REQUIRE_TEST_ACCOUNT_FOR_DEV_BYPASS !== "false";
+  const requireTestAccount = options.requireTestAccount !== undefined
+    ? options.requireTestAccount
+    : requireTestAccountFromEnv;
+
   if (requireTestAccount) {
     const isTestUser = isDevUser(userId);
 
@@ -46,6 +52,11 @@ export const validateDevModeBypass = (userId, options = {}) => {
       );
       throw new Error("只有測試帳號可以使用開發模式繞過");
     }
+  } else {
+    // 記錄允許任何帳號使用開發模式
+    logger.info(
+      `[開發模式] 允許任何帳號繞過支付: feature=${featureName}, userId=${userId}`
+    );
   }
 
   // ✅ 4. 檢查 IP 地址（可選，如果配置了白名單）

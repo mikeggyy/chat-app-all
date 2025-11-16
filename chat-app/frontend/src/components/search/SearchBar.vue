@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { ref } from "vue";
 import { MagnifyingGlassIcon } from "@heroicons/vue/24/outline";
 

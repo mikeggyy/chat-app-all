@@ -283,6 +283,9 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
   let result;
 
   await db.runTransaction(async (transaction) => {
+    // 定義 userRef 在 Transaction 作用域開頭 (修復 bug: userRef 作用域問題)
+    const userRef = db.collection("users").doc(userId);
+
     // 1. 在 Transaction 內讀取最新狀態
     const limitRef = db.collection("usage_limits").doc(userId);
     const limitDoc = await transaction.get(limitRef);
@@ -309,7 +312,6 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
     // 3. 使用解鎖票或金幣
     if (useTicket && characterUnlockCards > 0) {
       // 使用解鎖票（在 Transaction 內扣除）
-      const userRef = db.collection("users").doc(userId);
       const userDoc = await transaction.get(userRef);
       const userData = userDoc.data();
 
@@ -338,7 +340,6 @@ export const purchaseUnlimitedChat = async (userId, characterId, options = {}) =
       };
     } else {
       // 使用金幣（在 Transaction 內扣除）
-      const userRef = db.collection("users").doc(userId);
       const userDoc = await transaction.get(userRef);
       const userData = userDoc.data();
 

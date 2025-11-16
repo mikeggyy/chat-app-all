@@ -1,38 +1,34 @@
-<script setup>
+<script setup lang="ts">
 import BaseLimitModal from './BaseLimitModal.vue';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: '角色',
-  },
-  remainingMessages: {
-    type: Number,
-    default: 0,
-  },
-  dailyAdLimit: {
-    type: Number,
-    default: 10,
-  },
-  adsWatchedToday: {
-    type: Number,
-    default: 0,
-  },
-  isUnlocked: {
-    type: Boolean,
-    default: false,
-  },
-  characterUnlockCards: {
-    type: Number,
-    default: 0,
-  },
+interface Props {
+  isOpen: boolean;
+  characterName?: string;
+  remainingMessages?: number;
+  dailyAdLimit?: number;
+  adsWatchedToday?: number;
+  isUnlocked?: boolean;
+  characterUnlockCards?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterName: '角色',
+  remainingMessages: 0,
+  dailyAdLimit: 10,
+  adsWatchedToday: 0,
+  isUnlocked: false,
+  characterUnlockCards: 0,
 });
 
-const emit = defineEmits(['close', 'watchAd', 'upgrade', 'buyUnlockCard', 'useUnlockCard']);
+interface Emits {
+  (e: 'close'): void;
+  (e: 'watchAd'): void;
+  (e: 'upgrade'): void;
+  (e: 'buyUnlockCard'): void;
+  (e: 'useUnlockCard'): void;
+}
+
+const emit = defineEmits<Emits>();
 </script>
 
 <template>

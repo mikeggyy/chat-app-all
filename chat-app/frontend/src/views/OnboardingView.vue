@@ -87,27 +87,29 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useUserProfile } from "../composables/useUserProfile";
 import { useGlobalLoading } from "../composables/useGlobalLoading";
 
+type Gender = 'male' | 'female' | 'other';
+
 const router = useRouter();
 const { user, updateUserProfileDetails } = useUserProfile();
 const { startLoading, stopLoading } = useGlobalLoading();
 
-const gender = ref("male");
-const birthYear = ref("");
-const birthMonth = ref("");
-const birthDay = ref("");
-const errorMessage = ref("");
-const isSubmitting = ref(false);
+const gender = ref<Gender>("male");
+const birthYear = ref<number | ''>("");
+const birthMonth = ref<number | ''>("");
+const birthDay = ref<number | ''>("");
+const errorMessage = ref<string>("");
+const isSubmitting = ref<boolean>(false);
 
 // 生成年份選項 (從今年往前推110年，到13年前)
-const yearOptions = computed(() => {
+const yearOptions = computed<number[]>(() => {
   const currentYear = new Date().getFullYear();
-  const options = [];
+  const options: number[] = [];
   // 13歲到110歲
   for (let i = currentYear - 13; i >= currentYear - 110; i--) {
     options.push(i);
@@ -116,8 +118,8 @@ const yearOptions = computed(() => {
 });
 
 // 生成月份選項 (1-12)
-const monthOptions = computed(() => {
-  const options = [];
+const monthOptions = computed<number[]>(() => {
+  const options: number[] = [];
   for (let i = 1; i <= 12; i++) {
     options.push(i);
   }
@@ -125,10 +127,10 @@ const monthOptions = computed(() => {
 });
 
 // 生成日期選項 (1-31，根據選擇的月份和年份動態調整)
-const dayOptions = computed(() => {
+const dayOptions = computed<number[]>(() => {
   if (!birthYear.value || !birthMonth.value) {
     // 如果沒有選擇年月，返回1-31
-    const options = [];
+    const options: number[] = [];
     for (let i = 1; i <= 31; i++) {
       options.push(i);
     }
@@ -136,8 +138,8 @@ const dayOptions = computed(() => {
   }
 
   // 根據選擇的年月，計算該月的天數
-  const daysInMonth = new Date(birthYear.value, birthMonth.value, 0).getDate();
-  const options = [];
+  const daysInMonth = new Date(birthYear.value as number, birthMonth.value as number, 0).getDate();
+  const options: number[] = [];
   for (let i = 1; i <= daysInMonth; i++) {
     options.push(i);
   }
@@ -145,16 +147,16 @@ const dayOptions = computed(() => {
 });
 
 // 計算年齡
-const calculatedAge = computed(() => {
+const calculatedAge = computed<number | null>(() => {
   if (!birthYear.value || !birthMonth.value || !birthDay.value) {
     return null;
   }
 
   const today = new Date();
   const birthDate = new Date(
-    birthYear.value,
-    birthMonth.value - 1,
-    birthDay.value
+    birthYear.value as number,
+    (birthMonth.value as number) - 1,
+    birthDay.value as number
   );
 
   let age = today.getFullYear() - birthDate.getFullYear();
@@ -171,7 +173,7 @@ const calculatedAge = computed(() => {
   return age;
 });
 
-const handleSubmit = async () => {
+const handleSubmit = async (): Promise<void> => {
   if (
     !gender.value ||
     !birthYear.value ||
@@ -201,7 +203,7 @@ const handleSubmit = async () => {
     };
 
     // 更新用戶資料
-    const result = await updateUserProfileDetails(submitData);
+    await updateUserProfileDetails(submitData);
 
     // 等待 Vue 響應式更新完成
     await nextTick();
@@ -214,7 +216,7 @@ const handleSubmit = async () => {
     // 使用 replace 代替 push，避免循環導航
     await router.replace({ name: "match" });
   } catch (error) {
-    errorMessage.value = error.message || "更新失敗，請稍後再試";
+    errorMessage.value = (error as Error).message || "更新失敗，請稍後再試";
     isSubmitting.value = false;
   } finally {
     stopLoading();

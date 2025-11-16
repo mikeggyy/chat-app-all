@@ -22,7 +22,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// Types
+
 import { ref } from 'vue';
 import { BoltIcon } from '@heroicons/vue/24/outline';
 import { COIN_ICON_PATH } from '../../config/assets';

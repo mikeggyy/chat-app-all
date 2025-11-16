@@ -1,39 +1,38 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: '角色',
-  },
-  remainingCards: {
-    type: Number,
-    default: 0,
-  },
-  isUsing: {
-    type: Boolean,
-    default: false,
-  },
+interface Props {
+  isOpen: boolean;
+  characterName?: string;
+  remainingCards?: number;
+  isUsing?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterName: '角色',
+  remainingCards: 0,
+  isUsing: false,
 });
 
-const emit = defineEmits(['close', 'confirm']);
+interface Emits {
+  (e: 'close'): void;
+  (e: 'confirm'): void;
+}
 
-const handleClose = () => {
+const emit = defineEmits<Emits>();
+
+const handleClose = (): void => {
   if (props.isUsing) return;
   emit('close');
 };
 
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   if (props.isUsing) return;
   emit('confirm');
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   if (event.target === event.currentTarget) {
     handleClose();
   }

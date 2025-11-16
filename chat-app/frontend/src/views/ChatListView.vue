@@ -369,6 +369,7 @@ onBeforeUnmount(() => {
 const handleFavoriteAction = async (thread: Thread): Promise<void> => {
   showActionMessage('');
   const threadId = normalizeId(thread?.id);
+  const threadName = thread?.displayName || '';
   if (!threadId) return;
 
   if (isFavoriteMutating(threadId)) return;
@@ -441,10 +442,11 @@ const handleFavoriteAction = async (thread: Thread): Promise<void> => {
       favorites: favoritesList,
     });
 
-    showActionMessage(
-      wasFavorited ? '已取消收藏對話。' : '已加入收藏對話。',
-      'success'
-    );
+    // 顯示提示消息（統一格式）
+    const message = wasFavorited
+      ? `已取消收藏${threadName ? ` ${threadName}` : ''}`
+      : `已收藏${threadName ? ` ${threadName}` : ''}`;
+    showActionMessage(message, 'success');
   } catch (requestError) {
     // 回滾
     setUserProfile({

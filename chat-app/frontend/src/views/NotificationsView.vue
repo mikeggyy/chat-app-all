@@ -1,19 +1,27 @@
-<script setup>
+<script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 import { useNotifications } from '../composables/useNotifications';
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+}
+
 const router = useRouter();
 const { notifications } = useNotifications();
 
-const handleBack = () => {
+const handleBack = (): void => {
   router.back();
 };
 
-const formatTimestamp = (dateString) => {
+const formatTimestamp = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
-  const diff = now - date;
+  const diff = now.getTime() - date.getTime();
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
@@ -31,7 +39,7 @@ const formatTimestamp = (dateString) => {
   }
 };
 
-const handleNotificationClick = (notification) => {
+const handleNotificationClick = (notification: Notification): void => {
   if (!notification || !notification.id) {
     return;
   }

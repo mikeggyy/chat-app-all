@@ -43,6 +43,7 @@ export interface UseMembershipReturn {
 
   // Actions
   loadMembershipInfo: (userId?: string, options?: UseMembershipOptions) => Promise<any>;
+  loadMembership: (userId?: string, options?: UseMembershipOptions) => Promise<any>; // 別名
   upgradeMembership: (userId: string | undefined, targetTier: MembershipTier, options?: UpgradeOptions) => Promise<any>;
   cancelMembership: (userId?: string, options?: UseMembershipOptions) => Promise<any>;
 
@@ -328,6 +329,7 @@ export function useMembership(): UseMembershipReturn {
 
     // Actions
     loadMembershipInfo,
+    loadMembership: loadMembershipInfo, // 別名，用於向後兼容
     upgradeMembership,
     cancelMembership,
 

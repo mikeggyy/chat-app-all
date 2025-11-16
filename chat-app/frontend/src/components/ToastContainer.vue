@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { useToast } from '../composables/useToast';
 import {
   CheckCircleIcon,
@@ -7,10 +7,13 @@ import {
   ExclamationTriangleIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline';
+import type { Component } from 'vue';
+
+type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 const { toasts, dismissToast } = useToast();
 
-const getIcon = (type) => {
+const getIcon = (type: ToastType): Component => {
   switch (type) {
     case 'success':
       return CheckCircleIcon;
@@ -24,7 +27,7 @@ const getIcon = (type) => {
   }
 };
 
-const getColorClass = (type) => {
+const getColorClass = (type: ToastType): string => {
   switch (type) {
     case 'success':
       return 'toast--success';

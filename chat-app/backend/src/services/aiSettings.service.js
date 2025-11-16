@@ -6,6 +6,7 @@
 
 import { getFirestoreDb } from "../firebase/index.js";
 import logger from "../utils/logger.js";
+import { shouldUseMockMode } from "../utils/envModeHelper.js";
 
 const db = getFirestoreDb();
 
@@ -139,7 +140,8 @@ const DEFAULT_AI_SETTINGS = {
     personGeneration: "allow_adult",
     enableRetry: true,
     maxRetries: 3,
-    useMockVideo: false,
+    // 自動根據環境判斷是否使用 Mock 模式（NODE_ENV, Git 分支, 主機名等）
+    useMockVideo: shouldUseMockMode('video'),
     videoPromptTemplate: `A short video clip featuring a person. Character context: {角色背景設定}. Current situation: {最近對話內容}. Create a natural, candid video moment. The person can be engaged in daily activities like talking, smiling, walking, or relaxing. Natural expressions, warm lighting, documentary style. The setting can be indoors or outdoors, creating an authentic and relatable atmosphere. Keep the video simple and focused on the person.`,
     description: "角色影片生成 AI",
   },

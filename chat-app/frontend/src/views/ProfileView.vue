@@ -48,6 +48,7 @@ const {
   isExpiringSoon,
   balance,
   formattedBalance,
+  loadBalance, // ✅ 添加：金幣餘額加載函數
   hasUnreadNotifications,
   requireLogin,
   isGuest,
@@ -113,7 +114,20 @@ const settings = useSettings({
 
 const isStatsModalOpen: Ref<boolean> = ref(false);
 
-const openStatsModal = () => {
+const openStatsModal = async () => {
+  // 打開彈窗前強制刷新所有數據（繞過緩存）
+  if (targetUserId.value) {
+    try {
+      await Promise.all([
+        loadUserProfile(targetUserId.value, { force: true }),
+        loadUserAssets(targetUserId.value), // ✅ 合併：已包含金幣餘額，無需單獨調用 loadBalance()
+      ]);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        logger.error("[ProfileView] 刷新用戶數據失敗:", error);
+      }
+    }
+  }
   isStatsModalOpen.value = true;
 };
 

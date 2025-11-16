@@ -24,12 +24,14 @@
   </section>
 </template>
 
-<script setup>
-defineProps({
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+// Types
+interface Props {
+  isLoading?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  isLoading: false,
 });
 </script>
 

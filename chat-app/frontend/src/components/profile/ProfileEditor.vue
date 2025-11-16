@@ -1,47 +1,47 @@
-<script setup>
+<script setup lang="ts">
 import { PROFILE_LIMITS, GENDER_OPTIONS, generateAgeOptions } from "../../config/profile";
-import { computed } from "vue";
+import { computed, type Ref } from "vue";
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  isSaving: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: "",
-  },
-  form: {
-    type: Object,
-    required: true,
-  },
-  formErrors: {
-    type: Object,
-    required: true,
-  },
-  displayNameLength: {
-    type: Number,
-    default: 0,
-  },
-  promptLength: {
-    type: Number,
-    default: 0,
-  },
-  isFormDirty: {
-    type: Boolean,
-    default: false,
-  },
-  inputRef: {
-    type: Object,
-    default: null,
-  },
+interface ProfileForm {
+  displayName: string;
+  gender: string;
+  age: number | null;
+  defaultPrompt: string;
+}
+
+interface FormErrors {
+  displayName?: string;
+  age?: string;
+  defaultPrompt?: string;
+}
+
+interface Props {
+  isOpen?: boolean;
+  isSaving?: boolean;
+  error?: string;
+  form: ProfileForm;
+  formErrors: FormErrors;
+  displayNameLength?: number;
+  promptLength?: number;
+  isFormDirty?: boolean;
+  inputRef?: unknown;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isOpen: false,
+  isSaving: false,
+  error: "",
+  displayNameLength: 0,
+  promptLength: 0,
+  isFormDirty: false,
+  inputRef: null,
 });
 
-const emit = defineEmits(["close", "submit", "overlay-click"]);
+const emit = defineEmits<{
+  close: [];
+  submit: [];
+  "overlay-click": [];
+}>();
 
 const ageOptions = computed(() => generateAgeOptions());
 

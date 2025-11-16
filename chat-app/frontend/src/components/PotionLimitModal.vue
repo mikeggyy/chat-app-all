@@ -1,27 +1,34 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ShoppingCartIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  potionType: {
-    type: String, // 'memoryBoost' or 'brainBoost'
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: '',
-  },
+type PotionType = 'memoryBoost' | 'brainBoost';
+
+interface Props {
+  isOpen: boolean;
+  potionType: PotionType;
+  characterName?: string;
+}
+
+interface PotionInfo {
+  name: string;
+  description: string;
+  icon: string;
+  benefit: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterName: '',
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits<{
+  close: [];
+}>();
+
 const router = useRouter();
 
-const potionInfo = computed(() => {
+const potionInfo = computed((): PotionInfo | null => {
   if (props.potionType === 'memoryBoost') {
     return {
       name: '記憶增強藥水',
@@ -40,16 +47,16 @@ const potionInfo = computed(() => {
   return null;
 });
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit('close');
 };
 
-const handleGoToShop = () => {
+const handleGoToShop = (): void => {
   emit('close');
   router.push({ path: '/shop', query: { category: 'potions' } });
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   if (event.target === event.currentTarget) {
     handleClose();
   }

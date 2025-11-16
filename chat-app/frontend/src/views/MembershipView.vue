@@ -1,12 +1,12 @@
-<script setup>
-import { computed, ref, onMounted } from 'vue';
+<script setup lang="ts">
+import { computed, ref, onMounted, type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserProfile } from '../composables/useUserProfile';
 import { useMembership } from '../composables/useMembership';
 import { useToast } from '../composables/useToast';
 import { useGuestGuard } from '../composables/useGuestGuard';
 import { logger } from '../utils/logger.js';
-import { membershipTiers, comparisonFeatures } from '../config/membership.js';
+import { membershipTiers, comparisonFeatures, type Tier } from '../config/membership.js';
 import MembershipHero from '../components/membership/MembershipHero.vue';
 import MembershipTabs from '../components/membership/MembershipTabs.vue';
 import PlanCard from '../components/membership/PlanCard.vue';
@@ -25,20 +25,18 @@ import ComparisonTable from '../components/membership/ComparisonTable.vue';
 const router = useRouter();
 const { user } = useUserProfile();
 const {
-  tier: currentTier,
-  features: currentFeatures,
+  membershipTier: currentTier,
   loadMembership,
   upgradeMembership,
-  isLoading: isMembershipLoading,
 } = useMembership();
 
 const { success, error: showError, warning } = useToast();
 const { requireLogin } = useGuestGuard();
 
-const isUpgrading = ref(false);
+const isUpgrading: Ref<boolean> = ref(false);
 
 // 會員配置從 config/membership.js 導入
-const activeTierId = ref(membershipTiers[0].id);
+const activeTierId: Ref<string> = ref(membershipTiers[0].id);
 
 const activeTier = computed(() => {
   return (
@@ -50,7 +48,7 @@ const activeTier = computed(() => {
 /**
  * 切換會員方案
  */
-const selectTier = (tierId) => {
+const selectTier = (tierId: string): void => {
   if (!tierId || activeTierId.value === tierId) {
     return;
   }
@@ -60,7 +58,7 @@ const selectTier = (tierId) => {
 /**
  * 返回上一頁
  */
-const handleBack = () => {
+const handleBack = (): void => {
   if (typeof window !== 'undefined' && window.history.length > 1) {
     router.back();
     return;
@@ -71,7 +69,7 @@ const handleBack = () => {
 /**
  * 升級會員
  */
-const handleUpgrade = async (tier) => {
+const handleUpgrade = async (tier: Tier): Promise<void> => {
   if (!tier || isUpgrading.value) {
     return;
   }
@@ -101,7 +99,7 @@ const handleUpgrade = async (tier) => {
 
   try {
     // TODO: 整合真實的支付流程
-    await upgradeMembership(user.value.id, tier.id, {
+    await upgradeMembership(user.value.id, tier.id as 'free' | 'vip' | 'vvip', {
       paymentMethod: 'credit_card',
     });
 
@@ -112,7 +110,7 @@ const handleUpgrade = async (tier) => {
     success(`成功升級至 ${tier.label}！`, {
       title: '升級成功',
     });
-  } catch (error) {
+  } catch (error: any) {
     const message = error?.message || '升級失敗，請稍後再試';
     showError(message);
   } finally {

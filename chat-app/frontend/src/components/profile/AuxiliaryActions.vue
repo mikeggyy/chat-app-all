@@ -1,29 +1,35 @@
-<script setup>
+<script setup lang="ts">
 import { PencilSquareIcon, Cog6ToothIcon } from "@heroicons/vue/24/outline";
+import type { Component, Ref } from "vue";
 import SettingsMenu from "./SettingsMenu.vue";
 
-defineProps({
-  isSettingsMenuOpen: {
-    type: Boolean,
-    default: false,
-  },
-  settingsError: {
-    type: String,
-    default: "",
-  },
-  settingsMenuButtonRef: {
-    type: Function,
-    default: null,
-  },
-  settingsMenuRef: {
-    type: Function,
-    default: null,
-  },
+interface AuxiliaryAction {
+  key: string;
+  label: string;
+  icon: Component;
+}
+
+interface Props {
+  isSettingsMenuOpen?: boolean;
+  settingsError?: string;
+  settingsMenuButtonRef?: unknown;
+  settingsMenuRef?: unknown;
+}
+
+withDefaults(defineProps<Props>(), {
+  isSettingsMenuOpen: false,
+  settingsError: "",
+  settingsMenuButtonRef: null,
+  settingsMenuRef: null,
 });
 
-const emit = defineEmits(["edit-click", "settings-toggle", "settings-option-select"]);
+const emit = defineEmits<{
+  "edit-click": [];
+  "settings-toggle": [event: Event];
+  "settings-option-select": [option: string];
+}>();
 
-const auxiliaryActions = [
+const auxiliaryActions: AuxiliaryAction[] = [
   {
     key: "edit",
     label: "編輯個人資料",
@@ -36,7 +42,7 @@ const auxiliaryActions = [
   },
 ];
 
-const handleActionClick = (key, event) => {
+const handleActionClick = (key: string, event: Event) => {
   if (key === "edit") {
     emit("edit-click");
   } else if (key === "settings") {

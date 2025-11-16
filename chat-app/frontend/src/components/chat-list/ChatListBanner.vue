@@ -15,19 +15,18 @@
   </p>
 </template>
 
-<script setup>
-defineProps({
-  message: {
-    type: Object,
-    required: true,
-    validator: (value) => {
-      return (
-        typeof value.text === 'string' &&
-        (!value.tone || ['info', 'error', 'success'].includes(value.tone))
-      );
-    },
-  },
-});
+<script setup lang="ts">
+// Types
+interface Message {
+  text: string;
+  tone?: 'info' | 'error' | 'success';
+}
+
+interface Props {
+  message: Message;
+}
+
+defineProps<Props>();
 </script>
 
 <style scoped>

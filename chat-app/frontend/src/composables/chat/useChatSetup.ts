@@ -298,6 +298,7 @@ export function useChatSetup({
     partnerId,
     currentUserId,
     partner,
+    user,
     firebaseAuth,
     messages,
     chatContentRef,

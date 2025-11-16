@@ -64,19 +64,29 @@ export const recordMessage = async (userId, characterId) => {
 export const unlockByAd = async (userId, characterId, adId) => {
   const { getFirestoreDb } = await import("../firebase/index.js");
   const { FieldValue } = await import("firebase-admin/firestore");
-  const { logger } = await import("../utils/logger.js");
+  const loggerModule = await import("../utils/logger.js");
+  const logger = loggerModule.default;
   const db = getFirestoreDb();
 
   // ✅ P0-1 High 修復：使用 Transaction 確保原子性
   // 防止併發請求導致計數錯誤
   let unlockResult;
 
+  // ✅ 在 transaction 外先獲取用戶等級，避免 transaction 內讀取
+  const tier = await getUserTier(userId);
+  const membershipConfig = MEMBERSHIP_TIERS[tier];
+  const unlockedAmount = membershipConfig?.features?.unlockedMessagesPerAd ?? 5;
+
   await db.runTransaction(async (transaction) => {
     const adStatsRef = db.collection("ad_watch_stats").doc(userId);
+    const limitRef = db.collection("usage_limits").doc(userId);
 
-    // 1. 在 Transaction 內讀取用戶廣告觀看統計
+    // ✅ 1. 先執行所有讀取操作（Firestore transaction 要求）
     const statsDoc = await transaction.get(adStatsRef);
     const statsData = statsDoc.exists ? statsDoc.data() : {};
+
+    const limitDoc = await transaction.get(limitRef);
+    const limitData = limitDoc.exists ? limitDoc.data() : {};
 
     // 2. 檢查每日廣告次數限制（10 次/天）
     const today = new Date().toISOString().split("T")[0];
@@ -126,7 +136,15 @@ export const unlockByAd = async (userId, characterId, adId) => {
       throw new Error("該廣告獎勵已領取，請勿重複領取");
     }
 
-    // 7. 在 Transaction 內記錄廣告觀看
+    logger.info(`[廣告解鎖] Transaction 內驗證通過 - 用戶 ${userId} 觀看廣告解鎖對話`, {
+      characterId,
+      adId: adId.substring(0, 20) + "...", // 只記錄部分 adId
+      todayCount: todayCount + 1,
+      unlockedAmount,
+    });
+
+    // ✅ 7. 執行所有寫入操作（在所有讀取之後）
+    // 7.1 記錄廣告觀看
     transaction.set(
       adStatsRef,
       {
@@ -136,36 +154,35 @@ export const unlockByAd = async (userId, characterId, adId) => {
         lastAdId: adId,
         lastCharacterId: characterId,
         totalAdsWatched: (statsData.totalAdsWatched || 0) + 1,
-        updatedAt: FieldValue.serverTimestamp(),
+        updatedAt: new Date().toISOString(), // ✅ 使用 ISO 字串避免 ServerTimestampTransform 序列化問題
       },
       { merge: true }
     );
 
-    // 從會員配置中獲取解鎖參數
-    const tier = await getUserTier(userId);
-    const membershipConfig = MEMBERSHIP_TIERS[tier];
-    const unlockedAmount = membershipConfig?.features?.unlockedMessagesPerAd ?? 5;
-
-    logger.info(`[廣告解鎖] Transaction 內驗證通過 - 用戶 ${userId} 觀看廣告解鎖對話`, {
-      characterId,
-      adId: adId.substring(0, 20) + "...", // 只記錄部分 adId
-      todayCount: todayCount + 1,
-      unlockedAmount,
-    });
-
-    // 8. 在 Transaction 內解鎖對話
-    const limitRef = db.collection("usage_limits").doc(userId);
-    const limitDoc = await transaction.get(limitRef);
-    const limitData = limitDoc.exists ? limitDoc.data() : {};
-
+    // 7.2 解鎖對話
     const conversationLimit = limitData.conversation?.[characterId] || {
       count: 0,
       lastReset: new Date().toISOString().split("T")[0],
+      unlockHistory: [],
     };
 
-    // 增加解鎖次數
-    conversationLimit.count = (conversationLimit.count || 0) + unlockedAmount;
-    conversationLimit.lastUnlockedByAd = new Date().toISOString();
+    // ✅ 正確的解鎖邏輯：添加到 unlockHistory，而不是修改 count
+    // count 是已使用次數，unlockHistory 記錄廣告解鎖的額外額度
+    const currentTime = new Date();
+    const utc8Offset = 8 * 60 * 60 * 1000;
+    const nowUTC8 = new Date(currentTime.getTime() + currentTime.getTimezoneOffset() * 60000 + utc8Offset);
+    const expiresAt = new Date(nowUTC8.getTime() + 24 * 60 * 60 * 1000);
+
+    if (!Array.isArray(conversationLimit.unlockHistory)) {
+      conversationLimit.unlockHistory = [];
+    }
+
+    conversationLimit.unlockHistory.push({
+      amount: unlockedAmount,
+      unlockedAt: nowUTC8.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      unlockType: 'ad',
+    });
 
     transaction.set(
       limitRef,
@@ -180,7 +197,8 @@ export const unlockByAd = async (userId, characterId, adId) => {
     unlockResult = {
       success: true,
       unlockedAmount,
-      newCount: conversationLimit.count,
+      usedCount: conversationLimit.count,  // 已使用次數
+      unlockCount: conversationLimit.unlockHistory.length,  // 解鎖次數
       characterId,
     };
 

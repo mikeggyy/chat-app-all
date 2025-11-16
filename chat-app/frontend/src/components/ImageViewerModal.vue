@@ -38,28 +38,27 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { XMarkIcon, ArrowDownTrayIcon } from "@heroicons/vue/24/outline";
 import { apiFetch } from "../utils/api.js";
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  imageUrl: {
-    type: String,
-    default: "",
-  },
-  imageAlt: {
-    type: String,
-    default: "自拍照片",
-  },
+interface Props {
+  isOpen?: boolean;
+  imageUrl?: string;
+  imageAlt?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isOpen: false,
+  imageUrl: "",
+  imageAlt: "自拍照片",
 });
 
-const emit = defineEmits(["close"]);
+const emit = defineEmits<{
+  close: [];
+}>();
 
-const handleDownload = async () => {
+const handleDownload = async (): Promise<void> => {
   try {
     // 使用後端代理 API 下載圖片（繞過 CORS 限制）
     const encodedUrl = encodeURIComponent(props.imageUrl);

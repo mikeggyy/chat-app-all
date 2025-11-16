@@ -1,22 +1,29 @@
-<script setup>
-defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: "",
-  },
-  menuRef: {
-    type: Function,
-    default: null,
-  },
+<script setup lang="ts">
+import type { Ref } from "vue";
+
+interface SettingsOption {
+  key: string;
+  label: string;
+  variant?: "danger";
+}
+
+interface Props {
+  isOpen?: boolean;
+  error?: string;
+  menuRef?: unknown;
+}
+
+withDefaults(defineProps<Props>(), {
+  isOpen: false,
+  error: "",
+  menuRef: null,
 });
 
-const emit = defineEmits(["option-select"]);
+const emit = defineEmits<{
+  "option-select": [option: string];
+}>();
 
-const settingsOptions = [{ key: "logout", label: "登出", variant: "danger" }];
+const settingsOptions: SettingsOption[] = [{ key: "logout", label: "登出", variant: "danger" }];
 </script>
 
 <template>

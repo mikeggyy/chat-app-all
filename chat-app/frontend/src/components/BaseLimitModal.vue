@@ -1,6 +1,6 @@
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, type Router } from 'vue-router';
 import {
   XMarkIcon,
   BoltIcon,
@@ -12,119 +12,74 @@ import { logger } from '../utils/logger';
 import LimitOptionCard from './limit/LimitOptionCard.vue';
 import { useLimitModalConfig } from '../composables/limit/useLimitModalConfig';
 
-const props = defineProps({
-  // 通用 Props
-  type: {
-    type: String,
-    required: true,
-    validator: (value) => ['conversation', 'voice', 'photo', 'video'].includes(value),
-  },
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: '角色',
-  },
+type LimitType = 'conversation' | 'voice' | 'photo' | 'video';
 
+interface Props {
+  type: LimitType;
+  isOpen: boolean;
+  characterName?: string;
   // 對話限制相關
-  remainingMessages: {
-    type: Number,
-    default: 0,
-  },
-
+  remainingMessages?: number;
   // 語音限制相關
-  usedVoices: {
-    type: Number,
-    default: 0,
-  },
-  totalVoices: {
-    type: Number,
-    default: 10,
-  },
-
+  usedVoices?: number;
+  totalVoices?: number;
   // 照片/影片限制相關
-  used: {
-    type: Number,
-    default: 0,
-  },
-  remaining: {
-    type: Number,
-    default: 0,
-  },
-  total: {
-    type: Number,
-    default: 0,
-  },
-  standardTotal: {
-    type: Number,
-    default: null,
-  },
-  isTestAccount: {
-    type: Boolean,
-    default: false,
-  },
-  cards: {
-    type: Number,
-    default: 0,
-  },
-  tier: {
-    type: String,
-    default: 'free',
-  },
-  resetPeriod: {
-    type: String,
-    default: 'lifetime',
-  },
-
+  used?: number;
+  remaining?: number;
+  total?: number;
+  standardTotal?: number | null;
+  isTestAccount?: boolean;
+  cards?: number;
+  tier?: string;
+  resetPeriod?: string;
   // 廣告相關
-  dailyAdLimit: {
-    type: Number,
-    default: 10,
-  },
-  adsWatchedToday: {
-    type: Number,
-    default: 0,
-  },
-
+  dailyAdLimit?: number;
+  adsWatchedToday?: number;
   // 解鎖卡相關
-  characterUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  voiceUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  photoUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  videoUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-
+  characterUnlockCards?: number;
+  voiceUnlockCards?: number;
+  photoUnlockCards?: number;
+  videoUnlockCards?: number;
   // 對話限制專用
-  isUnlocked: {
-    type: Boolean,
-    default: false,
-  },
+  isUnlocked?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterName: '角色',
+  remainingMessages: 0,
+  usedVoices: 0,
+  totalVoices: 10,
+  used: 0,
+  remaining: 0,
+  total: 0,
+  standardTotal: null,
+  isTestAccount: false,
+  cards: 0,
+  tier: 'free',
+  resetPeriod: 'lifetime',
+  dailyAdLimit: 10,
+  adsWatchedToday: 0,
+  characterUnlockCards: 0,
+  voiceUnlockCards: 0,
+  photoUnlockCards: 0,
+  videoUnlockCards: 0,
+  isUnlocked: false,
 });
 
-const emit = defineEmits([
-  'close',
-  'watchAd',
-  'upgrade',
-  'buyUnlockCard',
-  'useUnlockCard',
-  'purchase-cards',
-  'upgrade-membership',
-]);
+interface Emits {
+  (e: 'close'): void;
+  (e: 'watchAd'): void;
+  (e: 'upgrade'): void;
+  (e: 'buyUnlockCard'): void;
+  (e: 'useUnlockCard'): void;
+  (e: 'purchase-cards'): void;
+  (e: 'upgrade-membership'): void;
+}
 
-const router = useRouter();
-const isWatchingAd = ref(false);
+const emit = defineEmits<Emits>();
+
+const router: Router = useRouter();
+const isWatchingAd = ref<boolean>(false);
 
 // 使用配置 composable
 const {
@@ -139,12 +94,12 @@ const {
 } = useLimitModalConfig(props);
 
 // 事件處理
-const handleClose = () => {
+const handleClose = (): void => {
   if (isWatchingAd.value) return;
   emit('close');
 };
 
-const handleWatchAd = async () => {
+const handleWatchAd = async (): Promise<void> => {
   if (!canWatchAd.value || isWatchingAd.value) return;
 
   isWatchingAd.value = true;
@@ -157,7 +112,7 @@ const handleWatchAd = async () => {
   }
 };
 
-const handleUpgrade = () => {
+const handleUpgrade = (): void => {
   if (props.type === 'photo') {
     emit('upgrade-membership');
   } else {
@@ -166,16 +121,16 @@ const handleUpgrade = () => {
   router.push({ name: 'membership' });
 };
 
-const handleBuyUnlockCard = () => {
+const handleBuyUnlockCard = (): void => {
   emit('buyUnlockCard');
   router.push({ path: '/shop', query: { category: config.value.shopCategory } });
 };
 
-const handleUseUnlockCard = () => {
+const handleUseUnlockCard = (): void => {
   emit('useUnlockCard');
 };
 
-const handleOverlayClick = (event) => {
+const handleOverlayClick = (event: MouseEvent): void => {
   if (event.target === event.currentTarget) {
     handleClose();
   }

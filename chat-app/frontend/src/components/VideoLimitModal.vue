@@ -1,54 +1,41 @@
-<script setup>
+<script setup lang="ts">
 import BaseLimitModal from './BaseLimitModal.vue';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: '角色',
-  },
-  used: {
-    type: Number,
-    default: 0,
-  },
-  remaining: {
-    type: Number,
-    default: 0,
-  },
-  total: {
-    type: Number,
-    default: 0,
-  },
-  standardTotal: {
-    type: Number,
-    default: null,
-  },
-  isTestAccount: {
-    type: Boolean,
-    default: false,
-  },
-  cards: {
-    type: Number,
-    default: 0,
-  },
-  tier: {
-    type: String,
-    default: 'free',
-  },
-  resetPeriod: {
-    type: String,
-    default: 'lifetime',
-  },
-  videoUnlockCards: {
-    type: Number,
-    default: 0,
-  },
+interface Props {
+  isOpen: boolean;
+  characterName?: string;
+  used?: number;
+  remaining?: number;
+  total?: number;
+  standardTotal?: number | null;
+  isTestAccount?: boolean;
+  cards?: number;
+  tier?: string;
+  resetPeriod?: string;
+  videoUnlockCards?: number;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterName: '角色',
+  used: 0,
+  remaining: 0,
+  total: 0,
+  standardTotal: null,
+  isTestAccount: false,
+  cards: 0,
+  tier: 'free',
+  resetPeriod: 'lifetime',
+  videoUnlockCards: 0,
 });
 
-const emit = defineEmits(['close', 'upgrade', 'buyUnlockCard', 'useUnlockCard', 'purchase-cards', 'upgrade-membership']);
+const emit = defineEmits<{
+  close: [];
+  upgrade: [];
+  buyUnlockCard: [];
+  useUnlockCard: [];
+  'purchase-cards': [];
+  'upgrade-membership': [];
+}>();
 </script>
 
 <template>

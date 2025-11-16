@@ -1,5 +1,5 @@
-<script setup>
-import { computed, ref, watch } from "vue";
+<script setup lang="ts">
+import { computed, ref, watch, type Ref, type ComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { HeartIcon } from "@heroicons/vue/24/solid";
@@ -7,18 +7,49 @@ import { apiJson } from "../utils/api";
 import { fallbackMatches } from "../utils/matchFallback";
 import { useUserProfile } from "../composables/useUserProfile";
 
+// Types
+interface Match {
+  id?: string;
+  display_name?: string;
+  displayName?: string;
+  name?: string;
+  portraitUrl?: string;
+  portrait?: string;
+  image?: string;
+  avatar?: string;
+  totalFavorites?: number;
+  favorites?: number;
+  collections?: number;
+  likes?: number;
+  totalChatUsers?: number;
+  totalConversations?: number;
+  messages?: number;
+  chatUsers?: number;
+  [key: string]: any;
+}
+
+interface ConversationEntry {
+  characterId?: string;
+  conversationId?: string;
+  matchId?: string;
+  id?: string;
+  character?: Match;
+  [key: string]: any;
+}
+
 const router = useRouter();
 const { user } = useUserProfile();
 
 // Tabs
-const activeTab = ref("chat");
-const isChatTab = computed(() => activeTab.value === "chat");
+const activeTab: Ref<string> = ref("chat");
+const isChatTab: ComputedRef<boolean> = computed(() => activeTab.value === "chat");
 
-const isLoading = ref(false);
-const errorMessage = ref("");
-const fetchedMatches = ref([]);
+const isLoading: Ref<boolean> = ref(false);
+const errorMessage: Ref<string> = ref("");
+const fetchedMatches: Ref<Match[]> = ref([]);
+const fetchedConversations: Ref<ConversationEntry[]> = ref([]);
 
-const normalizeId = (value) => {
+const normalizeId = (value: unknown): string => {
   if (typeof value !== "string") {
     return "";
   }
@@ -30,10 +61,10 @@ const favoriteIds = computed(() => {
   const values = Array.isArray(user.value?.favorites)
     ? user.value.favorites
     : [];
-  const seen = new Set();
-  const normalized = [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
 
-  values.forEach((value) => {
+  values.forEach((value: any) => {
     const id = normalizeId(value);
     if (id && !seen.has(id)) {
       seen.add(id);
@@ -44,10 +75,8 @@ const favoriteIds = computed(() => {
   return normalized;
 });
 
-const favoriteCount = computed(() => favoriteIds.value.length);
-
 const numberFormatter = new Intl.NumberFormat("zh-TW");
-const formatCount = (value) => {
+const formatCount = (value: unknown): string => {
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) {
     return "—";
@@ -150,17 +179,17 @@ const matchLookup = computed(() => {
 });
 
 const conversationCards = computed(() => {
-  const profile = user.value;
-  const conversations = Array.isArray(profile?.conversations)
-    ? profile.conversations
-    : [];
+  // ✅ 優先使用從 API 獲取的對話列表
+  const conversations = fetchedConversations.value.length > 0
+    ? fetchedConversations.value
+    : (Array.isArray(user.value?.conversations) ? user.value.conversations : []);
 
   if (!conversations.length) {
     return [];
   }
 
   const normalized = conversations
-    .map((entry, index) => {
+    .map((entry: string | ConversationEntry) => {
       if (typeof entry === "string") {
         const match = matchLookup.value.get(entry);
         if (match) {
@@ -232,12 +261,41 @@ const showChatEmptyState = computed(
   () => !isLoading.value && !errorMessage.value && !hasConversations.value
 );
 
-const selectTab = (tab) => {
+const selectTab = (tab: string): void => {
   activeTab.value = tab;
 };
 
-let requestToken = 0;
+let requestToken: number = 0;
 
+// ✅ 獲取對話列表
+watch(
+  () => user.value?.id,
+  async (nextUserId) => {
+    if (!nextUserId) {
+      fetchedConversations.value = [];
+      return;
+    }
+
+    try {
+      const response = await apiJson(
+        `/api/users/${encodeURIComponent(nextUserId)}/conversations`,
+        { skipGlobalLoading: true }
+      );
+
+      fetchedConversations.value = Array.isArray(response?.data?.conversations)
+        ? response.data.conversations
+        : (Array.isArray(response?.conversations)
+          ? response.conversations
+          : []);
+    } catch (error) {
+      console.error('獲取對話列表失敗:', error);
+      fetchedConversations.value = [];
+    }
+  },
+  { immediate: true }
+);
+
+// ✅ 獲取喜歡的角色
 watch(
   [() => user.value?.id, () => favoriteIds.value.join("|")],
   async ([nextUserId]) => {
@@ -268,7 +326,9 @@ watch(
 
       fetchedMatches.value = Array.isArray(response?.matches)
         ? response.matches
-        : [];
+        : (Array.isArray(response?.data?.matches)
+          ? response.data.matches
+          : []);
     } catch (error) {
       if (token !== requestToken) {
         return;
@@ -285,7 +345,7 @@ watch(
   { immediate: true }
 );
 
-const handleBack = () => {
+const handleBack = (): void => {
   if (typeof window !== "undefined" && window.history.length > 1) {
     router.back();
     return;
@@ -293,7 +353,7 @@ const handleBack = () => {
   router.push({ name: "profile" });
 };
 
-const handleCardClick = (characterId) => {
+const handleCardClick = (characterId: string): void => {
   router.push({
     name: "character-photos",
     params: { characterId },

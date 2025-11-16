@@ -43,7 +43,8 @@ conversationRouter.get(
     // 移除元數據和不必要的字段
     const optimizedMessages = applySelector(messages, 'message');
 
-    res.json({ messages: optimizedMessages });
+    // ✅ 修復：使用統一的響應格式 { success: true, data: { messages } }
+    sendSuccess(res, { messages: optimizedMessages });
   })
 );
 

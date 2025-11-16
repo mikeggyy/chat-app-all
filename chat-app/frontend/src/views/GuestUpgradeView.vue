@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useFirebaseAuth } from '../composables/useFirebaseAuth';
@@ -13,9 +13,9 @@ const { setUserProfile } = useUserProfile();
 const { resetGuestMessageCount } = useGuestGuard();
 
 // 從 query 參數獲取功能名稱
-const featureName = route.query.feature || '完整功能';
+const featureName = (route.query.feature as string) || '完整功能';
 
-const handleGoogleLogin = async () => {
+const handleGoogleLogin = async (): Promise<void> => {
   try {
     const { profile } = await signInWithGoogle();
 
@@ -29,11 +29,11 @@ const handleGoogleLogin = async () => {
     // 導向首頁
     router.push({ name: 'match' });
   } catch (error) {
-
+    // 錯誤已在 composable 中處理
   }
 };
 
-const goBack = () => {
+const goBack = (): void => {
   // 導向安全的頁面（避免回到受限頁面造成循環）
   router.push({ name: 'match' });
 };

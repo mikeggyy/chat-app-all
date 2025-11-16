@@ -5,7 +5,7 @@
  * 管理禮物、自拍、視頻、藥水、解鎖等功能
  */
 
-import { type Ref } from 'vue';
+import { type Ref, computed } from 'vue';
 import { useChatActions, type UseChatActionsReturn } from '../useChatActions.js';
 import { usePotionManagement, type UsePotionManagementReturn } from '../usePotionManagement.js';
 import { useSelfieGeneration, type UseSelfieGenerationReturn } from '../useSelfieGeneration.js';
@@ -43,6 +43,7 @@ export interface UseChatFeaturesDeps {
   partnerId: Ref<string>;
   currentUserId: Ref<string>;
   partner: Ref<Partner | null>;
+  user: Ref<User | null>;
   firebaseAuth: FirebaseAuthService;
 
   // 消息和引用
@@ -158,6 +159,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     partnerId,
     currentUserId,
     partner,
+    user,
     firebaseAuth,
     messages,
     chatContentRef,
@@ -301,7 +303,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     getPartnerId: () => partnerId.value,
     getFirebaseAuth: () => firebaseAuth,
     messages,
-    messageListRef: chatContentRef,
+    messageListRef: computed(() => chatContentRef.value?.messageListRef),
     rollbackUserMessage,
     requireLogin,
     canGeneratePhoto,
@@ -328,7 +330,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     getPartnerId: () => partnerId.value,
     getFirebaseAuth: () => firebaseAuth,
     messages,
-    messageListRef: chatContentRef,
+    messageListRef: computed(() => chatContentRef.value?.messageListRef),
     rollbackUserMessage,
     requireLogin,
     showVideoLimit,
@@ -363,7 +365,8 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
   } = useFavoriteManagement({
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
-    getUser: () => null, // TODO: 從 useChatCore 獲取
+    getPartnerName: () => partner.value?.displayName || partner.value?.display_name || '',
+    getUser: () => user.value,
     getFirebaseAuth: () => firebaseAuth,
     setUserProfile,
     requireLogin,

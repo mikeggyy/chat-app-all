@@ -228,38 +228,30 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
       // 生成請求ID
       const requestId = generatePhotoRequestId(userId, matchId);
 
-      const token = await firebaseAuth.getCurrentUserIdToken();
-
       // 調用後端 API（包含請求ID）
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/ai/generate-selfie`,
-        {
+      // 使用 apiJson 自動處理 CSRF Token 和認證
+      let response;
+      try {
+        response = await apiJson('/api/ai/generate-selfie', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+          body: {
             characterId: matchId,
             requestId,
             usePhotoCard,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-
+          },
+          skipGlobalLoading: true, // ✅ 不顯示全局 loading，允許用戶繼續聊天
+        });
+      } catch (error: any) {
         // 移除臨時消息
         const tempIndex = messages.value.findIndex((m) => m.id === tempMessageId);
         if (tempIndex !== -1) {
           messages.value.splice(tempIndex, 1);
         }
 
-        // 處理限制錯誤
-        if (response.status === 403 && errorData.limitExceeded) {
+        // 處理限制錯誤 (403 錯誤)
+        if (error.status === 403 && error.data?.limitExceeded) {
           if (onLimitExceeded) {
-            const limitInfo = errorData.limitInfo || {};
+            const limitInfo = error.data.limitInfo || {};
             onLimitExceeded({
               used: limitInfo.used || 0,
               remaining: limitInfo.remaining || 0,
@@ -274,10 +266,12 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           return null;
         }
 
-        throw new Error(errorData.message || '生成自拍失敗');
+        throw new Error(error.message || '生成自拍失敗');
       }
 
-      const data = await response.json();
+      // ✅ 修復：apiJson 返回 { success: true, data: {...} }
+      // 後端的 sendSuccess 將 generateSelfieForCharacter 的結果包裝在 data 中
+      const data = response.data || response;
 
       // 替換臨時消息
       if (data.message) {
@@ -651,15 +645,29 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
 
       const token = await firebaseAuth.getCurrentUserIdToken();
 
-      // 調用後端 TTS API
+      // 獲取 CSRF Token
+      const getCsrfToken = (): string | null => {
+        const match = document.cookie.match(/(?:^|;\s*)_csrf=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+      };
+
+      // 調用後端 TTS API（需要 CSRF Token）
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      };
+
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        headers['x-csrf-token'] = csrfToken;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/ai/tts`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
+          credentials: 'include', // 包含 Cookie
           body: JSON.stringify({
             text: text.trim(),
             characterId: matchId,

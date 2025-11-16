@@ -16,6 +16,7 @@ import type { FirebaseAuthService, User } from '../../types';
 export interface UseFavoriteManagementDeps {
   getCurrentUserId: () => string;
   getPartnerId: () => string;
+  getPartnerName?: () => string;
   getUser: () => User | null;
   getFirebaseAuth: () => FirebaseAuthService;
   setUserProfile: (profile: User) => void;
@@ -43,6 +44,7 @@ export function useFavoriteManagement(deps: UseFavoriteManagementDeps): UseFavor
   const {
     getCurrentUserId,
     getPartnerId,
+    getPartnerName,
     getUser,
     getFirebaseAuth,
     setUserProfile,
@@ -136,7 +138,12 @@ export function useFavoriteManagement(deps: UseFavoriteManagementDeps): UseFavor
         favorites: favoritesList,
       });
 
-      showSuccess(wasFavorited ? '已取消收藏' : '已加入收藏');
+      // 顯示提示消息（包含角色名稱）
+      const partnerName = getPartnerName ? getPartnerName() : '';
+      const message = wasFavorited
+        ? `已取消收藏${partnerName ? ` ${partnerName}` : ''}`
+        : `已收藏${partnerName ? ` ${partnerName}` : ''}`;
+      showSuccess(message);
     } catch (error: any) {
       // 錯誤回滾：恢復到之前的狀態
       setUserProfile({

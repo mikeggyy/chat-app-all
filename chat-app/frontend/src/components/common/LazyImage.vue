@@ -23,64 +23,57 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount, watch, type Ref } from 'vue';
 
-const props = defineProps({
-  src: {
-    type: String,
-    required: true,
-  },
-  srcset: {
-    type: String,
-    default: '',
-  },
-  alt: {
-    type: String,
-    default: '',
-  },
-  loading: {
-    type: String,
-    default: 'lazy',
-    validator: (value) => ['lazy', 'eager'].includes(value),
-  },
-  rootMargin: {
-    type: String,
-    default: '50px',
-  },
-  threshold: {
-    type: Number,
-    default: 0,
-  },
-  imageClass: {
-    type: String,
-    default: '',
-  },
-  showErrorState: {
-    type: Boolean,
-    default: true,
-  },
+// Types
+type Loading = 'lazy' | 'eager';
+
+interface Props {
+  src: string;
+  srcset?: string;
+  alt?: string;
+  loading?: Loading;
+  rootMargin?: string;
+  threshold?: number;
+  imageClass?: string;
+  showErrorState?: boolean;
+}
+
+interface Emits {
+  (e: 'load', event: Event): void;
+  (e: 'error', event: Event): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  srcset: '',
+  alt: '',
+  loading: 'lazy',
+  rootMargin: '50px',
+  threshold: 0,
+  imageClass: '',
+  showErrorState: true,
 });
 
-const emit = defineEmits(['load', 'error']);
+const emit = defineEmits<Emits>();
 
-const containerRef = ref(null);
-const isVisible = ref(false);
-const isLoaded = ref(false);
-const hasError = ref(false);
-let observer = null;
+const containerRef: Ref<HTMLElement | null> = ref(null);
+const isVisible: Ref<boolean> = ref(false);
+const isLoaded: Ref<boolean> = ref(false);
+const hasError: Ref<boolean> = ref(false);
+let observer: IntersectionObserver | null = null;
 
-const onLoad = (event) => {
+const onLoad = (event: Event): void => {
   isLoaded.value = true;
   emit('load', event);
 };
 
-const onError = (event) => {
+const onError = (event: Event): void => {
   hasError.value = true;
   emit('error', event);
 };
 
-const initObserver = () => {
+const initObserver = (): void => {
   if (!containerRef.value) return;
 
   observer = new IntersectionObserver(
@@ -104,7 +97,7 @@ const initObserver = () => {
   observer.observe(containerRef.value);
 };
 
-const cleanup = () => {
+const cleanup = (): void => {
   if (observer) {
     observer.disconnect();
     observer = null;

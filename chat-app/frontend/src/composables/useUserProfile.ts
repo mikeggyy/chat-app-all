@@ -65,6 +65,11 @@ const normalizeUser = (payload: Partial<User> = {}): User => {
   const updatedAt = payload.updatedAt ?? createdAt;
   const lastLoginAt = payload.lastLoginAt ?? nowIso;
 
+  // ✅ 關鍵修復：uid 必須等於 id（Firebase UID）
+  // 永遠不要重新生成 uid，因為它是用戶的唯一標識符
+  // 如果後端沒有提供 uid，使用 id 作為後備
+  const uid = payload.uid || id || "未設定帳號";
+
   // 解析錢包餘額（向後兼容：支援讀取舊格式）
   const walletBalance = payload.wallet?.balance
     ?? (payload as any).walletBalance
@@ -102,7 +107,7 @@ const normalizeUser = (payload: Partial<User> = {}): User => {
     hasCompletedOnboarding: Boolean(payload.hasCompletedOnboarding),
     notificationOptIn: Boolean(payload.notificationOptIn),
     signInProvider: payload.signInProvider ?? "unknown",
-    uid: payload.uid ?? generateUid(id || nowIso),
+    uid,  // ✅ 使用上面計算的 uid，不再調用 generateUid
     updatedAt,
     conversations: normalizeArray(payload.conversations),
     favorites: normalizeArray(payload.favorites),

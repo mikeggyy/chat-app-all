@@ -1,33 +1,40 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AvatarCropperOverlay from "./AvatarCropperOverlay.vue";
 
-const props = defineProps({
-  defaultAvatars: {
-    type: Array,
-    default: () => [],
-  },
-  currentPhoto: {
-    type: String,
-    default: "",
-  },
-  saving: {
-    type: Boolean,
-    default: false,
-  },
+interface AvatarOption {
+  src: string;
+  label: string;
+}
+
+interface Props {
+  defaultAvatars?: AvatarOption[];
+  currentPhoto?: string;
+  saving?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  defaultAvatars: () => [],
+  currentPhoto: "",
+  saving: false,
 });
 
-const emit = defineEmits(["close", "update"]);
+interface Emits {
+  (e: "close"): void;
+  (e: "update", result: string): void;
+}
 
-const presetAvatars = computed(() =>
+const emit = defineEmits<Emits>();
+
+const presetAvatars = computed<AvatarOption[]>(() =>
   Array.isArray(props.defaultAvatars) ? props.defaultAvatars : []
 );
 
-const fileInputRef = ref(null);
-const selectedSource = ref("");
-const uploadedResult = ref("");
-const uploadSourceRaw = ref("");
-const isCropperOpen = ref(false);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const selectedSource = ref<string>("");
+const uploadedResult = ref<string>("");
+const uploadSourceRaw = ref<string>("");
+const isCropperOpen = ref<boolean>(false);
 
 const activeSource = computed(
   () => selectedSource.value || props.currentPhoto || ""
@@ -35,9 +42,9 @@ const activeSource = computed(
 const usingUpload = computed(() => uploadedResult.value.length > 0);
 const canConfirm = computed(() => Boolean(activeSource.value));
 
-let lastCurrentPhoto = props.currentPhoto ?? "";
+let lastCurrentPhoto: string = props.currentPhoto ?? "";
 
-const initializeState = () => {
+const initializeState = (): void => {
   selectedSource.value = props.currentPhoto ?? "";
   uploadedResult.value = "";
   uploadSourceRaw.value = "";
@@ -68,18 +75,19 @@ watch(
   }
 );
 
-const handleKeydown = (event) => {
+const handleKeydown = (event: KeyboardEvent): void => {
   if (event.key !== "Escape") return;
   if (isCropperOpen.value) return;
   emit("close");
 };
 
-const triggerFilePicker = () => {
+const triggerFilePicker = (): void => {
   fileInputRef.value?.click();
 };
 
-const handleFileChange = (event) => {
-  const files = event.target?.files;
+const handleFileChange = (event: Event): void => {
+  const target = event.target as HTMLInputElement;
+  const files = target?.files;
   if (!files || !files.length) return;
   const [file] = files;
   const reader = new FileReader();
@@ -90,12 +98,12 @@ const handleFileChange = (event) => {
     }
   };
   reader.readAsDataURL(file);
-  if (event.target) {
-    event.target.value = "";
+  if (target) {
+    target.value = "";
   }
 };
 
-const handleCropConfirm = (result) => {
+const handleCropConfirm = (result: string | null): void => {
   if (!result) {
     handleCropCancel();
     return;
@@ -105,16 +113,16 @@ const handleCropConfirm = (result) => {
   isCropperOpen.value = false;
 };
 
-const handleCropCancel = () => {
+const handleCropCancel = (): void => {
   isCropperOpen.value = false;
 };
 
-const reopenCropper = () => {
+const reopenCropper = (): void => {
   if (!uploadSourceRaw.value) return;
   isCropperOpen.value = true;
 };
 
-const selectPreset = (src) => {
+const selectPreset = (src: string): void => {
   if (!src) return;
   uploadedResult.value = "";
   uploadSourceRaw.value = "";
@@ -122,13 +130,13 @@ const selectPreset = (src) => {
   isCropperOpen.value = false;
 };
 
-const confirmSelection = () => {
+const confirmSelection = (): void => {
   const result = activeSource.value;
   if (!result) return;
   emit("update", result);
 };
 
-const emitClose = () => {
+const emitClose = (): void => {
   emit("close");
 };
 </script>

@@ -1,0 +1,769 @@
+[36m
+🚀 開始執行嚴格商業邏輯測試套件...
+[0m
+
+================================================================================
+[36m🔥 嚴格商業邏輯測試套件 - 開始執行[0m
+================================================================================
+
+[34m測試時間: 2025/11/16 下午7:37:43[0m
+[34m環境: 生產環境 Firestore[0m
+
+================================================================================
+[36m📋 金幣系統嚴格測試[0m
+================================================================================
+
+[34m並發購買、Transaction 原子性、數據一致性、邊界條件 (8 個測試)[0m
+
+[34m🚀 運行: 金幣系統嚴格測試[0m
+[34m   腳本: test-coins-strict.js[0m
+
+2025-11-16 19:37:43 [[34mdebug[39m]: [34m[CacheManager] DefaultCache 自動清理已啟動 (間隔: 300000ms)[39m
+2025-11-16 19:37:43 [[32minfo[39m]: [32m[CacheManager] DefaultCache 已初始化 (TTL: 60000ms)[39m
+2025-11-16 19:37:43 [[34mdebug[39m]: [34m[CacheManager] AIFeaturePrices 自動清理已啟動 (間隔: 300000ms)[39m
+2025-11-16 19:37:43 [[32minfo[39m]: [32m[CacheManager] AIFeaturePrices 已初始化 (TTL: 60000ms)[39m
+2025-11-16 19:37:43 [[34mdebug[39m]: [34m[CacheManager] CoinPackages 自動清理已啟動 (間隔: 300000ms)[39m
+2025-11-16 19:37:43 [[32minfo[39m]: [32m[CacheManager] CoinPackages 已初始化 (TTL: 60000ms)[39m
+[1m
+======================================================================[0m
+[36m🔥 金幣系統嚴格測試套件[0m
+[1m======================================================================[0m
+[34m測試時間: 2025/11/16 下午7:37:43[0m
+[34m環境: 生產環境 Firestore[0m
+
+
+======================================================================
+[36m📋 測試: 測試 1: 並發購買測試 (5 個用戶同時購買)[0m
+======================================================================
+[34mℹ️  創建 5 個測試用戶,每個 500 金幣[0m
+(node:32024) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[34mℹ️  創建測試用戶: test-coins-strict-concurrent-0-1763293063736, 初始金幣: 500[0m
+[34mℹ️  創建測試用戶: test-coins-strict-concurrent-1-1763293063882, 初始金幣: 500[0m
+[34mℹ️  創建測試用戶: test-coins-strict-concurrent-2-1763293063905, 初始金幣: 500[0m
+[34mℹ️  創建測試用戶: test-coins-strict-concurrent-3-1763293063936, 初始金幣: 500[0m
+[34mℹ️  創建測試用戶: test-coins-strict-concurrent-4-1763293063970, 初始金幣: 500[0m
+[34mℹ️  同時發起 5 個購買請求...[0m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 從 Firestore 讀取 AI 功能價格: 3 個[39m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 從 Firestore 讀取 AI 功能價格: 3 個[39m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 從 Firestore 讀取 AI 功能價格: 3 個[39m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 從 Firestore 讀取 AI 功能價格: 3 個[39m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 從 Firestore 讀取 AI 功能價格: 3 個[39m
+2025-11-16 19:37:44 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-concurrent-0-1763293063736 永久解鎖角色 test-character-001[39m
+2025-11-16 19:37:44 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-concurrent-1-1763293063882 永久解鎖角色 test-character-001[39m
+2025-11-16 19:37:44 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-concurrent-4-1763293063970 永久解鎖角色 test-character-001[39m
+2025-11-16 19:37:44 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-concurrent-2-1763293063905 永久解鎖角色 test-character-001[39m
+2025-11-16 19:37:44 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-concurrent-3-1763293063936 永久解鎖角色 test-character-001[39m
+[34mℹ️  所有購買完成,耗時: 146ms[0m
+[34mℹ️  成功: 5, 失敗: 0[0m
+[32m✅ 所有用戶購買成功[0m
+[34mℹ️  驗證數據一致性...[0m
+[32m✅ 所有用戶數據一致性驗證通過[0m
+[32m✅ 測試 1: 並發購買 (多用戶) - 通過 (1146ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 2: 同一用戶並發購買多個角色[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-coins-strict-same-user-1763293064883, 初始金幣: 1000[0m
+[34mℹ️  同時購買 3 個不同角色...[0m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:44 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:44 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-user-1763293064883 永久解鎖角色 char-001[39m
+2025-11-16 19:37:46 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-user-1763293064883 永久解鎖角色 char-002[39m
+2025-11-16 19:37:46 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-user-1763293064883 永久解鎖角色 char-003[39m
+[34mℹ️  所有購買完成,耗時: 1686ms[0m
+[34mℹ️  成功: 3, 失敗: 0[0m
+[32m✅ 3 個角色都購買成功[0m
+[32m✅ 餘額正確: 100 (扣除 900)[0m
+[32m✅ 交易記錄數量正確: 3[0m
+[32m✅ 解鎖狀態正確: 3 個角色已解鎖[0m
+[32m✅ 測試 2: 並發購買 (同用戶多角色) - 通過 (1863ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 3: 並發購買同一角色 (應該只成功一次)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-coins-strict-same-char-1763293066745, 初始金幣: 1000[0m
+[34mℹ️  同時發起 5 個購買同一角色的請求...[0m
+2025-11-16 19:37:46 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:46 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:46 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:46 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:46 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:46 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-char-1763293066745 永久解鎖角色 test-character-same[39m
+2025-11-16 19:37:46 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-char-1763293066745 永久解鎖角色 test-character-same[39m
+2025-11-16 19:37:46 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-char-1763293066745 永久解鎖角色 test-character-same[39m
+2025-11-16 19:37:46 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-char-1763293066745 永久解鎖角色 test-character-same[39m
+2025-11-16 19:37:46 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-same-char-1763293066745 永久解鎖角色 test-character-same[39m
+[34mℹ️  所有請求完成,耗時: 1453ms[0m
+[34mℹ️  成功: 1, 失敗: 4[0m
+[32m✅ ✅ 正確:只有 1 個請求成功,其他 4 個被拒絕[0m
+[32m✅ ✅ 餘額正確:只扣除 300 (購買一次)[0m
+[32m✅ ✅ 交易記錄正確:只有 1 筆[0m
+[32m✅ 測試 3: 並發購買同一角色 - 通過 (1610ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 4: 邊界條件 - 餘額剛好等於價格 (300 金幣購買 300)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-coins-strict-exact-1763293068355, 初始金幣: 300[0m
+[34mℹ️  執行購買 (300 金幣購買角色,價格 300)...[0m
+2025-11-16 19:37:48 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:48 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-exact-1763293068355 永久解鎖角色 test-character-exact[39m
+[32m✅ 購買成功[0m
+[32m✅ ✅ 餘額正確:0 (剛好用完)[0m
+[32m✅ 測試 4: 邊界 - 餘額剛好 - 通過 (250ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 5: 邊界條件 - 餘額不足 1 分錢 (299 金幣購買 300)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-coins-strict-insufficient-1763293068606, 初始金幣: 299[0m
+[34mℹ️  嘗試購買 (299 金幣購買角色,價格 300)...[0m
+2025-11-16 19:37:48 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+[32m✅ ✅ 正確拋出錯誤: 金幣不足，需要 300，當前餘額 299[0m
+[32m✅ ✅ 餘額未變化:299 (Transaction 回滾)[0m
+[32m✅ 測試 5: 邊界 - 餘額不足 1 分 - 通過 (207ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 6: 並發導致餘額不足 (500 金幣並發購買 2 個角色,每個 300)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-coins-strict-concurrent-insuf-1763293068813, 初始金幣: 500[0m
+[34mℹ️  同時購買 2 個角色,每個 300 金幣 (總共 600,但只有 500)...[0m
+2025-11-16 19:37:48 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:48 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:48 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-concurrent-insuf-1763293068813 永久解鎖角色 char-insuf-001[39m
+2025-11-16 19:37:48 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-concurrent-insuf-1763293068813 永久解鎖角色 char-insuf-002[39m
+[34mℹ️  所有請求完成,耗時: 823ms[0m
+[34mℹ️  成功: 1, 失敗: 1[0m
+[32m✅ ✅ 正確:只有 1 個成功,另 1 個因餘額不足失敗[0m
+[32m✅ ✅ 餘額正確: 200[0m
+[32m✅ ✅ 交易記錄正確: 1 筆[0m
+[32m✅ 測試 6: 並發導致餘額不足 - 通過 (982ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 7: 數據一致性 - 餘額變化 vs 交易記錄總和[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-coins-strict-consistency-1763293069795, 初始金幣: 2000[0m
+[34mℹ️  執行 5 次購買...[0m
+2025-11-16 19:37:49 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:49 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-consistency-1763293069795 永久解鎖角色 char-c1[39m
+2025-11-16 19:37:49 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:49 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-consistency-1763293069795 永久解鎖角色 char-c2[39m
+2025-11-16 19:37:50 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:50 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-consistency-1763293069795 永久解鎖角色 char-c3[39m
+2025-11-16 19:37:50 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:50 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-consistency-1763293069795 永久解鎖角色 char-c4[39m
+2025-11-16 19:37:50 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:50 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-consistency-1763293069795 永久解鎖角色 char-c5[39m
+[32m✅ 5 次購買完成[0m
+[34mℹ️  初始餘額: 2000[0m
+[34mℹ️  交易記錄總和: -1500[0m
+[34mℹ️  當前餘額: 500[0m
+[32m✅ ✅ 數據一致: 500 === 2000 + -1500[0m
+[32m✅ 測試 7: 數據一致性檢查 - 通過 (654ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 8: Transaction balanceBefore/balanceAfter 準確性[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-coins-strict-tx-balance-1763293070450, 初始金幣: 1000[0m
+[34mℹ️  執行 3 次購買,驗證每筆交易的 before/after 餘額...[0m
+2025-11-16 19:37:50 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:50 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-tx-balance-1763293070450 永久解鎖角色 char-tx1[39m
+2025-11-16 19:37:50 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:50 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-tx-balance-1763293070450 永久解鎖角色 char-tx2[39m
+2025-11-16 19:37:50 [[34mdebug[39m]: [34m[金幣服務] 使用快取的 AI 功能價格[39m
+2025-11-16 19:37:50 [[32minfo[39m]: [32m[角色解鎖] ✅ Transaction 完成 - 用戶 test-coins-strict-tx-balance-1763293070450 永久解鎖角色 char-tx3[39m
+[34mℹ️  共 3 筆交易記錄[0m
+[34mℹ️  交易 1:[0m
+[34mℹ️    Before: 1000, After: 700, Amount: 300[0m
+[32m✅   ✅ balanceAfter 正確: 700 === 1000 - 300[0m
+[32m✅   ✅ 與下一筆交易鏈式關係正確[0m
+[34mℹ️  交易 2:[0m
+[34mℹ️    Before: 700, After: 400, Amount: 300[0m
+[32m✅   ✅ balanceAfter 正確: 400 === 700 - 300[0m
+[32m✅   ✅ 與下一筆交易鏈式關係正確[0m
+[34mℹ️  交易 3:[0m
+[34mℹ️    Before: 400, After: 100, Amount: 300[0m
+[32m✅   ✅ balanceAfter 正確: 100 === 400 - 300[0m
+[32m✅ 測試 8: Transaction 餘額準確性 - 通過 (444ms)[0m
+
+======================================================================
+[36m📊 測試摘要[0m
+======================================================================
+[32m✅ ✅ 測試 1: 並發購買 (多用戶) (1146ms)[0m
+[32m✅ ✅ 測試 2: 並發購買 (同用戶多角色) (1863ms)[0m
+[32m✅ ✅ 測試 3: 並發購買同一角色 (1610ms)[0m
+[32m✅ ✅ 測試 4: 邊界 - 餘額剛好 (250ms)[0m
+[32m✅ ✅ 測試 5: 邊界 - 餘額不足 1 分 (207ms)[0m
+[32m✅ ✅ 測試 6: 並發導致餘額不足 (982ms)[0m
+[32m✅ ✅ 測試 7: 數據一致性檢查 (654ms)[0m
+[32m✅ ✅ 測試 8: Transaction 餘額準確性 (444ms)[0m
+
+======================================================================
+[34m總耗時: 7158ms[0m
+[32m[1m[32m🎉 所有測試通過！(8/8)[0m[0m
+======================================================================
+
+[32m✅ 金幣系統嚴格測試 - 通過 (7540ms)
+[0m
+
+================================================================================
+[36m📋 限制服務嚴格測試[0m
+================================================================================
+
+[34m並發消息、語音限制、廣告解鎖、跨角色獨立性 (8 個測試)[0m
+
+[34m🚀 運行: 限制服務嚴格測試[0m
+[34m   腳本: test-limits-strict.js[0m
+
+[1m
+======================================================================[0m
+[36m🔥 限制服務嚴格測試套件[0m
+[1m======================================================================[0m
+[34m測試時間: 2025/11/16 下午7:37:51[0m
+[34m環境: 生產環境 Firestore[0m
+
+
+======================================================================
+[36m📋 測試: 測試 1: 並發發送消息 (同一角色,免費用戶 10 次限制)[0m
+======================================================================
+(node:620) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[34mℹ️  創建測試用戶: test-limits-strict-concurrent-msg-1763293071283, 會員等級: free[0m
+[34mℹ️  同時發送 15 條消息 (限制 10 條)...[0m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:51 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+2025-11-16 19:37:52 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-msg-1763293071283[39m
+[34mℹ️  所有請求完成,耗時: 2075ms[0m
+[34mℹ️  成功: 10, 失敗: 5[0m
+[32m✅ ✅ 並發計數正確: 10 次 (限制 10)[0m
+[32m✅ ✅ 數據庫計數正確: 10[0m
+[32m✅ 測試 1: 並發發送消息 (同一角色) - 通過 (2297ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 2: 跨角色限制獨立性 (不同角色互不影響)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-limits-strict-cross-char-1763293073579, 會員等級: free[0m
+[34mℹ️  對 3 個角色各發送 10 條消息...[0m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:53 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+[34mℹ️    角色 char-001: 成功發送 10 條[0m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:54 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+[34mℹ️    角色 char-002: 成功發送 10 條[0m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:55 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+[34mℹ️    角色 char-003: 成功發送 10 條[0m
+[32m✅ 所有角色都能發送滿額度的消息[0m
+[32m✅   ✅ 角色 char-001 計數正確: 10[0m
+[32m✅   ✅ 角色 char-002 計數正確: 10[0m
+[32m✅   ✅ 角色 char-003 計數正確: 10[0m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-cross-char-1763293073579[39m
+[31m❌ ❌ 第一個角色達到限制後仍可發送[0m
+[31m❌ 測試 2: 跨角色限制獨立性 - 失敗 (3105ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 3: 永久解鎖後無限制 (免費用戶解鎖角色)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-limits-strict-perm-unlock-1763293076684, 會員等級: free[0m
+[34mℹ️  永久解鎖角色...[0m
+[32m✅ 角色已永久解鎖[0m
+[34mℹ️  發送 20 條消息 (超過限制)...[0m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:56 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:57 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-perm-unlock-1763293076684[39m
+[32m✅ ✅ 永久解鎖後可發送 20 條消息 (無限制)[0m
+[32m✅ 測試 3: 永久解鎖後無限制 - 通過 (2147ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 4: 廣告解鎖邏輯 (免費用戶,每次解鎖 5 條,上限 10 次)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-limits-strict-ad-unlock-1763293078831, 會員等級: free[0m
+[34mℹ️  先用完基礎額度 10 條...[0m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:58 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+[32m✅ 基礎額度已用完[0m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+[32m✅ ✅ 基礎額度用完後正確拒絕[0m
+[34mℹ️  觀看廣告解鎖...[0m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-ad-unlock-1763293078831[39m
+2025-11-16 19:37:59 [[32minfo[39m]: [32m[廣告解鎖] Transaction 內驗證通過 - 用戶 test-limits-strict-ad-unlock-1763293078831 觀看廣告解鎖對話[39m
+[31m❌ 測試失敗: Firestore transactions require all reads to be executed before all writes.[0m
+Error: Firestore transactions require all reads to be executed before all writes.
+    at Transaction.get (D:\project\chat-app-all\shared\backend-utils\node_modules\@google-cloud\firestore\build\src\transaction.js:97:19)
+    at file:///D:/project/chat-app-all/chat-app/backend/src/conversation/conversationLimit.service.js:159:40
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Transaction.runTransactionOnce (D:\project\chat-app-all\shared\backend-utils\node_modules\@google-cloud\firestore\build\src\transaction.js:440:28)
+    at async D:\project\chat-app-all\shared\backend-utils\node_modules\@google-cloud\firestore\build\src\transaction.js:412:28
+    at async unlockByAd (file:///D:/project/chat-app-all/chat-app/backend/src/conversation/conversationLimit.service.js:75:3)
+    at async Object.testAdUnlock [as fn] (file:///D:/project/chat-app-all/chat-app/backend/scripts/test-limits-strict.js:357:5)
+    at async runAllTests (file:///D:/project/chat-app-all/chat-app/backend/scripts/test-limits-strict.js:678:20)
+[31m❌ 測試 4: 廣告解鎖邏輯 - 失敗 (828ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 5: VIP 用戶限制 (20 條/角色)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-limits-strict-vip-1763293079659, 會員等級: vip[0m
+[34mℹ️  VIP 用戶發送 20 條消息...[0m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:37:59 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:00 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+[32m✅ ✅ VIP 用戶可發送 20 條[0m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-vip-1763293079659[39m
+[31m❌ ❌ 達到 VIP 限制後仍可發送[0m
+[31m❌ 測試 5: VIP 用戶限制 - 失敗 (2093ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 6: 語音限制 - 免費用戶 (10 次/角色)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-limits-strict-voice-free-1763293081752, 會員等級: free[0m
+[34mℹ️  免費用戶播放 10 次語音...[0m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:01 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+2025-11-16 19:38:02 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+[32m✅ ✅ 免費用戶可播放 10 次語音[0m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-free-1763293081752[39m
+[31m❌ ❌ 達到語音限制後仍可播放[0m
+[31m❌ 測試 6: 語音限制 - 免費用戶 - 失敗 (1339ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 7: 語音限制 - VIP 用戶無限制[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-limits-strict-voice-vip-1763293083092, 會員等級: vip[0m
+[34mℹ️  VIP 用戶播放 50 次語音...[0m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:03 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:04 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:05 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:06 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:07 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-voice-vip-1763293083092[39m
+[32m✅ ✅ VIP 用戶可播放 50 次語音 (無限制)[0m
+[32m✅ 測試 7: 語音限制 - VIP 無限制 - 通過 (5510ms)[0m
+
+======================================================================
+[36m📋 測試: 測試 8: 並發語音播放 (同一角色,免費用戶 10 次限制)[0m
+======================================================================
+[34mℹ️  創建測試用戶: test-limits-strict-concurrent-voice-1763293088602, 會員等級: free[0m
+[34mℹ️  同時播放 15 次語音 (限制 10 次)...[0m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存未命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 從數據庫讀取用戶檔案: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存已設置: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:08 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:09 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+2025-11-16 19:38:10 [[34mdebug[39m]: [34m[UserProfileCache] 緩存命中: test-limits-strict-concurrent-voice-1763293088602[39m
+[34mℹ️  所有請求完成,耗時: 2307ms[0m
+[34mℹ️  成功: 10, 失敗: 5[0m
+[32m✅ ✅ 並發計數正確: 10 次[0m
+[32m✅ 測試 8: 並發語音播放 - 通過 (2408ms)[0m
+
+======================================================================
+[36m📊 測試摘要[0m
+======================================================================
+[32m✅ ✅ 測試 1: 並發發送消息 (同一角色) (2297ms)[0m
+[31m❌ ❌ 測試 2: 跨角色限制獨立性 (3105ms)[0m
+[32m✅ ✅ 測試 3: 永久解鎖後無限制 (2147ms)[0m
+[31m❌ ❌ 測試 4: 廣告解鎖邏輯 (828ms)[0m
+[31m❌ ❌ 測試 5: VIP 用戶限制 (2093ms)[0m
+[31m❌ ❌ 測試 6: 語音限制 - 免費用戶 (1339ms)[0m
+[32m✅ ✅ 測試 7: 語音限制 - VIP 無限制 (5510ms)[0m
+[32m✅ ✅ 測試 8: 並發語音播放 (2408ms)[0m
+
+======================================================================
+[34m總耗時: 19728ms[0m
+[31m[1m[31m⚠️  部分測試失敗 (4/8)[0m[0m
+======================================================================
+
+[31m❌ 限制服務嚴格測試 - 失敗 (20116ms)
+[0m
+
+================================================================================
+[36m📋 會員升級測試[0m
+================================================================================
+
+[34m會員升級流程、並發防護、獎勵發放 (5 個測試)[0m
+
+[34m🚀 運行: 會員升級測試[0m
+[34m   腳本: test-membership-upgrade.js[0m
+
+file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:27
+    throw new Error(
+          ^
+
+Error: Missing Firebase Admin environment variables: FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, FIREBASE_ADMIN_PRIVATE_KEY
+    at buildAdminConfig (file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:27:11)
+    at ensureApp (file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:57:17)
+    at getFirestoreDb (file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:73:3)
+    at file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:79:19
+    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.12.0
+[31m❌ 會員升級測試 - 失敗 (303ms)
+[0m
+
+================================================================================
+[36m📋 角色解鎖購買測試[0m
+================================================================================
+
+[34m解鎖券/金幣購買、數據遷移、重複購買防護 (6 個測試)[0m
+
+[34m🚀 運行: 角色解鎖購買測試[0m
+[34m   腳本: test-character-unlock.js[0m
+
+file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:27
+    throw new Error(
+          ^
+
+Error: Missing Firebase Admin environment variables: FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, FIREBASE_ADMIN_PRIVATE_KEY
+    at buildAdminConfig (file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:27:11)
+    at ensureApp (file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:57:17)
+    at getFirestoreDb (file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:73:3)
+    at file:///D:/project/chat-app-all/shared/backend-utils/firebase.js:79:19
+    at ModuleJob.run (node:internal/modules/esm/module_job:271:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:547:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.12.0
+[31m❌ 角色解鎖購買測試 - 失敗 (300ms)
+[0m
+
+================================================================================
+[36m📊 測試總結[0m
+================================================================================
+
+[32m✅ 金幣系統嚴格測試: 通過 (7540ms)[0m
+[31m❌ 限制服務嚴格測試: 失敗 (20116ms)[0m
+[31m❌ 會員升級測試: 失敗 (303ms)[0m
+[31m❌ 角色解鎖購買測試: 失敗 (300ms)[0m
+
+================================================================================
+[34m總耗時: 28.27s[0m
+[31m[1m[31m⚠️  部分測試失敗 (1/4)[0m[0m
+================================================================================
+
+================================================================================
+[31m❌ 失敗的測試[0m
+================================================================================
+[31m  - 限制服務嚴格測試[0m
+[31m  - 會員升級測試[0m
+[31m  - 角色解鎖購買測試[0m
+================================================================================
+

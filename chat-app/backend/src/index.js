@@ -49,6 +49,7 @@ import { initializeCharactersCache, getCacheStats as getCharacterCacheStats } fr
 import { startCacheStatsMonitoring, getCacheStats as getUserCacheStats } from "./user/userProfileCache.service.js";
 import { errorHandlerMiddleware } from "../../../shared/utils/errorFormatter.js";
 import { errorHandler } from "./utils/AppError.js";
+import { logEnvironmentInfo } from "./utils/envModeHelper.js";
 
 const app = express();
 const port = process.env.PORT ?? 4000;
@@ -285,6 +286,9 @@ app.listen(port, async () => {
   logger.info(`API 伺服器已啟動於 http://localhost:${port}`);
   logger.info(`環境: ${process.env.NODE_ENV || "development"}`);
   logger.info(`日誌級別: ${logger.level}`);
+
+  // 輸出環境配置信息（Mock 模式檢測）
+  logEnvironmentInfo();
 
   // 初始化 characters 緩存
   try {

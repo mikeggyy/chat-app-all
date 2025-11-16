@@ -79,11 +79,15 @@ export function useCoins(): UseCoinsReturn {
     error.value = null;
 
     try {
-      const data = await apiJson('/api/coins/balance', {
+      const response = await apiJson('/api/coins/balance', {
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
 
+      // ✅ 修復：處理包裹在 data 欄位中的響應
+      const data = response.data || response;
+
       coinsState.value.balance = data.balance || 0;
+      logger.log('[useCoins] 金幣餘額已更新:', coinsState.value.balance);
       return data;
     } catch (err: any) {
       error.value = err?.message || '載入金幣餘額失敗';

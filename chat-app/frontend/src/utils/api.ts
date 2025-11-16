@@ -491,7 +491,29 @@ export const apiJsonCached = async <T = any>(path: string, options: ApiCacheOpti
  * ```
  */
 export const clearApiCache = (pattern?: string | RegExp | null): void => {
+  // Clear long-term API cache
   apiCache.clear(pattern);
+
+  // ✅ Also clear JSON result deduplication cache
+  if (!pattern) {
+    // Clear all
+    jsonResultCache.clear();
+    return;
+  }
+
+  // Clear matching keys
+  const isRegex = pattern instanceof RegExp;
+  const keys = Array.from(jsonResultCache.keys());
+
+  for (const key of keys) {
+    const shouldDelete = isRegex
+      ? pattern.test(key)
+      : key.includes(pattern);
+
+    if (shouldDelete) {
+      jsonResultCache.delete(key);
+    }
+  }
 };
 
 /**

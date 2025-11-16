@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { apiJson } from "../utils/api";
@@ -10,16 +10,51 @@ import {
   clearTestSession,
 } from "../services/testAuthSession";
 
+// Types
+type StatusType = "idle" | "loading" | "success" | "error" | "info";
+
+interface FirebaseError extends Error {
+  code?: string;
+}
+
+interface TestAuthResponse {
+  user: {
+    id: string;
+    displayName: string;
+    email?: string;
+  };
+  token: string;
+  expiresIn: string | number;
+}
+
+interface TestUserProfile {
+  id: string;
+  displayName: string;
+  email: string;
+  locale: string;
+  photoURL: string;
+  defaultPrompt: string;
+  notificationOptIn: boolean;
+  signInProvider: string;
+  isGuest: boolean;
+  hasCompletedOnboarding: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string;
+  conversations: string[];
+  favorites: string[];
+}
+
 const router = useRouter();
-const { loadUserProfile, setUserProfile } = useUserProfile();
+const { setUserProfile } = useUserProfile();
 const { signInWithGoogle, resolveRedirectResult } = useFirebaseAuth();
 const { resetGuestMessageCount } = useGuestGuard();
 
-const statusMessage = ref("");
-const statusType = ref("idle");
-const isLoading = ref(false);
+const statusMessage = ref<string>("");
+const statusType = ref<StatusType>("idle");
+const isLoading = ref<boolean>(false);
 
-const setStatus = (type, message) => {
+const setStatus = (type: StatusType, message: string): void => {
   statusType.value = type;
   statusMessage.value = message;
 };
@@ -27,8 +62,8 @@ const setStatus = (type, message) => {
 // ⚠️ 方案 A：LoginView 只負責 Firebase Auth，不再處理用戶創建和狀態同步
 // 所有用戶狀態同步由 authBootstrap.js 統一處理，避免重複請求和競態條件
 
-const mapFirebaseErrorMessage = (error) => {
-  const code = error?.code ?? "";
+const mapFirebaseErrorMessage = (error: FirebaseError | Error | unknown): string => {
+  const code = (error as FirebaseError)?.code ?? "";
   switch (code) {
     case "auth/network-request-failed":
       return "網路連線異常，請稍後再試。";
@@ -47,10 +82,10 @@ const mapFirebaseErrorMessage = (error) => {
   }
 };
 
-const handleFirebaseAuthError = (error) => {
+const handleFirebaseAuthError = (error: FirebaseError | Error | unknown): void => {
   if (!error) return;
 
-  if (error?.code === "auth/redirect-cancelled-by-user") {
+  if ((error as FirebaseError)?.code === "auth/redirect-cancelled-by-user") {
     setStatus("idle", "您已取消 Google 登入流程。");
     return;
   }
@@ -70,7 +105,7 @@ const handleFirebaseAuthError = (error) => {
 };
 
 // ✅ 簡化的 Google 登入處理：只負責 Firebase Auth
-const handleGoogleLogin = async () => {
+const handleGoogleLogin = async (): Promise<void> => {
   if (isLoading.value) return;
   isLoading.value = true;
   setStatus("loading", "正在連線至 Google 登入服務...");
@@ -107,18 +142,18 @@ const handleGoogleLogin = async () => {
 };
 
 // ✅ 測試/遊客登入：不使用 Firebase Auth，需要手動處理
-const handleTestLogin = async () => {
+const handleTestLogin = async (): Promise<void> => {
   if (isLoading.value) return;
   isLoading.value = true;
   setStatus("loading", "正在以遊客身份登入...");
 
   try {
-    const data = await apiJson("/auth/test", {
+    const data = await apiJson<TestAuthResponse>("/auth/test", {
       method: "POST",
     });
 
     const nowIso = new Date().toISOString();
-    const testUser = {
+    const testUser: TestUserProfile = {
       id: data.user.id,
       displayName: data.user.displayName,
       email: data.user.email ?? "",

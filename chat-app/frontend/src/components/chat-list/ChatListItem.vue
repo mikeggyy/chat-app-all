@@ -45,7 +45,6 @@
       :style="{
         transform: `translate3d(${SWIPE_ACTION_WIDTH + swipeOffset}px, 0, 0)`,
       }"
-      aria-hidden="true"
     >
       <div class="chat-thread__actions-inner">
         <!-- 收藏按鈕 -->
@@ -59,6 +58,7 @@
           aria-label="收藏對話"
           :aria-pressed="thread.isFavorite ? 'true' : 'false'"
           :aria-busy="isFavoriting || isDeleting ? 'true' : 'false'"
+          :tabindex="swipeOffset < 0 ? 0 : -1"
           :disabled="isFavoriting || isDeleting"
           @pointerdown.stop
           @click.stop="$emit('favorite', thread)"
@@ -93,6 +93,7 @@
           class="chat-thread__action chat-thread__action--delete"
           aria-label="隱藏對話"
           :aria-busy="isDeleting ? 'true' : 'false'"
+          :tabindex="swipeOffset < 0 ? 0 : -1"
           :disabled="isDeleting || isFavoriting"
           @pointerdown.stop
           @click.stop="$emit('delete', thread)"
@@ -105,6 +106,7 @@
           >
             <path
               d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zm3.46-6.88a.75.75 0 0 1 1.06.02L12 13.59l1.48-1.45a.75.75 0 0 1 1.04 1.08L13.09 14.5l1.43 1.47a.75.75 0 0 1-1.08 1.04L12 15.56l-1.44 1.45a.75.75 0 0 1-1.07-1.05l1.44-1.47-1.39-1.35a.75.75 0 0 1-.02-1.02zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"
+              fill="currentColor"
             />
           </svg>
         </button>
@@ -401,8 +403,8 @@ defineExpose({
 }
 
 .chat-thread__action--delete {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  background: rgba(15, 23, 42, 0.5);
+  color: #ef4444;
 }
 
 .chat-thread__icon {

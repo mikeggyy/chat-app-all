@@ -1,24 +1,24 @@
-<script setup>
+<script setup lang="ts">
 import { ArrowLeftIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 
-defineProps({
-  currentStep: {
-    type: String,
-    required: true,
-  },
-  settingsStepValue: {
-    type: String,
-    required: true,
-  },
-  title: {
-    type: String,
-    default: "",
-  },
+// Types
+interface Props {
+  currentStep: string;
+  settingsStepValue: string;
+  title?: string;
+}
+
+interface Emits {
+  (e: "back"): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  title: "",
 });
 
-const emit = defineEmits(["back"]);
+const emit = defineEmits<Emits>();
 
-const handleBack = () => {
+const handleBack = (): void => {
   emit("back");
 };
 </script>

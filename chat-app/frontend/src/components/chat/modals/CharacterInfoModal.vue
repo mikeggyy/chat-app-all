@@ -1,22 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 
-defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  characterName: {
-    type: String,
-    default: '',
-  },
-  background: {
-    type: String,
-    default: '',
-  },
+// Types
+interface Props {
+  isOpen: boolean;
+  characterName?: string;
+  background?: string;
+}
+
+interface Emits {
+  (e: 'close'): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  characterName: '',
+  background: '',
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits<Emits>();
 </script>
 
 <template>

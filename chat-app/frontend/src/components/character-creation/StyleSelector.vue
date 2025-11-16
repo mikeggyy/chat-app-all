@@ -1,31 +1,39 @@
-<script setup>
+<script setup lang="ts">
 import { ArrowRightIcon } from "@heroicons/vue/24/outline";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
 
-const props = defineProps({
-  styleOptions: {
-    type: Array,
-    required: true,
-  },
-  selectedStyles: {
-    type: Array,
-    required: true,
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
+// Types
+interface StyleOption {
+  id: string;
+  label: string;
+  thumbnail: string;
+  [key: string]: any;
+}
+
+interface Props {
+  styleOptions: StyleOption[];
+  selectedStyles: string[];
+  isLoading?: boolean;
+}
+
+interface Emits {
+  (e: "toggle-style", styleId: string): void;
+  (e: "show-all"): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isLoading: false,
 });
 
-const emit = defineEmits(["toggle-style", "show-all"]);
+const emit = defineEmits<Emits>();
 
-const isStyleSelected = (styleId) => props.selectedStyles.includes(styleId);
+const isStyleSelected = (styleId: string): boolean => props.selectedStyles.includes(styleId);
 
-const handleToggleStyle = (styleId) => {
+const handleToggleStyle = (styleId: string): void => {
   emit("toggle-style", styleId);
 };
 
-const handleShowAll = () => {
+const handleShowAll = (): void => {
   emit("show-all");
 };
 </script>

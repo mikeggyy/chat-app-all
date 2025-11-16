@@ -32,36 +32,52 @@ defineProps({
 
 <style scoped>
 .chat-list-banner {
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 0.875rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
   text-align: center;
-  background: var(--info-bg, #dbeafe);
-  color: var(--info-text, #1e40af);
-  border-bottom: 1px solid var(--info-border, #93c5fd);
+  background: rgba(30, 41, 59, 0.95);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 12px;
   margin: 0;
-  animation: slideDown 0.3s ease-out;
+  min-width: 200px;
+  max-width: 90%;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .chat-list-banner.is-error {
-  background: var(--error-bg, #fee2e2);
-  color: var(--error-text, #991b1b);
-  border-bottom-color: var(--error-border, #fca5a5);
+  background: rgba(30, 41, 59, 0.95);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .chat-list-banner.is-success {
-  background: var(--success-bg, #d1fae5);
-  color: var(--success-text, #065f46);
-  border-bottom-color: var(--success-border, #6ee7b7);
+  background: rgba(30, 41, 59, 0.95);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.3);
+  box-shadow: 0 8px 32px rgba(16, 185, 129, 0.3),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateX(-50%) translateY(-20px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0) scale(1);
   }
 }
 </style>

@@ -1,40 +1,50 @@
-<script setup>
-import { computed } from 'vue';
+<script setup lang="ts">
+import { computed, type ComputedRef } from 'vue';
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  buffType: {
-    type: String,
-    default: '',
-  },
-  characterName: {
-    type: String,
-    default: '',
-  },
-  activeMemoryBoost: {
-    type: Object,
-    default: null,
-  },
-  activeBrainBoost: {
-    type: Object,
-    default: null,
-  },
-  activeCharacterUnlock: {
-    type: Object,
-    default: null,
-  },
+// Types
+interface BoostEffect {
+  activatedAt: string | number | Date;
+  expiresAt: string | number | Date;
+  unlockUntil?: string | number | Date;
+}
+
+interface BuffDetails {
+  name: string;
+  icon: string;
+  description: string;
+  activatedAt: string;
+  expiresAt: string;
+  remainingDays: number;
+}
+
+interface Props {
+  isOpen: boolean;
+  buffType?: string;
+  characterName?: string;
+  activeMemoryBoost?: BoostEffect | null;
+  activeBrainBoost?: BoostEffect | null;
+  activeCharacterUnlock?: BoostEffect | null;
+}
+
+interface Emits {
+  (e: 'close'): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  buffType: '',
+  characterName: '',
+  activeMemoryBoost: null,
+  activeBrainBoost: null,
+  activeCharacterUnlock: null,
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits<Emits>();
 
-const buffDetails = computed(() => {
+const buffDetails: ComputedRef<BuffDetails | null> = computed(() => {
   if (!props.buffType) return null;
 
-  let effect = null;
+  let effect: BoostEffect | null | undefined = null;
   let name = '';
   let icon = '';
   let description = '';
@@ -59,15 +69,15 @@ const buffDetails = computed(() => {
   if (!effect) return null;
 
   const now = new Date();
-  const expiresAt = new Date(effect.expiresAt || effect.unlockUntil);
-  const remainingMs = expiresAt - now;
+  const expiresAt = new Date(effect.expiresAt || effect.unlockUntil!);
+  const remainingMs = expiresAt.getTime() - now.getTime();
   const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
 
   return {
     name,
     icon,
     description,
-    activatedAt: new Date(effect.activatedAt || effect.unlockUntil).toLocaleString('zh-TW'),
+    activatedAt: new Date(effect.activatedAt || effect.unlockUntil!).toLocaleString('zh-TW'),
     expiresAt: expiresAt.toLocaleString('zh-TW'),
     remainingDays,
   };

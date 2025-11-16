@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import {
   computed,
   onBeforeUnmount,
@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from "vue";
+import type { Ref, ComputedRef } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
   fetchCharacterCreationFlow,
@@ -23,6 +24,50 @@ import SelectionStep from "../components/character-creation/SelectionStep.vue";
 import SettingsStep from "../components/character-creation/SettingsStep.vue";
 import GeneratingFooter from "../components/character-creation/GeneratingFooter.vue";
 
+// Types
+interface GeneratedResult {
+  id: string;
+  label: string;
+  image: string;
+  alt: string;
+  name: string;
+  tagline: string;
+  prompt: string;
+}
+
+interface PersonaForm {
+  name: string;
+  tagline: string;
+  hiddenProfile: string;
+  prompt: string;
+}
+
+interface FlowRecord {
+  generation?: {
+    result?: {
+      images?: Array<{ url: string; [key: string]: any }>;
+    };
+  };
+  [key: string]: any;
+}
+
+interface GenerateImagesOptions {
+  quality: string;
+  count: number;
+}
+
+interface GenerateImagesResponse {
+  images: Array<{ url: string; [key: string]: any }>;
+  flow: FlowRecord;
+}
+
+interface PersonaResponse {
+  name?: string;
+  tagline?: string;
+  hiddenProfile?: string;
+  prompt?: string;
+}
+
 const router = useRouter();
 const route = useRoute();
 
@@ -31,29 +76,31 @@ const Step = Object.freeze({
   PROGRESS: "progress",
   SELECTION: "selection",
   SETTINGS: "settings",
-});
+} as const);
+
+type StepType = typeof Step[keyof typeof Step];
 
 // ✅ 使用集中化配置（從 config/characterCreation.js 導入）
-const MAX_NAME_LENGTH = CHARACTER_CREATION_LIMITS.MAX_NAME_LENGTH;
-const MAX_TAGLINE_LENGTH = CHARACTER_CREATION_LIMITS.MAX_TAGLINE_LENGTH;
-const MAX_PROMPT_LENGTH = CHARACTER_CREATION_LIMITS.MAX_PROMPT_LENGTH;
-const MAX_HIDDEN_PROFILE_LENGTH = CHARACTER_CREATION_LIMITS.MAX_HIDDEN_PROFILE_LENGTH;
+const MAX_NAME_LENGTH: number = CHARACTER_CREATION_LIMITS.MAX_NAME_LENGTH;
+const MAX_TAGLINE_LENGTH: number = CHARACTER_CREATION_LIMITS.MAX_TAGLINE_LENGTH;
+const MAX_PROMPT_LENGTH: number = CHARACTER_CREATION_LIMITS.MAX_PROMPT_LENGTH;
+const MAX_HIDDEN_PROFILE_LENGTH: number = CHARACTER_CREATION_LIMITS.MAX_HIDDEN_PROFILE_LENGTH;
 
 // 進度條狀態
-const progress = ref(18);
-const isAnimating = ref(false);
-let progressTimer = null;
+const progress: Ref<number> = ref(18);
+const isAnimating: Ref<boolean> = ref(false);
+let progressTimer: number | null = null;
 
 // 生成結果
-const generatedResults = ref([]);
-const selectedResultId = ref("");
-const generatingEmblem = "/character-create/generating-emblem.png";
+const generatedResults: Ref<GeneratedResult[]> = ref([]);
+const selectedResultId: Ref<string> = ref("");
+const generatingEmblem: string = "/character-create/generating-emblem.png";
 
 // 當前步驟
-const currentStep = ref(Step.PROGRESS);
+const currentStep: Ref<StepType> = ref(Step.PROGRESS);
 
 // 表單數據
-const personaForm = reactive({
+const personaForm: PersonaForm = reactive({
   name: "",
   tagline: "",
   hiddenProfile: "",
@@ -69,22 +116,22 @@ const {
 } = useGenderPreference();
 
 // AI 相關狀態
-const isAIMagicianLoading = ref(false);
-const aiMagicianError = ref(null);
-const isGeneratingImages = ref(false);
-const imageGenerationError = ref(null);
+const isAIMagicianLoading: Ref<boolean> = ref(false);
+const aiMagicianError: Ref<string | null> = ref(null);
+const isGeneratingImages: Ref<boolean> = ref(false);
+const imageGenerationError: Ref<string | null> = ref(null);
 
 // Computed 屬性
-const isComplete = computed(() => progress.value >= 100);
-const progressText = computed(() => `${progress.value}%`);
-const statusText = computed(() =>
+const isComplete: ComputedRef<boolean> = computed(() => progress.value >= 100);
+const progressText: ComputedRef<string> = computed(() => `${progress.value}%`);
+const statusText: ComputedRef<string> = computed(() =>
   progress.value >= 100 ? "角色生成完成！" : "角色生成中"
 );
 
-const isSelectionStep = computed(() => currentStep.value === Step.SELECTION);
-const isSettingsStep = computed(() => currentStep.value === Step.SETTINGS);
+const isSelectionStep: ComputedRef<boolean> = computed(() => currentStep.value === Step.SELECTION);
+const isSettingsStep: ComputedRef<boolean> = computed(() => currentStep.value === Step.SETTINGS);
 
-const headerTitle = computed(() => {
+const headerTitle: ComputedRef<string> = computed(() => {
   if (currentStep.value === Step.SETTINGS) {
     return "角色設定";
   }
@@ -94,7 +141,7 @@ const headerTitle = computed(() => {
   return "";
 });
 
-const selectedResult = computed(() => {
+const selectedResult: ComputedRef<GeneratedResult | null> = computed(() => {
   return (
     generatedResults.value.find(
       (result) => result.id === selectedResultId.value
@@ -104,19 +151,19 @@ const selectedResult = computed(() => {
   );
 });
 
-const selectedResultImage = computed(() => selectedResult.value?.image ?? "");
-const selectedResultAlt = computed(
+const selectedResultImage: ComputedRef<string> = computed(() => selectedResult.value?.image ?? "");
+const selectedResultAlt: ComputedRef<string> = computed(
   () =>
     selectedResult.value?.alt ?? selectedResult.value?.label ?? "生成角色預覽"
 );
-const selectedResultLabel = computed(() => selectedResult.value?.label ?? "");
+const selectedResultLabel: ComputedRef<string> = computed(() => selectedResult.value?.label ?? "");
 
-const nameLength = computed(() => personaForm.name.length);
-const taglineLength = computed(() => personaForm.tagline.length);
-const hiddenProfileLength = computed(() => personaForm.hiddenProfile.length);
-const promptLength = computed(() => personaForm.prompt.length);
+const nameLength: ComputedRef<number> = computed(() => personaForm.name.length);
+const taglineLength: ComputedRef<number> = computed(() => personaForm.tagline.length);
+const hiddenProfileLength: ComputedRef<number> = computed(() => personaForm.hiddenProfile.length);
+const promptLength: ComputedRef<number> = computed(() => personaForm.prompt.length);
 
-const confirmButtonLabel = computed(() => {
+const confirmButtonLabel: ComputedRef<string> = computed(() => {
   if (currentStep.value === Step.SELECTION) {
     return "下一步";
   }
@@ -126,7 +173,7 @@ const confirmButtonLabel = computed(() => {
   return "確認";
 });
 
-const isConfirmDisabled = computed(() => {
+const isConfirmDisabled: ComputedRef<boolean> = computed(() => {
   if (currentStep.value === Step.PROGRESS) {
     return true;
   }
@@ -147,18 +194,9 @@ const isConfirmDisabled = computed(() => {
 // 使用 Character Creation Flow Composable
 const {
   flowId,
-  flowStatus,
-  isFlowInitializing,
-  isSyncingSummary,
-  lastFlowSyncError,
-  isReadyForSync,
-  savedAppearanceData,
   buildSummaryPayload,
-  buildMetadataPayload,
   persistSummaryToSession,
-  restoreSummaryFromSession,
   applyFlowRecord,
-  ensureFlowInitialized,
   syncSummaryToBackend,
   scheduleBackendSync,
   initializeFlowState,
@@ -167,27 +205,27 @@ const {
   setSuppressSync,
 } = useCharacterCreationFlow({
   personaForm,
-  selectedResult,
+  selectedResult: selectedResult as any,
   selectedResultId,
   selectedResultLabel,
   selectedResultImage,
   selectedResultAlt,
   genderPreference,
-  normalizeGenderPreference,
-  readStoredGenderPreference,
-  ensureGenderPreference,
+  normalizeGenderPreference: normalizeGenderPreference as any,
+  readStoredGenderPreference: readStoredGenderPreference as any,
+  ensureGenderPreference: ensureGenderPreference as any,
   currentStep,
 });
 
 // 工具函數
-const stopTimer = () => {
-  if (progressTimer) {
+const stopTimer = (): void => {
+  if (progressTimer !== null) {
     window.clearInterval(progressTimer);
     progressTimer = null;
   }
 };
 
-const beginProgressAnimation = () => {
+const beginProgressAnimation = (): void => {
   if (typeof window === "undefined" || isAnimating.value) {
     return;
   }
@@ -207,13 +245,13 @@ const beginProgressAnimation = () => {
 };
 
 // beforeunload 處理函數
-const handleBeforeUnload = (event) => {
+const handleBeforeUnload = (event: BeforeUnloadEvent): string => {
   event.preventDefault();
   event.returnValue = ""; // Chrome 需要設置 returnValue
   return ""; // 部分瀏覽器需要返回字串
 };
 
-const triggerImageGeneration = async () => {
+const triggerImageGeneration = async (): Promise<void> => {
   // 確保 flowId 已經初始化
   if (!flowId.value) {
     // 嘗試從 localStorage 讀取
@@ -244,8 +282,8 @@ const triggerImageGeneration = async () => {
       {
         quality: "low",
         count: 4,
-      }
-    );
+      } as GenerateImagesOptions
+    ) as GenerateImagesResponse;
 
     if (images && images.length > 0) {
       // 將生成的圖片更新到 generatedResults
@@ -266,12 +304,12 @@ const triggerImageGeneration = async () => {
 
       // 更新 flow 記錄
       if (updatedFlow) {
-        applyFlowRecord(updatedFlow);
+        applyFlowRecord(updatedFlow as any);
       }
     } else {
       throw new Error("未能生成任何圖片");
     }
-  } catch (error) {
+  } catch (error: any) {
     imageGenerationError.value = error?.message || "圖片生成失敗，請稍後再試";
     // 生成失敗時停止進度動畫
     stopTimer();
@@ -284,7 +322,7 @@ const triggerImageGeneration = async () => {
   }
 };
 
-const applyResultToPersona = (result) => {
+const applyResultToPersona = (result: GeneratedResult | null): void => {
   setSuppressSync(true);
   const fallbackName = result?.name || "";
   personaForm.name = fallbackName.slice(0, MAX_NAME_LENGTH);
@@ -300,14 +338,14 @@ const applyResultToPersona = (result) => {
   scheduleBackendSync();
 };
 
-const handleBack = () => {
+const handleBack = (): void => {
   // 直接返回到 profile 頁面
   router.push({ name: "profile" }).catch(() => {
     // Silent fail
   });
 };
 
-const persistCreationSummary = async () => {
+const persistCreationSummary = async (): Promise<void> => {
   const summary = buildSummaryPayload();
   persistSummaryToSession(summary);
 
@@ -321,7 +359,7 @@ const persistCreationSummary = async () => {
   }
 };
 
-const enterSettingsStep = () => {
+const enterSettingsStep = (): void => {
   applyResultToPersona(selectedResult.value);
   currentStep.value = Step.SETTINGS;
   if (typeof window !== "undefined") {
@@ -329,13 +367,13 @@ const enterSettingsStep = () => {
   }
 };
 
-const handleConfirm = async () => {
+const handleConfirm = async (): Promise<void> => {
   if (currentStep.value === Step.SELECTION) {
     if (!selectedResultId.value) {
       return;
     }
     // 在進入設定步驟前，先同步選擇的外觀到後端
-    await syncSummaryToBackend({ immediate: true });
+    await syncSummaryToBackend({} as any);
     enterSettingsStep();
     return;
   }
@@ -352,10 +390,7 @@ const handleConfirm = async () => {
   }
 };
 
-const isResultSelected = (resultId) =>
-  selectedResultId.value === resultId && currentStep.value === Step.SELECTION;
-
-const handleResultSelect = (resultId) => {
+const handleResultSelect = (resultId: string): void => {
   if (currentStep.value !== Step.SELECTION || !resultId) {
     return;
   }
@@ -365,7 +400,7 @@ const handleResultSelect = (resultId) => {
   persistSummaryToSession(summary);
 };
 
-const openAIMagician = async () => {
+const openAIMagician = async (): Promise<void> => {
   if (isAIMagicianLoading.value) {
     return;
   }
@@ -384,7 +419,7 @@ const openAIMagician = async () => {
     isAIMagicianLoading.value = true;
     aiMagicianError.value = null;
 
-    const persona = await generateCharacterPersonaWithAI(flowId.value);
+    const persona = await generateCharacterPersonaWithAI(flowId.value) as PersonaResponse;
 
     if (persona) {
       setSuppressSync(true);
@@ -394,9 +429,9 @@ const openAIMagician = async () => {
       personaForm.prompt = persona.prompt || "";
       setSuppressSync(false);
 
-      scheduleBackendSync({ immediate: true });
+      scheduleBackendSync({} as any);
     }
-  } catch (error) {
+  } catch (error: any) {
     aiMagicianError.value = error?.message || "AI 魔法師生成失敗，請稍後再試";
   } finally {
     isAIMagicianLoading.value = false;
@@ -418,8 +453,8 @@ watch(
 );
 
 // 創建表單欄位 watcher 的工具函數（避免重複代碼）
-const createFieldWatcher = (fieldName, maxLength) => {
-  return (value) => {
+const createFieldWatcher = (fieldName: keyof PersonaForm, maxLength: number) => {
+  return (value: string): void => {
     if (getSuppressSync()) return;
 
     if (typeof value !== "string") {
@@ -475,7 +510,7 @@ onMounted(() => {
       () => {
         return null;
       }
-    );
+    ) as FlowRecord | null;
 
     if (!currentFlow) {
       imageGenerationError.value = "找不到角色創建流程，請返回重新開始";
@@ -483,11 +518,11 @@ onMounted(() => {
     }
 
     const hasGeneratedImages =
-      currentFlow?.generation?.result?.images?.length > 0;
+      (currentFlow?.generation?.result?.images?.length ?? 0) > 0;
 
     if (hasGeneratedImages) {
       // 如果已有生成的圖片，直接使用
-      const images = currentFlow.generation.result.images;
+      const images = currentFlow.generation!.result!.images!;
       generatedResults.value = images.map((img, index) => ({
         id: `generated-${index}`,
         label: `風格 ${index + 1}`,

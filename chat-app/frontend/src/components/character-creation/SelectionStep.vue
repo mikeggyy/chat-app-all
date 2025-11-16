@@ -1,34 +1,40 @@
-<script setup>
-const props = defineProps({
-  selectedResultImage: {
-    type: String,
-    default: "",
-  },
-  selectedResultAlt: {
-    type: String,
-    default: "生成角色預覽",
-  },
-  generatedResults: {
-    type: Array,
-    default: () => [],
-  },
-  selectedResultId: {
-    type: String,
-    default: "",
-  },
-  isSelectionStep: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+// Types
+interface GeneratedResult {
+  id: string;
+  image: string;
+  alt?: string;
+  label?: string;
+  [key: string]: any;
+}
+
+interface Props {
+  selectedResultImage?: string;
+  selectedResultAlt?: string;
+  generatedResults?: GeneratedResult[];
+  selectedResultId?: string;
+  isSelectionStep?: boolean;
+}
+
+interface Emits {
+  (e: "select", resultId: string): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  selectedResultImage: "",
+  selectedResultAlt: "生成角色預覽",
+  generatedResults: () => [],
+  selectedResultId: "",
+  isSelectionStep: false,
 });
 
-const emit = defineEmits(["select"]);
+const emit = defineEmits<Emits>();
 
-const isResultSelected = (resultId) => {
+const isResultSelected = (resultId: string): boolean => {
   return resultId === props.selectedResultId;
 };
 
-const handleResultSelect = (resultId) => {
+const handleResultSelect = (resultId: string): void => {
   emit("select", resultId);
 };
 </script>

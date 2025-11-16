@@ -85,38 +85,47 @@
   </Teleport>
 </template>
 
-<script setup>
-import { ref, watch } from "vue";
+<script setup lang="ts">
+import { ref, watch, type Ref } from "vue";
 import { XMarkIcon, CheckIcon } from "@heroicons/vue/24/outline";
 import { apiJson } from "../../utils/api";
 import { useFirebaseAuth } from "../../composables/useFirebaseAuth";
 import { logger } from "@/utils/logger";
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  characterId: {
-    type: String,
-    required: true,
-  },
-  characterPhotoUrl: {
-    type: String,
-    default: "",
-  },
+// Types
+interface Photo {
+  id: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+  mediaType: string;
+  isDefault?: boolean;
+}
+
+interface Props {
+  isOpen: boolean;
+  characterId: string;
+  characterPhotoUrl?: string;
+}
+
+interface Emits {
+  (e: 'close'): void;
+  (e: 'select', imageUrl: string): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  characterPhotoUrl: "",
 });
 
-const emit = defineEmits(["close", "select"]);
+const emit = defineEmits<Emits>();
 
 const firebaseAuth = useFirebaseAuth();
-const isLoading = ref(false);
-const errorMessage = ref("");
-const photos = ref([]);
-const selectedPhoto = ref(null); // 當前選中的照片
+const isLoading: Ref<boolean> = ref(false);
+const errorMessage: Ref<string> = ref("");
+const photos: Ref<Photo[]> = ref([]);
+const selectedPhoto: Ref<Photo | null> = ref(null);
 
 // 載入照片
-const loadPhotos = async () => {
+const loadPhotos = async (): Promise<void> => {
   if (!props.characterId) return;
 
   isLoading.value = true;
@@ -139,18 +148,18 @@ const loadPhotos = async () => {
 
     // 只保留圖片類型的照片（不包含影片）
     const userPhotos = (response.photos || []).filter(
-      (photo) => photo.mediaType === "image" && photo.imageUrl
+      (photo: any) => photo.mediaType === "image" && photo.imageUrl
     );
 
     // 🎯 將角色預設照片加到列表開頭
-    const allPhotos = [];
+    const allPhotos: Photo[] = [];
     if (props.characterPhotoUrl) {
       allPhotos.push({
         id: "default",
         imageUrl: props.characterPhotoUrl,
         thumbnailUrl: props.characterPhotoUrl,
         mediaType: "image",
-        isDefault: true, // 標記為預設照片
+        isDefault: true,
       });
     }
 
@@ -166,7 +175,7 @@ const loadPhotos = async () => {
 // 當彈窗打開時載入照片
 watch(
   () => props.isOpen,
-  (newValue) => {
+  (newValue: boolean): void => {
     if (newValue) {
       loadPhotos();
     } else {
@@ -180,12 +189,12 @@ watch(
 );
 
 // 選擇照片（只標記為選中，不立即發送）
-const handleSelectPhoto = (photo) => {
+const handleSelectPhoto = (photo: Photo): void => {
   selectedPhoto.value = photo;
 };
 
 // 確認選擇
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   if (selectedPhoto.value) {
     emit("select", selectedPhoto.value.imageUrl);
     handleClose();
@@ -193,12 +202,12 @@ const handleConfirm = () => {
 };
 
 // 取消選擇
-const handleCancel = () => {
+const handleCancel = (): void => {
   selectedPhoto.value = null;
 };
 
 // 關閉彈窗
-const handleClose = () => {
+const handleClose = (): void => {
   selectedPhoto.value = null;
   emit("close");
 };

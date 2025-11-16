@@ -1,18 +1,25 @@
-<script setup>
-const props = defineProps({
-  categories: {
-    type: Array,
-    required: true,
-  },
-  activeCategory: {
-    type: String,
-    required: true,
-  },
-});
+<script setup lang="ts">
+// Types
+interface Category {
+  id: string;
+  label: string;
+  [key: string]: any;
+}
 
-const emit = defineEmits(["change"]);
+interface Props {
+  categories: Category[];
+  activeCategory: string;
+}
 
-const handleCategoryChange = (categoryId) => {
+interface Emits {
+  (e: "change", categoryId: string): void;
+}
+
+defineProps<Props>();
+
+const emit = defineEmits<Emits>();
+
+const handleCategoryChange = (categoryId: string): void => {
   emit("change", categoryId);
 };
 </script>

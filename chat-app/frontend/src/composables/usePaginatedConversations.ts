@@ -72,11 +72,13 @@ export function usePaginatedConversations(
       const response = await apiJson(
         `/api/users/${encodeURIComponent(currentUserId)}/conversations?limit=${pageSize}`,
         { skipGlobalLoading: true }
-      ) as PaginatedConversationsResponse;
+      ) as any;
 
-      conversations.value = response.conversations || [];
-      nextCursor.value = response.nextCursor || null;
-      hasMore.value = response.hasMore || false;
+      // ✅ 修復：處理包裝在 data 字段中的響應
+      const data = response?.data || response;
+      conversations.value = data.conversations || [];
+      nextCursor.value = data.nextCursor || null;
+      hasMore.value = data.hasMore || false;
     } catch (error) {
       logger.error('[對話載入] 初始載入失敗:', error);
       conversations.value = [];
@@ -102,15 +104,17 @@ export function usePaginatedConversations(
       const response = await apiJson(
         `/api/users/${encodeURIComponent(currentUserId)}/conversations?limit=${pageSize}&cursor=${nextCursor.value}`,
         { skipGlobalLoading: true }
-      ) as PaginatedConversationsResponse;
+      ) as any;
 
-      const newConversations = response.conversations || [];
+      // ✅ 修復：處理包裝在 data 字段中的響應
+      const data = response?.data || response;
+      const newConversations = data.conversations || [];
 
       // 將新對話添加到列表末尾
       conversations.value = [...conversations.value, ...newConversations];
 
-      nextCursor.value = response.nextCursor || null;
-      hasMore.value = response.hasMore || false;
+      nextCursor.value = data.nextCursor || null;
+      hasMore.value = data.hasMore || false;
 
       return { hasMore: hasMore.value };
     } catch (error) {

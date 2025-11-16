@@ -1,37 +1,38 @@
-<script setup>
+<script setup lang="ts">
 /**
  * 快速解鎖角色懸浮按鈕
  * 從 ChatView.vue 提取為獨立組件
  */
-import { computed } from 'vue';
+import { computed, type ComputedRef } from 'vue';
 
-const props = defineProps({
+interface Props {
   /** 角色是否已解鎖 */
-  isCharacterUnlocked: {
-    type: Boolean,
-    default: false,
-  },
+  isCharacterUnlocked?: boolean;
   /** 是否擁有角色解鎖卡 */
-  hasCharacterTickets: {
-    type: Boolean,
-    default: false,
-  },
+  hasCharacterTickets?: boolean;
   /** 角色解鎖卡數量 */
-  characterTickets: {
-    type: Number,
-    default: 0,
-  },
+  characterTickets?: number;
+}
+
+interface Emits {
+  (e: 'unlock-action'): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isCharacterUnlocked: false,
+  hasCharacterTickets: false,
+  characterTickets: 0,
 });
 
-const emit = defineEmits(['unlock-action']);
+const emit = defineEmits<Emits>();
 
-const buttonTitle = computed(() => {
+const buttonTitle: ComputedRef<string> = computed(() => {
   return props.hasCharacterTickets
     ? `使用解鎖卡（擁有 ${props.characterTickets} 張）`
     : '購買解鎖卡';
 });
 
-const handleClick = () => {
+const handleClick = (): void => {
   emit('unlock-action');
 };
 </script>

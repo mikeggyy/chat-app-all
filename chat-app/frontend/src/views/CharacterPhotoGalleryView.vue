@@ -37,7 +37,7 @@
             :is-edit-mode="editMode.isEditMode.value"
             :alt="characterName"
             @click="
-              editMode.handlePhotoClick(photo, gallery.openPhotoViewer)
+              editMode.handlePhotoClick(photo as any, gallery.openPhotoViewer as any)
             "
             @toggle-selection="editMode.toggleSelection"
           />
@@ -80,9 +80,9 @@
     <!-- 圖片查看器 -->
     <Teleport to="body">
       <ImageViewerModal
-        v-if="gallery.viewingPhoto.value && gallery.viewingPhoto.value.mediaType !== 'video'"
+        v-if="gallery.viewingPhoto.value && (gallery.viewingPhoto.value as Photo).mediaType !== 'video'"
         :is-open="!!gallery.viewingPhoto.value"
-        :image-url="gallery.viewingPhoto.value.imageUrl"
+        :image-url="(gallery.viewingPhoto.value as Photo).imageUrl"
         :image-alt="`${characterName}的照片`"
         @close="gallery.closePhotoViewer"
       />
@@ -90,15 +90,16 @@
 
     <!-- 影片查看器 -->
     <VideoViewer
-      :is-open="!!(gallery.viewingPhoto.value && gallery.viewingPhoto.value.mediaType === 'video')"
-      :video="gallery.viewingPhoto.value"
+      :is-open="!!(gallery.viewingPhoto.value && (gallery.viewingPhoto.value as Photo).mediaType === 'video')"
+      :video="gallery.viewingPhoto.value || undefined"
       @close="gallery.closePhotoViewer"
     />
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import type { ComputedRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { SparklesIcon, TrashIcon } from "@heroicons/vue/24/outline";
 import { useUserProfile } from "../composables/useUserProfile";
@@ -117,6 +118,14 @@ import { usePhotoEditMode } from "../composables/photo-gallery/usePhotoEditMode"
 import { useCharacterInfo } from "../composables/photo-gallery/useCharacterInfo";
 import { useVirtualScroll } from "../composables/useVirtualScroll";
 
+// Types
+interface Photo {
+  id: string;
+  imageUrl: string;
+  mediaType?: 'image' | 'video';
+  [key: string]: any;
+}
+
 const route = useRoute();
 const router = useRouter();
 const { user } = useUserProfile();
@@ -131,7 +140,7 @@ const virtualScroll = useVirtualScroll({
 });
 
 // 路由參數
-const characterId = computed(() => route.params.characterId);
+const characterId: ComputedRef<string> = computed(() => route.params.characterId as string);
 
 // 角色資訊
 const characterInfo = useCharacterInfo(characterId);
@@ -144,33 +153,35 @@ const gallery = usePhotoGallery();
 const editMode = usePhotoEditMode();
 
 // 刪除確認
-const showDeleteConfirm = ref(false);
-const isDeleting = ref(false);
+const showDeleteConfirm = ref<boolean>(false);
+const isDeleting = ref<boolean>(false);
 
 // 照片數量
-const photoCount = computed(() => {
+const photoCount = computed<number>(() => {
   return gallery.photos.value.length;
 });
 
 // ✅ P1 優化（2025-01）：虛擬滾動 - 只顯示可見範圍的照片
-const visiblePhotos = computed(() => {
+const visiblePhotos = computed<Photo[]>(() => {
   return gallery.photos.value.slice(0, virtualScroll.displayedCount.value);
 });
 
 // 是否還有更多照片可加載
-const hasMorePhotos = computed(() => {
+const hasMorePhotos = computed<boolean>(() => {
   return virtualScroll.displayedCount.value < gallery.photos.value.length;
 });
 
 // 處理滾動事件（虛擬滾動）
-const handleContentScroll = (event) => {
+const handleContentScroll = (event: Event): void => {
   virtualScroll.handleScroll(event, hasMorePhotos.value);
 };
 
 // 載入照片
-const loadPhotosData = async () => {
+const loadPhotosData = async (): Promise<void> => {
+  if (!user.value?.id) return;
+
   await gallery.loadPhotos(
-    user.value?.id,
+    user.value.id,
     characterId.value,
     characterPortrait.value,
     setCharacter
@@ -178,12 +189,14 @@ const loadPhotosData = async () => {
 };
 
 // 刪除照片
-const handleDeletePhotos = async () => {
+const handleDeletePhotos = async (): Promise<void> => {
+  if (!user.value?.id) return;
+
   isDeleting.value = true;
 
   const result = await gallery.deletePhotos(
     editMode.selectedIds.value,
-    user.value?.id
+    user.value.id
   );
 
   if (result.success) {
@@ -196,14 +209,14 @@ const handleDeletePhotos = async () => {
     editMode.cancelEditMode();
     showDeleteConfirm.value = false;
   } else {
-    showError(result.error);
+    showError(result.error || '刪除照片失敗');
   }
 
   isDeleting.value = false;
 };
 
 // 關閉相簿
-const handleClose = () => {
+const handleClose = (): void => {
   router.back();
 };
 

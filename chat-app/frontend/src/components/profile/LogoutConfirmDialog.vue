@@ -13,7 +13,7 @@ defineProps({
     default: "",
   },
   cancelButtonRef: {
-    type: Object,
+    type: Function,
     default: null,
   },
 });

@@ -22,7 +22,7 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ArrowLeftIcon } from '@heroicons/vue/24/outline';
 
 /**
@@ -30,8 +30,12 @@ import { ArrowLeftIcon } from '@heroicons/vue/24/outline';
  * 職責：顯示頁面標題、返回按鈕和宣傳文案
  */
 
-// Emits
-defineEmits(['back']);
+// Types
+interface Emits {
+  (e: 'back'): void;
+}
+
+defineEmits<Emits>();
 </script>
 
 <style scoped>

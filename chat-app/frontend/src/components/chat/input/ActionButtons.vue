@@ -25,7 +25,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { PaperAirplaneIcon, GiftIcon } from '@heroicons/vue/24/outline';
 
 /**
@@ -33,32 +33,31 @@ import { PaperAirplaneIcon, GiftIcon } from '@heroicons/vue/24/outline';
  * 職責：發送按鈕和禮物按鈕
  */
 
+// Types
+interface Props {
+  canSend?: boolean;
+  isSendingGift?: boolean;
+  isRequestingSelfie?: boolean;
+  isRequestingVideo?: boolean;
+  disabled?: boolean;
+}
+
+interface Emits {
+  (e: 'send-click'): void;
+  (e: 'gift-click'): void;
+}
+
 // Props
-defineProps({
-  canSend: {
-    type: Boolean,
-    default: false,
-  },
-  isSendingGift: {
-    type: Boolean,
-    default: false,
-  },
-  isRequestingSelfie: {
-    type: Boolean,
-    default: false,
-  },
-  isRequestingVideo: {
-    type: Boolean,
-    default: false,
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
+withDefaults(defineProps<Props>(), {
+  canSend: false,
+  isSendingGift: false,
+  isRequestingSelfie: false,
+  isRequestingVideo: false,
+  disabled: false,
 });
 
 // Emits
-defineEmits(['send-click', 'gift-click']);
+defineEmits<Emits>();
 </script>
 
 <style scoped>

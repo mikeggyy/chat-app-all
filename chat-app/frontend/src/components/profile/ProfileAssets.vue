@@ -68,7 +68,6 @@ onMounted(() => {
     />
     <div class="stats-button__content">
       <span class="stats-button__value">{{ formattedBalance }}</span>
-      <span class="stats-button__label">Ñc</span>
     </div>
     <ArrowRightIcon class="stats-button__arrow" aria-hidden="true" />
   </button>

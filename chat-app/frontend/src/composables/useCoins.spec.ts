@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 
 // Mock dependencies
 vi.mock('../utils/api', () => ({
@@ -29,20 +30,34 @@ vi.mock('../utils/logger', () => ({
 
 vi.mock('../utils/requestQueue.js', () => ({
   coinQueue: {
-    enqueue: vi.fn((fn) => fn()), // 直接執行函數
+    enqueue: vi.fn((fn: () => Promise<any>) => fn()), // 直接執行函數
   },
 }));
 
+interface CoinPackage {
+  id: string;
+  coins: number;
+  order?: number;
+  popular?: boolean;
+  bestValue?: boolean;
+}
+
+interface Transaction {
+  id: string;
+  amount: number;
+  type: string;
+}
+
 describe('useCoins - 金幣系統測試', () => {
-  let useCoins;
-  let apiJson;
+  let useCoins: any;
+  let apiJson: Mock;
 
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
 
     const { apiJson: mockApiJson } = await import('../utils/api');
-    apiJson = mockApiJson;
+    apiJson = mockApiJson as Mock;
 
     const { useCoins: composable } = await import('./useCoins.js');
     useCoins = composable;
@@ -88,7 +103,7 @@ describe('useCoins - 金幣系統測試', () => {
   describe('loadPackages', () => {
     it('應該成功加載並排序金幣套餐', async () => {
       const coins = useCoins();
-      const mockPackages = [
+      const mockPackages: CoinPackage[] = [
         { id: 'large', coins: 1000, order: 3 },
         { id: 'small', coins: 100, order: 1 },
         { id: 'medium', coins: 500, order: 2 },
@@ -238,7 +253,7 @@ describe('useCoins - 金幣系統測試', () => {
   describe('loadTransactions', () => {
     it('應該成功加載交易記錄', async () => {
       const coins = useCoins();
-      const mockTransactions = [
+      const mockTransactions: Transaction[] = [
         { id: 'tx1', amount: 100, type: 'purchase' },
         { id: 'tx2', amount: -50, type: 'spend' },
       ];

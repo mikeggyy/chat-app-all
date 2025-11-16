@@ -11,46 +11,51 @@
   />
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { ref, computed, type Ref, type WritableComputedRef } from 'vue';
 
 /**
  * TextInput - 文字輸入框組件
  * 職責：提供基本的文字輸入功能和 Enter 鍵發送
  */
 
+// Types
+interface Props {
+  modelValue?: string;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+interface Emits {
+  (e: 'update:modelValue', value: string): void;
+  (e: 'submit'): void;
+}
+
 // Props
-const props = defineProps({
-  modelValue: {
-    type: String,
-    default: '',
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  placeholder: {
-    type: String,
-    default: '輸入訊息...',
-  },
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: '',
+  disabled: false,
+  placeholder: '輸入訊息...',
 });
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'submit']);
+const emit = defineEmits<Emits>();
 
 // Refs
-const inputRef = ref(null);
+const inputRef: Ref<HTMLInputElement | null> = ref(null);
 
 // Computed - v-model 雙向綁定
-const inputValue = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
+const inputValue: WritableComputedRef<string> = computed({
+  get: (): string => props.modelValue ?? '',
+  set: (value: string): void => {
+    emit('update:modelValue', value);
+  },
 });
 
 /**
  * 處理提交（Enter 鍵）
  */
-const handleSubmit = () => {
+const handleSubmit = (): void => {
   if (inputValue.value && inputValue.value.trim().length > 0 && !props.disabled) {
     emit('submit');
   }
@@ -59,7 +64,7 @@ const handleSubmit = () => {
 /**
  * 聚焦輸入框（暴露給父組件）
  */
-const focus = () => {
+const focus = (): void => {
   inputRef.value?.focus();
 };
 

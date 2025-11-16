@@ -1,37 +1,37 @@
-<script setup>
-import { computed } from "vue";
+<script setup lang="ts">
+import { computed, type ComputedRef } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
 
-const props = defineProps({
-  isGenerating: {
-    type: Boolean,
-    default: false,
-  },
-  remainingUsage: {
-    type: Number,
-    required: true,
-  },
-  totalUsage: {
-    type: Number,
-    required: true,
-  },
+// Types
+interface Props {
+  isGenerating?: boolean;
+  remainingUsage: number;
+  totalUsage: number;
+}
+
+interface Emits {
+  (e: "click"): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isGenerating: false,
 });
 
-const emit = defineEmits(["click"]);
+const emit = defineEmits<Emits>();
 
-const isDisabled = computed(() => {
+const isDisabled: ComputedRef<boolean> = computed(() => {
   return props.isGenerating || props.remainingUsage <= 0;
 });
 
-const isWarning = computed(() => {
+const isWarning: ComputedRef<boolean> = computed(() => {
   return props.remainingUsage <= 1;
 });
 
-const buttonText = computed(() => {
+const buttonText: ComputedRef<string> = computed(() => {
   return props.isGenerating ? "生成中..." : "AI魔法師";
 });
 
-const handleClick = () => {
+const handleClick = (): void => {
   if (!isDisabled.value) {
     emit("click");
   }

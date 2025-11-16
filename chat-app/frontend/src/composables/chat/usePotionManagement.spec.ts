@@ -12,7 +12,25 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { nextTick } from 'vue';
+
+// Types
+interface PotionEffect {
+  potionType: string;
+  characterId: string;
+  expiresAt?: string;
+}
+
+interface MockDependencies {
+  getCurrentUserId: () => string | null;
+  getPartnerId: () => string | null;
+  getPotionType: () => string | null;
+  closePotionConfirm: () => void;
+  setLoading: (key: string, value: boolean) => void;
+  showError: (message: string) => void;
+  showSuccess: (message: string) => void;
+}
 
 // Mock dependencies
 vi.mock('../../utils/api', () => ({
@@ -20,9 +38,9 @@ vi.mock('../../utils/api', () => ({
 }));
 
 describe('usePotionManagement - 藥水管理測試', () => {
-  let usePotionManagement;
-  let apiUtils;
-  let mockDeps;
+  let usePotionManagement: any;
+  let apiUtils: any;
+  let mockDeps: MockDependencies;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -33,7 +51,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     apiUtils = api;
 
     // 設置默認 mock 返回值
-    apiUtils.apiJson.mockResolvedValue({
+    (apiUtils.apiJson as Mock).mockResolvedValue({
       success: true,
       potions: {
         memoryBoost: 5,
@@ -93,7 +111,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
 
   describe('loadPotions', () => {
     it('應該成功載入用戶藥水數量', async () => {
-      apiUtils.apiJson.mockResolvedValueOnce({
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({
         potions: {
           memoryBoost: 10,
           brainBoost: 5,
@@ -114,7 +132,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該處理缺少某個藥水類型的情況', async () => {
-      apiUtils.apiJson.mockResolvedValueOnce({
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({
         potions: {
           memoryBoost: 3,
           // 缺少 brainBoost
@@ -140,7 +158,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該靜默處理載入錯誤', async () => {
-      apiUtils.apiJson.mockRejectedValueOnce(new Error('API error'));
+      (apiUtils.apiJson as Mock).mockRejectedValueOnce(new Error('API error'));
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadPotions();
@@ -153,7 +171,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該處理 API 返回 null', async () => {
-      apiUtils.apiJson.mockResolvedValueOnce(null);
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce(null);
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadPotions();
@@ -167,7 +185,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
 
   describe('loadActivePotions', () => {
     it('應該成功載入活躍藥水效果', async () => {
-      const mockActivePotions = [
+      const mockActivePotions: PotionEffect[] = [
         {
           potionType: 'memory_boost',
           characterId: 'char-001',
@@ -180,7 +198,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
         },
       ];
 
-      apiUtils.apiJson.mockResolvedValueOnce({
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({
         potions: mockActivePotions,
       });
 
@@ -202,8 +220,8 @@ describe('usePotionManagement - 藥水管理測試', () => {
       ];
 
       // 模擬延遲的 API 調用
-      let resolveApi;
-      apiUtils.apiJson.mockReturnValueOnce(
+      let resolveApi: (value: any) => void;
+      (apiUtils.apiJson as Mock).mockReturnValueOnce(
         new Promise((resolve) => {
           resolveApi = resolve;
         })
@@ -216,7 +234,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
       expect(potionMgmt.activePotionEffects.value).toEqual([]);
 
       // 完成 API 調用
-      resolveApi({ potions: [{ potionType: 'brain_boost', characterId: 'new-char' }] });
+      resolveApi!({ potions: [{ potionType: 'brain_boost', characterId: 'new-char' }] });
       await loadPromise;
 
       expect(potionMgmt.activePotionEffects.value).toEqual([
@@ -234,7 +252,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該靜默處理載入錯誤', async () => {
-      apiUtils.apiJson.mockRejectedValueOnce(new Error('API error'));
+      (apiUtils.apiJson as Mock).mockRejectedValueOnce(new Error('API error'));
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadActivePotions();
@@ -246,7 +264,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
 
   describe('usePotion', () => {
     it('應該成功使用記憶增強藥水', async () => {
-      apiUtils.apiJson
+      (apiUtils.apiJson as Mock)
         .mockResolvedValueOnce({
           success: true,
           duration: 7,
@@ -271,7 +289,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該成功使用腦力激盪藥水', async () => {
-      apiUtils.apiJson
+      (apiUtils.apiJson as Mock)
         .mockResolvedValueOnce({
           success: true,
           duration: 3,
@@ -327,7 +345,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該處理 API 錯誤', async () => {
-      apiUtils.apiJson.mockRejectedValueOnce(new Error('使用失敗'));
+      (apiUtils.apiJson as Mock).mockRejectedValueOnce(new Error('使用失敗'));
 
       const potionMgmt = usePotionManagement(mockDeps);
       const result = await potionMgmt.usePotion('memoryBoost');
@@ -337,7 +355,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該在使用成功後重新載入藥水和效果', async () => {
-      apiUtils.apiJson
+      (apiUtils.apiJson as Mock)
         .mockResolvedValueOnce({ success: true, duration: 7 })
         .mockResolvedValueOnce({ potions: [] })
         .mockResolvedValueOnce({ potions: { memoryBoost: 4, brainBoost: 3 } });
@@ -350,7 +368,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該處理 API 返回 success: false', async () => {
-      apiUtils.apiJson.mockResolvedValueOnce({
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({
         success: false,
         message: '藥水不足',
       });
@@ -365,7 +383,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
 
   describe('handleConfirmUsePotion', () => {
     it('應該成功確認並使用藥水', async () => {
-      apiUtils.apiJson
+      (apiUtils.apiJson as Mock)
         .mockResolvedValueOnce({ success: true, duration: 7 })
         .mockResolvedValueOnce({ potions: [] })
         .mockResolvedValueOnce({ potions: { memoryBoost: 4, brainBoost: 3 } });
@@ -389,7 +407,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該在使用失敗時不關閉彈窗', async () => {
-      apiUtils.apiJson.mockRejectedValueOnce(new Error('使用失敗'));
+      (apiUtils.apiJson as Mock).mockRejectedValueOnce(new Error('使用失敗'));
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.handleConfirmUsePotion();
@@ -398,7 +416,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該確保 finally 清除 loading 狀態', async () => {
-      apiUtils.apiJson.mockRejectedValueOnce(new Error('使用失敗'));
+      (apiUtils.apiJson as Mock).mockRejectedValueOnce(new Error('使用失敗'));
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.handleConfirmUsePotion();
@@ -410,7 +428,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
 
   describe('Computed 屬性', () => {
     it('activeMemoryBoost 應該返回當前角色的記憶增強效果', async () => {
-      const mockEffects = [
+      const mockEffects: PotionEffect[] = [
         {
           potionType: 'memory_boost',
           characterId: 'char-001',
@@ -428,7 +446,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
         },
       ];
 
-      apiUtils.apiJson.mockResolvedValueOnce({ potions: mockEffects });
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({ potions: mockEffects });
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadActivePotions();
@@ -442,7 +460,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('activeBrainBoost 應該返回當前角色的腦力激盪效果', async () => {
-      const mockEffects = [
+      const mockEffects: PotionEffect[] = [
         {
           potionType: 'brain_boost',
           characterId: 'char-001',
@@ -455,7 +473,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
         },
       ];
 
-      apiUtils.apiJson.mockResolvedValueOnce({ potions: mockEffects });
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({ potions: mockEffects });
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadActivePotions();
@@ -469,7 +487,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該在沒有匹配效果時返回 undefined', async () => {
-      const mockEffects = [
+      const mockEffects: PotionEffect[] = [
         {
           potionType: 'memory_boost',
           characterId: 'char-002', // 不同角色
@@ -477,7 +495,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
         },
       ];
 
-      apiUtils.apiJson.mockResolvedValueOnce({ potions: mockEffects });
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({ potions: mockEffects });
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadActivePotions();
@@ -489,7 +507,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
 
     it('應該在活躍效果列表更新時重新計算 computed', async () => {
       // 初始載入 char-001 的效果
-      const initialEffects = [
+      const initialEffects: PotionEffect[] = [
         {
           potionType: 'memory_boost',
           characterId: 'char-001',
@@ -497,7 +515,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
         },
       ];
 
-      apiUtils.apiJson.mockResolvedValueOnce({ potions: initialEffects });
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({ potions: initialEffects });
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadActivePotions();
@@ -506,7 +524,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
       expect(potionMgmt.activeMemoryBoost.value.characterId).toBe('char-001');
 
       // 模擬重新載入效果列表（包含不同角色的效果）
-      const updatedEffects = [
+      const updatedEffects: PotionEffect[] = [
         {
           potionType: 'memory_boost',
           characterId: 'char-001',
@@ -519,7 +537,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
         },
       ];
 
-      apiUtils.apiJson.mockResolvedValueOnce({ potions: updatedEffects });
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({ potions: updatedEffects });
       await potionMgmt.loadActivePotions();
       await nextTick();
 
@@ -530,7 +548,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
 
   describe('邊界情況', () => {
     it('應該處理空的藥水數量響應', async () => {
-      apiUtils.apiJson.mockResolvedValueOnce({});
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({});
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadPotions();
@@ -542,7 +560,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該處理空的活躍效果響應', async () => {
-      apiUtils.apiJson.mockResolvedValueOnce({ potions: [] });
+      (apiUtils.apiJson as Mock).mockResolvedValueOnce({ potions: [] });
 
       const potionMgmt = usePotionManagement(mockDeps);
       await potionMgmt.loadActivePotions();
@@ -551,7 +569,7 @@ describe('usePotionManagement - 藥水管理測試', () => {
     });
 
     it('應該處理非標準錯誤對象', async () => {
-      apiUtils.apiJson.mockRejectedValueOnce('字符串錯誤');
+      (apiUtils.apiJson as Mock).mockRejectedValueOnce('字符串錯誤');
 
       const potionMgmt = usePotionManagement(mockDeps);
       const result = await potionMgmt.usePotion('memoryBoost');

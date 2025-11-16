@@ -24,19 +24,26 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * FeaturesList - 會員方案功能列表組件
  * 職責：顯示當前方案的所有功能特點
  */
 
-// Props
-defineProps({
-  features: {
-    type: Array,
-    required: true,
-  },
-});
+// Types
+interface Feature {
+  title: string;
+  detail: string;
+  icon: any; // Component type
+  badge?: string;
+  [key: string]: any;
+}
+
+interface Props {
+  features: Feature[];
+}
+
+defineProps<Props>();
 </script>
 
 <style scoped>

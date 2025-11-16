@@ -1,18 +1,22 @@
-<script setup>
+<script setup lang="ts">
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 
-defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true,
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
+// Types
+interface Props {
+  isOpen: boolean;
+  loading?: boolean;
+}
+
+interface Emits {
+  (e: 'cancel'): void;
+  (e: 'confirm'): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  loading: false,
 });
 
-const emit = defineEmits(['cancel', 'confirm']);
+const emit = defineEmits<Emits>();
 </script>
 
 <template>

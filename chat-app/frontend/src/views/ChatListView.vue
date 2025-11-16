@@ -1,5 +1,5 @@
-<script setup>
-import { computed, onBeforeUnmount, onBeforeUpdate, reactive, ref, watch } from 'vue';
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onBeforeUpdate, reactive, ref, watch, type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserProfile } from '../composables/useUserProfile';
 import { useFirebaseAuth } from '../composables/useFirebaseAuth';
@@ -15,6 +15,36 @@ import ChatListItem from '../components/chat-list/ChatListItem.vue';
 import ChatListEmpty from '../components/chat-list/ChatListEmpty.vue';
 import DeleteConfirmDialog from '../components/chat-list/DeleteConfirmDialog.vue';
 
+// ==========================================
+// 類型定義
+// ==========================================
+interface HiddenThreadMeta {
+  lastMessage: string;
+  timeLabel: string;
+  timestamp: number;
+}
+
+interface ActionMessage {
+  text: string;
+  tone: string;
+}
+
+interface DeleteConfirmState {
+  open: boolean;
+  threadId: string;
+  displayName: string;
+  lastMessage: string;
+  timeLabel: string;
+}
+
+interface Thread {
+  id: string;
+  displayName?: string;
+  lastMessage?: string;
+  timeLabel?: string;
+  [key: string]: any;
+}
+
 const router = useRouter();
 const { user, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
@@ -22,15 +52,13 @@ const firebaseAuth = useFirebaseAuth();
 // ==========================================
 // 分頁對話列表
 // ==========================================
-const userId = computed(() => user.value?.id);
+const userId = computed(() => user.value?.id ?? '');
 const {
   conversations: paginatedConversations,
-  hasMore: hasMoreConversations,
   isLoading: isLoadingConversations,
   isLoadingMore: isLoadingMoreConversations,
   loadInitial,
   loadMore: loadMoreConversations,
-  reload: reloadConversations,
 } = usePaginatedConversations(userId, 20);
 
 // 無限滾動
@@ -56,7 +84,6 @@ watch(
 const {
   activeTab,
   isFavoriteTab,
-  favoriteIds,
   conversationThreads,
   visibleThreads,
   isEmpty,
@@ -69,29 +96,29 @@ const {
 // ==========================================
 // 隱藏對話管理
 // ==========================================
-const HIDDEN_THREADS_STORAGE_KEY = 'chat-list-hidden-threads';
-const hiddenThreads = reactive(new Map());
-let lastHiddenOwnerId = '';
+const HIDDEN_THREADS_STORAGE_KEY: string = 'chat-list-hidden-threads';
+const hiddenThreads: Map<string, HiddenThreadMeta> = reactive(new Map());
+let lastHiddenOwnerId: string = '';
 
-const normalizeId = (value) => {
+const normalizeId = (value: unknown): string => {
   if (typeof value !== 'string') return '';
   const trimmed = value.trim();
   return trimmed.length ? trimmed : '';
 };
 
-const resolveHiddenThreadsKey = (ownerId = user.value?.id) => {
+const resolveHiddenThreadsKey = (ownerId: string | undefined = user.value?.id): string => {
   const raw = typeof ownerId === 'string' && ownerId.trim().length ? ownerId.trim() : '';
   return raw.length
     ? `${HIDDEN_THREADS_STORAGE_KEY}:${raw}`
     : `${HIDDEN_THREADS_STORAGE_KEY}:guest`;
 };
 
-const isThreadHidden = (id) => {
+const isThreadHidden = (id: unknown): boolean => {
   if (typeof id !== 'string') return false;
   return hiddenThreads.has(id);
 };
 
-const persistHiddenThreads = () => {
+const persistHiddenThreads = (): void => {
   if (typeof window === 'undefined') return;
   try {
     const payload = Array.from(hiddenThreads.entries()).map(([id, meta]) => ({
@@ -106,7 +133,7 @@ const persistHiddenThreads = () => {
   }
 };
 
-const loadHiddenThreads = (ownerId) => {
+const loadHiddenThreads = (ownerId: string | undefined): void => {
   if (typeof window === 'undefined') return;
   try {
     const storageKey = resolveHiddenThreadsKey(ownerId);
@@ -129,7 +156,7 @@ const loadHiddenThreads = (ownerId) => {
   }
 };
 
-const registerHiddenThread = (id, meta = {}) => {
+const registerHiddenThread = (id: unknown, meta: Partial<HiddenThreadMeta> = {}): void => {
   const threadId = normalizeId(id);
   if (!threadId) return;
   hiddenThreads.set(threadId, {
@@ -140,7 +167,7 @@ const registerHiddenThread = (id, meta = {}) => {
   persistHiddenThreads();
 };
 
-const unregisterHiddenThread = (id) => {
+const unregisterHiddenThread = (id: unknown): void => {
   const threadId = normalizeId(id);
   if (!threadId || !hiddenThreads.has(threadId)) return;
   hiddenThreads.delete(threadId);
@@ -155,7 +182,7 @@ if (typeof window !== 'undefined') {
 // 監聽用戶變化，重新載入隱藏對話
 watch(
   () => user.value?.id,
-  (nextUserId) => {
+  (nextUserId: string | undefined) => {
     const normalizedUserId = normalizeId(nextUserId ?? '');
     if (normalizedUserId !== lastHiddenOwnerId) {
       lastHiddenOwnerId = normalizedUserId;
@@ -184,10 +211,10 @@ const conversationThreadsMap = computed(() => {
 // 監聽對話變化，自動恢復已更新的隱藏對話
 watch(
   conversationThreads,
-  (threads) => {
+  () => {
     if (!hiddenThreads.size) return;
 
-    const restoreIds = [];
+    const restoreIds: string[] = [];
 
     // 優化：使用 computed 的 Map 避免重複創建，O(n) 遍歷而非 O(n*m)
     hiddenThreads.forEach((meta, id) => {
@@ -213,11 +240,11 @@ watch(
 // ==========================================
 // 滑動手勢管理
 // ==========================================
-const chatItemRefs = ref([]);
-const shouldBlockThreadClick = ref(false);
-const activeSwipeThreadId = ref(null);
+const chatItemRefs: Ref<any[]> = ref([]);
+const shouldBlockThreadClick: Ref<boolean> = ref(false);
+const activeSwipeThreadId: Ref<string | null> = ref(null);
 
-const closeAllSwipes = () => {
+const closeAllSwipes = (): void => {
   chatItemRefs.value.forEach((itemRef) => {
     if (itemRef && typeof itemRef.closeSwipe === 'function') {
       itemRef.closeSwipe();
@@ -227,7 +254,7 @@ const closeAllSwipes = () => {
   activeSwipeThreadId.value = null;
 };
 
-const handleSwipeStart = (threadId) => {
+const handleSwipeStart = (threadId: string): void => {
   // 關閉所有滑動（包括當前項）
   // 當前項會在子組件的 onSwipeStart 中立即重新開始滑動，所以這不會有副作用
   chatItemRefs.value.forEach((itemRef) => {
@@ -239,18 +266,18 @@ const handleSwipeStart = (threadId) => {
   activeSwipeThreadId.value = threadId;
 };
 
-const handleSwipeMove = (threadId, offset) => {
+const handleSwipeMove = (_threadId: string, offset: number): void => {
   if (Math.abs(offset) > 6) {
     shouldBlockThreadClick.value = true;
   }
 };
 
-const handleSwipeEnd = (threadId, isOpen) => {
+const handleSwipeEnd = (threadId: string, isOpen: boolean): void => {
   // 滑動狀態由子組件自己管理，這裡不需要額外操作
   activeSwipeThreadId.value = isOpen ? threadId : null;
 };
 
-const handleSwipeCancel = (threadId) => {
+const handleSwipeCancel = (_threadId: string): void => {
   shouldBlockThreadClick.value = false;
   activeSwipeThreadId.value = null;
 };
@@ -271,15 +298,15 @@ watch(activeTab, () => {
 // ==========================================
 // 收藏和刪除操作
 // ==========================================
-const favoriteMutations = reactive({});
-const deleteMutations = reactive({});
+const favoriteMutations: Record<string, boolean> = reactive({});
+const deleteMutations: Record<string, boolean> = reactive({});
 
-const isFavoriteMutating = (id) => {
+const isFavoriteMutating = (id: string | undefined): boolean => {
   if (!id) return false;
   return Boolean(favoriteMutations[id]);
 };
 
-const setFavoriteMutating = (id, value) => {
+const setFavoriteMutating = (id: string | undefined, value: boolean): void => {
   if (!id) return;
   if (value) {
     favoriteMutations[id] = true;
@@ -288,7 +315,7 @@ const setFavoriteMutating = (id, value) => {
   }
 };
 
-const isDeletingThread = (id) => {
+const isDeletingThread = (id: string | undefined): boolean => {
   if (!id) return false;
   return Boolean(deleteMutations[id]);
 };
@@ -296,13 +323,13 @@ const isDeletingThread = (id) => {
 // ==========================================
 // Action Message
 // ==========================================
-const actionMessage = reactive({
+const actionMessage: ActionMessage = reactive({
   text: '',
   tone: '',
 });
-let actionMessageTimer = 0;
+let actionMessageTimer: number = 0;
 
-const showActionMessage = (text, tone = 'info') => {
+const showActionMessage = (text: string, tone: string = 'info'): void => {
   const content = typeof text === 'string' ? text.trim() : '';
   if (!content) {
     actionMessage.text = '';
@@ -339,7 +366,7 @@ onBeforeUnmount(() => {
 // ==========================================
 // 收藏操作
 // ==========================================
-const handleFavoriteAction = async (thread) => {
+const handleFavoriteAction = async (thread: Thread): Promise<void> => {
   showActionMessage('');
   const threadId = normalizeId(thread?.id);
   if (!threadId) return;
@@ -437,7 +464,7 @@ const handleFavoriteAction = async (thread) => {
 // ==========================================
 // 刪除確認對話框
 // ==========================================
-const deleteConfirm = reactive({
+const deleteConfirm: DeleteConfirmState = reactive({
   open: false,
   threadId: '',
   displayName: '',
@@ -445,7 +472,7 @@ const deleteConfirm = reactive({
   timeLabel: '',
 });
 
-const clearDeleteConfirmState = () => {
+const clearDeleteConfirmState = (): void => {
   deleteConfirm.open = false;
   deleteConfirm.threadId = '';
   deleteConfirm.displayName = '';
@@ -453,7 +480,7 @@ const clearDeleteConfirmState = () => {
   deleteConfirm.timeLabel = '';
 };
 
-const requestDeleteAction = (thread) => {
+const requestDeleteAction = (thread: Thread): void => {
   showActionMessage('');
   const threadId = normalizeId(thread?.id);
   if (!threadId) return;
@@ -472,12 +499,12 @@ const requestDeleteAction = (thread) => {
   deleteConfirm.open = true;
 };
 
-const cancelDeleteAction = () => {
+const cancelDeleteAction = (): void => {
   if (isDeletingThread(deleteConfirm.threadId)) return;
   clearDeleteConfirmState();
 };
 
-const confirmDeleteAction = () => {
+const confirmDeleteAction = (): void => {
   const threadId = deleteConfirm.threadId;
   if (!threadId) {
     clearDeleteConfirmState();
@@ -504,7 +531,7 @@ const confirmDeleteAction = () => {
 // ==========================================
 // 對話選擇
 // ==========================================
-const handleThreadSelect = (thread) => {
+const handleThreadSelect = (thread: Thread): void => {
   if (shouldBlockThreadClick.value) {
     shouldBlockThreadClick.value = false;
     return;
@@ -542,7 +569,7 @@ const handleThreadSelect = (thread) => {
     <section
       v-if="!isEmpty"
       :id="isFavoriteTab ? 'chat-thread-favorite' : 'chat-thread-all'"
-      :ref="!isFavoriteTab ? containerRef : undefined"
+      :ref="!isFavoriteTab ? (containerRef as any) : undefined"
       class="chat-thread-scroll chat-thread-list"
       role="list"
     >
@@ -634,7 +661,8 @@ const handleThreadSelect = (thread) => {
 }
 
 .chat-thread-list {
-  padding-bottom: env(safe-area-inset-bottom);
+  /* 底部導航欄高度(~64px) + 額外間距(16px) + 安全區域 */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 .chat-list-loading {

@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { nextTick } from 'vue';
 
 // Mock dependencies
@@ -25,13 +26,13 @@ vi.mock('./useUserProfile', () => ({
 }));
 
 vi.mock('../../../../shared/config/testAccounts', () => ({
-  isGuestUser: vi.fn((userId) => userId === 'guest'),
-  isDevUser: vi.fn((userId) => userId === 'dev-user'),
+  isGuestUser: vi.fn((userId: string) => userId === 'guest'),
+  isDevUser: vi.fn((userId: string) => userId === 'dev-user'),
 }));
 
 vi.mock('./useBaseLimitService.js', () => ({
-  createLimitService: vi.fn((config) => {
-    const limitData = { value: null };
+  createLimitService: vi.fn((config: any) => {
+    const limitData = { value: null as any };
     const isLoading = { value: false };
     const error = { value: null };
 
@@ -54,7 +55,7 @@ vi.mock('./useBaseLimitService.js', () => ({
           resetPeriod: 'lifetime',
         };
       }),
-      purchaseCards: vi.fn(async (userId, quantity) => ({
+      purchaseCards: vi.fn(async (userId: string, quantity: number) => ({
         success: true,
         cardsAdded: quantity,
         newTotal: quantity,
@@ -67,15 +68,15 @@ vi.mock('./useBaseLimitService.js', () => ({
 }));
 
 describe('usePhotoLimit - 照片限制測試', () => {
-  let usePhotoLimit;
-  let useUserProfile;
+  let usePhotoLimit: any;
+  let useUserProfile: Mock;
 
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
 
     const userProfileModule = await import('./useUserProfile');
-    useUserProfile = userProfileModule.useUserProfile;
+    useUserProfile = userProfileModule.useUserProfile as Mock;
 
     const { usePhotoLimit: composable } = await import('./usePhotoLimit.js');
     usePhotoLimit = composable;

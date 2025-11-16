@@ -12,7 +12,7 @@
         aria-controls="chat-thread-all"
         @click="$emit('change-tab', 'all')"
       >
-        全部
+        聊天
       </button>
       <button
         type="button"
@@ -36,11 +36,11 @@ defineProps({
   activeTab: {
     type: String,
     required: true,
-    validator: (value) => ['all', 'favorite'].includes(value),
+    validator: (value) => ["all", "favorite"].includes(value),
   },
 });
 
-defineEmits(['change-tab']);
+defineEmits(["change-tab"]);
 </script>
 
 <style scoped>
@@ -48,7 +48,7 @@ defineEmits(['change-tab']);
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(2, 6, 23, 0.8);
+  background: rgba(2, 6, 23, 0.4);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }

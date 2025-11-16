@@ -17,26 +17,31 @@
   </nav>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * MembershipTabs - 會員方案切換標籤組件
  * 職責：顯示會員方案選項並處理切換
  */
 
-// Props
-defineProps({
-  tiers: {
-    type: Array,
-    required: true,
-  },
-  activeTierId: {
-    type: String,
-    required: true,
-  },
-});
+// Types
+interface Tier {
+  id: string;
+  label: string;
+  [key: string]: any;
+}
 
-// Emits
-defineEmits(['select']);
+interface Props {
+  tiers: Tier[];
+  activeTierId: string;
+}
+
+interface Emits {
+  (e: 'select', tierId: string): void;
+}
+
+defineProps<Props>();
+
+defineEmits<Emits>();
 </script>
 
 <style scoped>

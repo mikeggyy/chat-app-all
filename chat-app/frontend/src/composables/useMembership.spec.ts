@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { nextTick } from 'vue';
 
 // Mock dependencies
@@ -30,9 +31,25 @@ vi.mock('../utils/logger', () => ({
   },
 }));
 
+interface MembershipData {
+  tier?: string;
+  features?: Record<string, any>;
+  pricing?: Record<string, any>;
+  isActive?: boolean;
+  expiresAt?: string | null;
+  subscriptionStatus?: string;
+}
+
+interface UpgradeOptions {
+  durationMonths?: number;
+  autoRenew?: boolean;
+  paymentMethod?: string;
+  paymentId?: string;
+}
+
 describe('useMembership - 會員系統測試', () => {
-  let useMembership;
-  let apiJson;
+  let useMembership: any;
+  let apiJson: Mock;
 
   beforeEach(async () => {
     // 重置模塊
@@ -41,7 +58,7 @@ describe('useMembership - 會員系統測試', () => {
 
     // 重新導入
     const { apiJson: mockApiJson } = await import('../utils/api');
-    apiJson = mockApiJson;
+    apiJson = mockApiJson as Mock;
 
     const { useMembership: composable } = await import('./useMembership.js');
     useMembership = composable;
@@ -88,7 +105,7 @@ describe('useMembership - 會員系統測試', () => {
   describe('loadMembership', () => {
     it('應該成功加載會員資訊', async () => {
       const membership = useMembership();
-      const mockData = {
+      const mockData: MembershipData = {
         tier: 'vip',
         features: { conversationLimit: 100 },
         pricing: { monthly: 299 },
@@ -328,7 +345,7 @@ describe('useMembership - 會員系統測試', () => {
   describe('cancelMembership', () => {
     it('應該成功取消會員訂閱', async () => {
       const membership = useMembership();
-      const mockResponse = {
+      const mockResponse: MembershipData = {
         tier: 'free',
         isActive: false,
         subscriptionStatus: 'cancelled',

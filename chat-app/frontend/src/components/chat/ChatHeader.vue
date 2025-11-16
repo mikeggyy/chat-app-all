@@ -120,8 +120,8 @@
   </header>
 </template>
 
-<script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount, type Ref } from "vue";
 import {
   ArrowUturnLeftIcon,
   EllipsisHorizontalIcon,
@@ -129,96 +129,79 @@ import {
 } from "@heroicons/vue/24/outline";
 import { HeartIcon as HeartSolid } from "@heroicons/vue/24/solid";
 
+// Types
+interface Props {
+  partnerName: string;
+  isResettingConversation?: boolean;
+  isFavorited?: boolean;
+  isFavoriteMutating?: boolean;
+  memoryBoostCount?: number;
+  brainBoostCount?: number;
+  activeMemoryBoost?: any;
+  activeBrainBoost?: any;
+  activeCharacterUnlock?: any;
+  characterUnlockCards?: number;
+  isCharacterUnlocked?: boolean;
+}
+
+interface Emits {
+  (e: 'back'): void;
+  (e: 'menu-action', action: string): void;
+  (e: 'toggle-favorite'): void;
+  (e: 'view-buff-details', buffType: string): void;
+}
+
 // Props
-const props = defineProps({
-  partnerName: {
-    type: String,
-    required: true,
-  },
-  isResettingConversation: {
-    type: Boolean,
-    default: false,
-  },
-  isFavorited: {
-    type: Boolean,
-    default: false,
-  },
-  isFavoriteMutating: {
-    type: Boolean,
-    default: false,
-  },
-  memoryBoostCount: {
-    type: Number,
-    default: 0,
-  },
-  brainBoostCount: {
-    type: Number,
-    default: 0,
-  },
-  activeMemoryBoost: {
-    type: Object,
-    default: null,
-  },
-  activeBrainBoost: {
-    type: Object,
-    default: null,
-  },
-  activeCharacterUnlock: {
-    type: Object,
-    default: null,
-  },
-  characterUnlockCards: {
-    type: Number,
-    default: 0,
-  },
-  isCharacterUnlocked: {
-    type: Boolean,
-    default: false,
-  },
+withDefaults(defineProps<Props>(), {
+  isResettingConversation: false,
+  isFavorited: false,
+  isFavoriteMutating: false,
+  memoryBoostCount: 0,
+  brainBoostCount: 0,
+  activeMemoryBoost: undefined,
+  activeBrainBoost: undefined,
+  activeCharacterUnlock: undefined,
+  characterUnlockCards: 0,
+  isCharacterUnlocked: false,
 });
 
 // Emits
-const emit = defineEmits([
-  "back",
-  "menu-action",
-  "toggle-favorite",
-  "view-buff-details",
-]);
+const emit = defineEmits<Emits>();
 
 // Methods
-const handleBuffClick = (buffType) => {
+const handleBuffClick = (buffType: string): void => {
   emit("view-buff-details", buffType);
 };
 
 // 狀態
-const isMenuOpen = ref(false);
-const actionMenuButtonRef = ref(null);
-const actionMenuRef = ref(null);
+const isMenuOpen: Ref<boolean> = ref(false);
+const actionMenuButtonRef: Ref<HTMLElement | null> = ref(null);
+const actionMenuRef: Ref<HTMLElement | null> = ref(null);
 
 // 切換選單
-const toggleMenu = () => {
+const toggleMenu = (): void => {
   isMenuOpen.value = !isMenuOpen.value;
 };
 
 // 關閉選單
-const closeMenu = () => {
+const closeMenu = (): void => {
   isMenuOpen.value = false;
 };
 
 // 處理選單操作
-const handleMenuAction = (action) => {
+const handleMenuAction = (action: string): void => {
   emit("menu-action", action);
   closeMenu();
 };
 
 // 點擊外部關閉選單
-const handleClickOutside = (event) => {
+const handleClickOutside = (event: MouseEvent): void => {
   if (
     isMenuOpen.value &&
     actionMenuRef.value &&
     actionMenuButtonRef.value &&
-    !actionMenuRef.value.contains(event.target) &&
-    !actionMenuButtonRef.value.contains(event.target)
+    !actionMenuRef.value.contains(event.target as Node) &&
+    !actionMenuButtonRef.value.contains(event.target as Node)
   ) {
     closeMenu();
   }

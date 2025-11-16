@@ -470,13 +470,15 @@ export function useChatListState(options: UseChatListStateOptions): UseChatListS
             nextUserId
           )}/favorites?include=matches`,
           { skipGlobalLoading: true }
-        ) as FavoritesResponse;
+        ) as any;
 
         if (favoriteRequestToken !== token) {
           return;
         }
 
-        const matches = Array.isArray(response?.matches) ? response.matches : [];
+        // ✅ 修復：處理包裝在 data 字段中的響應
+        const data = response?.data || response;
+        const matches = Array.isArray(data?.matches) ? data.matches : [];
         favoriteMatches.value = matches;
       } catch (error) {
         if (favoriteRequestToken !== token) {

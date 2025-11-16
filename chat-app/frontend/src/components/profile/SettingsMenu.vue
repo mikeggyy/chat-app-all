@@ -9,7 +9,7 @@ defineProps({
     default: "",
   },
   menuRef: {
-    type: Object,
+    type: Function,
     default: null,
   },
 });

@@ -1,39 +1,39 @@
-<script setup>
-const props = defineProps({
-  show: {
-    type: Boolean,
-    default: false,
-  },
-  type: {
-    type: String,
-    default: "confirm", // 'confirm' or 'purchase'
-  },
-  confirmMessage: {
-    type: String,
-    default: "",
-  },
+<script setup lang="ts">
+// Types
+interface Props {
+  show?: boolean;
+  type?: "confirm" | "purchase";
+  confirmMessage?: string;
+}
+
+interface Emits {
+  (e: "close"): void;
+  (e: "confirm"): void;
+  (e: "go-to-shop"): void;
+  (e: "go-to-vip"): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  show: false,
+  type: "confirm",
+  confirmMessage: "",
 });
 
-const emit = defineEmits([
-  "close",
-  "confirm",
-  "go-to-shop",
-  "go-to-vip",
-]);
+const emit = defineEmits<Emits>();
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit("close");
 };
 
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   emit("confirm");
 };
 
-const handleGoToShop = () => {
+const handleGoToShop = (): void => {
   emit("go-to-shop");
 };
 
-const handleGoToVIP = () => {
+const handleGoToVIP = (): void => {
   emit("go-to-vip");
 };
 </script>

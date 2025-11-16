@@ -57,42 +57,38 @@
   </main>
 </template>
 
-<script setup>
-import { ref, computed, watch, nextTick, onMounted } from "vue";
+<script setup lang="ts">
+import { computed, watch, nextTick, onMounted } from "vue";
 import Message from "./Message.vue";
 import { useChatVirtualScroll } from "../../composables/useChatVirtualScroll";
 
+// Types
+interface Props {
+  messages: any[];
+  partnerName: string;
+  partnerBackground?: string;
+  isReplying?: boolean;
+  playingVoiceMessageId?: string;
+}
+
+interface Emits {
+  (e: 'play-voice', message: any): void;
+  (e: 'image-click', message: any): void;
+}
+
 // Props
-const props = defineProps({
-  messages: {
-    type: Array,
-    required: true,
-  },
-  partnerName: {
-    type: String,
-    required: true,
-  },
-  partnerBackground: {
-    type: String,
-    default: "",
-  },
-  isReplying: {
-    type: Boolean,
-    default: false,
-  },
-  playingVoiceMessageId: {
-    type: String,
-    default: null,
-  },
+const props = withDefaults(defineProps<Props>(), {
+  partnerBackground: "",
+  isReplying: false,
+  playingVoiceMessageId: undefined,
 });
 
 // Emits
-const emit = defineEmits(["play-voice", "image-click"]);
+const emit = defineEmits<Emits>();
 
 // 虛擬滾動配置
 const initialMessageCount = 50; // 初始顯示 50 條消息
 const {
-  displayedCount,
   isLoadingMore,
   containerRef: messageListRef,
   getVisibleMessages,
@@ -122,17 +118,17 @@ const hasMore = computed(() => {
 /**
  * 處理滾動事件
  */
-const handleScroll = (event) => {
+const handleScroll = (event: Event): void => {
   handleVirtualScroll(event, props.messages.length);
 };
 
 /**
  * 滾動到底部
  */
-const scrollToBottom = (smooth = true) => {
+const scrollToBottom = (smooth: boolean = true): void => {
   nextTick(() => {
     if (messageListRef.value) {
-      const scrollOptions = {
+      const scrollOptions: ScrollToOptions = {
         top: messageListRef.value.scrollHeight,
         behavior: smooth ? "smooth" : "auto",
       };
@@ -146,7 +142,7 @@ const scrollToBottom = (smooth = true) => {
  */
 watch(
   () => props.messages.length,
-  (newLength, oldLength) => {
+  (newLength: number, oldLength: number) => {
     // 只有新增消息時才滾動
     if (newLength > oldLength) {
       scrollToBottom();
@@ -160,7 +156,7 @@ watch(
  */
 watch(
   () => props.isReplying,
-  (isReplying) => {
+  (isReplying: boolean | undefined) => {
     if (isReplying) {
       scrollToBottom();
     }

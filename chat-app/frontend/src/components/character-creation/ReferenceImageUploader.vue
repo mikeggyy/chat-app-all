@@ -1,48 +1,48 @@
-<script setup>
-import { ref } from "vue";
+<script setup lang="ts">
+// No imports needed besides icons
 import { PhotoIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  referencePreview: {
-    type: String,
-    default: "",
-  },
-  referenceName: {
-    type: String,
-    default: "",
-  },
-  referenceFocus: {
-    type: String,
-    default: "face",
-  },
-  referenceFocusOptions: {
-    type: Array,
-    required: true,
-  },
+// Types
+interface FocusOption {
+  value: string;
+  label: string;
+}
+
+interface Props {
+  referencePreview?: string;
+  referenceName?: string;
+  referenceFocus?: string;
+  referenceFocusOptions: FocusOption[];
+}
+
+interface Emits {
+  (e: "trigger-upload"): void;
+  (e: "clear-reference"): void;
+  (e: "reopen-cropper"): void;
+  (e: "update:referenceFocus", value: string): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  referencePreview: "",
+  referenceName: "",
+  referenceFocus: "face",
 });
 
-const emit = defineEmits([
-  "trigger-upload",
-  "clear-reference",
-  "reopen-cropper",
-  "update:referenceFocus",
-]);
+const emit = defineEmits<Emits>();
 
-const referenceInput = ref(null);
-
-const handleTrigger = () => {
+const handleTrigger = (): void => {
   emit("trigger-upload");
 };
 
-const handleClear = () => {
+const handleClear = (): void => {
   emit("clear-reference");
 };
 
-const handleReopenCropper = () => {
+const handleReopenCropper = (): void => {
   emit("reopen-cropper");
 };
 
-const handleFocusChange = (value) => {
+const handleFocusChange = (value: string): void => {
   emit("update:referenceFocus", value);
 };
 </script>

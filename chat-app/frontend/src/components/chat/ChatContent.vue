@@ -1,57 +1,73 @@
-<script setup>
+<script setup lang="ts">
 import { ref, defineExpose } from 'vue';
 import MessageList from './MessageList.vue';
 import MessageInput from './MessageInput.vue';
 import UnlockFab from './UnlockFab.vue';
 
-// Props
-const props = defineProps({
+// Types
+interface Props {
   // MessageList props
-  messages: { type: Array, required: true },
-  partnerName: { type: String, required: true },
-  partnerBackground: { type: String, default: '' },
-  isReplying: { type: Boolean, default: false },
-  playingVoiceMessageId: { type: String, default: null },
+  messages: any[];
+  partnerName: string;
+  partnerBackground?: string;
+  isReplying?: boolean;
+  playingVoiceMessageId?: string;
 
   // MessageInput props
-  draft: { type: String, default: '' },
-  disabled: { type: Boolean, default: false },
-  suggestions: { type: Array, default: () => [] },
-  isLoadingSuggestions: { type: Boolean, default: false },
-  suggestionError: { type: String, default: null },
-  isSendingGift: { type: Boolean, default: false },
-  isRequestingSelfie: { type: Boolean, default: false },
-  isRequestingVideo: { type: Boolean, default: false },
-  photoRemaining: { type: Number, default: 0 },
+  draft?: string;
+  disabled?: boolean;
+  suggestions?: any[];
+  isLoadingSuggestions?: boolean;
+  suggestionError?: string;
+  isSendingGift?: boolean;
+  isRequestingSelfie?: boolean;
+  isRequestingVideo?: boolean;
+  photoRemaining?: number;
 
   // UnlockFab props
-  isCharacterUnlocked: { type: Boolean, default: false },
-  hasCharacterTickets: { type: Boolean, default: false },
-  characterTickets: { type: Number, default: 0 },
+  isCharacterUnlocked?: boolean;
+  hasCharacterTickets?: boolean;
+  characterTickets?: number;
+}
+
+// Props
+withDefaults(defineProps<Props>(), {
+  partnerBackground: '',
+  isReplying: false,
+  playingVoiceMessageId: undefined,
+  draft: '',
+  disabled: false,
+  suggestions: () => [],
+  isLoadingSuggestions: false,
+  suggestionError: undefined,
+  isSendingGift: false,
+  isRequestingSelfie: false,
+  isRequestingVideo: false,
+  photoRemaining: 0,
+  isCharacterUnlocked: false,
+  hasCharacterTickets: false,
+  characterTickets: 0,
 });
 
 // Emits
-const emit = defineEmits([
-  // MessageList events
-  'play-voice',
-  'image-click',
+interface Emits {
+  (e: 'play-voice', message: any): void;
+  (e: 'image-click', message: any): void;
+  (e: 'update:draft', value: string): void;
+  (e: 'send', value: string): void;
+  (e: 'suggestion-click', suggestion: string): void;
+  (e: 'request-suggestions'): void;
+  (e: 'gift-click'): void;
+  (e: 'selfie-click'): void;
+  (e: 'video-click'): void;
+  (e: 'unlock-action'): void;
+}
 
-  // MessageInput events
-  'update:draft',
-  'send',
-  'suggestion-click',
-  'request-suggestions',
-  'gift-click',
-  'selfie-click',
-  'video-click',
-
-  // UnlockFab events
-  'unlock-action',
-]);
+const emit = defineEmits<Emits>();
 
 // Refs
-const messageListRef = ref(null);
-const messageInputRef = ref(null);
+const messageListRef = ref<{ messageListRef?: any } | null>(null);
+const messageInputRef = ref<any>(null);
 
 // Expose refs for parent access
 defineExpose({

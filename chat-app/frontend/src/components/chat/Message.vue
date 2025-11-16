@@ -108,23 +108,47 @@
   </article>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { PlayIcon } from "@heroicons/vue/24/outline";
 
+// Types
+interface VideoData {
+  url: string;
+  duration?: string;
+  resolution?: string;
+}
+
+interface Message {
+  role?: 'partner' | 'user';
+  state?: 'pending' | 'sent' | 'delivered';
+  imageUrl?: string;
+  video?: VideoData | 'loading';
+  text?: string;
+  [key: string]: any;
+}
+
+interface ImageClickPayload {
+  url: string;
+  alt: string;
+}
+
+interface Props {
+  message: Message;
+  isPlaying?: boolean;
+}
+
+interface Emits {
+  (e: 'play-voice', message: Message): void;
+  (e: 'image-click', payload: ImageClickPayload): void;
+}
+
 // Props
-const props = defineProps({
-  message: {
-    type: Object,
-    required: true,
-  },
-  isPlaying: {
-    type: Boolean,
-    default: false,
-  },
+withDefaults(defineProps<Props>(), {
+  isPlaying: false,
 });
 
 // Emits
-const emit = defineEmits(["play-voice", "image-click"]);
+defineEmits<Emits>();
 </script>
 
 <style scoped lang="scss">

@@ -54,19 +54,30 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 /**
  * ComparisonTable - 會員方案對比表格組件
  * 職責：顯示各會員方案的功能對比
  */
 
-// Props
-defineProps({
-  features: {
-    type: Array,
-    required: true,
-  },
-});
+// Types
+interface ComparisonItem {
+  name: string;
+  free: string;
+  vip: string;
+  vvip: string;
+}
+
+interface FeatureCategory {
+  category: string;
+  items: ComparisonItem[];
+}
+
+interface Props {
+  features: FeatureCategory[];
+}
+
+defineProps<Props>();
 </script>
 
 <style scoped>

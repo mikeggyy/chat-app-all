@@ -11,11 +11,27 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
+
+// Types
+interface GiftData {
+  giftId: string;
+  quantity: number;
+}
+
+interface MockDependencies {
+  getCurrentUserId: () => string | null;
+  openGiftSelector: (callback?: () => Promise<void>) => Promise<void>;
+  sendGift: (giftData: GiftData, onSuccess?: () => Promise<void>) => Promise<void>;
+  loadBalance: (userId: string) => Promise<void>;
+  showGiftAnimation: (emoji: string, name: string) => void;
+  closeGiftAnimation: () => void;
+}
 
 // Mock dependencies
 vi.mock('../../config/gifts', () => ({
-  getGiftById: vi.fn((giftId) => {
-    const gifts = {
+  getGiftById: vi.fn((giftId: string) => {
+    const gifts: Record<string, any> = {
       'gift-1': { id: 'gift-1', name: '玫瑰', emoji: '🌹', price: 10 },
       'gift-2': { id: 'gift-2', name: '鑽石', emoji: '💎', price: 100 },
       'gift-3': { id: 'gift-3', name: '巧克力', emoji: '🍫', price: 5 },
@@ -25,9 +41,9 @@ vi.mock('../../config/gifts', () => ({
 }));
 
 describe('useGiftManagement - 禮物管理測試', () => {
-  let useGiftManagement;
-  let mockDeps;
-  let giftsConfig;
+  let useGiftManagement: any;
+  let mockDeps: MockDependencies;
+  let giftsConfig: any;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -41,11 +57,11 @@ describe('useGiftManagement - 禮物管理測試', () => {
     // 創建標準的 mock 依賴項
     mockDeps = {
       getCurrentUserId: vi.fn(() => 'user-123'),
-      openGiftSelector: vi.fn(async (callback) => {
+      openGiftSelector: vi.fn(async (callback?: () => Promise<void>) => {
         // 模擬打開選擇器並執行回調
         if (callback) await callback();
       }),
-      sendGift: vi.fn(async (giftData, onSuccess) => {
+      sendGift: vi.fn(async (giftData: GiftData, onSuccess?: () => Promise<void>) => {
         // 模擬發送成功並執行回調
         if (onSuccess) await onSuccess();
       }),
@@ -214,7 +230,7 @@ describe('useGiftManagement - 禮物管理測試', () => {
 
   describe('禮物動畫時序', () => {
     it('應該在發送禮物前顯示動畫', async () => {
-      const callOrder = [];
+      const callOrder: string[] = [];
 
       mockDeps.showGiftAnimation = vi.fn(() => {
         callOrder.push('showAnimation');
@@ -286,7 +302,7 @@ describe('useGiftManagement - 禮物管理測試', () => {
 
   describe('邊界情況', () => {
     it('應該處理 giftData 缺少 giftId', async () => {
-      const giftData = { quantity: 1 }; // 沒有 giftId
+      const giftData = { quantity: 1 } as any; // 沒有 giftId
 
       const giftMgmt = useGiftManagement(mockDeps);
       await giftMgmt.handleSelectGift(giftData);

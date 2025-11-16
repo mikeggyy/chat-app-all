@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { logger } from "@/utils/logger";
@@ -10,18 +10,46 @@ import { apiJson } from "../utils/api";
 import CharacterCreationLimitModal from "../components/CharacterCreationLimitModal.vue";
 import ResumeFlowModal from "../components/ResumeFlowModal.vue";
 import {
-  readStoredCharacterCreationFlowId,
-  fetchCharacterCreationFlow,
   clearStoredCharacterCreationFlowId,
   cancelCharacterCreation,
 } from "../services/characterCreation.service.js";
+
+// Types
+interface GenderOption {
+  value: string;
+  label: string;
+  portrait: string;
+  alt: string;
+}
+
+interface CreationLimitResponse {
+  limit?: {
+    remaining: number;
+    used?: number;
+    total?: number;
+    standardTotal?: number;
+    isTestAccount?: boolean;
+    tier?: string;
+  };
+}
+
+interface CharacterCreationFlow {
+  id?: string;
+  status?: string;
+  appearance?: any;
+  generation?: {
+    result?: {
+      images?: any[];
+    };
+  };
+}
 
 const router = useRouter();
 const { requireLogin } = useGuestGuard();
 const { user } = useUserProfile();
 const { loadBalance: loadTicketsBalance, createCards } = useUnlockTickets();
 
-const genderOptions = [
+const genderOptions: GenderOption[] = [
   {
     value: "male",
     label: "男",
@@ -42,72 +70,33 @@ const genderOptions = [
   },
 ];
 
-const selectedGender = ref("");
-const remainingCreations = ref(0);
-const usedCreations = ref(0);
-const totalLimit = ref(0);
-const standardTotal = ref(null);
-const isTestAccount = ref(false);
-const membershipTier = ref("free");
-const showLimitModal = ref(false);
-const showResumeFlowModal = ref(false);
-const pendingFlow = ref(null);
+const selectedGender = ref<string>("");
+const remainingCreations = ref<number | string>(0);
+const usedCreations = ref<number>(0);
+const totalLimit = ref<number | string>(0);
+const standardTotal = ref<number | string | null>(null);
+const isTestAccount = ref<boolean>(false);
+const membershipTier = ref<string>("free");
+const showLimitModal = ref<boolean>(false);
+const showResumeFlowModal = ref<boolean>(false);
+const pendingFlow = ref<CharacterCreationFlow | null>(null);
 
-const clearCreationState = () => {
+const clearCreationState = (): void => {
   if (typeof window === "undefined") {
     return;
   }
   try {
     window.sessionStorage.removeItem("characterCreation.gender");
     window.sessionStorage.removeItem("characterCreation.appearance");
-  } catch (error) {
+  } catch {
+    // Silent fail
   }
 };
 
 // 統一使用 useUnlockTickets 來獲取創建卡數量
 // createCards 已經從 useUnlockTickets 導入，無需再次獲取
 
-const checkAndResumeFlow = async () => {
-  // 檢查是否有未完成的 flow
-  const storedFlowId = readStoredCharacterCreationFlowId();
-  if (!storedFlowId) {
-    return false;
-  }
-
-  try {
-    // 嘗試從後端獲取 flow 資料
-    const flow = await fetchCharacterCreationFlow(storedFlowId);
-
-    if (!flow) {
-      // Flow 不存在，清除狀態
-      clearStoredCharacterCreationFlowId();
-      clearCreationState();
-      return false;
-    }
-
-    // 根據 flow 狀態決定跳轉到哪個頁面
-    const status = flow.status || "draft";
-
-    if (status === "completed") {
-      // 已完成，清除狀態並開始新流程
-      clearStoredCharacterCreationFlowId();
-      clearCreationState();
-      return false;
-    }
-
-    // 有未完成的 flow，顯示確認彈窗
-    pendingFlow.value = flow;
-    showResumeFlowModal.value = true;
-    return true;
-  } catch (error) {
-    // 發生錯誤，清除狀態並重新開始
-    clearStoredCharacterCreationFlowId();
-    clearCreationState();
-    return false;
-  }
-};
-
-const handleResumeFlowConfirm = async () => {
+const handleResumeFlowConfirm = async (): Promise<void> => {
   showResumeFlowModal.value = false;
 
   if (!pendingFlow.value) {
@@ -121,28 +110,30 @@ const handleResumeFlowConfirm = async () => {
     // 根據狀態跳轉到對應頁面
     if (status === "voice" || status === "persona") {
       await router.replace({ name: "character-create-voice" });
-    } else if (status === "generating" || flow.generation?.result?.images?.length > 0) {
+    } else if (status === "generating" || (flow.generation?.result?.images?.length ?? 0) > 0) {
       await router.replace({ name: "character-create-generating" });
     } else if (status === "appearance" || flow.appearance) {
       await router.replace({ name: "character-create-appearance" });
     }
-  } catch (error) {
+  } catch (_error) {
+    // Silent fail
   } finally {
     pendingFlow.value = null;
   }
 };
 
-const handleResumeFlowCancel = async () => {
+const handleResumeFlowCancel = async (): Promise<void> => {
   showResumeFlowModal.value = false;
 
   const flowToCancel = pendingFlow.value;
   pendingFlow.value = null;
 
   // 如果有生成的圖片，調用後端 API 刪除所有圖片
-  if (flowToCancel?.id && flowToCancel?.generation?.result?.images?.length > 0) {
+  const imagesLength = flowToCancel?.generation?.result?.images?.length ?? 0;
+  if (flowToCancel?.id && imagesLength > 0) {
     try {
       await cancelCharacterCreation(flowToCancel.id);
-      logger.log(`[角色創建] 已取消流程並清理 ${flowToCancel.generation.result.images.length} 張生成的圖片`);
+      logger.log(`[角色創建] 已取消流程並清理 ${imagesLength} 張生成的圖片`);
     } catch (error) {
       logger.error("[角色創建] 取消流程失敗:", error);
       // 即使刪除失敗也繼續清除本地狀態
@@ -171,7 +162,7 @@ onMounted(async () => {
   const userId = user.value?.id;
   if (userId) {
     try {
-      const response = await apiJson(`/api/character-creation/limits/${userId}`, {
+      const response = await apiJson<CreationLimitResponse>(`/api/character-creation/limits/${userId}`, {
         method: "GET",
         skipGlobalLoading: true,
       });
@@ -203,7 +194,8 @@ onMounted(async () => {
           membershipTier.value = response.limit.tier;
         }
       }
-    } catch (error) {
+    } catch {
+      // Silent fail
     }
 
     // 載入用戶資產（解鎖卡數量）- 統一使用 useUnlockTickets
@@ -211,16 +203,16 @@ onMounted(async () => {
   }
 });
 
-const isConfirmDisabled = computed(() => !selectedGender.value);
+const isConfirmDisabled = computed<boolean>(() => !selectedGender.value);
 
-const handleOptionSelect = (option) => {
+const handleOptionSelect = (option: GenderOption | null): void => {
   if (!option?.value) {
     return;
   }
   selectedGender.value = option.value;
 };
 
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   if (isConfirmDisabled.value) {
     return;
   }
@@ -235,27 +227,29 @@ const handleConfirm = () => {
         selectedGender.value
       );
     }
-  } catch (error) {
+  } catch {
+    // Silent fail
   }
-  router.push({ name: "character-create-appearance" }).catch((error) => {
+  router.push({ name: "character-create-appearance" }).catch(() => {
+    // Silent fail
   });
 };
 
-const handleCloseLimitModal = () => {
+const handleCloseLimitModal = (): void => {
   showLimitModal.value = false;
 };
 
-const handleUpgrade = () => {
+const handleUpgrade = (): void => {
   showLimitModal.value = false;
   // 會由彈窗組件自行導向
 };
 
-const handleBuyUnlockCard = () => {
+const handleBuyUnlockCard = (): void => {
   showLimitModal.value = false;
   // 會由彈窗組件自行導向商城
 };
 
-const handleUseUnlockCard = async () => {
+const handleUseUnlockCard = async (): Promise<void> => {
   // 註：不在這裡扣除創建卡
   // 後端會在生成角色圖片成功後才扣除，確保生成失敗時不會扣除用戶的資源
 
@@ -270,19 +264,22 @@ const handleUseUnlockCard = async () => {
         selectedGender.value
       );
     }
-  } catch (error) {
+  } catch {
+    // Silent fail
   }
-  router.push({ name: "character-create-appearance" }).catch((error) => {
+  router.push({ name: "character-create-appearance" }).catch(() => {
+    // Silent fail
   });
 };
 
-const navigateBackToProfile = () => {
+const navigateBackToProfile = (): void => {
   clearCreationState();
-  router.replace({ name: "profile" }).catch((error) => {
+  router.replace({ name: "profile" }).catch(() => {
+    // Silent fail
   });
 };
 
-const handleClose = () => {
+const handleClose = (): void => {
   if (typeof window === "undefined") {
     navigateBackToProfile();
     return;
@@ -366,8 +363,8 @@ const handleClose = () => {
     <CharacterCreationLimitModal
       :is-open="showLimitModal"
       :used-creations="usedCreations"
-      :total-limit="totalLimit"
-      :standard-total="standardTotal"
+      :total-limit="(totalLimit as any)"
+      :standard-total="(standardTotal as any)"
       :is-test-account="isTestAccount"
       :membership-tier="membershipTier"
       :create-cards="createCards"

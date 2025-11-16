@@ -1,5 +1,6 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, reactive, watchEffect } from "vue";
+import type { Ref, ComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import AvatarCropperOverlay from "../components/AvatarCropperOverlay.vue";
@@ -14,13 +15,51 @@ import { useAppearanceDescription } from "../composables/character-creation/useA
 import { usePurchaseFlow } from "../composables/character-creation/usePurchaseFlow.js";
 import { logger } from "../utils/logger.js";
 
+// Types
+interface AppearanceForm {
+  description: string;
+  styles: string[];
+}
+
+interface ReferenceInfo {
+  image: string;
+  name: string;
+  source: string;
+  focus: string;
+}
+
+interface AppearanceData {
+  description: string;
+  styles: string[];
+  referenceInfo: ReferenceInfo | null;
+}
+
+interface ClearCreationStateOptions {
+  preserveGender?: boolean;
+}
+
+interface CropResult {
+  croppedImage: string;
+  [key: string]: any;
+}
+
+interface StoredAppearance {
+  description?: string;
+  styles?: string[];
+  referencePreview?: string;
+  referenceName?: string;
+  referenceSource?: string;
+  referenceFocus?: string;
+  [key: string]: any;
+}
+
 const router = useRouter();
 
 // 保存的性別資料
-const savedGender = ref("");
+const savedGender: Ref<string> = ref("");
 
 // Session Storage 管理
-const clearCreationState = ({ preserveGender = false } = {}) => {
+const clearCreationState = ({ preserveGender = false }: ClearCreationStateOptions = {}): void => {
   if (typeof window === "undefined") {
     return;
   }
@@ -34,7 +73,7 @@ const clearCreationState = ({ preserveGender = false } = {}) => {
   }
 };
 
-const saveAppearanceState = (partial) => {
+const saveAppearanceState = (partial: Partial<StoredAppearance>): void => {
   if (typeof window === "undefined") {
     return;
   }
@@ -42,7 +81,7 @@ const saveAppearanceState = (partial) => {
     const existing = window.sessionStorage.getItem(
       "characterCreation.appearance"
     );
-    const data = existing ? JSON.parse(existing) : {};
+    const data: StoredAppearance = existing ? JSON.parse(existing) : {};
     Object.assign(data, partial);
     window.sessionStorage.setItem(
       "characterCreation.appearance",
@@ -57,11 +96,9 @@ const saveAppearanceState = (partial) => {
 const {
   styleOptions,
   isLoadingStyles,
-  validateStyles,
-  checkStyleVersion,
 } = useStyleSelection();
 
-const appearanceForm = reactive({
+const appearanceForm: AppearanceForm = reactive({
   description: "",
   styles: [],
 });
@@ -87,7 +124,6 @@ const {
 // 形象描述
 const {
   description,
-  descriptionCharCount,
   maxLength: DESCRIPTION_MAX_LENGTH,
   loadDescriptionFromStorage,
   updateDescription,
@@ -110,9 +146,6 @@ const {
 
 // 購買流程
 const {
-  userCreateCards,
-  freeCreationsRemaining,
-  isLoadingAssets,
   isGenerateConfirmVisible,
   showPurchaseModal,
   confirmMessage,
@@ -140,7 +173,7 @@ watchEffect(() => {
     );
 
     if (storedAppearance) {
-      const parsed = JSON.parse(storedAppearance);
+      const parsed: StoredAppearance = JSON.parse(storedAppearance);
 
       // 載入描述
       loadDescriptionFromStorage(parsed);
@@ -159,7 +192,7 @@ watchEffect(() => {
 });
 
 // 風格選擇處理
-const toggleStyle = (styleId) => {
+const toggleStyle = (styleId: string): void => {
   if (!styleId) {
     return;
   }
@@ -172,14 +205,12 @@ const toggleStyle = (styleId) => {
   saveAppearanceState({ styles: [...appearanceForm.styles] });
 };
 
-const isStyleSelected = (styleId) => appearanceForm.styles.includes(styleId);
-
 // AI 魔法師處理
-const handleAIMagicianClick = async () => {
+const handleAIMagicianClick = async (): Promise<void> => {
   const result = await callAIMagician(
-    appearanceForm.styles,
+    appearanceForm.styles as any,
     referencePreview.value,
-    referenceFocus.value
+    referenceFocus.value as any
   );
 
   if (result) {
@@ -188,22 +219,22 @@ const handleAIMagicianClick = async () => {
 };
 
 // 生成處理
-const isGenerateDisabled = computed(() => {
+const isGenerateDisabled: ComputedRef<boolean> = computed(() => {
   const desc = description.value.trim();
   return desc.length === 0;
 });
 
-const handleGenerateAppearance = () => {
+const handleGenerateAppearance = (): void => {
   triggerGenerate(isGenerateDisabled.value);
 };
 
-const confirmGenerate = async () => {
+const confirmGenerate = async (): Promise<void> => {
   saveAppearanceState({ styles: [...appearanceForm.styles] });
   const sanitizedDescription = sanitizeText(
     description.value.slice(0, DESCRIPTION_MAX_LENGTH)
   );
 
-  const appearanceData = {
+  const appearanceData: AppearanceData = {
     description: desanitizeText(sanitizedDescription),
     styles: [...appearanceForm.styles],
     referenceInfo: referencePreview.value
@@ -220,10 +251,10 @@ const confirmGenerate = async () => {
 };
 
 // 處理關閉
-const handleClose = () => {
-  const fallbackToProfile = () => {
+const handleClose = (): void => {
+  const fallbackToProfile = (): void => {
     clearCreationState();
-    router.replace({ name: "profile" }).catch((error) => {});
+    router.replace({ name: "profile" }).catch(() => {});
   };
 
   if (typeof window === "undefined") {
@@ -246,15 +277,15 @@ const handleClose = () => {
 };
 
 // 參考圖片處理（包裝 composable 函數）
-const handleCropConfirmWrapper = (result) => {
-  handleCropConfirm(result, saveAppearanceState);
+const handleCropConfirmWrapper = (result: CropResult): void => {
+  handleCropConfirm(result as any, saveAppearanceState);
 };
 
-const handleReferenceClearWrapper = () => {
+const handleReferenceClearWrapper = (): void => {
   handleReferenceClear(saveAppearanceState);
 };
 
-const handleReferenceFocusUpdate = (value) => {
+const handleReferenceFocusUpdate = (value: string): void => {
   referenceFocus.value = value;
   saveAppearanceState({ referenceFocus: value });
 };

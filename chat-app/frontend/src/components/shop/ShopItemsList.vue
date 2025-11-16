@@ -1,54 +1,57 @@
-<script setup>
+<script setup lang="ts">
 import ShopItem from "./ShopItem.vue";
 import { ShoppingBagIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  items: {
-    type: Array,
-    default: () => [],
-  },
-  isPurchasing: {
-    type: Boolean,
-    default: false,
-  },
-  isPurchasingItem: {
-    type: Boolean,
-    default: false,
-  },
-  balance: {
-    type: Number,
-    default: 0,
-  },
-  membershipTier: {
-    type: String,
-    default: "free",
-  },
-  isCoinIconAvailable: {
-    type: Boolean,
-    default: true,
-  },
-  categoryDescription: {
-    type: String,
-    default: "",
-  },
+// Types
+interface ShopItemType {
+  id: string;
+  name: string;
+  price: number;
+  isCoinPackage?: boolean;
+  [key: string]: any;
+}
+
+interface Props {
+  items?: ShopItemType[];
+  isPurchasing?: boolean;
+  isPurchasingItem?: boolean;
+  balance?: number;
+  membershipTier?: string;
+  isCoinIconAvailable?: boolean;
+  categoryDescription?: string;
+}
+
+interface Emits {
+  (e: "purchase", item: ShopItemType): void;
+  (e: "coinIconError"): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  items: () => [],
+  isPurchasing: false,
+  isPurchasingItem: false,
+  balance: 0,
+  membershipTier: "free",
+  isCoinIconAvailable: true,
+  categoryDescription: "",
 });
 
-const emit = defineEmits(["purchase", "coinIconError"]);
+const emit = defineEmits<Emits>();
 
-const handlePurchase = (item) => {
+const handlePurchase = (item: ShopItemType): void => {
   emit("purchase", item);
 };
 
-const handleCoinIconError = () => {
+const handleCoinIconError = (): void => {
   emit("coinIconError");
 };
 
 // 判斷是否正在購買該商品
-const isPurchasingItem = (item) => {
+const isPurchasingItem = (item: ShopItemType): boolean => {
   if (item.isCoinPackage) {
-    return props.isPurchasing;
+    return props.isPurchasing ?? false;
   } else {
-    return props.isPurchasingItem;
+    return props.isPurchasingItem ?? false;
   }
 };
 </script>

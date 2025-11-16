@@ -1,33 +1,37 @@
-<script setup>
-import { computed } from "vue";
+<script setup lang="ts">
+import { computed, type ComputedRef } from "vue";
 import {
   ArrowLeftIcon,
   ChatBubbleBottomCenterIcon,
 } from "@heroicons/vue/24/outline";
 import { COIN_ICON_PATH } from "../../config/assets";
 
-const props = defineProps({
-  formattedBalance: {
-    type: String,
-    required: true,
-  },
-  isCoinIconAvailable: {
-    type: Boolean,
-    default: true,
-  },
+// Types
+interface Props {
+  formattedBalance: string;
+  isCoinIconAvailable?: boolean;
+}
+
+interface Emits {
+  (e: "back"): void;
+  (e: "coinIconError"): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isCoinIconAvailable: true,
 });
 
-const emit = defineEmits(["back", "coinIconError"]);
+const emit = defineEmits<Emits>();
 
-const coinIconPath = computed(() =>
+const coinIconPath: ComputedRef<string> = computed(() =>
   props.isCoinIconAvailable ? COIN_ICON_PATH : ""
 );
 
-const handleBack = () => {
+const handleBack = (): void => {
   emit("back");
 };
 
-const handleCoinIconError = () => {
+const handleCoinIconError = (): void => {
   emit("coinIconError");
 };
 </script>

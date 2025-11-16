@@ -63,8 +63,8 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+<script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount, type Ref } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/outline";
 
 /**
@@ -72,38 +72,39 @@ import { SparklesIcon } from "@heroicons/vue/24/outline";
  * 職責：顯示 AI 生成的建議回覆
  */
 
+// Types
+interface Props {
+  suggestions?: string[];
+  isLoading?: boolean;
+  error?: string | null;
+  disabled?: boolean;
+}
+
+interface Emits {
+  (e: 'suggestion-click', item: string): void;
+  (e: 'request-suggestions'): void;
+}
+
 // Props
-const props = defineProps({
-  suggestions: {
-    type: Array,
-    default: () => [],
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: null,
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<Props>(), {
+  suggestions: () => [],
+  isLoading: false,
+  error: null,
+  disabled: false,
 });
 
 // Emits
-const emit = defineEmits(["suggestion-click", "request-suggestions"]);
+const emit = defineEmits<Emits>();
 
 // Refs
-const buttonRef = ref(null);
-const menuRef = ref(null);
-const isMenuOpen = ref(false);
+const buttonRef: Ref<HTMLElement | null> = ref(null);
+const menuRef: Ref<HTMLElement | null> = ref(null);
+const isMenuOpen: Ref<boolean> = ref(false);
 
 /**
  * 切換選單
  */
-const toggleMenu = () => {
+const toggleMenu = (): void => {
   if (props.disabled) return;
 
   isMenuOpen.value = !isMenuOpen.value;
@@ -117,7 +118,7 @@ const toggleMenu = () => {
 /**
  * 選擇建議
  */
-const handleSelect = (item) => {
+const handleSelect = (item: string): void => {
   emit("suggestion-click", item);
   isMenuOpen.value = false;
 };
@@ -125,13 +126,13 @@ const handleSelect = (item) => {
 /**
  * 點擊外部關閉選單
  */
-const handleClickOutside = (event) => {
+const handleClickOutside = (event: MouseEvent): void => {
   if (
     isMenuOpen.value &&
     buttonRef.value &&
     menuRef.value &&
-    !buttonRef.value.contains(event.target) &&
-    !menuRef.value.contains(event.target)
+    !buttonRef.value.contains(event.target as Node) &&
+    !menuRef.value.contains(event.target as Node)
   ) {
     isMenuOpen.value = false;
   }

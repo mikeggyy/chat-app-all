@@ -44,7 +44,7 @@
   </footer>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from "vue";
 import TextInput from "./input/TextInput.vue";
 import ActionButtons from "./input/ActionButtons.vue";
@@ -60,74 +60,62 @@ import MediaMenu from "./input/MediaMenu.vue";
  * ✅ 改善可維護性、可測試性、可重用性
  */
 
+// Types
+interface Props {
+  modelValue?: string;
+  disabled?: boolean;
+  suggestions?: any[];
+  isLoadingSuggestions?: boolean;
+  suggestionError?: string;
+  isSendingGift?: boolean;
+  isRequestingSelfie?: boolean;
+  isRequestingVideo?: boolean;
+  photoRemaining?: number;
+}
+
+interface Emits {
+  (e: 'update:modelValue', value: string): void;
+  (e: 'send', value: string): void;
+  (e: 'suggestion-click', suggestion: string): void;
+  (e: 'request-suggestions'): void;
+  (e: 'gift-click'): void;
+  (e: 'selfie-click'): void;
+  (e: 'video-click'): void;
+}
+
 // Props
-const props = defineProps({
-  modelValue: {
-    type: String,
-    default: "",
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
-  suggestions: {
-    type: Array,
-    default: () => [],
-  },
-  isLoadingSuggestions: {
-    type: Boolean,
-    default: false,
-  },
-  suggestionError: {
-    type: String,
-    default: null,
-  },
-  isSendingGift: {
-    type: Boolean,
-    default: false,
-  },
-  isRequestingSelfie: {
-    type: Boolean,
-    default: false,
-  },
-  isRequestingVideo: {
-    type: Boolean,
-    default: false,
-  },
-  photoRemaining: {
-    type: Number,
-    default: null,
-  },
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: "",
+  disabled: false,
+  suggestions: () => [],
+  isLoadingSuggestions: false,
+  suggestionError: undefined,
+  isSendingGift: false,
+  isRequestingSelfie: false,
+  isRequestingVideo: false,
+  photoRemaining: undefined,
 });
 
 // Emits
-const emit = defineEmits([
-  "update:modelValue",
-  "send",
-  "suggestion-click",
-  "request-suggestions",
-  "gift-click",
-  "selfie-click",
-  "video-click",
-]);
+const emit = defineEmits<Emits>();
 
 // Refs
-const textInputRef = ref(null);
+const textInputRef = ref<{ focus: () => void } | null>(null);
 
 // Computed
 const inputValue = computed({
-  get: () => props.modelValue,
-  set: (value) => emit("update:modelValue", value),
+  get: (): string => props.modelValue ?? "",
+  set: (value: string) => emit("update:modelValue", value),
 });
 
-const hasContent = computed(() => {
-  return inputValue.value && inputValue.value.trim().length > 0;
+const hasContent = computed((): boolean => {
+  return Boolean(inputValue.value && inputValue.value.trim().length > 0);
 });
 
 /**
  * 發送訊息
  */
-const handleSend = () => {
+const handleSend = (): void => {
   if (!hasContent.value || props.disabled) return;
   emit("send", inputValue.value.trim());
 };
@@ -135,14 +123,14 @@ const handleSend = () => {
 /**
  * 處理建議點擊
  */
-const handleSuggestionClick = (suggestion) => {
+const handleSuggestionClick = (suggestion: string): void => {
   emit("suggestion-click", suggestion);
 };
 
 /**
  * 聚焦輸入框（暴露給父組件）
  */
-const focus = () => {
+const focus = (): void => {
   textInputRef.value?.focus();
 };
 

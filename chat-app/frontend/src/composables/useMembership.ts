@@ -90,19 +90,20 @@ const upgradeProgress: Ref<UpgradeProgress> = ref({
 export function useMembership(): UseMembershipReturn {
   /**
    * 載入會員信息
-   * @param userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
+   * @param userId - 用戶 ID（必須提供）
    * @param options - 選項
    */
   const loadMembershipInfo = async (userId?: string, options: UseMembershipOptions = {}): Promise<any> => {
-    // userId 參數已廢棄，保留是為了向後兼容
-    // 後端現在從認證 token 自動獲取 userId
-    void userId; // 標記參數已被認知
+    if (!userId) {
+      error.value = '缺少用戶 ID';
+      throw new Error('缺少用戶 ID');
+    }
 
     isLoading.value = true;
     error.value = null;
 
     try {
-      const data = await apiJson('/api/membership/info', {
+      const data = await apiJson(`/api/membership/${encodeURIComponent(userId)}`, {
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
 
@@ -132,7 +133,7 @@ export function useMembership(): UseMembershipReturn {
 
   /**
    * 升級會員
-   * @param userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
+   * @param userId - 用戶 ID（必須提供）
    * @param targetTier - 目標會員等級 (vip 或 vvip)
    * @param options - 選項
    */
@@ -141,9 +142,10 @@ export function useMembership(): UseMembershipReturn {
     targetTier: MembershipTier,
     options: UpgradeOptions = {}
   ): Promise<any> => {
-    // userId 參數已廢棄，保留是為了向後兼容
-    // 後端現在從認證 token 自動獲取 userId
-    void userId; // 標記參數已被認知
+    if (!userId) {
+      error.value = '缺少用戶 ID';
+      throw new Error('缺少用戶 ID');
+    }
 
     if (!targetTier || (targetTier !== 'vip' && targetTier !== 'vvip')) {
       error.value = '無效的目標會員等級';
@@ -166,7 +168,7 @@ export function useMembership(): UseMembershipReturn {
         message: '處理升級請求...',
       };
 
-      const data = await apiJson('/api/membership/upgrade', {
+      const data = await apiJson(`/api/membership/${encodeURIComponent(userId)}/upgrade`, {
         method: 'POST',
         body: {
           targetTier,
@@ -226,19 +228,20 @@ export function useMembership(): UseMembershipReturn {
 
   /**
    * 取消會員
-   * @param userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
+   * @param userId - 用戶 ID（必須提供）
    * @param options - 選項
    */
   const cancelMembership = async (userId?: string, options: UseMembershipOptions = {}): Promise<any> => {
-    // userId 參數已廢棄，保留是為了向後兼容
-    // 後端現在從認證 token 自動獲取 userId
-    void userId; // 標記參數已被認知
+    if (!userId) {
+      error.value = '缺少用戶 ID';
+      throw new Error('缺少用戶 ID');
+    }
 
     isLoading.value = true;
     error.value = null;
 
     try {
-      const data = await apiJson('/api/membership/cancel', {
+      const data = await apiJson(`/api/membership/${encodeURIComponent(userId)}/cancel`, {
         method: 'POST',
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });

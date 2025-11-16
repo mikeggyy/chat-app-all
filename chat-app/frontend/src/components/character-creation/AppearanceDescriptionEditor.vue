@@ -1,39 +1,42 @@
-<script setup>
-import { computed } from "vue";
+<script setup lang="ts">
+import { computed, type ComputedRef } from "vue";
 import AIMagicianButton from "./AIMagicianButton.vue";
 
-const props = defineProps({
-  description: {
-    type: String,
-    required: true,
-  },
-  maxLength: {
-    type: Number,
-    default: 60,
-  },
-  isGenerating: {
-    type: Boolean,
-    default: false,
-  },
-  aiMagicianUsage: {
-    type: Object,
-    required: true,
-  },
-  errorMessage: {
-    type: String,
-    default: "",
-  },
+// Types
+interface AIMagicianUsage {
+  remaining: number;
+  total: number;
+}
+
+interface Props {
+  description: string;
+  maxLength?: number;
+  isGenerating?: boolean;
+  aiMagicianUsage: AIMagicianUsage;
+  errorMessage?: string;
+}
+
+interface Emits {
+  (e: "update:description", value: string): void;
+  (e: "ai-magician"): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  maxLength: 60,
+  isGenerating: false,
+  errorMessage: "",
 });
 
-const emit = defineEmits(["update:description", "ai-magician"]);
+const emit = defineEmits<Emits>();
 
-const charCount = computed(() => props.description.length);
+const charCount: ComputedRef<number> = computed(() => props.description.length);
 
-const handleInput = (event) => {
-  emit("update:description", event.target.value);
+const handleInput = (event: Event): void => {
+  const target = event.target as HTMLTextAreaElement;
+  emit("update:description", target.value);
 };
 
-const handleAIMagician = () => {
+const handleAIMagician = (): void => {
   emit("ai-magician");
 };
 </script>

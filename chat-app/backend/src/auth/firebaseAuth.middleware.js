@@ -82,16 +82,41 @@ export const requireFirebaseAuth = async (req, res, next) => {
     const verifyOptions = process.env.USE_FIREBASE_EMULATOR === "true"
       ? { checkRevoked: false }
       : {};
+
+    logger.info('[Auth] 開始驗證 Firebase token...', {
+      tokenPrefix: rawToken.substring(0, 30) + '...',
+      isEmulator: process.env.USE_FIREBASE_EMULATOR === "true",
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID
+    });
+
     const decoded = await auth.verifyIdToken(rawToken, verifyOptions);
+
+    logger.info('[Auth] ✅ Firebase token 驗證成功', {
+      uid: decoded.uid,
+      email: decoded.email,
+      iat: decoded.iat,
+      exp: decoded.exp,
+      aud: decoded.aud
+    });
+
     req.firebaseUser = decoded;
     next();
   } catch (error) {
     const code =
       typeof error?.code === "string" ? error.code : "auth/token-verification";
-    logger.error("Firebase ID token verification failed:", error);
+
+    logger.error('[Auth] ❌ Firebase token 驗證失敗', {
+      code,
+      message: error.message,
+      stack: error.stack,
+      tokenPrefix: rawToken.substring(0, 30) + '...',
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID
+    });
+
     res.status(401).json({
       message: "Firebase 登入憑證驗證失敗",
       code,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

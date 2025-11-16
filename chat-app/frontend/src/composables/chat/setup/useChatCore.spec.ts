@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import { ref } from 'vue';
 
 // Mock all dependencies
@@ -35,7 +36,7 @@ vi.mock('../../useToast', () => ({
 }));
 
 vi.mock('../usePartner', () => ({
-  usePartner: vi.fn(({ partnerId }) => ({
+  usePartner: vi.fn(({ partnerId }: any) => ({
     partner: ref({ id: 'char-001', display_name: '測試角色' }),
     partnerDisplayName: ref('測試角色'),
     partnerBackground: ref('測試背景'),
@@ -45,7 +46,7 @@ vi.mock('../usePartner', () => ({
 }));
 
 vi.mock('../useChatMessages', () => ({
-  useChatMessages: vi.fn((partnerId) => ({
+  useChatMessages: vi.fn((partnerId: any) => ({
     messages: ref([]),
     isReplying: ref(false),
     isLoadingHistory: ref(false),
@@ -57,7 +58,7 @@ vi.mock('../useChatMessages', () => ({
 }));
 
 vi.mock('../useSuggestions', () => ({
-  useSuggestions: vi.fn((messages, partner, firebaseAuth, currentUserId) => ({
+  useSuggestions: vi.fn((messages: any, partner: any, firebaseAuth: any, currentUserId: any) => ({
     suggestionOptions: ref([]),
     isLoadingSuggestions: ref(false),
     suggestionError: ref(null),
@@ -68,10 +69,10 @@ vi.mock('../useSuggestions', () => ({
 }));
 
 describe('useChatCore - 集成測試', () => {
-  let useChatCore;
-  let useSuggestionsMock;
-  let usePartnerMock;
-  let useChatMessagesMock;
+  let useChatCore: any;
+  let useSuggestionsMock: Mock;
+  let usePartnerMock: Mock;
+  let useChatMessagesMock: Mock;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -81,9 +82,9 @@ describe('useChatCore - 集成測試', () => {
     const { usePartner } = await import('../usePartner');
     const { useChatMessages } = await import('../useChatMessages');
 
-    useSuggestionsMock = useSuggestions;
-    usePartnerMock = usePartner;
-    useChatMessagesMock = useChatMessages;
+    useSuggestionsMock = useSuggestions as Mock;
+    usePartnerMock = usePartner as Mock;
+    useChatMessagesMock = useChatMessages as Mock;
 
     // 導入測試目標
     const module = await import('./useChatCore');
@@ -161,7 +162,7 @@ describe('useChatCore - 集成測試', () => {
       const { useUserProfile } = require('../../useUserProfile');
 
       // Mock 空用戶
-      useUserProfile.mockReturnValueOnce({
+      (useUserProfile as Mock).mockReturnValueOnce({
         user: ref(null),
         setUserProfile: vi.fn(),
         addConversationHistory: vi.fn(),

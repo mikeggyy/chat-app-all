@@ -1,18 +1,22 @@
-<script setup>
-defineProps({
-  confirmButtonLabel: {
-    type: String,
-    default: "確認",
-  },
-  isConfirmDisabled: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+// Types
+interface Props {
+  confirmButtonLabel?: string;
+  isConfirmDisabled?: boolean;
+}
+
+interface Emits {
+  (e: "confirm"): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  confirmButtonLabel: "確認",
+  isConfirmDisabled: false,
 });
 
-const emit = defineEmits(["confirm"]);
+const emit = defineEmits<Emits>();
 
-const handleConfirm = () => {
+const handleConfirm = (): void => {
   emit("confirm");
 };
 </script>

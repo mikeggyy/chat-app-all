@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { nextTick } from 'vue';
 
 // Mock apiJson 模塊
@@ -20,12 +21,33 @@ vi.mock('./useFirebaseAuth.js', () => ({
 
 // Mock testAccounts
 vi.mock('../../../../shared/config/testAccounts.js', () => ({
-  isGuestUser: vi.fn((userId) => userId?.includes('guest')),
+  isGuestUser: vi.fn((userId?: string) => userId?.includes('guest')),
 }));
 
+interface UserData {
+  id?: string;
+  email?: string;
+  displayName?: string;
+  locale?: string;
+  wallet?: {
+    balance: number;
+  };
+  coins?: number;
+  membershipTier?: string;
+  membershipStatus?: string;
+  photoURL?: string;
+  conversations?: string[];
+  favorites?: string[];
+  assets?: {
+    characterUnlockCards?: number;
+    photoUnlockCards?: number;
+    videoUnlockCards?: number;
+  };
+}
+
 describe('useUserProfile - 核心功能測試', () => {
-  let useUserProfile;
-  let apiJson;
+  let useUserProfile: any;
+  let apiJson: Mock;
 
   beforeEach(async () => {
     // 清除所有模塊緩存
@@ -33,7 +55,7 @@ describe('useUserProfile - 核心功能測試', () => {
 
     // 重新導入模塊以獲取新的實例
     const { apiJson: mockApiJson } = await import('../utils/api');
-    apiJson = mockApiJson;
+    apiJson = mockApiJson as Mock;
 
     const { useUserProfile: composable } = await import('./useUserProfile.js');
     useUserProfile = composable;
@@ -56,7 +78,7 @@ describe('useUserProfile - 核心功能測試', () => {
 
     it('應該能設置用戶資料', async () => {
       const profile = useUserProfile();
-      const userData = {
+      const userData: UserData = {
         id: 'test-user-123',
         email: 'test@example.com',
         displayName: 'Test User',
@@ -142,7 +164,7 @@ describe('useUserProfile - 核心功能測試', () => {
   describe('loadUserProfile', () => {
     it('應該能從 API 加載用戶資料', async () => {
       const profile = useUserProfile();
-      const mockData = {
+      const mockData: UserData = {
         id: 'user-456',
         email: 'user@example.com',
         displayName: 'API User',

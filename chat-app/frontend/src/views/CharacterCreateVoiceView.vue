@@ -1,5 +1,6 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import type { Ref, ComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import { finalizeCharacterCreation } from "../services/characterCreation.service.js";
 import { useUserProfile } from "../composables/useUserProfile.js";
@@ -16,6 +17,39 @@ import { useVoiceFiltering } from "../composables/voice-selection/useVoiceFilter
 import { useFlowSync } from "../composables/voice-selection/useFlowSync.js";
 import { useVoiceLoading } from "../composables/voice-selection/useVoiceLoading.js";
 
+// Types
+interface VoicePreset {
+  id: string;
+  name?: string;
+  gender?: string;
+  locale?: string;
+  [key: string]: any;
+}
+
+interface PersonaSummary {
+  name: string;
+  tagline: string;
+  hiddenProfile: string;
+  prompt: string;
+}
+
+interface AppearanceSummary {
+  image?: string;
+  [key: string]: any;
+}
+
+interface SummaryData {
+  persona?: PersonaSummary;
+  appearance?: AppearanceSummary | null;
+  voice?: VoicePreset | null;
+  gender?: string;
+}
+
+interface CreatedCharacter {
+  id: string;
+  [key: string]: any;
+}
+
 const router = useRouter();
 const { user } = useUserProfile();
 const { success: showSuccess, error: showError } = useToast();
@@ -23,8 +57,6 @@ const { success: showSuccess, error: showError } = useToast();
 // 語音加載
 const {
   voicePresets,
-  isLoadingVoices,
-  voicesLoadError,
   loadVoicesFromAPI,
   resolvePreviewUrl,
 } = useVoiceLoading();
@@ -35,9 +67,7 @@ const { isPlayingId, toggleVoicePreview } = useVoiceAudioPlayer();
 // 語音過濾
 const {
   selectedGender,
-  hasUserAdjustedGenderFilter,
   genderOptions,
-  localeOptions,
   filteredVoicePresets,
   formatGender,
   autoSetGenderFilter,
@@ -47,11 +77,8 @@ const {
 // Flow 同步
 const {
   flowId,
-  flowStatus,
   isFlowInitializing,
   isSyncingSummary,
-  lastFlowSyncError,
-  isReadyForSync,
   hasLoadedSummary,
   summaryData,
   suppressSync: flowSuppressSync,
@@ -62,41 +89,15 @@ const {
 } = useFlowSync();
 
 // 本地狀態
-const selectedVoiceId = ref("");
-let suppressSync = false;
+const selectedVoiceId: Ref<string> = ref("");
+let suppressSync: boolean = false;
 
 // 角色創建成功彈窗
-const isCharacterCreatedModalVisible = ref(false);
-const createdCharacter = ref(null);
+const isCharacterCreatedModalVisible: Ref<boolean> = ref(false);
+const createdCharacter: Ref<CreatedCharacter | null> = ref(null);
 
 // 計算屬性
-const personaSummary = computed(
-  () =>
-    summaryData.value?.persona ?? {
-      name: "",
-      tagline: "",
-      hiddenProfile: "",
-      prompt: "",
-    }
-);
-
-const appearanceSummary = computed(() => summaryData.value?.appearance ?? null);
-
-const voiceSummary = computed(() => {
-  if (summaryData.value?.voice) {
-    return summaryData.value.voice;
-  }
-  if (!selectedVoiceId.value) {
-    return null;
-  }
-  return (
-    filteredVoicePresets.value.find(
-      (preset) => preset.id === selectedVoiceId.value
-    ) ?? null
-  );
-});
-
-const isPrimaryDisabled = computed(() => {
+const isPrimaryDisabled: ComputedRef<boolean> = computed(() => {
   // 只要選擇了語音且不在初始化/同步中，就可以完成
   return (
     !selectedVoiceId.value || isFlowInitializing.value || isSyncingSummary.value
@@ -104,7 +105,7 @@ const isPrimaryDisabled = computed(() => {
 });
 
 // 方法
-const handleToggleVoicePreview = (voiceId) => {
+const handleToggleVoicePreview = (voiceId: string): void => {
   const url = resolvePreviewUrl(voiceId);
   toggleVoicePreview(voiceId, url);
 
@@ -114,22 +115,27 @@ const handleToggleVoicePreview = (voiceId) => {
   }
 };
 
-const finalizeCreation = async () => {
+const finalizeCreation = async (): Promise<void> => {
   try {
     // 確保有 flowId
     if (!flowId.value) {
       throw new Error("找不到角色創建流程");
     }
 
+    // 確保有用戶
+    if (!user.value) {
+      throw new Error("用戶未登入");
+    }
+
     // 獲取用戶選擇的圖片 URL
-    const selectedImageUrl = summaryData.value?.appearance?.image || null;
+    const selectedImageUrl = (summaryData.value as SummaryData | null)?.appearance?.image || null;
 
     // 調用 API 將角色保存到資料庫，並傳遞選擇的圖片 URL
     const character = await finalizeCharacterCreation(
       flowId.value,
       user.value,
       selectedImageUrl
-    );
+    ) as CreatedCharacter;
 
     // 保存角色資料並顯示成功彈窗
     createdCharacter.value = character;
@@ -140,29 +146,29 @@ const finalizeCreation = async () => {
 
     // 顯示成功訊息
     showSuccess("角色創建成功！");
-  } catch (error) {
+  } catch (error: any) {
     // 顯示錯誤訊息給用戶
     showError(error?.message || "保存角色失敗，請稍後再試");
   }
 };
 
-const handleViewCharacter = () => {
+const handleViewCharacter = (): void => {
   isCharacterCreatedModalVisible.value = false;
   router.replace({ name: "my-characters" });
 };
 
-const handleCloseModal = () => {
+const handleCloseModal = (): void => {
   isCharacterCreatedModalVisible.value = false;
   router.replace({ name: "my-characters" });
 };
 
-const goToCharacterSettings = () => {
+const goToCharacterSettings = (): void => {
   router
     .push({
       name: "character-create-generating",
       query: { step: "settings" },
     })
-    .catch((error) => {});
+    .catch(() => {});
 };
 
 // 監聽器
@@ -175,9 +181,9 @@ watch(
       return;
     }
     if (voiceId && voiceId !== previous) {
-      const preset = voicePresets.value.find((item) => item.id === voiceId);
+      const preset = (voicePresets.value as any).find((item: any) => item.id === voiceId);
       if (preset) {
-        updateVoiceSelection(preset);
+        updateVoiceSelection(preset as any);
       }
     }
     if (!voiceId) {
@@ -188,19 +194,19 @@ watch(
 
 watch(
   () => filteredVoicePresets.value,
-  (presets) => {
+  (presets: any) => {
     if (!hasLoadedSummary.value || suppressSync || flowSuppressSync) {
       return;
     }
     const exists = presets.some(
-      (preset) => preset.id === selectedVoiceId.value
+      (preset: any) => preset.id === selectedVoiceId.value
     );
     if (!exists && presets.length) {
       suppressSync = true;
       selectedVoiceId.value = presets[0].id;
       suppressSync = false;
       const preset = presets[0];
-      updateVoiceSelection(preset);
+      updateVoiceSelection(preset as any);
     }
   },
   { deep: true }
@@ -212,7 +218,7 @@ onMounted(async () => {
   await loadVoicesFromAPI();
 
   // 然後初始化流程狀態
-  const loadedSummary = await initializeFlowState();
+  const loadedSummary = await initializeFlowState() as SummaryData | null;
 
   // 如果有載入的摘要且包含語音，設置選中的語音
   if (loadedSummary?.voice?.id) {
@@ -227,9 +233,9 @@ onMounted(async () => {
   // 如果還沒有選中語音，默認選擇第一個
   if (!selectedVoiceId.value && filteredVoicePresets.value.length) {
     suppressSync = true;
-    selectedVoiceId.value = filteredVoicePresets.value[0].id;
+    selectedVoiceId.value = (filteredVoicePresets.value[0] as any).id;
     suppressSync = false;
-    updateVoiceSelection(filteredVoicePresets.value[0]);
+    updateVoiceSelection(filteredVoicePresets.value[0] as any);
   }
 });
 

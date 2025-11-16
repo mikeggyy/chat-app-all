@@ -12,11 +12,11 @@ defineProps({
     default: "",
   },
   settingsMenuButtonRef: {
-    type: Object,
+    type: Function,
     default: null,
   },
   settingsMenuRef: {
-    type: Object,
+    type: Function,
     default: null,
   },
 });

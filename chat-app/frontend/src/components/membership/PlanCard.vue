@@ -34,7 +34,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ArrowRightIcon } from '@heroicons/vue/24/solid';
 import LoadingSpinner from '../LoadingSpinner.vue';
 
@@ -43,20 +43,33 @@ import LoadingSpinner from '../LoadingSpinner.vue';
  * 職責：顯示單一會員方案的詳細信息和升級按鈕
  */
 
-// Props
-defineProps({
-  tier: {
-    type: Object,
-    required: true,
-  },
-  isUpgrading: {
-    type: Boolean,
-    default: false,
-  },
+// Types
+interface Tier {
+  id: string;
+  label: string;
+  highlight: string;
+  highlightColor: string;
+  headline: string;
+  description: string;
+  priceTag: string;
+  pricePeriod: string;
+  [key: string]: any;
+}
+
+interface Props {
+  tier: Tier;
+  isUpgrading?: boolean;
+}
+
+interface Emits {
+  (e: 'upgrade', tier: Tier): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  isUpgrading: false,
 });
 
-// Emits
-defineEmits(['upgrade']);
+defineEmits<Emits>();
 </script>
 
 <style scoped>

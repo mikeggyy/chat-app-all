@@ -61,8 +61,8 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+<script setup lang="ts">
+import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue';
 import {
   EllipsisHorizontalIcon,
   CameraIcon,
@@ -74,45 +74,46 @@ import {
  * 職責：自拍照片和影片生成功能
  */
 
+// Types
+interface Props {
+  photoRemaining?: number | null;
+  isRequestingSelfie?: boolean;
+  isRequestingVideo?: boolean;
+  isSendingGift?: boolean;
+}
+
+interface Emits {
+  (e: 'selfie-click'): void;
+  (e: 'video-click'): void;
+}
+
 // Props
-defineProps({
-  photoRemaining: {
-    type: Number,
-    default: null,
-  },
-  isRequestingSelfie: {
-    type: Boolean,
-    default: false,
-  },
-  isRequestingVideo: {
-    type: Boolean,
-    default: false,
-  },
-  isSendingGift: {
-    type: Boolean,
-    default: false,
-  },
+withDefaults(defineProps<Props>(), {
+  photoRemaining: null,
+  isRequestingSelfie: false,
+  isRequestingVideo: false,
+  isSendingGift: false,
 });
 
 // Emits
-const emit = defineEmits(['selfie-click', 'video-click']);
+const emit = defineEmits<Emits>();
 
 // Refs
-const buttonRef = ref(null);
-const menuRef = ref(null);
-const isMenuOpen = ref(false);
+const buttonRef: Ref<HTMLElement | null> = ref(null);
+const menuRef: Ref<HTMLElement | null> = ref(null);
+const isMenuOpen: Ref<boolean> = ref(false);
 
 /**
  * 切換選單
  */
-const toggleMenu = () => {
+const toggleMenu = (): void => {
   isMenuOpen.value = !isMenuOpen.value;
 };
 
 /**
  * 選擇媒體動作
  */
-const handleSelect = (action) => {
+const handleSelect = (action: 'selfie' | 'video'): void => {
   if (action === 'selfie') {
     emit('selfie-click');
   } else if (action === 'video') {
@@ -124,13 +125,13 @@ const handleSelect = (action) => {
 /**
  * 點擊外部關閉選單
  */
-const handleClickOutside = (event) => {
+const handleClickOutside = (event: MouseEvent): void => {
   if (
     isMenuOpen.value &&
     buttonRef.value &&
     menuRef.value &&
-    !buttonRef.value.contains(event.target) &&
-    !menuRef.value.contains(event.target)
+    !buttonRef.value.contains(event.target as Node) &&
+    !menuRef.value.contains(event.target as Node)
   ) {
     isMenuOpen.value = false;
   }

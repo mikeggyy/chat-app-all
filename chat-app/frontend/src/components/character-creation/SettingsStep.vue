@@ -1,71 +1,70 @@
-<script setup>
+<script setup lang="ts">
 import { SparklesIcon } from "@heroicons/vue/24/solid";
 
-const props = defineProps({
-  selectedResultImage: {
-    type: String,
-    default: "",
-  },
-  selectedResultAlt: {
-    type: String,
-    default: "生成角色預覽",
-  },
-  personaForm: {
-    type: Object,
-    required: true,
-  },
-  nameLength: {
-    type: Number,
-    required: true,
-  },
-  taglineLength: {
-    type: Number,
-    required: true,
-  },
-  hiddenProfileLength: {
-    type: Number,
-    required: true,
-  },
-  promptLength: {
-    type: Number,
-    required: true,
-  },
-  maxNameLength: {
-    type: Number,
-    required: true,
-  },
-  maxTaglineLength: {
-    type: Number,
-    required: true,
-  },
-  maxHiddenProfileLength: {
-    type: Number,
-    required: true,
-  },
-  maxPromptLength: {
-    type: Number,
-    required: true,
-  },
-  isAIMagicianLoading: {
-    type: Boolean,
-    default: false,
-  },
-  aiMagicianError: {
-    type: String,
-    default: null,
-  },
+// Types
+interface PersonaForm {
+  name: string;
+  tagline: string;
+  hiddenProfile: string;
+  prompt: string;
+  [key: string]: any;
+}
+
+interface Props {
+  selectedResultImage?: string;
+  selectedResultAlt?: string;
+  personaForm: PersonaForm;
+  nameLength: number;
+  taglineLength: number;
+  hiddenProfileLength: number;
+  promptLength: number;
+  maxNameLength: number;
+  maxTaglineLength: number;
+  maxHiddenProfileLength: number;
+  maxPromptLength: number;
+  isAIMagicianLoading?: boolean;
+  aiMagicianError?: string | null;
+}
+
+interface Emits {
+  (e: "openAIMagician"): void;
+  (e: "update:name", value: string): void;
+  (e: "update:tagline", value: string): void;
+  (e: "update:hiddenProfile", value: string): void;
+  (e: "update:prompt", value: string): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  selectedResultImage: "",
+  selectedResultAlt: "生成角色預覽",
+  isAIMagicianLoading: false,
+  aiMagicianError: null,
 });
 
-const emit = defineEmits([
-  "openAIMagician",
-  "update:name",
-  "update:tagline",
-  "update:hiddenProfile",
-  "update:prompt",
-]);
+const emit = defineEmits<Emits>();
 
-const handleAIMagician = () => {
+const handleAIMagician = (): void => {
   emit("openAIMagician");
+};
+
+const handleNameInput = (event: Event): void => {
+  const target = event.target as HTMLInputElement;
+  emit("update:name", target.value);
+};
+
+const handleTaglineInput = (event: Event): void => {
+  const target = event.target as HTMLTextAreaElement;
+  emit("update:tagline", target.value);
+};
+
+const handleHiddenProfileInput = (event: Event): void => {
+  const target = event.target as HTMLTextAreaElement;
+  emit("update:hiddenProfile", target.value);
+};
+
+const handlePromptInput = (event: Event): void => {
+  const target = event.target as HTMLTextAreaElement;
+  emit("update:prompt", target.value);
 };
 </script>
 
@@ -112,7 +111,7 @@ const handleAIMagician = () => {
         <input
           id="generating-name"
           :value="personaForm.name"
-          @input="emit('update:name', $event.target.value)"
+          @input="handleNameInput"
           type="text"
           class="generating__input"
           :maxlength="maxNameLength"
@@ -138,7 +137,7 @@ const handleAIMagician = () => {
         <textarea
           id="generating-tagline"
           :value="personaForm.tagline"
-          @input="emit('update:tagline', $event.target.value)"
+          @input="handleTaglineInput"
           class="generating__textarea"
           :maxlength="maxTaglineLength"
           rows="4"
@@ -157,7 +156,7 @@ const handleAIMagician = () => {
         <textarea
           id="generating-hidden"
           :value="personaForm.hiddenProfile"
-          @input="emit('update:hiddenProfile', $event.target.value)"
+          @input="handleHiddenProfileInput"
           class="generating__textarea"
           :maxlength="maxHiddenProfileLength"
           rows="4"
@@ -178,7 +177,7 @@ const handleAIMagician = () => {
         <textarea
           id="generating-prompt"
           :value="personaForm.prompt"
-          @input="emit('update:prompt', $event.target.value)"
+          @input="handlePromptInput"
           class="generating__textarea"
           :maxlength="maxPromptLength"
           rows="5"

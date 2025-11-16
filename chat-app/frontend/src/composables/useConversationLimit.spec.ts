@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 
 // Mock dependencies
 vi.mock('../utils/api', () => ({
@@ -16,8 +17,8 @@ vi.mock('../utils/api', () => ({
 }));
 
 vi.mock('./useBaseLimitService.js', () => ({
-  createLimitService: vi.fn((config) => {
-    const limitData = { value: {} };
+  createLimitService: vi.fn((config: any) => {
+    const limitData = { value: {} as Record<string, any> };
     const isLoading = { value: false };
     const error = { value: null };
 
@@ -25,7 +26,7 @@ vi.mock('./useBaseLimitService.js', () => ({
       limitData,
       isLoading,
       error,
-      checkLimit: vi.fn(async (userId, characterId) => {
+      checkLimit: vi.fn(async (userId: string, characterId: string) => {
         const key = `${userId}::${characterId}`;
         limitData.value[key] = {
           canSend: true,
@@ -39,11 +40,11 @@ vi.mock('./useBaseLimitService.js', () => ({
         totalMessages: 50,
       })),
       unlockByAd: vi.fn(async () => ({ success: true })),
-      clearState: vi.fn((userId, characterId) => {
+      clearState: vi.fn((userId: string, characterId: string) => {
         const key = `${userId}::${characterId}`;
         delete limitData.value[key];
       }),
-      getLimitData: vi.fn((userId, characterId) => {
+      getLimitData: vi.fn((userId: string, characterId: string) => {
         const key = `${userId}::${characterId}`;
         return limitData.value[key] || null;
       }),
@@ -52,15 +53,15 @@ vi.mock('./useBaseLimitService.js', () => ({
 }));
 
 describe('useConversationLimit - 對話限制測試', () => {
-  let useConversationLimit;
-  let apiJson;
+  let useConversationLimit: any;
+  let apiJson: Mock;
 
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
 
     const { apiJson: mockApiJson } = await import('../utils/api');
-    apiJson = mockApiJson;
+    apiJson = mockApiJson as Mock;
 
     const { useConversationLimit: composable } = await import('./useConversationLimit.js');
     useConversationLimit = composable;

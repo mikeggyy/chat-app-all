@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // Modal Components
 import ConversationLimitModal from '../ConversationLimitModal.vue';
 import VoiceLimitModal from '../VoiceLimitModal.vue';
@@ -18,130 +18,105 @@ import ResetConfirmModal from './modals/ResetConfirmModal.vue';
 import CharacterInfoModal from './modals/CharacterInfoModal.vue';
 import BuffDetailsModal from './modals/BuffDetailsModal.vue';
 
-const props = defineProps({
-  // Modals state
-  modals: {
-    type: Object,
-    required: true,
-  },
+// Types
+interface UserPotions {
+  memoryBoost: number;
+  brainBoost: number;
+}
 
-  // Partner data
-  partnerDisplayName: {
-    type: String,
-    default: '',
-  },
-  partnerBackground: {
-    type: String,
-    default: '',
-  },
-  partnerId: {
-    type: String,
-    default: '',
-  },
-  partner: {
-    type: Object,
-    default: null,
-  },
+interface ModalState {
+  show: boolean;
+  [key: string]: any;
+}
 
-  // Potion data
-  userPotions: {
-    type: Object,
-    default: () => ({ memoryBoost: 0, brainBoost: 0 }),
-  },
-  activeMemoryBoost: {
-    type: Object,
-    default: null,
-  },
-  activeBrainBoost: {
-    type: Object,
-    default: null,
-  },
-  activeCharacterUnlock: {
-    type: Object,
-    default: null,
-  },
+interface Modals {
+  resetConfirm: ModalState & { loading?: boolean };
+  characterInfo: ModalState;
+  potionConfirm: ModalState & { type?: string };
+  potionLimit: ModalState & { type?: string };
+  unlockConfirm: ModalState & { loading?: boolean };
+  unlockLimit: ModalState;
+  buffDetails: ModalState & { type?: string };
+  conversationLimit: ModalState & { data: any };
+  voiceLimit: ModalState & { data: any };
+  photoLimit: ModalState & { data: any };
+  videoLimit: ModalState & { data: any };
+  photoSelector: ModalState;
+  imageViewer: ModalState & { url?: string; alt?: string };
+  giftAnimation: ModalState & { emoji?: string; name?: string };
+  [key: string]: any;
+}
 
-  // Cards/Tickets
-  characterTickets: {
-    type: Number,
-    default: 0,
-  },
-  voiceCards: {
-    type: Number,
-    default: 0,
-  },
-  photoCards: {
-    type: Number,
-    default: 0,
-  },
-  videoCards: {
-    type: Number,
-    default: 0,
-  },
+interface Props {
+  modals: Modals;
+  partnerDisplayName?: string;
+  partnerBackground?: string;
+  partnerId?: string;
+  partner?: any;
+  userPotions?: UserPotions;
+  activeMemoryBoost?: any;
+  activeBrainBoost?: any;
+  activeCharacterUnlock?: any;
+  characterTickets?: number;
+  voiceCards?: number;
+  photoCards?: number;
+  videoCards?: number;
+  showGiftSelector?: boolean;
+  balance?: number;
+  membershipTier?: string;
+}
 
-  // Gift
-  showGiftSelector: {
-    type: Boolean,
-    default: false,
-  },
-  balance: {
-    type: Number,
-    default: 0,
-  },
-  membershipTier: {
-    type: String,
-    default: 'free',
-  },
+interface Emits {
+  (e: 'cancel-reset'): void;
+  (e: 'confirm-reset'): void;
+  (e: 'close-character-info'): void;
+  (e: 'close-potion-confirm'): void;
+  (e: 'confirm-use-potion'): void;
+  (e: 'close-potion-limit'): void;
+  (e: 'close-unlock-confirm'): void;
+  (e: 'confirm-unlock-character'): void;
+  (e: 'close-unlock-limit'): void;
+  (e: 'close-buff-details'): void;
+  (e: 'close-conversation-limit'): void;
+  (e: 'watch-ad'): void;
+  (e: 'use-unlock-card'): void;
+  (e: 'close-voice-limit'): void;
+  (e: 'watch-voice-ad'): void;
+  (e: 'use-voice-unlock-card'): void;
+  (e: 'close-photo-limit'): void;
+  (e: 'use-photo-unlock-card'): void;
+  (e: 'close-video-limit'): void;
+  (e: 'use-video-unlock-card'): void;
+  (e: 'upgrade-membership'): void;
+  (e: 'close-photo-selector'): void;
+  (e: 'photo-select', value: any): void;
+  (e: 'close-image-viewer'): void;
+  (e: 'close-gift-selector'): void;
+  (e: 'select-gift', value: any): void;
+}
+
+withDefaults(defineProps<Props>(), {
+  partnerDisplayName: '',
+  partnerBackground: '',
+  partnerId: '',
+  partner: null,
+  userPotions: () => ({ memoryBoost: 0, brainBoost: 0 }),
+  activeMemoryBoost: null,
+  activeBrainBoost: null,
+  activeCharacterUnlock: null,
+  characterTickets: 0,
+  voiceCards: 0,
+  photoCards: 0,
+  videoCards: 0,
+  showGiftSelector: false,
+  balance: 0,
+  membershipTier: 'free',
 });
 
-const emit = defineEmits([
-  // Reset
-  'cancel-reset',
-  'confirm-reset',
-
-  // Character Info
-  'close-character-info',
-
-  // Potion
-  'close-potion-confirm',
-  'confirm-use-potion',
-  'close-potion-limit',
-
-  // Character Unlock
-  'close-unlock-confirm',
-  'confirm-unlock-character',
-  'close-unlock-limit',
-
-  // Buff Details
-  'close-buff-details',
-
-  // Limit Modals
-  'close-conversation-limit',
-  'watch-ad',
-  'use-unlock-card',
-  'close-voice-limit',
-  'watch-voice-ad',
-  'use-voice-unlock-card',
-  'close-photo-limit',
-  'use-photo-unlock-card',
-  'close-video-limit',
-  'use-video-unlock-card',
-  'upgrade-membership',
-
-  // Photo Selector
-  'close-photo-selector',
-  'photo-select',
-
-  // Image Viewer
-  'close-image-viewer',
-
-  // Gift
-  'close-gift-selector',
-  'select-gift',
-]);
+const emit = defineEmits<Emits>();
 
 // Methods
-const handleCloseGiftSelector = () => {
+const handleCloseGiftSelector = (): void => {
   emit('close-gift-selector');
 };
 </script>

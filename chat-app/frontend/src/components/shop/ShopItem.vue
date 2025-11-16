@@ -1,33 +1,48 @@
-<script setup>
-import { computed } from "vue";
+<script setup lang="ts">
+import { computed, type ComputedRef } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
 import LoadingSpinner from "../LoadingSpinner.vue";
 import { COIN_ICON_PATH } from "../../config/assets";
 
-const props = defineProps({
-  item: {
-    type: Object,
-    required: true,
-  },
-  isPurchasing: {
-    type: Boolean,
-    default: false,
-  },
-  balance: {
-    type: Number,
-    default: 0,
-  },
-  membershipTier: {
-    type: String,
-    default: "free",
-  },
-  isCoinIconAvailable: {
-    type: Boolean,
-    default: true,
-  },
+// Types
+interface ShopItemData {
+  id: string;
+  name: string;
+  price: number;
+  isCoinPackage?: boolean;
+  badge?: string;
+  popular?: boolean;
+  emoji?: string;
+  useCoinImage?: boolean;
+  icon?: any; // Component type
+  iconColor?: string;
+  bonusText?: string;
+  description?: string;
+  effect?: string;
+  [key: string]: any;
+}
+
+interface Props {
+  item: ShopItemData;
+  isPurchasing?: boolean;
+  balance?: number;
+  membershipTier?: string;
+  isCoinIconAvailable?: boolean;
+}
+
+interface Emits {
+  (e: "purchase", item: ShopItemData): void;
+  (e: "coinIconError"): void;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isPurchasing: false,
+  balance: 0,
+  membershipTier: "free",
+  isCoinIconAvailable: true,
 });
 
-const emit = defineEmits(["purchase", "coinIconError"]);
+const emit = defineEmits<Emits>();
 
 // 格式化器
 const coinsFormatter = new Intl.NumberFormat("zh-TW");
@@ -37,11 +52,11 @@ const priceFormatter = new Intl.NumberFormat("zh-TW", {
   minimumFractionDigits: 0,
 });
 
-const formatCoins = (value) => coinsFormatter.format(value);
-const formatPrice = (value) => priceFormatter.format(value);
+const formatCoins = (value: number): string => coinsFormatter.format(value);
+const formatPrice = (value: number): string => priceFormatter.format(value);
 
 // 是否禁用購買按鈕
-const isDisabled = computed(() => {
+const isDisabled: ComputedRef<boolean> = computed(() => {
   if (props.isPurchasing) return true;
   if (!props.item.isCoinPackage && props.balance < props.item.price) return true;
   if (
@@ -54,7 +69,7 @@ const isDisabled = computed(() => {
 });
 
 // 禁用提示
-const disabledTitle = computed(() => {
+const disabledTitle: ComputedRef<string> = computed(() => {
   if (
     props.item.id === "potion-brain-boost" &&
     props.membershipTier === "vvip"
@@ -64,11 +79,11 @@ const disabledTitle = computed(() => {
   return "";
 });
 
-const handlePurchase = () => {
+const handlePurchase = (): void => {
   emit("purchase", props.item);
 };
 
-const handleCoinIconError = () => {
+const handleCoinIconError = (): void => {
   emit("coinIconError");
 };
 </script>

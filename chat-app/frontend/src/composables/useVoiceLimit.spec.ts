@@ -19,8 +19,8 @@ vi.mock('../utils/api', () => ({
 }));
 
 vi.mock('./useBaseLimitService.js', () => ({
-  createLimitService: vi.fn((config) => {
-    const limitData = { value: {} };
+  createLimitService: vi.fn((config: any) => {
+    const limitData = { value: {} as Record<string, any> };
     const isLoading = { value: false };
     const error = { value: null };
 
@@ -28,7 +28,7 @@ vi.mock('./useBaseLimitService.js', () => ({
       limitData,
       isLoading,
       error,
-      checkLimit: vi.fn(async (userId, characterId) => {
+      checkLimit: vi.fn(async (userId: string, characterId: string) => {
         const key = characterId;
         limitData.value[key] = {
           canPlay: true,
@@ -58,7 +58,7 @@ vi.mock('./useBaseLimitService.js', () => ({
 }));
 
 describe('useVoiceLimit - 語音限制測試', () => {
-  let useVoiceLimit;
+  let useVoiceLimit: any;
 
   beforeEach(async () => {
     vi.resetModules();

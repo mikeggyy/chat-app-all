@@ -1,33 +1,19 @@
-<script setup>
-defineProps({
-  progress: {
-    type: Number,
-    required: true,
-  },
-  progressText: {
-    type: String,
-    required: true,
-  },
-  statusText: {
-    type: String,
-    required: true,
-  },
-  isComplete: {
-    type: Boolean,
-    default: false,
-  },
-  isGeneratingImages: {
-    type: Boolean,
-    default: false,
-  },
-  imageGenerationError: {
-    type: String,
-    default: null,
-  },
-  generatingEmblem: {
-    type: String,
-    required: true,
-  },
+<script setup lang="ts">
+// Types
+interface Props {
+  progress: number;
+  progressText: string;
+  statusText: string;
+  isComplete?: boolean;
+  isGeneratingImages?: boolean;
+  imageGenerationError?: string | null;
+  generatingEmblem: string;
+}
+
+withDefaults(defineProps<Props>(), {
+  isComplete: false,
+  isGeneratingImages: false,
+  imageGenerationError: null,
 });
 </script>
 

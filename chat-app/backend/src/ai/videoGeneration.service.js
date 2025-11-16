@@ -65,6 +65,89 @@ const buildVideoPromptFromTemplate = (template, character, recentMessages = []) 
 };
 
 /**
+ * 判斷字串是否為 HTTP(S) URL
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+const isValidHttpUrl = (value) => {
+  return typeof value === "string" && /^https?:\/\//i.test(value.trim());
+};
+
+/**
+ * 安全序列化輸出以供日誌使用
+ * @param {unknown} payload
+ * @returns {string}
+ */
+const safeStringify = (payload) => {
+  try {
+    return JSON.stringify(payload, null, 2);
+  } catch {
+    return String(payload);
+  }
+};
+
+/**
+ * 從 Replicate API 的輸出結構中提取影片 URL
+ * @param {unknown} output - Replicate 回傳的輸出
+ * @param {Set<any>} visited - 用於避免循環引用
+ * @returns {string|null}
+ */
+const extractVideoUrlFromOutput = (output, visited = new Set()) => {
+  if (output === null || typeof output === "undefined") {
+    return null;
+  }
+
+  if (typeof output === "string") {
+    return isValidHttpUrl(output) ? output : null;
+  }
+
+  if (typeof output !== "object") {
+    return null;
+  }
+
+  if (visited.has(output)) {
+    return null;
+  }
+  visited.add(output);
+
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      const candidate = extractVideoUrlFromOutput(item, visited);
+      if (candidate) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  const candidateKeys = [
+    "url",
+    "videoUrl",
+    "video_url",
+    "video",
+    "result",
+    "results",
+    "output",
+    "outputs",
+    "data",
+    "data_url",
+    "location",
+    "href",
+  ];
+
+  for (const key of candidateKeys) {
+    if (Object.prototype.hasOwnProperty.call(output, key)) {
+      const candidate = extractVideoUrlFromOutput(output[key], visited);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
  * 生成 Mock 影片（測試模式）
  * @param {string} userId - 用戶 ID
  * @param {string} characterId - 角色 ID
@@ -198,28 +281,17 @@ const generateVideoWithReplicate = async (userId, characterId, character, option
     );
 
     logger.info("[Replicate SVD] API 回應成功");
-    logger.info("[Replicate SVD] Output 類型:", typeof output);
+    logger.info("[Replicate SVD] Output 類型:", Array.isArray(output) ? "array" : typeof output);
 
-    // 使用 useFileOutput: false 後，SDK 應該直接返回 URL 字串
-    let tempVideoUrl;
+    const tempVideoUrl = extractVideoUrlFromOutput(output);
 
-    if (typeof output === 'string') {
-      // 直接是 URL 字串
-      tempVideoUrl = output;
-      logger.info("[Replicate SVD] 收到 URL 字串");
-    } else {
-      // 輸出完整結構以便調試
-      logger.error("[Replicate SVD] 預期字串 URL，但收到其他格式:", {
+    if (!tempVideoUrl) {
+      logger.error("[Replicate SVD] 無法從 API 回應提取影片 URL", {
         type: typeof output,
         isArray: Array.isArray(output),
-        output: JSON.stringify(output, null, 2),
+        output: safeStringify(output),
       });
-      throw new Error("Replicate SVD 返回格式錯誤：預期字串 URL");
-    }
-
-    if (!tempVideoUrl || typeof tempVideoUrl !== 'string') {
-      logger.error("[Replicate SVD] 提取的 URL 無效:", tempVideoUrl);
-      throw new Error("無法從回應中提取有效的影片 URL");
+      throw new Error("Replicate SVD 無法提供有效的影片 URL");
     }
 
     logger.info("[Replicate SVD] 臨時影片 URL:", tempVideoUrl);
@@ -408,24 +480,15 @@ const generateVideoWithHailuo = async (userId, characterId, character, options =
 
     logger.info("[Hailuo 02] API 回應成功");
 
-    // 使用 useFileOutput: false 後，SDK 應該直接返回 URL 字串
-    let tempVideoUrl;
+    const tempVideoUrl = extractVideoUrlFromOutput(output);
 
-    if (typeof output === 'string') {
-      tempVideoUrl = output;
-    } else {
-      // 輸出完整結構以便調試
-      logger.error("[Hailuo 02] 預期字串 URL，但收到其他格式:", {
+    if (!tempVideoUrl) {
+      logger.error("[Hailuo 02] 無法從 API 回應提取影片 URL", {
         type: typeof output,
         isArray: Array.isArray(output),
-        output: JSON.stringify(output, null, 2),
+        output: safeStringify(output),
       });
-      throw new Error("Hailuo 02 返回格式錯誤：預期字串 URL");
-    }
-
-    if (!tempVideoUrl || typeof tempVideoUrl !== 'string') {
-      logger.error("[Hailuo 02] 提取的 URL 無效:", tempVideoUrl);
-      throw new Error("無法從回應中提取有效的影片 URL");
+      throw new Error("Hailuo 02 無法提供有效的影片 URL");
     }
 
     logger.info("[Hailuo 02] 臨時影片 URL:", tempVideoUrl);

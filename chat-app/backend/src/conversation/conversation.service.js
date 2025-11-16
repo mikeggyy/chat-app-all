@@ -2,6 +2,9 @@ import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import { HISTORY_LIMITS } from "../config/limits.js";
 import logger from "../utils/logger.js";
 import { LRUCache } from "../utils/LRUCache.js";
+import { addConversationForUser } from "../user/user.service.js";
+import { addOrUpdateConversation } from "../user/userConversations.service.js";
+import { buildConversationMetadata } from "./conversation.helpers.js";
 
 const CONVERSATIONS_COLLECTION = "conversations";
 
@@ -150,6 +153,41 @@ const normalizeMessagePayload = (payload = {}) => {
   }
 
   return result;
+};
+
+/**
+ * 將最新的對話預覽同步到使用者文件與子集合
+ * @param {string} userId
+ * @param {string} characterId
+ * @param {object} metadata
+ */
+const syncConversationPreview = async (userId, characterId, metadata = {}) => {
+  if (!userId || !characterId) {
+    return;
+  }
+
+  const payload =
+    metadata && typeof metadata === "object"
+      ? { ...metadata, characterId }
+      : { characterId };
+
+  try {
+    await addConversationForUser(userId, characterId, payload);
+  } catch (error) {
+    logger.warn(
+      `[對話服務] ⚠️ 無法更新 users/${userId} conversations 預覽:`,
+      error instanceof Error ? error.message : error
+    );
+  }
+
+  try {
+    await addOrUpdateConversation(userId, characterId, payload);
+  } catch (error) {
+    logger.warn(
+      `[對話服務] ⚠️ 無法同步 users/${userId}/conversations/${characterId}:`,
+      error instanceof Error ? error.message : error
+    );
+  }
 };
 
 /**
@@ -476,13 +514,14 @@ export const deleteConversationPhotos = async (userId, characterId, messageIds) 
   const conversationRef = getConversationRef(userId, characterId);
   const db = getFirestoreDb();
 
-  const result = await db.runTransaction(async (transaction) => {
+  const transactionResult = await db.runTransaction(async (transaction) => {
     const doc = await transaction.get(conversationRef);
 
     if (!doc.exists) {
       return {
         deleted: [],
         remaining: 0,
+        metadata: null,
       };
     }
 
@@ -518,17 +557,27 @@ export const deleteConversationPhotos = async (userId, characterId, messageIds) 
       { merge: true }
     );
 
+    const metadata = buildConversationMetadata(newHistory);
+
     return {
       deleted: deletedPhotos,
       remaining: newHistory.filter((msg) => msg.imageUrl).length,
+      metadata,
     };
   });
+
+  if (transactionResult.metadata) {
+    await syncConversationPreview(userId, characterId, transactionResult.metadata);
+  }
 
   // 清除緩存
   const key = createConversationKey(userId, characterId);
   conversationCache.delete(key);
 
-  return result;
+  return {
+    deleted: transactionResult.deleted,
+    remaining: transactionResult.remaining,
+  };
 };
 
 /**
@@ -546,13 +595,14 @@ export const deleteConversationMessages = async (userId, characterId, messageIds
   const conversationRef = getConversationRef(userId, characterId);
   const db = getFirestoreDb();
 
-  const result = await db.runTransaction(async (transaction) => {
+  const transactionResult = await db.runTransaction(async (transaction) => {
     const doc = await transaction.get(conversationRef);
 
     if (!doc.exists) {
       return {
         deleted: [],
         remaining: 0,
+        metadata: null,
       };
     }
 
@@ -590,15 +640,25 @@ export const deleteConversationMessages = async (userId, characterId, messageIds
 
     logger.info(`[對話服務] 🗑️ 刪除訊息: userId=${userId}, characterId=${characterId}, 刪除數量=${deletedMessages.length}`);
 
+    const metadata = buildConversationMetadata(newHistory);
+
     return {
       deleted: deletedMessages,
       remaining: newHistory.length,
+      metadata,
     };
   });
+
+  if (transactionResult.metadata) {
+    await syncConversationPreview(userId, characterId, transactionResult.metadata);
+  }
 
   // 清除緩存
   const key = createConversationKey(userId, characterId);
   conversationCache.delete(key);
 
-  return result;
+  return {
+    deleted: transactionResult.deleted,
+    remaining: transactionResult.remaining,
+  };
 };

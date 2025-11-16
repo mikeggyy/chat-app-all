@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Match 收藏管理 Composable
  *

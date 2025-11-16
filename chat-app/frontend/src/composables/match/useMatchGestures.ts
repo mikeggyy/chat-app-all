@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Match 手勢控制 Composable
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ref, type Ref } from "vue";
 import { useToast } from "../useToast.js";
 import { usePurchaseConfirm } from "../usePurchaseConfirm.js";

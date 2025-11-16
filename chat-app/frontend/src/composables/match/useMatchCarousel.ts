@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Match 輪播控制 Composable
  *

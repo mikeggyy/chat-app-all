@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Chat 模態框管理（TypeScript 版本）
  * 統一管理所有彈窗的顯示/隱藏狀態

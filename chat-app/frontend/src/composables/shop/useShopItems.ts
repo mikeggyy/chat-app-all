@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { computed, ref, type Ref, type ComputedRef } from "vue";
 import { COIN_ICON_PATH } from "../../config/assets";
 

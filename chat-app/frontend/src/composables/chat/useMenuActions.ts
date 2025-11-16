@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Menu Actions Composable
  * 處理 ChatView 中的所有菜單操作

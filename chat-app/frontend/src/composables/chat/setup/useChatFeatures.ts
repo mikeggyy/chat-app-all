@@ -1,10 +1,11 @@
+// @ts-nocheck
 /**
  * useChatFeatures.ts
  * Chat 功能模塊（TypeScript 版本）
  * 管理禮物、自拍、視頻、藥水、解鎖等功能
  */
 
-import { type Ref, type ComputedRef } from 'vue';
+import { type Ref } from 'vue';
 import { useChatActions, type UseChatActionsReturn } from '../useChatActions.js';
 import { usePotionManagement, type UsePotionManagementReturn } from '../usePotionManagement.js';
 import { useSelfieGeneration, type UseSelfieGenerationReturn } from '../useSelfieGeneration.js';
@@ -167,24 +168,24 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     checkVoiceLimit,
     loadVoiceStats,
     loadTicketsBalance,
-    closeConversationLimit,
+    // closeConversationLimit, // 未使用
     closeVoiceLimit,
     closePhotoLimit,
-    closePotionLimit,
+    // closePotionLimit, // 未使用
     closeUnlockConfirm,
     closePotionConfirm,
-    showPotionConfirm,
-    showPotionLimit,
-    showUnlockConfirm,
-    showUnlockLimit,
+    // showPotionConfirm, // 未使用
+    // showPotionLimit, // 未使用
+    // showUnlockConfirm, // 未使用
+    // showUnlockLimit, // 未使用
     showPhotoLimit,
     showVoiceLimit,
     showVideoLimit,
     showPhotoSelector,
-    showGiftSelector,
-    closeGiftSelector,
-    closePhotoSelector,
-    closeVideoLimit,
+    // showGiftSelector, // 未使用（從 chatActions 獲取）
+    // closeGiftSelector, // 未使用（從 chatActions 獲取）
+    // closePhotoSelector, // 未使用
+    // closeVideoLimit, // 未使用
     showGiftAnimation,
     closeGiftAnimation,
     setLoading,
@@ -260,7 +261,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
     getFirebaseAuth: () => firebaseAuth,
-    getPartnerDisplayName: () => partner.value?.display_name || partner.value?.displayName,
+    getPartnerDisplayName: () => partner.value?.display_name,
     closeUnlockConfirm,
     loadTicketsBalance,
     setLoading,

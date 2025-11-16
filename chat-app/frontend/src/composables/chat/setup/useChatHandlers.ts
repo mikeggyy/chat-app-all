@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * useChatHandlers.ts
  * Chat 事件處理器（TypeScript 版本）

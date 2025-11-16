@@ -4,7 +4,7 @@
  * 從 ChatView.vue 提取為獨立 composable
  */
 
-import { nextTick, type Ref } from 'vue';
+import { nextTick } from 'vue';
 import { isGuestUser } from '../../../../../shared/config/testAccounts';
 import { writeCachedHistory } from '../../utils/conversationCache';
 import { logger } from '../../utils/logger';

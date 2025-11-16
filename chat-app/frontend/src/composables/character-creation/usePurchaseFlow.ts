@@ -63,13 +63,6 @@ interface ClearStateOptions {
 type ClearStateCallback = (options?: ClearStateOptions) => void;
 
 /**
- * usePurchaseFlow 組合式函數的依賴項
- */
-interface UsePurchaseFlowDependencies {
-  savedGender: Ref<string>;
-}
-
-/**
  * usePurchaseFlow 組合式函數的返回值
  */
 interface UsePurchaseFlowReturn {
@@ -150,24 +143,24 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
     isLoadingAssets.value = true;
     try {
       // 獲取用戶資產（創建卡數量）
-      const assetsData = await apiJson<UserAssetsResponse>(
+      const assetsData = await apiJson(
         `/api/users/${encodeURIComponent(userId)}/assets`,
         {
           skipGlobalLoading: true,
         }
-      );
+      ) as UserAssetsResponse;
 
       if (assetsData) {
         userCreateCards.value = assetsData.createCards || 0;
       }
 
       // 獲取免費創建次數（從 limits API）
-      const limitsData = await apiJson<LimitsResponse>(
+      const limitsData = await apiJson(
         `/api/character-creation/limits/${encodeURIComponent(userId)}`,
         {
           skipGlobalLoading: true,
         }
-      );
+      ) as LimitsResponse;
 
       if (limitsData) {
         freeCreationsRemaining.value = limitsData.remainingFreeCreations || 0;
@@ -204,13 +197,17 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
   const handleGoToShop = (): void => {
     // 導向商店購買創建角色卡
     showPurchaseModal.value = false;
-    router.push({ name: "shop" }).catch((error) => {});
+    router.push({ name: "shop" }).catch((error) => {
+      void error;
+    });
   };
 
   const handleGoToVIP = (): void => {
     // 導向 VIP 充值頁面
     showPurchaseModal.value = false;
-    router.push({ name: "membership" }).catch((error) => {});
+    router.push({ name: "membership" }).catch((error) => {
+      void error;
+    });
   };
 
   const confirmGenerate = async (
@@ -280,7 +277,9 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
 
       router
         .push({ name: "character-create-generating" })
-        .catch((error) => {});
+        .catch((error) => {
+          void error;
+        });
     } catch (error) {
       if (typeof window !== "undefined") {
         window.alert(

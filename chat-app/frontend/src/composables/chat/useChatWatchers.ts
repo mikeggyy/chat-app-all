@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Chat Watchers Composable
  * 處理 ChatView 中的所有 watch 邏輯

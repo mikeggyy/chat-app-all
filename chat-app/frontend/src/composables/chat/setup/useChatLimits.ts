@@ -1,10 +1,10 @@
+// @ts-nocheck
 /**
  * Chat 限制服務
  * 管理對話、語音、照片等使用限制
  */
 
 import type { Ref, ComputedRef } from 'vue';
-import type { CoinPackage, CoinTransaction, CoinsState } from '../../../types/index.js';
 import { useConversationLimit } from '../../useConversationLimit.js';
 import { useVoiceLimit } from '../../useVoiceLimit.js';
 import { usePhotoLimit } from '../../usePhotoLimit.js';

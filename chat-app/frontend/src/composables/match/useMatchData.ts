@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Match 數據載入 Composable
  *

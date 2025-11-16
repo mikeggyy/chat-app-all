@@ -58,9 +58,9 @@ export function useStyleSelection(): UseStyleSelectionReturn {
   const loadCharacterStyles = async (): Promise<void> => {
     isLoadingStyles.value = true;
     try {
-      const response = await apiJson<StylesApiResponse>("/api/character-styles", {
+      const response = await apiJson("/api/character-styles", {
         skipGlobalLoading: true,
-      });
+      }) as StylesApiResponse;
 
       if (response?.styles && Array.isArray(response.styles)) {
         styleOptions.value = response.styles.map((style: ApiStyleData) => ({

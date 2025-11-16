@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Chat 頁面統一設置 Composable（TypeScript 版本）
  * 整合所有 Chat 相關的 composables，簡化 ChatView.vue

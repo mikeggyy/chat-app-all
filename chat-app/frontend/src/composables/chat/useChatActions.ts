@@ -1,10 +1,9 @@
-// @ts-nocheck
 /**
  * useChatActions.ts
  * 管理聊天操作功能（TypeScript 版本）：拍照、禮物、語音播放
  */
 
-import { ref, nextTick, onBeforeUnmount, type Ref, type ComputedRef } from 'vue';
+import { ref, nextTick, onBeforeUnmount, unref, type Ref, type ComputedRef } from 'vue';
 import { apiJson } from '../../utils/api.js';
 import { writeCachedHistory } from '../../utils/conversationCache.js';
 import { getGiftById } from '../../config/gifts.js';
@@ -180,7 +179,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
     }
 
     const matchId = partner.value?.id ?? '';
-    const userId = (currentUserId as any).value ?? currentUserId;
+    const userId = unref(currentUserId) ?? '';
 
     if (!matchId || !userId) {
       toast.error('無法請求自拍');
@@ -332,7 +331,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
       return;
     }
 
-    const userId = (currentUserId as any).value ?? currentUserId;
+    const userId = unref(currentUserId) ?? '';
     if (!userId) {
       toast.error('無法打開禮物選擇器');
       return;
@@ -364,7 +363,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
     onSuccess?: (giftMessage: Message, replyMessage: Message | null) => void
   ): Promise<boolean> => {
     const matchId = partner.value?.id ?? '';
-    const userId = (currentUserId as any).value ?? currentUserId;
+    const userId = unref(currentUserId) ?? '';
 
     if (!matchId || !userId) {
       toast.error('無法送出禮物');
@@ -602,8 +601,11 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
       return false;
     }
 
+    // 確保消息有 ID（用於防止重複播放）
+    const messageId = message.id ?? `temp-${Date.now()}`;
+
     // 防止重複播放
-    if (playingVoiceMessageId.value === message.id) {
+    if (playingVoiceMessageId.value === messageId) {
       return false;
     }
 
@@ -614,7 +616,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
 
     try {
       const matchId = partner.value?.id ?? '';
-      const userId = (currentUserId as any).value ?? currentUserId;
+      const userId = unref(currentUserId) ?? '';
 
       if (!matchId || !userId) {
         toast.error('無法播放語音');
@@ -642,10 +644,10 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
       }
 
       // 生成請求ID
-      const requestId = generateVoiceRequestId(userId, matchId, message.id);
+      const requestId = generateVoiceRequestId(userId, matchId, messageId);
 
       // 立即設置播放狀態
-      playingVoiceMessageId.value = message.id;
+      playingVoiceMessageId.value = messageId;
 
       const token = await firebaseAuth.getCurrentUserIdToken();
 

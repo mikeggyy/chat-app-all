@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Chat Watchers Composable
  * 處理 ChatView 中的所有 watch 邏輯
@@ -6,7 +5,7 @@
  */
 
 import { watch } from 'vue';
-import type { Ref, WatchStopHandle } from 'vue';
+import type { Ref } from 'vue';
 import type { Message } from '../../types/index.js';
 
 /**

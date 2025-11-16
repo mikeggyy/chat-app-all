@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, type Ref } from 'vue';
 import type { Message } from '../../types';
 
@@ -70,9 +69,9 @@ export function usePhotoEditMode(
    * @param onView - 查看照片的回調
    */
   const handlePhotoClick = (photo: Message, onView: (photo: Message) => void): void => {
-    if (isEditMode.value) {
+    if (isEditMode.value && photo.id) {
       toggleSelection(photo.id);
-    } else {
+    } else if (!isEditMode.value) {
       onView(photo);
     }
   };

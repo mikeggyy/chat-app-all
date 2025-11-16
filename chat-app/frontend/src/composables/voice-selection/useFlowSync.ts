@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, type Ref } from 'vue';
 import {
   fetchCharacterCreationFlow,
@@ -19,10 +18,10 @@ type Gender = 'male' | 'female' | 'non-binary' | '';
 type FlowStatus = 'draft' | 'voice' | 'generating' | 'completed' | 'failed';
 
 interface PersonaData {
-  name: string;
-  tagline: string;
-  hiddenProfile: string;
-  prompt: string;
+  name?: string;
+  tagline?: string;
+  hiddenProfile?: string;
+  prompt?: string;
 }
 
 interface VoicePreset {
@@ -55,10 +54,10 @@ interface FlowMetadata {
 
 interface FlowRecord {
   id?: string;
-  status?: FlowStatus;
+  status?: FlowStatus | string;
   persona?: PersonaData;
   appearance?: unknown | null;
-  voice?: VoicePayload | null;
+  voice?: VoicePayload | string | null;
   metadata?: FlowMetadata;
 }
 
@@ -226,7 +225,12 @@ export function useFlowSync(): UseFlowSyncReturn {
       return;
     }
     flowId.value = record.id ?? flowId.value;
-    flowStatus.value = record.status ?? flowStatus.value;
+
+    // Type guard for flowStatus
+    const validStatuses: FlowStatus[] = ['draft', 'voice', 'generating', 'completed', 'failed'];
+    if (record.status && validStatuses.includes(record.status as FlowStatus)) {
+      flowStatus.value = record.status as FlowStatus;
+    }
 
     const normalizedGender = normalizeGenderPreference(
       record?.metadata?.gender ?? summaryData.value.gender ?? ''
@@ -240,7 +244,7 @@ export function useFlowSync(): UseFlowSyncReturn {
         prompt: record?.persona?.prompt ?? '',
       },
       appearance: record?.appearance ?? null,
-      voice: record?.voice ?? null,
+      voice: typeof record?.voice === 'object' ? record.voice : null,
       gender: normalizedGender,
       updatedAt: Date.now(),
     };

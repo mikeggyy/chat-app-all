@@ -1,5 +1,5 @@
-<script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect, type Ref } from "vue";
 import { useRouter } from "vue-router";
 import { logger } from "@/utils/logger";
 import AvatarEditorModal from "../components/AvatarEditorModal.vue";
@@ -54,12 +54,11 @@ const {
   userAssets,
   loadUserAssets,
   initializeProfileData,
-  refreshProfileData,
 } = useProfileData();
 
 // ==================== 頭像管理 ====================
 
-const avatarPreview = ref(FALLBACK_USER.photoURL);
+const avatarPreview: Ref<string> = ref(FALLBACK_USER.photoURL);
 
 watch(
   () => profile.value.photoURL,
@@ -74,6 +73,7 @@ watch(
 );
 
 const avatarUpload = useAvatarUpload({
+  // @ts-ignore - UserProfile 和 AvatarUpdateResult 類型不完全兼容
   onUpdate: updateUserAvatar,
   avatarPreview,
 });
@@ -87,7 +87,7 @@ const openAvatarEditor = () => {
 
 // ==================== 個人資料編輯 ====================
 
-const profileEditor = useProfileEditor(profile, updateUserProfileDetails);
+const profileEditor = useProfileEditor(profile, async (patch) => { await updateUserProfileDetails(patch); });
 
 const openProfileEditor = () => {
   if (requireLogin({ feature: "編輯個人資料" })) {
@@ -111,7 +111,7 @@ const settings = useSettings({
 
 // ==================== 統計彈窗 ====================
 
-const isStatsModalOpen = ref(false);
+const isStatsModalOpen: Ref<boolean> = ref(false);
 
 const openStatsModal = () => {
   isStatsModalOpen.value = true;
@@ -123,12 +123,12 @@ const closeStatsModal = () => {
 
 // ==================== 快捷操作 ====================
 
-const handleQuickActionSelect = async (action) => {
+const handleQuickActionSelect = async (action: { key?: string } | null): Promise<void> => {
   if (!action || typeof action !== "object") {
     return;
   }
 
-  const routeName = QUICK_ACTION_ROUTES[action.key];
+  const routeName = QUICK_ACTION_ROUTES[action.key as keyof typeof QUICK_ACTION_ROUTES];
 
   if (!routeName) {
     return;
@@ -141,12 +141,12 @@ const handleQuickActionSelect = async (action) => {
   }
 };
 
-const handleBuyUnlockCard = (cardType) => {
-  const category = CARD_CATEGORY_MAP[cardType] || "coins";
+const handleBuyUnlockCard = (cardType: string): void => {
+  const category = CARD_CATEGORY_MAP[cardType as keyof typeof CARD_CATEGORY_MAP] || "coins";
   router.push({ path: "/shop", query: { category } });
 };
 
-const handleUsePotion = async (potionType) => {
+const handleUsePotion = async (potionType: string): Promise<void> => {
   try {
     const { useToast } = await import("../composables/useToast");
     const { warning } = useToast();
@@ -160,14 +160,14 @@ const handleUsePotion = async (potionType) => {
       warning("請在與角色聊天時使用腦力激盪藥水");
       return;
     }
-  } catch (error) {
+  } catch (error: any) {
     const { useToast } = await import("../composables/useToast");
     const { error: showError } = useToast();
     showError(error.message || "使用藥水失敗");
   }
 };
 
-const handleUseUnlockCard = async (cardType) => {
+const handleUseUnlockCard = async (cardType: string): Promise<void> => {
   if (!targetUserId.value) return;
 
   try {
@@ -194,8 +194,8 @@ const handleUseUnlockCard = async (cardType) => {
 
 // ==================== 滾動鎖定 ====================
 
-let previousBodyOverflow = "";
-const toggleBodyScrollLock = (isLocked) => {
+let previousBodyOverflow: string = "";
+const toggleBodyScrollLock = (isLocked: boolean): void => {
   if (typeof document === "undefined") return;
   if (isLocked) {
     previousBodyOverflow = document.body.style.overflow;
@@ -230,7 +230,7 @@ watch(
 
 // ==================== 鍵盤事件 ====================
 
-const handleGlobalKeydown = (event) => {
+const handleGlobalKeydown = (event: KeyboardEvent): void => {
   if (event.key !== "Escape") return;
   if (profileEditor.isOpen.value) {
     event.preventDefault();
@@ -267,7 +267,7 @@ onBeforeUnmount(() => {
   toggleBodyScrollLock(false);
 });
 
-const ensureProfileLoaded = async (id) => {
+const ensureProfileLoaded = async (id: string | null | undefined): Promise<void> => {
   if (!id) return;
   try {
     await loadUserProfile(id, { fallback: FALLBACK_USER });

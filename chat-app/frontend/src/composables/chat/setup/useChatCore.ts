@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Chat 核心狀態和服務（TypeScript 版本）
  * 管理用戶、角色、消息等核心數據

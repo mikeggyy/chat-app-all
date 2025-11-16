@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * useVideoGeneration.ts
  * 影片生成 Composable（TypeScript 版本）
@@ -154,7 +153,7 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
     isRequestingVideo.value = true;
 
     // 用於追蹤用戶消息 ID，以便失敗時撤回
-    let userMessageId: string | null = null;
+    let userMessageId: string | undefined = undefined;
 
     try {
       const firebaseAuth = getFirebaseAuth();

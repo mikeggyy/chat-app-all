@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * useSelfieGeneration.ts
  * Selfie 生成 Composable（TypeScript 版本）
@@ -150,7 +149,7 @@ export function useSelfieGeneration(deps: UseSelfieGenerationDeps): UseSelfieGen
     }
 
     // 用於追蹤用戶消息 ID，以便失敗時撤回
-    let userMessageId: string | null = null;
+    let userMessageId: string | undefined = undefined;
 
     try {
       // 1. 先發送一條隨機的拍照請求訊息

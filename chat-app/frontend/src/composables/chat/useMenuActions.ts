@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Menu Actions Composable
  * 處理 ChatView 中的所有菜單操作
@@ -6,8 +5,7 @@
  */
 
 import type { Ref, ComputedRef } from 'vue';
-import type { UseModalManagerReturn, PotionType } from './useModalManager.js';
-import type { UsePotionManagementReturn } from './usePotionManagement.js';
+import type { UseModalManagerReturn } from './useModalManager.js';
 
 // ==================== 類型定義 ====================
 

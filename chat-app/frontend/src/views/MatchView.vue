@@ -1,5 +1,5 @@
-<script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserProfile } from '../composables/useUserProfile';
 import { useFirebaseAuth } from '../composables/useFirebaseAuth';
@@ -22,6 +22,29 @@ import { logger } from '../utils/logger';
  * ✅ 改善可維護性、可測試性、可重用性
  */
 
+// ==================== 類型定義 ====================
+
+interface Match {
+  id: string;
+  display_name: string;
+  locale: string;
+  creatorUid: string;
+  creatorDisplayName: string;
+  gender: string;
+  background: string;
+  first_message: string;
+  secret_background: string;
+  portraitUrl: string;
+}
+
+interface BackgroundDialog {
+  open: boolean;
+  title: string;
+  text: string;
+}
+
+// ==================== 初始化 ====================
+
 const router = useRouter();
 const { user, loadUserProfile, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
@@ -32,7 +55,7 @@ const matchData = useMatchData({ user });
 const { matches, isLoading, error } = matchData;
 
 // 當前顯示的角色數據
-const match = reactive({
+const match: Match = reactive<Match>({
   id: '',
   display_name: '',
   locale: '',
@@ -46,7 +69,7 @@ const match = reactive({
 });
 
 // 應用角色數據
-const applyMatchData = (data) => {
+const applyMatchData = (data: any): void => {
   if (!data) return;
 
   Object.assign(match, {
@@ -72,7 +95,7 @@ const applyMatchData = (data) => {
 // 輪播控制
 const carousel = useMatchCarousel({
   matches,
-  onIndexChange: (index, matchData) => {
+  onIndexChange: (_index, matchData) => {
     applyMatchData(matchData);
   },
 });
@@ -111,13 +134,13 @@ const isFavorited = computed(() => {
 });
 
 // 背景對話框
-const backgroundDialog = reactive({
+const backgroundDialog: BackgroundDialog = reactive<BackgroundDialog>({
   open: false,
   title: '',
   text: '',
 });
 
-const openBackgroundDialog = (displayName, text) => {
+const openBackgroundDialog = (displayName: string | null | undefined, text: string | null | undefined): void => {
   if (typeof text !== 'string') return;
   const content = text.trim();
   if (!content) return;
@@ -130,18 +153,18 @@ const openBackgroundDialog = (displayName, text) => {
   backgroundDialog.open = true;
 };
 
-const closeBackgroundDialog = () => {
+const closeBackgroundDialog = (): void => {
   backgroundDialog.open = false;
 };
 
-const handleKeydown = (event) => {
+const handleKeydown = (event: KeyboardEvent): void => {
   if (event.key === 'Escape' && backgroundDialog.open) {
     closeBackgroundDialog();
   }
 };
 
 // 進入聊天室
-const enterChatRoom = () => {
+const enterChatRoom = (): void => {
   if (!match.id) {
     return;
   }
@@ -164,11 +187,11 @@ const enterChatRoom = () => {
 };
 
 // 用戶變更時的數據載入
-let lastLoadedUserId = '';
+let lastLoadedUserId: string = '';
 
 watch(
   () => user.value?.id,
-  async (nextId, prevId) => {
+  async (nextId: string | undefined, prevId: string | undefined) => {
     // 如果沒有用戶 ID（遊客模式）
     if (!nextId) {
       lastLoadedUserId = '';
@@ -243,8 +266,8 @@ watch(
 // 監聽用戶收藏列表變更
 watch(
   () => user.value?.favorites,
-  (next) => {
-    favorites.syncFavoriteSet(next);
+  (next: string[] | undefined) => {
+    favorites.syncFavoriteSet(next ?? []);
   },
   { immediate: true }
 );
@@ -280,7 +303,7 @@ onBeforeUnmount(() => {
 
     <!-- 內容輪播 -->
     <div class="content-wrapper" ref="carouselContainerRef">
-      <div class="carousel-track" :style="carousel.trackStyle.value">
+      <div class="carousel-track" :style="carousel.trackStyle.value as any">
         <!-- ✅ 修復閃爍問題：使用穩定的 slot 作為 key，重用 DOM 元素 -->
         <MatchCard
           v-for="item in carousel.carouselMatches.value"
@@ -291,7 +314,7 @@ onBeforeUnmount(() => {
           :favorite-mutating="favorites.favoriteMutating.value"
           :favorite-error="favorites.favoriteError.value"
           :is-loading="isLoading"
-          :error="item.data?.id === match.id ? error : null"
+          :error="item.data?.id === match.id ? error : undefined"
           @toggle-favorite="favorites.toggleFavorite(match.id)"
           @open-background="openBackgroundDialog"
           @enter-chat="enterChatRoom"

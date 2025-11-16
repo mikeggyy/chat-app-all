@@ -11,9 +11,10 @@ interface FlowResponse {
   [key: string]: any;
 }
 
-interface CharacterCreationFlow {
+export interface CharacterCreationFlow {
   id?: string;
   userId?: string;
+  status?: string;
   metadata?: Record<string, any>;
   persona?: {
     name?: string;

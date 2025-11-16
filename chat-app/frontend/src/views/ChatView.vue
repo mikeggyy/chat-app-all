@@ -1,5 +1,5 @@
-<script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+<script setup lang="ts">
+import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 // Chat 組件
@@ -17,9 +17,9 @@ import { useChatInitialization } from '../composables/chat/useChatInitialization
 const router = useRouter();
 
 // Local Refs
-const draft = ref('');
-const chatContentRef = ref(null);
-const chatPageRef = ref(null);
+const draft: Ref<string> = ref('');
+const chatContentRef: Ref<{ messageListRef?: any } | null> = ref(null);
+const chatPageRef: Ref<HTMLElement | null> = ref(null);
 
 // ====================
 // Setup All Chat Logic
@@ -170,6 +170,7 @@ const { initializeChat } = useChatInitialization({
   loadActivePotions,
   loadActiveUnlocks,
   loadHistory,
+  // @ts-ignore - useChatSetup 還有 @ts-nocheck，導致類型推斷不正確
   addConversationHistory,
   loadVoiceStats,
   fetchPhotoStats,
@@ -186,6 +187,13 @@ onMounted(async () => {
 const handleCloseGiftSelector = () => {
   closeGiftSelector();
 };
+
+// ====================
+// Type conversions for template (null -> undefined)
+// ====================
+const playingVoiceMessageIdComputed = computed(() => playingVoiceMessageId.value ?? undefined);
+const suggestionErrorComputed = computed(() => suggestionError.value ?? undefined);
+const partnerComputed = computed(() => partner.value ?? undefined);
 
 // ====================
 // Cleanup
@@ -223,12 +231,12 @@ onBeforeUnmount(() => {
       :partner-name="partnerDisplayName"
       :partner-background="partnerBackground"
       :is-replying="isReplying"
-      :playing-voice-message-id="playingVoiceMessageId"
+      :playing-voice-message-id="playingVoiceMessageIdComputed"
       :draft="draft"
       :disabled="isLoadingHistory || isReplying"
       :suggestions="suggestionOptions"
       :is-loading-suggestions="isLoadingSuggestions"
-      :suggestion-error="suggestionError"
+      :suggestion-error="suggestionErrorComputed"
       :is-sending-gift="isSendingGift"
       :is-requesting-selfie="isRequestingSelfie"
       :is-requesting-video="isRequestingVideo"
@@ -254,7 +262,7 @@ onBeforeUnmount(() => {
       :partner-display-name="partnerDisplayName"
       :partner-background="partnerBackground"
       :partner-id="partnerId"
-      :partner="partner"
+      :partner="partnerComputed"
       :user-potions="userPotions"
       :active-memory-boost="activeMemoryBoost"
       :active-brain-boost="activeBrainBoost"

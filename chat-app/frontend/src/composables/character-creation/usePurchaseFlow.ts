@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, computed, onMounted } from "vue";
 import type { Ref, ComputedRef } from "vue";
 import { useRouter } from "vue-router";
@@ -9,6 +8,7 @@ import {
   createCharacterCreationFlow,
   storeCharacterCreationFlowId,
   updateCharacterCreationStep,
+  type CharacterCreationFlow,
 } from "../../services/characterCreation.service.js";
 
 // ==================== 類型定義 ====================
@@ -34,20 +34,6 @@ interface AppearanceData {
   description?: string;
   style?: string;
   tags?: string[];
-  [key: string]: any;
-}
-
-/**
- * 角色創建流程數據
- */
-interface CharacterCreationFlow {
-  id: string;
-  status: string;
-  appearance?: AppearanceData;
-  metadata?: {
-    gender?: string;
-    [key: string]: any;
-  };
   [key: string]: any;
 }
 

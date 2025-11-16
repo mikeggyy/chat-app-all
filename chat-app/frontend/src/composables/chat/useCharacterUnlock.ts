@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * 角色解鎖管理 Composable
  *

@@ -4,7 +4,7 @@
  */
 
 import { ref, computed, type Ref, type ComputedRef } from 'vue';
-import { requestAiSuggestions } from '../../utils/conversation';
+import { requestAiSuggestions } from '../../utils/conversation.js';
 import { SUGGESTION_CONFIG } from '../../config/chat.js';
 import type { Message, Partner, FirebaseAuthService } from '../../types';
 
@@ -41,7 +41,7 @@ export function useSuggestions(
 ): UseSuggestionsReturn {
   // 狀態
   const suggestionOptions = ref<string[]>([]);
-  const isLoadingSuggestions = ref(false);
+  const isLoadingSuggestions: Ref<boolean> = ref(false);
   const suggestionError = ref<string | null>(null);
   const suggestionSignature = ref<string | null>(null);
 
@@ -235,7 +235,7 @@ export function useSuggestions(
   /**
    * 是否有建議快取
    */
-  const hasCachedSuggestions = computed(() => {
+  const hasCachedSuggestions = computed<boolean>(() => {
     return suggestionOptions.value.length > 0;
   });
 

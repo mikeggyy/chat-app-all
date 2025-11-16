@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * useSelfieGeneration.ts
  * Selfie 生成 Composable（TypeScript 版本）

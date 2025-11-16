@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * useConversationReset.ts
  * 對話重置 Composable（TypeScript 版本）

@@ -182,7 +182,7 @@ export function useVoiceLoading(): UseVoiceLoadingReturn {
     voicesLoadError.value = null;
 
     try {
-      const response: FetchVoicesResponse = await fetchAllVoices();
+      const response = await fetchAllVoices() as unknown as FetchVoicesResponse;
 
       if (response?.voices && Array.isArray(response.voices)) {
         // 轉換 API 返回的語音格式

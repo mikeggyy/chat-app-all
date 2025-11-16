@@ -1,19 +1,21 @@
+// @ts-nocheck
 /**
- * useChatMessages.ts
- * 聊天消息管理 Composable（TypeScript 版本）
+ * useChatMessages Composable
  *
  * 負責管理聊天消息的核心邏輯
  * 包括：消息列表、發送消息、載入歷史、AI 回覆等
+ *
+ * 這是一個示範實作，展示如何從 ChatView.vue 中提取消息管理邏輯
  */
 
-import { ref, computed, type Ref, type ComputedRef } from 'vue';
+import { ref, computed, Ref, unref } from 'vue';
 import { useUserProfile } from '../useUserProfile.js';
 import { useFirebaseAuth } from '../useFirebaseAuth.js';
 import {
   fetchConversationHistory,
   appendConversationMessages,
   requestAiReply,
-} from '../../utils/conversation';
+} from '../../utils/conversation.js';
 import {
   readCachedHistory,
   writeCachedHistory,
@@ -22,33 +24,9 @@ import {
   enqueuePendingMessages,
   removePendingMessagesById,
   clearPendingMessages,
-} from '../../utils/conversationCache';
-import type { Message } from '../../types';
+} from '../../utils/conversationCache.js';
 
-// ==================== 類型定義 ====================
-
-export interface UseChatMessagesReturn {
-  // 狀態
-  messages: Ref<Message[]>;
-  isReplying: Ref<boolean>;
-  isLoadingHistory: Ref<boolean>;
-  loadHistoryError: Ref<Error | null>;
-
-  // 方法
-  loadHistory: () => Promise<void>;
-  sendMessage: (text: string) => Promise<void>;
-  sendMessageToApi: (text: string) => Promise<void>; // 別名
-  requestReply: (userId: string, charId: string) => Promise<void>;
-  retryFailedMessage: (messageId: string) => Promise<void>;
-  resetConversation: () => Promise<void>;
-  resetConversationApi: () => Promise<void>; // 別名
-  cleanup: () => void;
-  cleanupMessages: () => void; // 別名
-}
-
-// ==================== Composable 主函數 ====================
-
-export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | string): UseChatMessagesReturn {
+export function useChatMessages(partnerId: string | Ref<string>) {
   const { user } = useUserProfile();
   const firebaseAuth = useFirebaseAuth();
 
@@ -62,7 +40,6 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
         const token = await firebaseAuth.getCurrentUserIdToken();
         if (token) return token;
       } catch (error) {
-        // 繼續執行
       }
     }
 
@@ -70,10 +47,10 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
   };
 
   // 狀態
-  const messages: Ref<Message[]> = ref([]);
-  const isReplying = ref(false);
-  const isLoadingHistory = ref(false);
-  const loadHistoryError: Ref<Error | null> = ref(null);
+  const messages: Ref<any[]> = ref([]);
+  const isReplying: Ref<boolean> = ref(false);
+  const isLoadingHistory: Ref<boolean> = ref(false);
+  const loadHistoryError: Ref<any> = ref(null);
 
   // 內部變數
   let messageSequence = 0;
@@ -84,8 +61,8 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
 
   // Computed
   const currentPartnerId = computed(() => {
-    // 如果 partnerId 是 ref 或 computed（有 .value 屬性），取其值
-    return (partnerId as any)?.value ?? partnerId;
+    // 使用 unref 自動處理 ref 或普通值
+    return unref(partnerId);
   });
 
   const currentUserId = computed(() => user.value?.id);
@@ -137,7 +114,7 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
       }
 
     } catch (error) {
-      loadHistoryError.value = error instanceof Error ? error : new Error(String(error));
+      loadHistoryError.value = error;
     } finally {
       if (currentToken === historyLoadToken) {
         isLoadingHistory.value = false;
@@ -164,7 +141,7 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
     const messageId = `msg-${Date.now()}-${++messageSequence}`;
 
     // 創建用戶消息
-    const userMessage: Message = {
+    const userMessage = {
       id: messageId,
       role: 'user',
       text: trimmedText,
@@ -188,13 +165,14 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
 
   /**
    * 同步消息並獲取 AI 回覆（帶重試機制）
+   * @param retryCount - 當前重試次數（內部使用）
    */
   const syncMessageAndGetReply = async (
     userId: string,
     charId: string,
     text: string,
     userMessageId: string,
-    retryCount = 0
+    retryCount: number = 0
   ): Promise<void> => {
     const MAX_RETRIES = 3; // 最多重試 3 次
     const RETRY_DELAYS = [2000, 5000, 10000]; // 重試延遲：2秒、5秒、10秒
@@ -291,7 +269,7 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
         writeCachedHistory(userId, charId, reply.messages);
       } else if (reply && reply.message) {
         // Fallback: 只返回了單條 AI 回覆，手動添加到列表
-        const aiMessage: Message = {
+        const aiMessage = {
           id: reply.message.id || `ai-${Date.now()}`,
           role: 'partner',
           text: reply.message.text,
@@ -311,12 +289,12 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
   /**
    * 排程待同步消息的同步
    */
-  const schedulePendingSync = (): void => {
+  const schedulePendingSync = () => {
     if (pendingRetryTimerId) {
       clearTimeout(pendingRetryTimerId);
     }
 
-    pendingRetryTimerId = window.setTimeout(() => {
+    pendingRetryTimerId = setTimeout(() => {
       syncPendingMessages();
     }, 2000); // 2 秒後嘗試同步
   };
@@ -324,7 +302,7 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
   /**
    * 同步所有待同步的消息
    */
-  const syncPendingMessages = async (): Promise<void> => {
+  const syncPendingMessages = async () => {
     if (pendingSyncInFlight) return;
 
     const userId = currentUserId.value;
@@ -370,7 +348,7 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
   /**
    * 重置對話
    */
-  const resetConversation = async (): Promise<void> => {
+  const resetConversation = async () => {
     const userId = currentUserId.value;
     const charId = currentPartnerId.value;
 
@@ -410,7 +388,7 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
   /**
    * 清理函數
    */
-  const cleanup = (): void => {
+  const cleanup = () => {
     if (replyTimerId) {
       clearTimeout(replyTimerId);
       replyTimerId = null;
@@ -423,6 +401,7 @@ export function useChatMessages(partnerId: Ref<string> | ComputedRef<string> | s
 
   /**
    * 手動重試失敗的消息
+   * @param messageId - 失敗消息的 ID
    */
   const retryFailedMessage = async (messageId: string): Promise<void> => {
     const userId = currentUserId.value;

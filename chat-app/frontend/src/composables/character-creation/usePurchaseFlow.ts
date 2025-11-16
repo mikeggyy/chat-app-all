@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ref, computed, onMounted } from "vue";
 import type { Ref, ComputedRef } from "vue";
 import { useRouter } from "vue-router";

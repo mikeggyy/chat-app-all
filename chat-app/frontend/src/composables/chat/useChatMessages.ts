@@ -45,6 +45,27 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     throw new Error('無法獲取認證權杖');
   };
 
+  /**
+   * 合併消息列表，保留臨時的影片 loading 卡片和照片 loading 卡片
+   */
+  const mergeMessagesPreservingLoadingCards = (
+    currentMessages: any[],
+    newMessages: any[]
+  ): any[] => {
+    // 找出所有 loading 狀態的臨時消息
+    const loadingMessages = currentMessages.filter(
+      m => m.video === 'loading' || m.imageUrl === 'loading'
+    );
+
+    // 如果沒有 loading 消息，直接返回新消息
+    if (loadingMessages.length === 0) {
+      return newMessages;
+    }
+
+    // 合併：新消息 + loading 消息
+    return [...newMessages, ...loadingMessages];
+  };
+
   // 狀態
   const messages: Ref<any[]> = ref([]);
   const isReplying: Ref<boolean> = ref(false);
@@ -202,8 +223,9 @@ export function useChatMessages(partnerId: string | Ref<string>) {
 
       // 3. 更新消息列表和快取（✅ 修復：同時更新界面顯示）
       if (result && result.messages && Array.isArray(result.messages)) {
-        // ⭐ 關鍵修復：更新界面上的消息列表
-        messages.value = result.messages;
+        // ⭐ 關鍵修復：更新界面上的消息列表，同時保留 loading 卡片
+        const mergedMessages = mergeMessagesPreservingLoadingCards(messages.value, result.messages);
+        messages.value = mergedMessages;
         writeCachedHistory(userId, charId, result.messages);
       }
 
@@ -263,8 +285,9 @@ export function useChatMessages(partnerId: string | Ref<string>) {
 
       // ⭐ 修復：優先檢查完整的消息歷史（更安全的邏輯）
       if (reply && reply.messages && Array.isArray(reply.messages)) {
-        // 服務器返回了完整的對話歷史，直接使用
-        messages.value = reply.messages;
+        // 服務器返回了完整的對話歷史，保留 loading 卡片後合併
+        const mergedMessages = mergeMessagesPreservingLoadingCards(messages.value, reply.messages);
+        messages.value = mergedMessages;
         writeCachedHistory(userId, charId, reply.messages);
       } else if (reply && reply.message) {
         // Fallback: 只返回了單條 AI 回覆，手動添加到列表

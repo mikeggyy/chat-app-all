@@ -11,6 +11,7 @@ import { useMenuActions } from '../useMenuActions.js';
 import { useConversationReset } from '../useConversationReset.js';
 import { usePhotoVideoHandler } from '../usePhotoVideoHandler.js';
 import { useShareFunctionality } from '../useShareFunctionality.js';
+import { getGiftById } from '../../../config/gifts.js'; // ✅ 新增:導入禮物配置
 import type { Ref, ComputedRef } from 'vue';
 import type { Router } from 'vue-router';
 import type { Partner, Message, LimitCheckResult } from '../../../types';
@@ -130,6 +131,13 @@ export interface UseChatHandlersParams {
 
   // Config
   MESSAGE_ID_PREFIXES: MessageIdPrefixes;
+
+  // ✅ 新增:禮物相關依賴
+  sendGift: (giftData: any, onSuccess: () => void, selectedPhotoUrl?: string) => Promise<void>;
+  loadBalance: (userId: string) => Promise<void>;
+  showGiftAnimation: (emoji: string, name: string) => void;
+  closeGiftAnimation: () => void;
+  modals: any; // ModalsState - 包含 photoSelector 等模態框數據
 }
 
 /**
@@ -212,6 +220,12 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     showError,
     success,
     MESSAGE_ID_PREFIXES,
+    // ✅ 新增:禮物相關依賴
+    sendGift,
+    loadBalance,
+    showGiftAnimation,
+    closeGiftAnimation,
+    modals,
   } = options;
 
   // Send Message Handler
@@ -298,7 +312,7 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     handleUpgradeFromVideoModal,
   } = usePhotoVideoHandler({
     getCurrentUserId: () => currentUserId.value,
-    getPhotoSelectorModal: (): PhotoSelectorModal => ({ isVisible: false }), // 從 modals 獲取
+    getPhotoSelectorModal: () => modals?.photoSelector || { isVisible: false }, // ✅ 從 modals 獲取真實數據
     generateVideo,
     loadTicketsBalance,
     closePhotoSelector,
@@ -306,6 +320,12 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     showPhotoSelector,
     navigateToMembership: () => router.push('/membership'),
     showError,
+    // ✅ 新增:禮物相關依賴
+    sendGift,
+    loadBalance: (userId: string) => loadBalance(userId),
+    showGiftAnimation,
+    closeGiftAnimation,
+    getGiftById,
   });
 
   // Share Functionality

@@ -50,10 +50,14 @@ const baseState = reactive<{ user: User | null }>({
   user: null,
 });
 
-// ✅ P1 優化：增加用戶資料緩存 TTL（10 分鐘）
-// 用戶資料變化不頻繁，可以使用更長的緩存時間減少 API 請求
+// ✅ 修復：減少緩存 TTL 為 1 分鐘，解決前後台金幣餘額不同步問題
+// 原值：10 分鐘 - 導致管理後台修改後需等待 10 分鐘才能在前端看到更新
 const profileCache = new Map<string, CacheEntry>(); // 存儲格式: { data: userData, timestamp: Date.now() }
-const CACHE_TTL = 10 * 60 * 1000; // 10 分鐘 = 600000ms（原本 2 分鐘）
+const CACHE_TTL = 1 * 60 * 1000; // 1 分鐘 = 60000ms（修復前：10 分鐘）
+
+// 🔒 修復競態條件：追蹤正在載入的請求，防止重複 API 調用
+const loadingProfiles = new Map<string, Promise<User>>();
+
 const firebaseAuth = useFirebaseAuth();
 
 // ==================== 內部工具函數 ====================
@@ -155,7 +159,7 @@ const loadUserProfile = async (id: string, options: LoadUserProfileOptions = {})
     const now = Date.now();
     const age = now - cacheEntry.timestamp;
 
-    // 如果緩存未過期（小於 10 分鐘），直接返回
+    // 如果緩存未過期，直接返回
     if (age < CACHE_TTL) {
       const cached = cacheEntry.data;
       baseState.user = cached;
@@ -168,19 +172,43 @@ const loadUserProfile = async (id: string, options: LoadUserProfileOptions = {})
     }
   }
 
-  // 緩存不存在或已過期，從 API 獲取新資料
-  try {
-    console.debug(`[useUserProfile] 從 API 獲取用戶資料: ${id}`);
-    const data = await apiJson(`/api/users/${encodeURIComponent(id)}`, {
-      skipGlobalLoading,
-    });
-    return cacheUserProfile(data);
-  } catch (error) {
-    if (fallback) {
-      return cacheUserProfile({ ...fallback, id });
-    }
-    throw error;
+  // 🔒 修復競態條件：檢查是否已有正在進行的請求
+  if (!force && loadingProfiles.has(id)) {
+    console.debug(`[useUserProfile] 重用正在進行的請求: ${id}`);
+    return loadingProfiles.get(id)!;
   }
+
+  // 緩存不存在或已過期，從 API 獲取新資料
+  const loadPromise = (async (): Promise<User> => {
+    try {
+      console.debug(`[useUserProfile] 從 API 獲取用戶資料: ${id}`);
+      const response = await apiJson(`/api/users/${encodeURIComponent(id)}`, {
+        skipGlobalLoading,
+      });
+
+      // ✅ 修復：處理嵌套的 API 響應格式（與 authBootstrap.ts 保持一致）
+      // API 可能返回 { success: true, data: {...} } 或直接返回 {...}
+      const data = (response as any)?.data || response;
+
+      return cacheUserProfile(data);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('[useUserProfile] 載入用戶資料失敗:', error);
+      }
+      if (fallback) {
+        console.debug('[useUserProfile] 使用 fallback 數據');
+        return cacheUserProfile({ ...fallback, id });
+      }
+      throw error;
+    } finally {
+      // 請求完成後清理
+      loadingProfiles.delete(id);
+    }
+  })();
+
+  // 保存正在進行的請求
+  loadingProfiles.set(id, loadPromise);
+  return loadPromise;
 };
 
 const setUserProfile = (payload: Partial<User>): User => {
@@ -470,6 +498,8 @@ const resetConversationHistory = async (conversationId: string): Promise<User> =
 
 const clearUserProfile = (): void => {
   baseState.user = null;
+  // ✅ 修復：同時清除緩存，確保下次讀取時從 API 獲取最新數據
+  profileCache.clear();
 };
 
 // ==================== Composable 主函數 ====================

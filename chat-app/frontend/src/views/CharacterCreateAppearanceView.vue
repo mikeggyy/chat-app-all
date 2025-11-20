@@ -219,9 +219,10 @@ const handleAIMagicianClick = async (): Promise<void> => {
 };
 
 // 生成處理
+// 🔥 允許空描述：後端會自動生成隨機描述
 const isGenerateDisabled: ComputedRef<boolean> = computed(() => {
-  const desc = description.value.trim();
-  return desc.length === 0;
+  // 不再檢查描述是否為空，用戶可以完全隨機生成
+  return false;
 });
 
 const handleGenerateAppearance = (): void => {
@@ -390,12 +391,81 @@ const handleReferenceFocusUpdate = (value: string): void => {
 <style scoped>
 /* 全局 CSS 變數定義在原始文件中已經存在於 :root，這裡只需要組件特定樣式 */
 .appearance {
+  /* 顏色變數 */
+  --color-white: #ffffff;
+  --color-primary: #ff2f92;
+  --color-primary-lighter: #ff77c3;
+  --color-primary-lightest: #ffb3db;
+  --text-secondary: rgba(255, 255, 255, 0.72);
+
+  /* 背景變數 */
+  --bg-card: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.03)
+    ),
+    rgba(16, 16, 16, 0.64);
+  --bg-overlay: rgba(255, 255, 255, 0.08);
+  --bg-overlay-hover: rgba(255, 255, 255, 0.18);
+
+  /* 邊框變數 */
+  --border-light: rgba(255, 255, 255, 0.12);
+
+  /* 漸變變數 */
+  --gradient-primary: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
+
+  /* 圓角變數 */
+  --radius-full: 999px;
+  --radius-2xl: 18px;
+
+  /* 間距變數 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+
+  /* 過渡變數 */
+  --transition-fast: 0.2s ease;
+
+  /* 額外的邊框和背景變數 */
+  --border-medium: rgba(255, 255, 255, 0.2);
+  --border-dashed: rgba(255, 255, 255, 0.3);
+  --bg-overlay-light: rgba(255, 255, 255, 0.05);
+  --bg-overlay-medium: rgba(255, 255, 255, 0.15);
+  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --radius-lg: 12px;
+
+  /* 漸變和陰影 */
+  --color-primary-bg-section: rgba(255, 47, 146, 0.15);
+  --color-primary-shadow-icon: 0 4px 12px rgba(255, 47, 146, 0.2);
+  --gradient-section-rose: linear-gradient(135deg, rgba(255, 47, 146, 0.2), rgba(255, 90, 188, 0.15));
+
+  /* 文字顏色變數 */
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-dim: rgba(255, 255, 255, 0.5);
+
+  /* 更多背景和邊框變數 */
+  --bg-overlay-strong: rgba(255, 255, 255, 0.2);
+  --bg-overlay-option: rgba(255, 255, 255, 0.04);
+  --border-hover: rgba(255, 255, 255, 0.35);
+  --border-highlight: rgba(255, 255, 255, 0.25);
+  --color-primary-border-active: var(--color-primary);
+  --color-primary-border-strong: var(--color-primary);
+  --color-primary-shadow-light: 0 0 0 3px rgba(255, 47, 146, 0.15);
+
+  /* 應用樣式 */
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: var(--spacing-2xl) var(--spacing-xl) 32px;
-  background: var(--gradient-bg);
+  background: radial-gradient(
+      120% 120% at 50% 10%,
+      rgba(255, 51, 151, 0.16),
+      rgba(10, 10, 10, 0.92) 70%
+    ),
+    #0b0b0b;
   color: var(--color-white);
 }
 

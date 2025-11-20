@@ -28,6 +28,22 @@ const props = withDefaults(defineProps<Props>(), {
   isVisible: false,
 });
 
+// 🔍 調試：當 props 變化時記錄角色資料
+import { watch } from "vue";
+watch(() => props.character, (newChar) => {
+  if (newChar && props.isVisible) {
+    console.log('[CharacterCreatedModal] 🎉 收到角色資料：', {
+      portraitUrl: newChar.portraitUrl,
+      display_name: newChar.display_name,
+      gender: newChar.gender,
+      voice: newChar.voice,
+      background: newChar.background,
+      secret_background: newChar.secret_background,
+      first_message: newChar.first_message
+    });
+  }
+}, { immediate: true });
+
 interface Emits {
   (e: "close"): void;
   (e: "viewCharacter"): void;

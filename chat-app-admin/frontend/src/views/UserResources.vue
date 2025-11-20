@@ -1180,12 +1180,24 @@ async function loadResourceData(userId) {
         activeEffects: [],
       };
     }
+    // ✅ 確保 potions.inventory 存在
+    if (!data.potions.inventory) {
+      data.potions.inventory = { memoryBoost: 0, brainBoost: 0 };
+    }
+    // ✅ 確保 potions.activeEffects 存在
+    if (!data.potions.activeEffects) {
+      data.potions.activeEffects = [];
+    }
 
     // 確保 unlocks 存在
     if (!data.unlocks) {
       data.unlocks = {
         activeEffects: [],
       };
+    }
+    // ✅ 確保 unlocks.activeEffects 存在
+    if (!data.unlocks.activeEffects) {
+      data.unlocks.activeEffects = [];
     }
 
     // 確保 globalUsage 存在
@@ -1305,7 +1317,8 @@ async function handleSaveAndRefresh() {
   saveLoading.value = true;
   try {
     // 1. 保存錢包與資產數據
-    await api.put(`/api/users/${resourceData.userId}`, {
+    // ✅ 修復：使用 API 響應立即更新本地狀態，無需等待重新加載
+    const walletResponse = await api.put(`/api/users/${resourceData.userId}`, {
       coins: resourceData.wallet.coins,
       assets: {
         characterUnlockCards: resourceData.assets.characterUnlockCards,
@@ -1315,6 +1328,18 @@ async function handleSaveAndRefresh() {
         voiceUnlockCards: resourceData.assets.voiceUnlockCards,
       },
     });
+
+    // ✅ 立即使用返回的數據更新本地狀態（無需等待刷新）
+    if (walletResponse?.user) {
+      resourceData.wallet.coins = walletResponse.user.coins || walletResponse.user.walletBalance || 0;
+      if (walletResponse.user.assets) {
+        resourceData.assets.characterUnlockCards = walletResponse.user.assets.characterUnlockCards || 0;
+        resourceData.assets.photoUnlockCards = walletResponse.user.assets.photoUnlockCards || 0;
+        resourceData.assets.videoUnlockCards = walletResponse.user.assets.videoUnlockCards || 0;
+        resourceData.assets.voiceUnlockCards = walletResponse.user.assets.voiceUnlockCards || 0;
+        resourceData.assets.createCards = walletResponse.user.assets.createCards || 0;
+      }
+    }
 
     // 2. 保存全局資源使用次數
     const globalResourceTypes = ['photos', 'videos', 'characterCreation'];

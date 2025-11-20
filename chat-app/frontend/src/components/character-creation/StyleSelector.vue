@@ -280,4 +280,66 @@ const handleShowAll = (): void => {
   box-shadow: var(--shadow-primary);
   background: var(--color-primary-bg);
 }
+
+.appearance__card-titles h2 {
+  color: var(--color-white) !important;
+}
+
+.appearance__card-subtitle {
+  color: var(--text-secondary) !important;
+}
+
+/* 強化按鈕邊框和樣式 */
+.appearance__section-action {
+  border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.appearance__section-action:hover {
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 強化風格卡片邊框 */
+.appearance__style-card {
+  border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.appearance__style-card:hover:not(.appearance__style-card--selected) {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+}
+
+.appearance__style-card--selected {
+  border-color: var(--color-primary) !important;
+  background: rgba(255, 47, 146, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(255, 47, 146, 0.15), 0 4px 12px rgba(255, 47, 146, 0.2) !important;
+}
+
+.appearance__style-card--selected:hover {
+  border-color: var(--color-primary) !important;
+  background: rgba(255, 47, 146, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+/* 確保所有文字為白色或淺色 */
+.appearance__section-title h2,
+.appearance__section-kicker,
+.appearance__section-note,
+.appearance__section-action,
+.appearance__style-name,
+.appearance__style-meta {
+  color: var(--color-white) !important;
+}
+
+.appearance__section-kicker {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.appearance__section-note {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
 </style>

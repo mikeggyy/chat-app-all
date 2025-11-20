@@ -6,26 +6,13 @@
       type="button"
       class="media-button"
       :class="{ 'is-loading': isRequestingSelfie || isRequestingVideo }"
-      :disabled="isRequestingSelfie || isSendingGift || isRequestingVideo"
+      :disabled="isSendingGift"
       :aria-expanded="isMenuOpen ? 'true' : 'false'"
       aria-haspopup="menu"
-      :aria-label="
-        photoRemaining !== null && photoRemaining > 0
-          ? `媒體功能 (剩餘 ${photoRemaining} 次)`
-          : '媒體功能'
-      "
+      aria-label="媒體功能"
       @click="toggleMenu"
     >
       <EllipsisHorizontalIcon class="icon" aria-hidden="true" />
-
-      <!-- 剩餘次數 Badge -->
-      <span
-        v-if="photoRemaining !== null && photoRemaining > 0"
-        class="media-button__badge"
-        aria-hidden="true"
-      >
-        {{ photoRemaining }}
-      </span>
     </button>
 
     <!-- 媒體選單 -->
@@ -76,7 +63,6 @@ import {
 
 // Types
 interface Props {
-  photoRemaining?: number | null;
   isRequestingSelfie?: boolean;
   isRequestingVideo?: boolean;
   isSendingGift?: boolean;
@@ -89,7 +75,6 @@ interface Emits {
 
 // Props
 withDefaults(defineProps<Props>(), {
-  photoRemaining: null,
   isRequestingSelfie: false,
   isRequestingVideo: false,
   isSendingGift: false,
@@ -212,38 +197,6 @@ onBeforeUnmount(() => {
   transform: scale(1.1);
 }
 
-/* Badge - 剩餘次數徽章 */
-.media-button__badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 var(--spacing-xs, 0.25rem);
-  font-size: 0.625rem;
-  font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, var(--primary-color, #8b5cf6) 0%, var(--primary-active, #6d28d9) 100%);
-  border: 2px solid var(--bg-primary, #ffffff);
-  border-radius: var(--radius-full, 9999px);
-  box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
-  animation: badge-appear 0.3s ease;
-}
-
-@keyframes badge-appear {
-  0% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 /* 選單樣式 */
 .media-menu {
   position: absolute;
@@ -335,12 +288,6 @@ onBeforeUnmount(() => {
   .icon {
     width: 1.375rem;
     height: 1.375rem;
-  }
-
-  .media-button__badge {
-    min-width: 1.125rem;
-    height: 1.125rem;
-    font-size: 0.5625rem;
   }
 
   .media-menu {

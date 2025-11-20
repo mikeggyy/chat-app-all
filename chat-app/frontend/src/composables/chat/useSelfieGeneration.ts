@@ -77,6 +77,8 @@ export interface UseSelfieGenerationDeps {
   loadTicketsBalance: (userId: string) => Promise<void>;
   showError: (message: string) => void;
   showSuccess: (message: string) => void;
+  onPhotoFailed?: (characterId: string, characterName: string, reason?: string) => void; // ✅ 照片生成失敗回調
+  getPartnerName?: () => string; // ✅ 獲取角色名稱
   config: SelfieGenerationConfig;
 }
 
@@ -136,10 +138,10 @@ export function useSelfieGeneration(deps: UseSelfieGenerationDeps): UseSelfieGen
       return;
     }
 
-    // 先檢查拍照限制，避免發送訊息後才發現限制不足
+    // 先檢查拍照限制
     const limitCheck = await canGeneratePhoto();
 
-    // ✅ 修復：當免費額度用完時，顯示彈窗讓用戶決定是否使用解鎖卡
+    // ✅ 當免費額度用完時，顯示彈窗讓用戶決定是否使用解鎖卡
     // 彈窗會根據 cards 數量顯示不同按鈕：
     // - cards > 0: 顯示「使用解鎖卡」按鈕
     // - cards = 0: 顯示「次數已達上限」及升級選項
@@ -152,6 +154,101 @@ export function useSelfieGeneration(deps: UseSelfieGenerationDeps): UseSelfieGen
     let userMessageId: string | undefined = undefined;
 
     try {
+      // 1. 有免費額度時，發送一條隨機的拍照請求訊息
+      const randomMessage = getRandomSelfieMessage();
+
+      // 創建用戶消息
+      const userMessage: Message = {
+        id: `${MESSAGE_ID_PREFIXES.SELFIE_REQUEST}${Date.now()}`,
+        role: 'user',
+        text: randomMessage,
+        createdAt: new Date().toISOString(),
+      };
+
+      // 保存消息 ID 以便失敗時撤回
+      userMessageId = userMessage.id;
+
+      // 添加到消息列表
+      messages.value.push(userMessage);
+
+      // 滾動到底部
+      await nextTick();
+      messageListRef.value?.scrollToBottom();
+
+      // 獲取認證權杖
+      const firebaseAuth = getFirebaseAuth();
+      const token = await firebaseAuth.getCurrentUserIdToken();
+
+      // 發送到後端（只保存訊息，不請求 AI 回覆）
+      await apiJson(`/api/conversations/${userId}/${matchId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: {
+          id: userMessage.id, // ✅ 傳遞消息 ID，確保前後端一致
+          text: randomMessage,
+          role: 'user',
+        },
+        skipGlobalLoading: true,
+      });
+
+      // 更新緩存
+      writeCachedHistory(userId, matchId, messages.value);
+
+      // 2. 調用拍照功能
+      const photoResult = await requestSelfie(
+        { canGeneratePhoto, fetchPhotoStats },
+        (limitInfo) => {
+          // On limit exceeded
+          showPhotoLimit(limitInfo);
+        },
+        { usePhotoCard: false } // ✅ 此處使用免費額度
+      );
+
+      // 如果拍照失敗（返回 null），撤回用戶訊息
+      if (!photoResult && userMessageId) {
+        await rollbackUserMessage(userId, matchId, userMessageId);
+
+        // ✅ 觸發照片生成失敗回調（記錄失敗信息）
+        if (deps.onPhotoFailed) {
+          const characterName = deps.getPartnerName ? deps.getPartnerName() : '角色';
+          deps.onPhotoFailed(matchId, characterName, '照片生成失敗');
+        }
+      }
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : '請求自拍失敗';
+      showError(errorMessage);
+
+      // ✅ 觸發照片生成失敗回調（記錄失敗信息）
+      if (deps.onPhotoFailed) {
+        const characterName = deps.getPartnerName ? deps.getPartnerName() : '角色';
+        deps.onPhotoFailed(matchId, characterName, errorMessage);
+      }
+
+      // 撤回用戶剛發送的訊息
+      if (userMessageId) {
+        await rollbackUserMessage(userId, matchId, userMessageId);
+      }
+    }
+  };
+
+  /**
+   * 使用照片卡生成照片
+   */
+  const handleUsePhotoUnlockCard = async (): Promise<void> => {
+    const userId = getCurrentUserId();
+    const matchId = getPartnerId();
+
+    if (!userId || !matchId) return;
+
+    // 用於追蹤用戶消息 ID，以便失敗時撤回
+    let userMessageId: string | undefined = undefined;
+
+    try {
+      // 關閉模態框
+      closePhotoLimit();
+
       // 1. 先發送一條隨機的拍照請求訊息
       const randomMessage = getRandomSelfieMessage();
 
@@ -194,41 +291,7 @@ export function useSelfieGeneration(deps: UseSelfieGenerationDeps): UseSelfieGen
       // 更新緩存
       writeCachedHistory(userId, matchId, messages.value);
 
-      // 2. 然後調用拍照功能
-      const photoResult = await requestSelfie(
-        { canGeneratePhoto, fetchPhotoStats },
-        (limitInfo) => {
-          // On limit exceeded
-          showPhotoLimit(limitInfo);
-        },
-        { usePhotoCard: false } // ✅ 此處僅在有免費額度時才被調用
-      );
-
-      // 如果拍照失敗（返回 null），撤回用戶訊息
-      if (!photoResult && userMessageId) {
-        await rollbackUserMessage(userId, matchId, userMessageId);
-      }
-    } catch (error: any) {
-      showError(error instanceof Error ? error.message : '請求自拍失敗');
-
-      // 撤回用戶剛發送的訊息
-      if (userMessageId) {
-        await rollbackUserMessage(userId, matchId, userMessageId);
-      }
-    }
-  };
-
-  /**
-   * 使用照片卡生成照片
-   */
-  const handleUsePhotoUnlockCard = async (): Promise<void> => {
-    const userId = getCurrentUserId();
-
-    try {
-      // 關閉模態框
-      closePhotoLimit();
-
-      // 使用照片卡生成照片
+      // 2. 使用照片卡生成照片
       const result = await requestSelfie(
         { canGeneratePhoto, fetchPhotoStats },
         (limitInfo) => {
@@ -239,6 +302,18 @@ export function useSelfieGeneration(deps: UseSelfieGenerationDeps): UseSelfieGen
         { usePhotoCard: true } // 告訴 requestSelfie 使用照片卡
       );
 
+      // 如果照片生成失敗，撤回用戶訊息
+      if (!result && userMessageId) {
+        await rollbackUserMessage(userId, matchId, userMessageId);
+
+        // ✅ 觸發照片生成失敗回調（記錄失敗信息）
+        if (deps.onPhotoFailed) {
+          const characterName = deps.getPartnerName ? deps.getPartnerName() : '角色';
+          deps.onPhotoFailed(matchId, characterName, '使用照片卡失敗');
+        }
+        return;
+      }
+
       // 成功後重新加載解鎖卡數據
       if (result && userId) {
         await Promise.all([fetchPhotoStats(), loadTicketsBalance(userId)]);
@@ -246,7 +321,19 @@ export function useSelfieGeneration(deps: UseSelfieGenerationDeps): UseSelfieGen
         showSuccess('拍照解鎖卡使用成功！');
       }
     } catch (error: any) {
-      showError(error instanceof Error ? error.message : '使用照片卡失敗');
+      const errorMessage = error instanceof Error ? error.message : '使用照片卡失敗';
+      showError(errorMessage);
+
+      // ✅ 觸發照片生成失敗回調（記錄失敗信息）
+      if (deps.onPhotoFailed) {
+        const characterName = deps.getPartnerName ? deps.getPartnerName() : '角色';
+        deps.onPhotoFailed(matchId, characterName, errorMessage);
+      }
+
+      // 撤回用戶剛發送的訊息
+      if (userMessageId) {
+        await rollbackUserMessage(userId, matchId, userMessageId);
+      }
     }
   };
 

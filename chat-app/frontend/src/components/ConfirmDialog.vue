@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="dialog">
-      <div v-if="isOpen" class="dialog-overlay" @click.self="handleCancel">
+      <div class="dialog-overlay" @click.self="handleCancel">
         <div class="dialog-container">
           <div class="dialog-content">
             <!-- 標題 -->
@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 
 interface Props {
   title?: string;
@@ -61,34 +61,17 @@ interface Emits {
 
 const emit = defineEmits<Emits>();
 
-const isOpen = ref<boolean>(false);
-
 const messageLines = computed<string[]>(() => {
   return props.message.split('\n');
 });
 
-const open = (): void => {
-  isOpen.value = true;
-};
-
-const close = (): void => {
-  isOpen.value = false;
-};
-
 const handleConfirm = (): void => {
   emit('confirm');
-  close();
 };
 
 const handleCancel = (): void => {
   emit('cancel');
-  close();
 };
-
-defineExpose({
-  open,
-  close,
-});
 </script>
 
 <style scoped>

@@ -10,11 +10,16 @@
         class="stat-card__icon-wrapper"
         :class="`stat-card__icon-wrapper--${iconColor}`"
       >
-        <component :is="icon" class="stat-card__icon" aria-hidden="true" />
+        <!-- 支援 emoji 字串或 Vue 組件圖標 -->
+        <span v-if="typeof icon === 'string'" class="stat-card__emoji">{{ icon }}</span>
+        <component v-else :is="icon" class="stat-card__icon" aria-hidden="true" />
       </div>
       <span class="stat-card__label">{{ name }}</span>
     </div>
-    <div class="stat-card__value">{{ count }} {{ unit }}</div>
+    <div class="stat-card__value">
+      <span class="stat-card__count">{{ count }}</span>
+      <span class="stat-card__unit">{{ unit }}</span>
+    </div>
 
     <!-- 達到上限時顯示按鈕 -->
     <div v-if="hasLimit" class="stat-card__action">
@@ -55,7 +60,7 @@ defineProps({
     required: true,
   },
   icon: {
-    type: [Object, Function],
+    type: [String, Object, Function],
     required: true,
   },
   iconColor: {
@@ -152,6 +157,14 @@ defineEmits(['use', 'buy']);
   color: #ffffff;
 }
 
+.stat-card__emoji {
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .stat-card__label {
   font-size: 0.875rem;
   font-weight: 500;
@@ -159,10 +172,22 @@ defineEmits(['use', 'buy']);
 }
 
 .stat-card__value {
-  font-size: 1.5rem;
-  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.stat-card__count {
+  font-size: 1.125rem;
+  font-weight: 600;
   letter-spacing: 0.02em;
-  color: #e2e8f0;
+  color: #f1f5f9;
+}
+
+.stat-card__unit {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(226, 232, 240, 0.6);
 }
 
 .stat-card__action {

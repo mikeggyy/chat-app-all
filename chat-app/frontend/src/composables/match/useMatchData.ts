@@ -65,53 +65,69 @@ export function useMatchData(options: UseMatchDataOptions = {}): UseMatchDataRet
   const isLoading = ref<boolean>(false);
   const error = ref<string>('');
 
+  // 🔒 修復競態條件：追蹤正在進行的請求，防止重複 API 調用
+  let loadingMatchesPromise: Promise<Partner[]> | null = null;
+
   /**
    * 載入配對列表
    * @returns 配對角色列表
    */
   const loadMatches = async (): Promise<Partner[]> => {
+    // 🔒 修復競態條件：如果已有正在進行的請求，重用該 Promise
+    if (loadingMatchesPromise) {
+      logger.debug('[useMatchData] 重用正在進行的配對列表請求');
+      return loadingMatchesPromise;
+    }
+
     isLoading.value = true;
     error.value = '';
 
-    try {
-      const currentUserId = user?.value?.id;
-      const endpoint = currentUserId
-        ? `/match/all?userId=${encodeURIComponent(currentUserId)}`
-        : '/match/all';
+    // 🔒 創建並保存正在進行的請求 Promise
+    loadingMatchesPromise = (async (): Promise<Partner[]> => {
+      try {
+        const currentUserId = user?.value?.id;
+        const endpoint = currentUserId
+          ? `/match/all?userId=${encodeURIComponent(currentUserId)}`
+          : '/match/all';
 
-      // 使用統一的 API 緩存服務，5 分鐘緩存
-      const data = await apiJsonCached<Partner[]>(endpoint, {
-        cacheKey: cacheKeys.matches({ userId: currentUserId || 'guest' }),
-        cacheTTL: cacheTTL.MATCHES,
-        skipGlobalLoading: true,
-      });
+        // 使用統一的 API 緩存服務，5 分鐘緩存
+        const data = await apiJsonCached<Partner[]>(endpoint, {
+          cacheKey: cacheKeys.matches({ userId: currentUserId || 'guest' }),
+          cacheTTL: cacheTTL.MATCHES,
+          skipGlobalLoading: true,
+        });
 
-      if (!Array.isArray(data) || data.length === 0) {
-        throw new Error('尚未建立配對角色資料');
+        if (!Array.isArray(data) || data.length === 0) {
+          throw new Error('尚未建立配對角色資料');
+        }
+
+        matches.value = data;
+        return data;
+      } catch (err) {
+        // 使用 fallback 數據
+        const fallbackData = Array.isArray(fallbackMatches)
+          ? fallbackMatches.map((item) => ({ ...item }))
+          : [];
+
+        if (fallbackData.length) {
+          matches.value = fallbackData;
+          error.value = '暫時無法連線至配對服務，已載入示範角色資料。';
+          logger.error('載入匹配列表失敗:', err);
+          return fallbackData;
+        } else {
+          matches.value = [];
+          error.value =
+            err instanceof Error ? err.message : '取得配對資料時發生錯誤';
+          throw err;
+        }
+      } finally {
+        isLoading.value = false;
+        // 🔒 清理 Promise，允許後續請求
+        loadingMatchesPromise = null;
       }
+    })();
 
-      matches.value = data;
-      return data;
-    } catch (err) {
-      // 使用 fallback 數據
-      const fallbackData = Array.isArray(fallbackMatches)
-        ? fallbackMatches.map((item) => ({ ...item }))
-        : [];
-
-      if (fallbackData.length) {
-        matches.value = fallbackData;
-        error.value = '暫時無法連線至配對服務，已載入示範角色資料。';
-        logger.error('載入匹配列表失敗:', err);
-        return fallbackData;
-      } else {
-        matches.value = [];
-        error.value =
-          err instanceof Error ? err.message : '取得配對資料時發生錯誤';
-        throw err;
-      }
-    } finally {
-      isLoading.value = false;
-    }
+    return loadingMatchesPromise;
   };
 
   /**

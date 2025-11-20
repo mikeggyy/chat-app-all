@@ -162,6 +162,18 @@ export interface UseChatSetupReturn {
   // ==================== Dependencies for watchers ====================
   activePotionEffects: UseChatFeaturesReturn['activePotionEffects'];
   activeUnlockEffects: UseChatFeaturesReturn['activeUnlockEffects'];
+
+  // ==================== Video Completion Notification ====================
+  videoNotification: UseChatFeaturesReturn['videoNotification'];
+  showVideoNotification: UseChatFeaturesReturn['showVideoNotification'];
+  hideVideoNotification: UseChatFeaturesReturn['hideVideoNotification'];
+  scrollToVideo: UseChatFeaturesReturn['scrollToVideo'];
+
+  // ==================== Generation Failure Notification ====================
+  generationFailures: UseChatFeaturesReturn['generationFailures'];
+  clearGenerationFailure: UseChatFeaturesReturn['clearGenerationFailure'];
+  clearAllGenerationFailures: UseChatFeaturesReturn['clearAllGenerationFailures'];
+  checkForGenerationFailures: UseChatFeaturesReturn['checkForGenerationFailures'];
 }
 
 // ==================== Composable 主函數 ====================
@@ -388,6 +400,16 @@ export function useChatSetup({
     requestSelfie,
     playVoice,
     sendGift,
+    // Video Completion Notification
+    videoNotification,
+    showVideoNotification,
+    hideVideoNotification,
+    scrollToVideo,
+    // Generation Failure Notification
+    generationFailures,
+    clearGenerationFailure,
+    clearAllGenerationFailures,
+    checkForGenerationFailures,
   } = features;
 
   // ====================
@@ -434,6 +456,12 @@ export function useChatSetup({
     showError,
     success,
     MESSAGE_ID_PREFIXES,
+    // ✅ 新增:禮物相關依賴
+    sendGift,
+    loadBalance,
+    showGiftAnimation,
+    closeGiftAnimation,
+    modals, // ✅ 傳遞 modals 以便獲取 photoSelector 數據
   });
 
   const {
@@ -567,5 +595,17 @@ export function useChatSetup({
     // Dependencies for watchers
     activePotionEffects,
     activeUnlockEffects,
+
+    // Video Completion Notification
+    videoNotification,
+    showVideoNotification,
+    hideVideoNotification,
+    scrollToVideo,
+
+    // Generation Failure Notification
+    generationFailures,
+    clearGenerationFailure,
+    clearAllGenerationFailures,
+    checkForGenerationFailures,
   };
 }

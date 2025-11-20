@@ -475,7 +475,7 @@ export const createMatch = async (matchData) => {
     locale: matchData.locale || "zh-TW",
     creatorUid,
     creatorDisplayName: matchData.creatorDisplayName || "",
-    display_name: matchData.display_name || "",
+    display_name: matchData.display_name || matchData.name || "", // 🔥 向後兼容：同時接受 display_name 和 name
     gender: normalizedGender,
     background: matchData.background || "",
     first_message: matchData.first_message || "",

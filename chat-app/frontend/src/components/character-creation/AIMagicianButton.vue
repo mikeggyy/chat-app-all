@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type ComputedRef } from "vue";
+import { computed, watch, type ComputedRef } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
 
 // Types
@@ -32,10 +32,25 @@ const buttonText: ComputedRef<string> = computed(() => {
 });
 
 const handleClick = (): void => {
+  console.log('[AIMagicianButton] 按鈕被點擊', {
+    isDisabled: isDisabled.value,
+    isGenerating: props.isGenerating,
+    remainingUsage: props.remainingUsage
+  });
   if (!isDisabled.value) {
     emit("click");
   }
 };
+
+// 🔥 調試：監聽 isGenerating 變化
+watch(() => props.isGenerating, (newVal, oldVal) => {
+  console.log('[AIMagicianButton] isGenerating 變化:', {
+    old: oldVal,
+    new: newVal,
+    buttonText: buttonText.value,
+    isDisabled: isDisabled.value
+  });
+}, { immediate: true });
 </script>
 
 <template>
@@ -43,6 +58,9 @@ const handleClick = (): void => {
     <button
       type="button"
       class="appearance__ai-button"
+      :class="{
+        'appearance__ai-button--loading': isGenerating,
+      }"
       :disabled="isDisabled"
       @click="handleClick"
     >
@@ -97,6 +115,29 @@ const handleClick = (): void => {
 .appearance__ai-button svg {
   width: 16px;
   height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.appearance__ai-button--loading svg {
+  animation: thinking 1.5s ease-in-out infinite;
+}
+
+@keyframes thinking {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-3px) rotate(90deg);
+  }
+  50% {
+    transform: translateY(0) rotate(180deg);
+  }
+  75% {
+    transform: translateY(3px) rotate(270deg);
+  }
+  100% {
+    transform: translateY(0) rotate(360deg);
+  }
 }
 
 .appearance__ai-usage {
@@ -108,5 +149,14 @@ const handleClick = (): void => {
 .appearance__ai-usage--warning {
   color: var(--color-warning);
   font-weight: 600;
+}
+
+/* 確保按鈕文字為白色 */
+button {
+  color: var(--color-white) !important;
+}
+
+button span {
+  color: var(--color-white) !important;
 }
 </style>

@@ -9,6 +9,7 @@ import { apiJson } from '../utils/api.js';
 import { generateIdempotencyKey } from '../utils/idempotency.js';
 import { logger } from '../utils/logger';
 import { coinQueue } from '../utils/requestQueue.js';
+import { useUserProfile } from './useUserProfile';
 import type { CoinsState, CoinPackage, CoinTransaction } from '../types';
 
 // ==================== 類型定義 ====================
@@ -34,6 +35,7 @@ export interface UseCoinsReturn {
   loadTransactions: (userId?: string, options?: UseCoinsOptions) => Promise<any>;
   purchasePackage: (userId: string | undefined, packageId: string, options?: PurchaseOptions) => Promise<any>;
   loadPricing: (userId?: string, options?: UseCoinsOptions) => Promise<any>;
+  updateBalance: (newBalance: number) => void; // 新增：直接更新餘額
 
   // Computed
   balance: ComputedRef<number>;
@@ -86,8 +88,10 @@ export function useCoins(): UseCoinsReturn {
       // ✅ 修復：處理包裹在 data 欄位中的響應
       const data = response.data || response;
 
-      coinsState.value.balance = data.balance || 0;
-      logger.log('[useCoins] 金幣餘額已更新:', coinsState.value.balance);
+      // 🔒 使用 updateBalance 確保競態條件保護
+      const timestamp = Date.now();
+      updateBalance(data.balance || 0, timestamp);
+      logger.log('[useCoins] 金幣餘額已從 API 更新:', data.balance);
       return data;
     } catch (err: any) {
       error.value = err?.message || '載入金幣餘額失敗';
@@ -211,6 +215,18 @@ export function useCoins(): UseCoinsReturn {
           logger.log(`[金幣] 絕對值更新: ${data.newBalance}`);
         }
 
+        // ✅ 修復：重新加載用戶資料而不是清空，避免用戶被登出
+        try {
+          const { user: currentUser, loadUserProfile } = useUserProfile();
+          if (currentUser.value?.id) {
+            await loadUserProfile(currentUser.value.id, { force: true, skipGlobalLoading: true });
+            logger.log('[金幣] 已重新加載用戶資料，確保狀態同步');
+          }
+        } catch (err) {
+          // 忽略錯誤（不影響購買成功）
+          logger.warn('[金幣] 無法重新加載用戶資料:', err);
+        }
+
         return data;
       } catch (err: any) {
         error.value = err?.message || '購買金幣套餐失敗';
@@ -241,6 +257,42 @@ export function useCoins(): UseCoinsReturn {
       error.value = err?.message || '載入功能定價失敗';
       throw err;
     }
+  };
+
+  /**
+   * 最後更新時間戳（防止舊資料覆蓋新資料）
+   */
+  let lastBalanceUpdateTimestamp = 0;
+
+  /**
+   * 直接更新金幣餘額（用於避免重複 API 調用）
+   * @param newBalance - 新的金幣餘額
+   * @param timestamp - 更新時間戳（可選，用於判斷資料新舊）
+   *
+   * ✅ 修復競態條件：使用時間戳防止舊資料覆蓋新資料
+   */
+  const updateBalance = (newBalance: number, timestamp?: number): void => {
+    if (typeof newBalance !== 'number' || newBalance < 0) {
+      logger.warn('[useCoins] 無效的餘額值:', newBalance);
+      return;
+    }
+
+    const ts = timestamp || Date.now();
+
+    // 🔒 競態條件保護：只接受比當前更新時間更新的資料
+    if (ts < lastBalanceUpdateTimestamp) {
+      logger.warn('[useCoins] 忽略過期的餘額更新:', {
+        newBalance,
+        newTimestamp: ts,
+        currentTimestamp: lastBalanceUpdateTimestamp,
+        currentBalance: coinsState.value.balance,
+      });
+      return;
+    }
+
+    coinsState.value.balance = newBalance;
+    lastBalanceUpdateTimestamp = ts;
+    logger.log('[useCoins] 金幣餘額已更新:', newBalance, '時間戳:', ts);
   };
 
   // Computed properties
@@ -280,6 +332,7 @@ export function useCoins(): UseCoinsReturn {
     loadTransactions,
     purchasePackage,
     loadPricing,
+    updateBalance, // 新增：直接更新餘額
 
     // Computed
     balance,

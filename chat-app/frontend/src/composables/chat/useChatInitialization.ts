@@ -87,6 +87,7 @@ export const useChatInitialization = (
 
   /**
    * 執行所有初始化流程
+   * ⚡ 優化：將獨立的請求分組並行執行，提升初始化速度
    */
   const initializeChat = async (): Promise<void> => {
     const userId = getCurrentUserId();
@@ -94,111 +95,90 @@ export const useChatInitialization = (
 
     if (!userId || !matchId) return;
 
+    const isGuest = isGuestUser(userId);
+
     try {
-      // 1. Load partner data first
+      // ==================== 階段 1: 加載角色數據 ====================
+      // 必須先完成，因為後續步驟依賴角色數據
       await loadPartner(matchId);
 
-      // 2. Load unlock tickets (統一管道獲取所有卡片，跳過訪客用戶)
-      if (!isGuestUser(userId)) {
-        try {
-          await loadTicketsBalance(userId, { skipGlobalLoading: true });
-        } catch (error) {
-          // 靜默失敗，不影響用戶體驗
-          if (import.meta.env.DEV) {
-            logger.warn("加載解鎖卡餘額失敗:", error);
-          }
-        }
+      // ==================== 階段 2: 並行加載用戶資產和狀態 ====================
+      // 這些請求互不依賴，可以並行執行
+      if (!isGuest) {
+        await Promise.allSettled([
+          // 解鎖卡餘額
+          loadTicketsBalance(userId, { skipGlobalLoading: true }).catch((error) => {
+            if (import.meta.env.DEV) {
+              logger.warn("加載解鎖卡餘額失敗:", error);
+            }
+          }),
+          // 藥水列表
+          loadPotions().catch((error) => {
+            if (import.meta.env.DEV) {
+              logger.warn("加載藥水失敗:", error);
+            }
+          }),
+          // 活躍藥水效果
+          loadActivePotions().catch((error) => {
+            if (import.meta.env.DEV) {
+              logger.warn("加載活躍藥水效果失敗:", error);
+            }
+          }),
+          // 活躍解鎖效果
+          loadActiveUnlocks().catch((error) => {
+            if (import.meta.env.DEV) {
+              logger.warn("加載活躍解鎖效果失敗:", error);
+            }
+          }),
+        ]);
       }
 
-      // 3. Load potions (跳過訪客用戶)
-      if (!isGuestUser(userId)) {
-        try {
-          await loadPotions();
-        } catch (error) {
-          // 靜默失敗，不影響用戶體驗
-          if (import.meta.env.DEV) {
-            logger.warn("加載藥水失敗:", error);
-          }
-        }
-      }
-
-      // 4. Load active potion effects (跳過訪客用戶)
-      if (!isGuestUser(userId)) {
-        try {
-          await loadActivePotions();
-        } catch (error) {
-          // 靜默失敗，不影響用戶體驗
-          if (import.meta.env.DEV) {
-            logger.warn("加載活躍藥水效果失敗:", error);
-          }
-        }
-      }
-
-      // 5. Load active unlock effects (跳過訪客用戶)
-      if (!isGuestUser(userId)) {
-        try {
-          await loadActiveUnlocks();
-        } catch (error) {
-          // 靜默失敗，不影響用戶體驗
-          if (import.meta.env.DEV) {
-            logger.warn("加載活躍解鎖效果失敗:", error);
-          }
-        }
-      }
-
-      // 6. Load conversation history
+      // ==================== 階段 3: 加載對話歷史 ====================
+      // 必須在添加第一句話之前完成
       await loadHistory(userId, matchId);
 
-      // 7. 記錄對話歷史（靜默失敗，不影響聊天功能）
-      try {
-        await addConversationHistory(matchId);
-      } catch (error) {
-        // 靜默失敗，不影響用戶體驗
-        if (import.meta.env.DEV) {
-          logger.warn("記錄對話歷史失敗:", error);
-        }
+      // ==================== 階段 4: 並行執行輔助操作 ====================
+      // 這些操作互不依賴，可以並行執行
+      const phase4Tasks = [
+        // 記錄對話歷史（靜默失敗）
+        addConversationHistory(matchId).catch((error) => {
+          if (import.meta.env.DEV) {
+            logger.warn("記錄對話歷史失敗:", error);
+          }
+        }),
+      ];
+
+      // 非訪客用戶的額外請求
+      if (!isGuest) {
+        phase4Tasks.push(
+          // 語音統計
+          loadVoiceStats(userId, { skipGlobalLoading: true }).catch((error) => {
+            if (import.meta.env.DEV) {
+              logger.warn("加載語音統計失敗:", error);
+            }
+          }),
+          // 照片統計
+          fetchPhotoStats().catch((error) => {
+            if (import.meta.env.DEV) {
+              logger.warn("加載照片統計失敗:", error);
+            }
+          }),
+          // 金幣餘額
+          loadBalance(userId, { skipGlobalLoading: true }).catch((error) => {
+            if (import.meta.env.DEV) {
+              logger.warn("加載金幣餘額失敗:", error);
+            }
+          })
+        );
       }
 
-      // 8. 檢查是否需要添加角色的第一句話
+      await Promise.allSettled(phase4Tasks);
+
+      // ==================== 階段 5: 最終處理 ====================
+      // 添加第一句話（依賴角色數據和歷史記錄）
       await addFirstMessageIfNeeded(userId, matchId);
 
-      // 9. Load voice stats (跳過訪客用戶)
-      if (!isGuestUser(userId)) {
-        try {
-          await loadVoiceStats(userId, { skipGlobalLoading: true });
-        } catch (error) {
-          // 靜默失敗，不影響用戶體驗
-          if (import.meta.env.DEV) {
-            logger.warn("加載語音統計失敗:", error);
-          }
-        }
-      }
-
-      // 10. Load photo stats (跳過訪客用戶)
-      if (!isGuestUser(userId)) {
-        try {
-          await fetchPhotoStats();
-        } catch (error) {
-          // 靜默失敗，不影響用戶體驗
-          if (import.meta.env.DEV) {
-            logger.warn("加載照片統計失敗:", error);
-          }
-        }
-      }
-
-      // 11. Load balance (跳過訪客用戶)
-      if (!isGuestUser(userId)) {
-        try {
-          await loadBalance(userId, { skipGlobalLoading: true });
-        } catch (error) {
-          // 靜默失敗，不影響用戶體驗
-          if (import.meta.env.DEV) {
-            logger.warn("加載金幣餘額失敗:", error);
-          }
-        }
-      }
-
-      // 12. Scroll to bottom
+      // 滾動到底部
       await nextTick();
       const messageListRef = getMessageListRef();
       messageListRef?.scrollToBottom(false);

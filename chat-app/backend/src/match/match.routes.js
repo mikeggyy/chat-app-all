@@ -193,18 +193,21 @@ matchRouter.post(
       }
     }
 
-    // ⚠️ 重要：先記錄創建次數，再創建角色
-    // 這樣可以確保即使角色創建失敗，免費次數也會被正確記錄
-    // 避免用戶重複使用免費次數
+    // ⚠️ 重要：只有在圖片生成時未扣除，且使用免費次數時，才記錄創建次數
+    // 避免重複扣除：圖片生成時已經扣除過了
 
     // 步驟 1: 記錄角色創建次數（增加計數）
     let tempCharacterId = null;
-    if (userId) {
+    if (userId && !alreadyDeducted && !needsCreateCard) {
+      // 🔥 只有在以下情況才記錄創建次數：
+      // 1. 圖片生成時未扣除（!alreadyDeducted）
+      // 2. 使用免費次數而非創建卡（!needsCreateCard）
+
       // 暫時使用一個臨時 ID，稍後會更新為真實的角色 ID
       tempCharacterId = `temp-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       try {
         await recordCreation(userId, tempCharacterId);
-        logger.info(`[角色創建] 用戶 ${userId} 創建計數已增加${needsCreateCard ? '（已扣除創建卡）' : '（使用免費次數）'}`);
+        logger.info(`[角色創建] 用戶 ${userId} 創建計數已增加（使用免費次數）`);
       } catch (recordError) {
         logger.error("[角色創建] 記錄創建次數失敗:", recordError);
         // ⚠️ 記錄失敗必須拋出錯誤，避免免費次數被重複使用
@@ -213,6 +216,13 @@ matchRouter.post(
           "記錄創建次數失敗，請重試",
           { originalError: recordError.message }
         );
+      }
+    } else {
+      // 跳過記錄創建次數的情況
+      if (alreadyDeducted) {
+        logger.info(`[角色創建] 用戶 ${userId} 跳過記錄次數（圖片生成時已扣除）`);
+      } else if (needsCreateCard) {
+        logger.info(`[角色創建] 用戶 ${userId} 跳過記錄次數（使用創建卡）`);
       }
     }
 

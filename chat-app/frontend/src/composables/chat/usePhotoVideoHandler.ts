@@ -13,6 +13,8 @@
 export interface PhotoSelectorModal {
   useCard?: boolean;
   visible?: boolean;
+  forGift?: boolean; // ✅ 標記是否用於送禮物
+  pendingGift?: GiftData | null; // ✅ 待發送的禮物數據
 }
 
 /**
@@ -21,6 +23,14 @@ export interface PhotoSelectorModal {
 export interface VideoGenerationOptions {
   useVideoCard: boolean;
   imageUrl: string;
+}
+
+/**
+ * 禮物數據
+ */
+export interface GiftData {
+  giftId: string;
+  [key: string]: any;
 }
 
 /**
@@ -45,6 +55,18 @@ export interface UsePhotoVideoHandlerDeps {
   navigateToMembership: () => void;
   /** 顯示錯誤提示 */
   showError: (message: string) => void;
+
+  // ✅ 新增:禮物相關依賴
+  /** 發送禮物 */
+  sendGift: (giftData: GiftData, onSuccess: () => void, selectedPhotoUrl?: string) => Promise<void>;
+  /** 重新加載用戶餘額 */
+  loadBalance: (userId: string) => Promise<void>;
+  /** 顯示禮物動畫 */
+  showGiftAnimation: (emoji: string, name: string) => void;
+  /** 關閉禮物動畫 */
+  closeGiftAnimation: () => void;
+  /** 根據 ID 獲取禮物 */
+  getGiftById: (giftId: string) => any;
 }
 
 /**
@@ -75,6 +97,12 @@ export function usePhotoVideoHandler(deps: UsePhotoVideoHandlerDeps): UsePhotoVi
     showPhotoSelector,
     navigateToMembership,
     showError,
+    // ✅ 新增:禮物相關依賴
+    sendGift,
+    loadBalance,
+    showGiftAnimation,
+    closeGiftAnimation,
+    getGiftById,
   } = deps;
 
   // ==========================================
@@ -83,33 +111,72 @@ export function usePhotoVideoHandler(deps: UsePhotoVideoHandlerDeps): UsePhotoVi
 
   /**
    * 處理用戶選擇照片（從照片選擇器）
+   * 支援兩種模式：影片生成 和 禮物照片選擇
    * @param imageUrl - 圖片 URL
    * @returns {Promise<void>}
    */
   const handlePhotoSelect = async (imageUrl: string): Promise<void> => {
     try {
-      // 根據標記決定是否使用影片卡
+      const userId = getCurrentUserId();
+      if (!userId) {
+        showError('用戶未登入');
+        closePhotoSelector();
+        return;
+      }
+
+      // 獲取模態框數據
       const modalData = getPhotoSelectorModal();
+      const forGift = modalData?.forGift ?? false;
+      const pendingGift = modalData?.pendingGift;
       const useCard = modalData?.useCard ?? false;
 
-      // 生成影片
-      await generateVideo({
-        useVideoCard: useCard,
-        imageUrl: imageUrl,
-      });
+      // ✅ 禮物模式：發送禮物並使用選擇的照片
+      if (forGift && pendingGift) {
+        // 獲取禮物資訊用於動畫
+        const gift = getGiftById(pendingGift.giftId);
+        if (gift) {
+          // 立即顯示禮物動畫
+          showGiftAnimation(gift.emoji, gift.name);
 
-      // 成功後關閉選擇器
-      closePhotoSelector();
+          // 2秒後自動隱藏動畫
+          setTimeout(() => {
+            closeGiftAnimation();
+          }, 2000);
+        }
 
-      // ✅ 如果使用了影片卡，重新加載解鎖卡餘額
-      if (useCard) {
-        const userId = getCurrentUserId();
-        if (userId) {
+        // 發送禮物（帶選擇的照片 URL）
+        await sendGift(
+          pendingGift,
+          () => {
+            // On success - 動畫已經在顯示，不需要再做處理
+          },
+          imageUrl // ✅ 傳遞選擇的照片 URL
+        );
+
+        // 重新加載餘額
+        await loadBalance(userId);
+
+        // 關閉照片選擇器
+        closePhotoSelector();
+      }
+      // ✅ 影片模式：生成影片
+      else {
+        // 生成影片
+        await generateVideo({
+          useVideoCard: useCard,
+          imageUrl: imageUrl,
+        });
+
+        // 成功後關閉選擇器
+        closePhotoSelector();
+
+        // 如果使用了影片卡，重新加載解鎖卡餘額
+        if (useCard) {
           await loadTicketsBalance(userId);
         }
       }
     } catch (error) {
-      showError(error instanceof Error ? error.message : '生成影片失敗');
+      showError(error instanceof Error ? error.message : '操作失敗');
       closePhotoSelector();
     }
   };

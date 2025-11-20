@@ -7,6 +7,7 @@
 import { ref, nextTick, type Ref } from 'vue';
 import { apiJson } from '../../utils/api.js';
 import { writeCachedHistory } from '../../utils/conversationCache.js';
+import { logger } from '../../utils/logger.js';
 import type { Message, FirebaseAuthService } from '../../types';
 
 // ==================== 類型定義 ====================
@@ -74,6 +75,9 @@ export interface UseVideoGenerationDeps {
   createLimitModalData: (limitCheck: VideoLimitCheckResult, type: string) => any;
   showError: (message: string) => void;
   showSuccess: (message: string) => void;
+  onVideoCompleted?: (videoMessageId: string) => void; // 影片生成完成回調
+  onVideoFailed?: (characterId: string, characterName: string, reason?: string) => void; // ✅ 影片生成失敗回調
+  getPartnerName?: () => string; // ✅ 獲取角色名稱
   config: VideoGenerationConfig;
 }
 
@@ -121,6 +125,7 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
   // 狀態
   // ====================
   const isRequestingVideo: Ref<boolean> = ref(false);
+  const VIDEO_GENERATION_TIMEOUT_MS = 4 * 60 * 1000;
 
   // ====================
   // 輔助方法
@@ -150,7 +155,21 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
 
     if (!userId || !matchId) return;
 
+    if (isRequestingVideo.value) {
+      logger.warn('[VideoGeneration] 已有影片請求進行中，忽略新的請求', {
+        matchId,
+        pending: true,
+      });
+      showError('影片生成中，請稍候...');
+      return;
+    }
+
     isRequestingVideo.value = true;
+    logger.log('[VideoGeneration] 開始生成影片', {
+      matchId,
+      initialUseVideoCard: useVideoCard,
+      imageUrl,
+    });
 
     // 用於追蹤用戶消息 ID，以便失敗時撤回
     let userMessageId: string | undefined = undefined;
@@ -168,6 +187,11 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         skipGlobalLoading: true,
       });
       const limitCheck: VideoLimitCheckResult = limitCheckResponse.data || limitCheckResponse;
+      logger.debug('[VideoGeneration] Limit check result', {
+        allowed: limitCheck.allowed,
+        videoCards: limitCheck.videoCards,
+        remaining: limitCheck.remaining,
+      });
 
       // 如果沒有基礎額度但有影片卡，自動使用影片卡
       if (!limitCheck.allowed && limitCheck.videoCards > 0) {
@@ -229,27 +253,60 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
 
       // 3. 生成影片
       showSuccess('角色正在錄製影片給你，稍等一下下哦～');
+      logger.log('[VideoGeneration] 已送出影片請求訊息並建立 loading 卡', {
+        requestMessageId: userMessage.id,
+        matchId,
+      });
+
+      const requestId = userMessage.id;
+
+      // ✅ 將相對路徑轉換為完整 URL（供後端 API 使用）
+      let fullImageUrl = imageUrl;
+      if (imageUrl && imageUrl.startsWith('/')) {
+        // 相對路徑，轉換為完整 URL
+        fullImageUrl = `${window.location.origin}${imageUrl}`;
+        logger.log('[VideoGeneration] 轉換相對路徑為完整 URL', {
+          originalUrl: imageUrl,
+          fullUrl: fullImageUrl,
+        });
+      }
+
+      const requestBody = {
+        characterId: matchId,
+        requestId,
+        duration: VIDEO_CONFIG.DURATION,
+        resolution: VIDEO_CONFIG.RESOLUTION,
+        aspectRatio: VIDEO_CONFIG.ASPECT_RATIO,
+        useVideoCard,
+        imageUrl: fullImageUrl,
+      };
+
+      logger.log('[VideoGeneration] 發送影片生成 API 請求', {
+        requestBody,
+        timeoutMs: VIDEO_GENERATION_TIMEOUT_MS,
+      });
 
       const videoResult = await apiJson(`/api/ai/generate-video`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        body: {
-          // userId 從後端認證 token 自動獲取，無需傳遞
-          characterId: matchId,
-          requestId: `video-${userId}-${matchId}-${Date.now()}`, // 冪等性 ID
-          duration: VIDEO_CONFIG.DURATION,
-          resolution: VIDEO_CONFIG.RESOLUTION,
-          aspectRatio: VIDEO_CONFIG.ASPECT_RATIO,
-          useVideoCard, // 告訴後端是否使用影片卡
-          imageUrl, // 🎨 自定義圖片 URL（從相簿選擇）
-        },
+        body: requestBody,
+        timeoutMs: VIDEO_GENERATION_TIMEOUT_MS,
         skipGlobalLoading: true, // ✅ 允許用戶繼續聊天
       });
 
-      // ✅ 驗證影片生成結果
-      if (!videoResult || !videoResult.videoUrl) {
+      const normalizedResult =
+        videoResult && typeof videoResult === 'object' && 'videoUrl' in videoResult
+          ? videoResult
+          : (videoResult as any)?.data || null;
+
+      logger.log('[VideoGeneration] 影片 API 回應', {
+        requestId,
+        hasData: Boolean(normalizedResult),
+      });
+
+      if (!normalizedResult || !normalizedResult.videoUrl) {
         // 移除臨時消息
         const tempIndex = messages.value.findIndex((m) => m.id === tempVideoMessageId);
         if (tempIndex !== -1) {
@@ -265,9 +322,9 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         text: AI_VIDEO_RESPONSE_TEXT,
         createdAt: new Date().toISOString(),
         video: {
-          url: videoResult.videoUrl,
-          duration: videoResult.duration,
-          resolution: videoResult.resolution,
+          url: normalizedResult.videoUrl,
+          duration: normalizedResult.duration,
+          resolution: normalizedResult.resolution,
         },
       };
 
@@ -305,7 +362,15 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         await nextTick();
         messageListRef.value?.scrollToBottom();
 
-        showSuccess('影片錄好了！快來看看吧 ✨');
+        // ✅ 觸發影片完成通知（不使用 toast）
+        if (deps.onVideoCompleted) {
+          deps.onVideoCompleted(aiVideoMessage.id);
+        }
+
+        logger.log('[VideoGeneration] 影片訊息已顯示於聊天室', {
+          messageId: aiVideoMessage.id,
+          matchId,
+        });
       } catch (saveError) {
         // ✅ 保存 AI 訊息失敗，撤回前端的 AI 訊息
         const aiMsgIndex = messages.value.findIndex((m) => m.id === aiMessageId);
@@ -314,6 +379,7 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         }
 
         // 重新拋出錯誤，進入外層 catch 處理
+        logger.error('[VideoGeneration] 保存影片訊息失敗', saveError);
         throw new Error('保存影片訊息失敗');
       }
     } catch (error: any) {
@@ -323,7 +389,15 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         messages.value.splice(tempIndex, 1);
       }
 
-      showError(error instanceof Error ? error.message : '生成影片失敗');
+      logger.error('[VideoGeneration] 影片生成流程失敗', error);
+      const errorMessage = error instanceof Error ? error.message : '生成影片失敗';
+      showError(errorMessage);
+
+      // ✅ 觸發影片生成失敗回調（記錄失敗信息）
+      if (deps.onVideoFailed) {
+        const characterName = deps.getPartnerName ? deps.getPartnerName() : '角色';
+        deps.onVideoFailed(matchId, characterName, errorMessage);
+      }
 
       // 撤回用戶剛發送的訊息
       if (userMessageId) {

@@ -1,9 +1,13 @@
 import { createApp, App } from "vue";
+import { createPinia } from "pinia";
 import AppComponent from "./App.vue";
 import router from "./router";
 import { ensureAuthState } from "./services/authBootstrap.js";
 import { enableHorizontalDragScroll } from "./utils/enableHorizontalDragScroll.js";
 import "./style.scss";
+
+// 創建 Pinia 實例
+const pinia = createPinia();
 
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
   try {
@@ -43,5 +47,7 @@ const app: App = createApp(AppComponent);
 
 await ensureAuthState();
 
+// 註冊 Pinia 和 Router
+app.use(pinia);
 app.use(router);
 app.mount("#app");

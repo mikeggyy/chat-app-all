@@ -152,7 +152,7 @@ export function useCharacterUnlock(deps: UseCharacterUnlockDeps): UseCharacterUn
   /**
    * 加載活躍的解鎖效果
    * @returns {Promise<void>}
-   * TODO: 後端需要添加 /api/unlock-tickets/active 端點
+   * ✅ 已實現：後端 /api/unlock-tickets/active 端點已添加
    */
   const loadActiveUnlocks = async (): Promise<void> => {
     const userId = getCurrentUserId();
@@ -165,15 +165,16 @@ export function useCharacterUnlock(deps: UseCharacterUnlockDeps): UseCharacterUn
     activeUnlockEffects.value = [];
 
     try {
-      // TODO: 暫時禁用，等待後端實現 /api/unlock-tickets/active 端點
-      // const data = await apiJson(`/api/unlock-tickets/active`, {
-      //   skipGlobalLoading: true,
-      // });
-      // if (data && data.unlocks) {
-      //   activeUnlockEffects.value = data.unlocks;
-      // }
+      // ✅ 啟用：後端已實現 /api/unlock-tickets/active 端點
+      const data = await apiJson<{ unlocks: UnlockEffect[] }>(`/api/unlock-tickets/active`, {
+        skipGlobalLoading: true,
+      });
+      if (data && data.unlocks) {
+        activeUnlockEffects.value = data.unlocks;
+      }
     } catch (error) {
       // Silent fail - 不影響用戶體驗
+      console.warn('[解鎖狀態] 載入活躍解鎖失敗:', error);
     } finally {
       // 數據加載完成，允許顯示圖標
       isUnlockDataLoaded.value = true;

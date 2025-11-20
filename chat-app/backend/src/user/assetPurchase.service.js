@@ -68,30 +68,28 @@ export const purchaseAssetPackage = async (userId, sku) => {
   const name = packageConfig.displayName || packageConfig.name;
   // 兼容不同的資產類型欄位
   let assetType = packageConfig.assetType;
-  const category = packageConfig.category;
+  let category = packageConfig.category; // 使用 let 因為藥水可能需要設置默認值
 
-  // 如果沒有 assetType但有 baseId（藥水），則判斷是藥水類型
+  // 如果沒有 assetType但有 baseId（藥水），則設置為藥水類型
   if (!assetType && packageConfig.baseId) {
-    // 藥水商品，使用藥水購買服務
-    logger.info(`[資產購買] 檢測到藥水商品，轉發到藥水購買服務: ${sku}, quantity=${quantity}, price=${price}`);
+    // ✅ 修復：藥水使用統一的資產購買邏輯（不再轉發到 potion.service.js）
+    // 藥水的庫存存儲在 usage_limits 集合的 potionInventory 中
+    logger.info(`[資產購買] 檢測到藥水商品: ${sku}, baseId=${packageConfig.baseId}, quantity=${quantity}, price=${price}`);
 
-    // 動態導入藥水購買服務
-    const potionService = await import("../payment/potion.service.js");
+    // 將 baseId 映射為 potionInventory 的欄位名稱
+    const potionTypeMapping = {
+      'memory_boost': 'memoryBoost',
+      'brain_boost': 'brainBoost',
+    };
 
-    // 根據 baseId 判斷藥水類型，傳遞正確的數量和價格
-    if (packageConfig.baseId === "memory_boost") {
-      return await potionService.purchaseMemoryBoost(userId, {
-        quantity,
-        unitPrice: price
-      });
-    } else if (packageConfig.baseId === "brain_boost") {
-      return await potionService.purchaseBrainBoost(userId, {
-        quantity,
-        unitPrice: price
-      });
-    } else {
+    assetType = potionTypeMapping[packageConfig.baseId];
+
+    if (!assetType) {
       throw new Error(`未知的藥水類型: ${packageConfig.baseId}`);
     }
+
+    // 標記為藥水商品（使用特殊的購買邏輯）
+    category = category || 'potions';
   }
 
   logger.info(
@@ -117,6 +115,8 @@ export const purchaseAssetPackage = async (userId, sku) => {
   // ✅ 使用單個 Transaction 確保原子性：扣款 + 增加資產 + 創建交易記錄
   const db = getFirestoreDb();
   const userRef = db.collection("users").doc(userId);
+  const isPotionPurchase = category === 'potions';
+  const usageLimitRef = isPotionPurchase ? db.collection("usage_limits").doc(userId) : null;
 
   const result = await db.runTransaction(async (transaction) => {
     // 1. 在 Transaction 內讀取用戶資料
@@ -134,21 +134,58 @@ export const purchaseAssetPackage = async (userId, sku) => {
       throw new Error(`金幣不足，需要 ${price} 金幣，當前餘額 ${currentBalance} 金幣`);
     }
 
-    // 3. 獲取當前資產數量
-    const currentAssets = user.assets || {};
-    const previousAssetQuantity = currentAssets[mainDocAssetType] || 0;
-    const newAssetQuantity = previousAssetQuantity + quantity;
+    // 3. 獲取當前資產數量（藥水從 usage_limits 讀取，其他從 users.assets 讀取）
+    let previousAssetQuantity = 0;
+    let newAssetQuantity = 0;
+
+    if (isPotionPurchase) {
+      // 藥水：從 usage_limits 集合讀取
+      const usageLimitDoc = await transaction.get(usageLimitRef);
+      const usageLimitData = usageLimitDoc.exists ? usageLimitDoc.data() : {};
+      const potionInventory = usageLimitData.potionInventory || {};
+      previousAssetQuantity = potionInventory[mainDocAssetType] || 0;
+      newAssetQuantity = previousAssetQuantity + quantity;
+    } else {
+      // 其他資產：從 users.assets 讀取
+      const currentAssets = user.assets || {};
+      previousAssetQuantity = currentAssets[mainDocAssetType] || 0;
+      newAssetQuantity = previousAssetQuantity + quantity;
+    }
 
     // 4. 計算新金幣餘額
     const newBalance = currentBalance - price;
 
     // 5. 在同一 Transaction 內：扣款 + 增加資產
     const walletUpdate = createWalletUpdate(newBalance);
-    transaction.update(userRef, {
-      ...walletUpdate,
-      [`assets.${mainDocAssetType}`]: newAssetQuantity,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    const now = new Date().toISOString();
+
+    // 5a. 更新用戶餘額
+    const userUpdateData = {
+      wallet: walletUpdate.wallet,
+      updatedAt: now,
+    };
+
+    if (!isPotionPurchase) {
+      // 非藥水：更新 users.assets
+      userUpdateData[`assets.${mainDocAssetType}`] = newAssetQuantity;
+    }
+
+    transaction.update(userRef, userUpdateData);
+
+    // 5b. 如果是藥水，更新 usage_limits.potionInventory
+    if (isPotionPurchase) {
+      // ✅ 在 transaction 中不能使用 FieldValue.increment()，必須直接設置計算後的值
+      transaction.set(
+        usageLimitRef,
+        {
+          potionInventory: {
+            [mainDocAssetType]: newAssetQuantity, // 直接使用計算後的值
+          },
+          updatedAt: now, // 使用普通時間戳而不是 serverTimestamp()
+        },
+        { merge: true }
+      );
+    }
 
     // 6. 在同一 Transaction 內創建交易記錄
     // ✅ P1-3 修復：統一使用絕對值存儲 amount
@@ -321,11 +358,13 @@ export const purchaseAssetBundle = async (userId, items) => {
 
     // 5. 在同一 Transaction 內：扣款 + 增加所有資產
     const walletUpdate = createWalletUpdate(newBalance);
-    transaction.update(userRef, {
-      ...walletUpdate,
-      ...assetUpdates,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
+    const now = new Date().toISOString();
+    const updateData = {
+      wallet: walletUpdate.wallet,
+      updatedAt: now,
+    };
+    Object.assign(updateData, assetUpdates);
+    transaction.update(userRef, updateData);
 
     // 6. 在同一 Transaction 內創建交易記錄
     // ✅ P1-3 修復：統一使用絕對值存儲 amount

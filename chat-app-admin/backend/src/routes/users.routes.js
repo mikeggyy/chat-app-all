@@ -196,8 +196,9 @@ router.get("/", requireMinRole("moderator"), relaxedAdminRateLimiter, async (req
           membershipAutoRenew: userData.membershipAutoRenew || false,
 
           // 錢包與資產
-          walletBalance: userData.walletBalance || userData.wallet?.balance || 0,
-          coins: userData.walletBalance || userData.wallet?.balance || userData.coins || 0,
+          // ✅ 修復：優先讀取新字段 wallet.balance，確保前後台同步
+          walletBalance: userData.wallet?.balance || userData.walletBalance || 0,
+          coins: userData.wallet?.balance || userData.walletBalance || userData.coins || 0,
           assets: {
             characterUnlockCards: userData.assets?.characterUnlockCards || 0,
             photoUnlockCards: userData.assets?.photoUnlockCards || 0,
@@ -355,9 +356,10 @@ router.get("/:userId", requireMinRole("moderator"), relaxedAdminRateLimiter, asy
       membershipExpiresAt: userData.membershipExpiresAt || null,
       membershipAutoRenew: userData.membershipAutoRenew || false,
 
-      // 錢包與資產（優先使用 walletBalance 頂層字段）
-      walletBalance: userData.walletBalance || userData.wallet?.balance || 0,
-      coins: userData.walletBalance || userData.wallet?.balance || userData.coins || 0,
+      // 錢包與資產
+      // ✅ 修復：優先讀取新字段 wallet.balance，確保前後台同步
+      walletBalance: userData.wallet?.balance || userData.walletBalance || 0,
+      coins: userData.wallet?.balance || userData.walletBalance || userData.coins || 0,
       assets: {
         characterUnlockCards: userData.assets?.characterUnlockCards || 0,
         photoUnlockCards: userData.assets?.photoUnlockCards || 0,
@@ -415,9 +417,25 @@ const updateUserHandler = async (req, res) => {
     const { userId } = req.params;
     const user = await updateUser(userId, req.body);
 
+    // ✅ 修復：重新查詢完整的用戶資料（包括 assets），確保前端能立即看到更新
+    const userDoc = await db.collection("users").doc(userId).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+
     res.json({
       message: "用戶資料更新成功",
-      user,
+      user: {
+        ...user,
+        // ✅ 添加完整的金幣和資產資料
+        coins: userData.coins || userData.walletBalance || userData.wallet?.balance || 0,
+        walletBalance: userData.walletBalance || userData.wallet?.balance || 0,
+        assets: {
+          characterUnlockCards: userData.assets?.characterUnlockCards || 0,
+          photoUnlockCards: userData.assets?.photoUnlockCards || 0,
+          videoUnlockCards: userData.assets?.videoUnlockCards || 0,
+          voiceUnlockCards: userData.assets?.voiceUnlockCards || 0,
+          createCards: userData.assets?.createCards || 0,
+        },
+      },
     });
   } catch (error) {
     if (error.code === "auth/user-not-found") {
@@ -959,20 +977,36 @@ router.delete("/:userId/unlock-effects/:characterId", requireMinRole("admin"), s
       return res.status(404).json({ error: "用戶不存在" });
     }
 
-    // 獲取 usage_limits 文檔
-    const usageLimitDoc = await db.collection("usage_limits").doc(userId).get();
-    if (!usageLimitDoc.exists) {
-      return res.status(404).json({ error: "找不到用戶使用限制數據" });
-    }
+    // ✅ 使用 Transaction 確保原子性刪除兩處數據
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection("users").doc(userId);
+      const limitRef = db.collection("usage_limits").doc(userId);
 
-    // 刪除 conversation[characterId].temporaryUnlockUntil
-    await db.collection("usage_limits").doc(userId).update({
-      [`conversation.${characterId}.temporaryUnlockUntil`]: FieldValue.delete(),
+      // 1. 讀取用戶文檔和限制文檔（驗證存在）
+      const userDoc = await transaction.get(userRef);
+      const limitDoc = await transaction.get(limitRef);
+
+      if (!userDoc.exists) {
+        throw new Error("用戶文檔不存在");
+      }
+
+      // 2. 刪除 users.unlockedCharacters.{characterId}（主應用讀取此處）
+      transaction.update(userRef, {
+        [`unlockedCharacters.${characterId}`]: FieldValue.delete(),
+      });
+
+      // 3. 刪除 usage_limits.conversation.{characterId}.temporaryUnlockUntil（歷史遺留）
+      if (limitDoc.exists) {
+        transaction.update(limitRef, {
+          [`conversation.${characterId}.temporaryUnlockUntil`]: FieldValue.delete(),
+          [`conversation.${characterId}.permanentUnlock`]: FieldValue.delete(),
+        });
+      }
     });
 
     res.json({
       success: true,
-      message: "角色解鎖效果已刪除",
+      message: "角色解鎖效果已刪除（已從 users 和 usage_limits 中移除）",
       userId,
       characterId,
     });
@@ -1134,32 +1168,42 @@ router.get("/:userId/resource-limits", requireMinRole("admin"), relaxedAdminRate
       }
     }
 
-    // 6. 獲取角色解鎖效果數據（從 conversation 欄位中的 temporaryUnlockUntil）
+    // 6. 獲取角色解鎖效果數據（✅ 從 users.unlockedCharacters 讀取，統一數據源）
     const activeUnlockEffects = [];
-    for (const [characterId, convData] of Object.entries(conversationData)) {
-      const temporaryUnlockUntil = convData.temporaryUnlockUntil
-        ? new Date(convData.temporaryUnlockUntil)
-        : null;
+    const unlockedCharacters = userData.unlockedCharacters || {};
 
-      if (temporaryUnlockUntil && temporaryUnlockUntil > now) {
+    for (const [characterId, unlockData] of Object.entries(unlockedCharacters)) {
+      // 檢查是否過期
+      let isActive = false;
+      let expiresAt = null;
+
+      if (unlockData.permanent) {
+        // 永久解鎖
+        isActive = true;
+      } else if (unlockData.expiresAt) {
+        // 時限解鎖
+        expiresAt = new Date(unlockData.expiresAt);
+        isActive = expiresAt && expiresAt > now;
+      }
+
+      if (isActive) {
         const character = charactersMap.get(characterId);
-        const characterName = character?.display_name || "未知角色";
-        const characterAvatar = character?.portraitUrl || null;
-
-        const daysRemaining = Math.ceil(
-          (temporaryUnlockUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const daysRemaining = expiresAt
+          ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          : 999; // 永久解鎖顯示 999 天
 
         activeUnlockEffects.push({
           id: `unlock-${characterId}`,
           characterId,
-          characterName,
-          characterAvatar,
+          characterName: character?.display_name || "未知角色",
+          characterAvatar: character?.portraitUrl || null,
           character: character || null,
           unlockType: "character",
-          unlockUntil: temporaryUnlockUntil.toISOString(),
+          unlockUntil: expiresAt ? expiresAt.toISOString() : null,
           daysRemaining,
           isActive: true,
+          permanent: unlockData.permanent || false,
+          unlockedBy: unlockData.unlockedBy || "unknown",
         });
       }
     }

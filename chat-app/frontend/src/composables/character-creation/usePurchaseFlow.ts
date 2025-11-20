@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import type { Router } from "vue-router";
 import { apiJson } from "../../utils/api.js";
 import { useUserProfile } from "../useUserProfile.js";
+import { useToast } from "../useToast.js";
 import {
   createCharacterCreationFlow,
   storeCharacterCreationFlowId,
@@ -90,6 +91,7 @@ interface UsePurchaseFlowReturn {
 export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn {
   const router: Router = useRouter();
   const { user } = useUserProfile();
+  const { error: showErrorToast } = useToast();
 
   const userCreateCards = ref<number>(0);
   const freeCreationsRemaining = ref<number>(0);
@@ -130,27 +132,27 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
     isLoadingAssets.value = true;
     try {
       // 獲取用戶資產（創建卡數量）
-      const assetsData = await apiJson(
+      const assetsResponse = await apiJson(
         `/api/users/${encodeURIComponent(userId)}/assets`,
         {
           skipGlobalLoading: true,
         }
-      ) as UserAssetsResponse;
+      ) as any;
 
-      if (assetsData) {
-        userCreateCards.value = assetsData.createCards || 0;
+      if (assetsResponse?.data) {
+        userCreateCards.value = assetsResponse.data.createCards || 0;
       }
 
       // 獲取免費創建次數（從 limits API）
-      const limitsData = await apiJson(
+      const limitsResponse = await apiJson(
         `/api/character-creation/limits/${encodeURIComponent(userId)}`,
         {
           skipGlobalLoading: true,
         }
-      ) as LimitsResponse;
+      ) as any;
 
-      if (limitsData) {
-        freeCreationsRemaining.value = limitsData.remainingFreeCreations || 0;
+      if (limitsResponse?.data) {
+        freeCreationsRemaining.value = limitsResponse.data.remainingFreeCreations || 0;
       }
     } catch (error) {
       // 使用預設值
@@ -203,6 +205,15 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
   ): Promise<void> => {
     isGenerateConfirmVisible.value = false;
 
+    // 調試日誌：檢查 appearanceData
+    console.log('[confirmGenerate] appearanceData:', {
+      hasDescription: !!appearanceData.description,
+      descriptionLength: appearanceData.description?.length || 0,
+      hasStyles: !!appearanceData.styles,
+      stylesCount: appearanceData.styles?.length || 0,
+      description: appearanceData.description?.substring(0, 50) + '...' // 只顯示前50個字符
+    });
+
     // 註：不在這裡扣除創建卡或免費次數
     // 後端會在生成角色圖片成功後才扣除，確保生成失敗時不會扣除用戶的資源
 
@@ -253,6 +264,14 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
       // 確保 flowId 被保存（無論是創建還是更新）
       if (flow && flow.id) {
         storeCharacterCreationFlowId(flow.id);
+
+        // 調試日誌：檢查保存後的 flow
+        console.log('[confirmGenerate] Flow saved:', {
+          flowId: flow.id,
+          hasAppearance: !!flow.appearance,
+          hasDescription: !!flow.appearance?.description,
+          descriptionLength: flow.appearance?.description?.length || 0,
+        });
       } else {
         throw new Error("Flow 創建/更新失敗：未返回有效的 flow ID");
       }
@@ -268,13 +287,15 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
           void error;
         });
     } catch (error) {
-      if (typeof window !== "undefined") {
-        window.alert(
-          error instanceof Error && error.message
-            ? `保存失敗：${error.message}`
-            : "保存角色形象資料失敗，請稍後再試"
-        );
-      }
+      // 使用 Toast 顯示錯誤而非 alert
+      const errorMessage = error instanceof Error && error.message
+        ? error.message
+        : "保存角色形象資料失敗，請稍後再試";
+
+      showErrorToast(errorMessage, {
+        title: "保存失敗",
+        duration: 5000
+      });
     }
   };
 

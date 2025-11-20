@@ -22,10 +22,12 @@ export interface GiftData {
 export interface UseGiftManagementDeps {
   getCurrentUserId: () => string;
   openGiftSelector: (callback: () => Promise<void>) => Promise<void>;
-  sendGift: (giftData: GiftData, onSuccess: () => void) => Promise<void>;
+  sendGift: (giftData: GiftData, onSuccess: () => void, selectedPhotoUrl?: string) => Promise<void>; // ✅ 添加 selectedPhotoUrl 參數
   loadBalance: (userId: string) => Promise<void>;
   showGiftAnimation: (emoji: string, name: string) => void;
   closeGiftAnimation: () => void;
+  showPhotoSelector: (forGift: boolean, pendingGift: GiftData) => void; // ✅ 新增:打開照片選擇器
+  closeGiftSelector: () => void; // ✅ 新增:關閉禮物選擇器
 }
 
 /**
@@ -51,6 +53,8 @@ export function useGiftManagement(deps: UseGiftManagementDeps): UseGiftManagemen
     loadBalance,
     showGiftAnimation,
     closeGiftAnimation,
+    showPhotoSelector, // ✅ 新增
+    closeGiftSelector, // ✅ 新增
   } = deps;
 
   // ====================
@@ -71,32 +75,19 @@ export function useGiftManagement(deps: UseGiftManagementDeps): UseGiftManagemen
   };
 
   /**
-   * 處理選擇並發送禮物
+   * 處理選擇禮物（新流程：先選照片再發送）
    * @param giftData - 禮物數據
    */
   const handleSelectGift = async (giftData: GiftData): Promise<void> => {
     const userId = getCurrentUserId();
     if (!userId) return;
 
-    // 獲取禮物資訊用於動畫
-    const gift = getGiftById(giftData.giftId);
-    if (gift) {
-      // 立即顯示禮物動畫
-      showGiftAnimation(gift.emoji, gift.name);
+    // ✅ 新流程：關閉禮物選擇器，打開照片選擇器
+    closeGiftSelector();
 
-      // 2秒後自動隱藏動畫
-      setTimeout(() => {
-        closeGiftAnimation();
-      }, 2000);
-    }
-
-    // 發送禮物（動畫已經在播放）
-    await sendGift(giftData, () => {
-      // On success - 動畫已經在顯示，不需要再做處理
-    });
-
-    // Reload balance
-    await loadBalance(userId);
+    // ✅ 打開照片選擇器，讓用戶選擇照片（傳遞待發送的禮物數據）
+    // 實際的禮物發送會在用戶選擇照片後（handlePhotoSelect）執行
+    showPhotoSelector(true, giftData); // forGift=true, pendingGift=giftData
   };
 
   // ====================

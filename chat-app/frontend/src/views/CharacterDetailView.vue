@@ -193,11 +193,18 @@ onMounted(() => {
       <div v-else-if="character" class="character-detail">
         <!-- 角色頭像 -->
         <div class="detail-portrait">
+          <!-- 🔥 有圖片時顯示圖片 -->
           <img
-            :src="character.portraitUrl || '/ai-role/match-role-01.webp'"
+            v-if="character.portraitUrl"
+            :src="character.portraitUrl"
             :alt="`${character.display_name || '角色'} 的形象`"
             class="detail-portrait__image"
           />
+          <!-- 🔥 沒有圖片時顯示占位符 -->
+          <div v-else class="detail-portrait__placeholder">
+            <span class="detail-portrait__text">{{ character.display_name?.charAt(0) || '?' }}</span>
+            <span class="detail-portrait__hint">未設定圖片</span>
+          </div>
         </div>
 
         <!-- 角色基本資訊 -->
@@ -457,6 +464,36 @@ onMounted(() => {
     border-radius: 16px;
     object-fit: cover;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  // 🔥 占位符樣式
+  &__placeholder {
+    width: 100%;
+    max-width: 300px;
+    aspect-ratio: 3 / 4;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(96, 42, 72, 0.3) 0%, rgba(17, 6, 15, 0.6) 100%);
+    border: 3px dashed rgba(255, 236, 213, 0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  &__text {
+    font-size: 4rem;
+    font-weight: 700;
+    color: rgba(255, 236, 213, 0.7);
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  &__hint {
+    font-size: 0.875rem;
+    color: rgba(255, 236, 213, 0.4);
+    letter-spacing: 0.1em;
   }
 }
 

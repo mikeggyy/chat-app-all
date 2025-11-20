@@ -7,9 +7,11 @@
 
 import { type Ref, computed } from 'vue';
 import { useChatActions, type UseChatActionsReturn } from '../useChatActions.js';
-import { usePotionManagement, type UsePotionManagementReturn } from '../usePotionManagement.js';
+import { usePotionManagement, type UsePotionManagementReturn, type PotionType } from '../usePotionManagement.js';
 import { useSelfieGeneration, type UseSelfieGenerationReturn } from '../useSelfieGeneration.js';
 import { useVideoGeneration, type UseVideoGenerationReturn } from '../useVideoGeneration.js';
+import { useVideoCompletionNotification, type UseVideoCompletionNotificationReturn, type VideoCompletionNotification } from '../useVideoCompletionNotification.js';
+import { useGenerationFailureNotification, type UseGenerationFailureNotificationReturn, type GenerationFailure } from '../useGenerationFailureNotification.js';
 import { useGiftManagement, type UseGiftManagementReturn } from '../useGiftManagement.js';
 import { useCharacterUnlock, type UseCharacterUnlockReturn } from '../useCharacterUnlock.js';
 import { useFavoriteManagement, type UseFavoriteManagementReturn } from '../useFavoriteManagement.js';
@@ -49,6 +51,9 @@ export interface UseChatFeaturesDeps {
   // 消息和引用
   messages: Ref<Message[]>;
   chatContentRef: Ref<any>;
+
+  // 模態框狀態（✅ 新增）
+  modals: any; // ModalsState from useModalManager
 
   // 功能函數
   requireLogin: () => boolean;
@@ -108,6 +113,7 @@ export interface UseChatFeaturesReturn {
   handleConfirmUsePotion: UsePotionManagementReturn['handleConfirmUsePotion'];
 
   // Character Unlock - 角色解鎖
+  activeCharacterUnlock: UseCharacterUnlockReturn['activeCharacterUnlock'];
   isCharacterUnlocked: UseCharacterUnlockReturn['isCharacterUnlocked'];
   loadActiveUnlocks: UseCharacterUnlockReturn['loadActiveUnlocks'];
   activeUnlockEffects: UseCharacterUnlockReturn['activeUnlockEffects'];
@@ -145,6 +151,18 @@ export interface UseChatFeaturesReturn {
   // Favorite - 收藏
   isFavoriteMutating: UseFavoriteManagementReturn['isFavoriteMutating'];
   toggleFavorite: UseFavoriteManagementReturn['toggleFavorite'];
+
+  // Video Completion Notification - 影片完成通知
+  videoNotification: Ref<VideoCompletionNotification | null>;
+  showVideoNotification: UseVideoCompletionNotificationReturn['showNotification'];
+  hideVideoNotification: UseVideoCompletionNotificationReturn['hideNotification'];
+  scrollToVideo: UseVideoCompletionNotificationReturn['scrollToVideo'];
+
+  // Generation Failure Notification - 生成失敗通知
+  generationFailures: Ref<GenerationFailure[]>;
+  clearGenerationFailure: UseGenerationFailureNotificationReturn['clearFailure'];
+  clearAllGenerationFailures: UseGenerationFailureNotificationReturn['clearAllFailures'];
+  checkForGenerationFailures: UseGenerationFailureNotificationReturn['checkForFailures'];
 }
 
 // ==================== Composable 主函數 ====================
@@ -163,6 +181,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     firebaseAuth,
     messages,
     chatContentRef,
+    modals, // ✅ 新增：模態框狀態
     requireLogin,
     canGeneratePhoto,
     fetchPhotoStats,
@@ -243,7 +262,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
   } = usePotionManagement({
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
-    getPotionType: () => null, // TODO: 從 modals 或其他地方獲取
+    getPotionType: () => modals.potionConfirm.type as PotionType | null, // ✅ 從 modals 獲取藥水類型
     closePotionConfirm,
     setLoading,
     showError,
@@ -254,6 +273,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
   // Character Unlock - 角色解鎖
   // ==========================================
   const {
+    activeCharacterUnlock,
     isCharacterUnlocked,
     loadActiveUnlocks,
     activeUnlockEffects,
@@ -316,7 +336,39 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     showError,
     showSuccess: success,
     config,
+    // ✅ 照片生成失敗回調
+    onPhotoFailed: (characterId: string, characterName: string, reason?: string) => {
+      addGenerationFailure({
+        type: 'photo',
+        characterId,
+        characterName,
+        failedAt: new Date().toISOString(),
+        reason,
+      });
+    },
+    getPartnerName: () => partner.value?.displayName || partner.value?.display_name || '角色',
   });
+
+  // ==========================================
+  // Video Completion Notification - 影片完成通知
+  // ==========================================
+  const {
+    notification: videoNotification,
+    showNotification: showVideoNotification,
+    hideNotification: hideVideoNotification,
+    scrollToVideo,
+  } = useVideoCompletionNotification();
+
+  // ==========================================
+  // Generation Failure Notification - 生成失敗通知
+  // ==========================================
+  const {
+    failures: generationFailures,
+    addFailure: addGenerationFailure,
+    clearFailure: clearGenerationFailure,
+    clearAllFailures: clearAllGenerationFailures,
+    checkForFailures: checkForGenerationFailures,
+  } = useGenerationFailureNotification();
 
   // ==========================================
   // Video Generation - 視頻生成
@@ -339,6 +391,22 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     showError,
     showSuccess: success,
     config,
+    // ✅ 影片完成回調
+    onVideoCompleted: (videoMessageId: string) => {
+      const characterName = partner.value?.displayName || partner.value?.display_name || '角色';
+      showVideoNotification(videoMessageId, characterName);
+    },
+    // ✅ 影片生成失敗回調
+    onVideoFailed: (characterId: string, characterName: string, reason?: string) => {
+      addGenerationFailure({
+        type: 'video',
+        characterId,
+        characterName,
+        failedAt: new Date().toISOString(),
+        reason,
+      });
+    },
+    getPartnerName: () => partner.value?.displayName || partner.value?.display_name || '角色',
   });
 
   // ==========================================
@@ -354,6 +422,8 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     loadBalance,
     showGiftAnimation,
     closeGiftAnimation,
+    showPhotoSelector, // ✅ 新增:打開照片選擇器
+    closeGiftSelector: closeGiftSelectorFromActions, // ✅ 新增:關閉禮物選擇器
   });
 
   // ==========================================
@@ -388,6 +458,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     handleConfirmUsePotion,
 
     // Character Unlock - 角色解鎖
+    activeCharacterUnlock,
     isCharacterUnlocked,
     loadActiveUnlocks,
     activeUnlockEffects,
@@ -425,5 +496,17 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     // Favorite - 收藏
     isFavoriteMutating,
     toggleFavorite,
+
+    // Video Completion Notification - 影片完成通知
+    videoNotification,
+    showVideoNotification,
+    hideVideoNotification,
+    scrollToVideo,
+
+    // Generation Failure Notification - 生成失敗通知
+    generationFailures,
+    clearGenerationFailure,
+    clearAllGenerationFailures,
+    checkForGenerationFailures,
   };
 }

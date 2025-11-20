@@ -48,7 +48,7 @@ export const CHARACTER_CREATION_LIMITS: CharacterCreationLimits = {
   MIN_APPEARANCE_LENGTH: 10,
 
   // 外觀簡短描述長度限制（用於預覽）
-  MAX_APPEARANCE_PREVIEW_LENGTH: 60,
+  MAX_APPEARANCE_PREVIEW_LENGTH: 200,
 };
 
 /**

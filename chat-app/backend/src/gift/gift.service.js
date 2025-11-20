@@ -4,6 +4,7 @@
  * ✅ 使用 Firestore Transaction 保護餘額檢查和扣款
  * ✅ 在事務中重新獲取會員等級（防止過期會員仍享受折扣）
  * ✅ 使用 deductCoins 服務（已有 Transaction 保護）
+ * ✅ 2025-01-19: 修復 Transaction 內動態 import 導致的 500 錯誤
  */
 
 import { getGiftById, isValidGift, getGiftList } from "../config/gifts.js";
@@ -12,6 +13,8 @@ import { deductCoins } from "../payment/coins.service.js";
 import { getUserTier } from "../utils/membershipUtils.js";
 import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
+import { getWalletBalance, createWalletUpdate } from "../user/walletHelpers.js";
+import { TRANSACTION_TYPES } from "../payment/coins.service.js";
 
 /**
  * 計算禮物價格（考慮會員折扣）
@@ -77,51 +80,29 @@ export const sendGift = async (userId, characterId, giftId) => {
   let result = null;
 
   await db.runTransaction(async (transaction) => {
-    // 1. 讀取用戶資料（在 Transaction 內重新讀取以確保最新）
+    // ✅ 步驟 1: 先執行所有讀取操作（Firestore 要求所有讀取必須在寫入之前）
+
+    // 1.1 讀取用戶資料
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) {
       throw new Error("找不到用戶");
     }
 
+    // 1.2 讀取禮物統計（必須在任何寫入操作之前讀取）
+    const statsDoc = await transaction.get(characterGiftStatsRef);
+
+    // ✅ 步驟 2: 處理讀取的數據
     const userData = userDoc.data();
-    const { getWalletBalance, createWalletUpdate } = await import("../user/walletHelpers.js");
     const currentBalance = getWalletBalance(userData);
 
-    // 2. 檢查餘額是否足夠
+    // 2.1 檢查餘額是否足夠
     if (currentBalance < pricing.finalPrice) {
       throw new Error(`金幣不足，當前餘額：${currentBalance}，需要：${pricing.finalPrice}`);
     }
 
     const newBalance = currentBalance - pricing.finalPrice;
 
-    // 3. 在同一事務中更新用戶餘額
-    const walletUpdate = createWalletUpdate(newBalance);
-    transaction.update(userRef, {
-      ...walletUpdate,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    // 4. 創建禮物記錄
-    transaction.set(giftRecordRef, {
-      id: giftRecordRef.id,
-      userId,
-      characterId,
-      giftId,
-      giftName: gift.name,
-      giftEmoji: gift.emoji,
-      cost: pricing.finalPrice,
-      basePrice: pricing.basePrice,
-      discount: pricing.discount,
-      saved: pricing.saved,
-      membershipTier: tier,
-      timestamp: FieldValue.serverTimestamp(),
-      status: "completed",
-      previousBalance: currentBalance,
-      newBalance: newBalance,
-    });
-
-    // 5. 更新禮物統計
-    const statsDoc = await transaction.get(characterGiftStatsRef);
+    // 2.2 準備禮物統計數據
     let stats = statsDoc.exists
       ? statsDoc.data()
       : {
@@ -147,10 +128,38 @@ export const sendGift = async (userId, characterId, giftId) => {
     stats.totalSpent += pricing.finalPrice;
     stats.updatedAt = FieldValue.serverTimestamp();
 
+    // ✅ 步驟 3: 執行所有寫入操作（所有讀取完成後才能寫入）
+
+    // 3.1 更新用戶餘額
+    const walletUpdate = createWalletUpdate(newBalance);
+    transaction.update(userRef, {
+      ...walletUpdate,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 3.2 創建禮物記錄
+    transaction.set(giftRecordRef, {
+      id: giftRecordRef.id,
+      userId,
+      characterId,
+      giftId,
+      giftName: gift.name,
+      giftEmoji: gift.emoji,
+      cost: pricing.finalPrice,
+      basePrice: pricing.basePrice,
+      discount: pricing.discount,
+      saved: pricing.saved,
+      membershipTier: tier,
+      timestamp: FieldValue.serverTimestamp(),
+      status: "completed",
+      previousBalance: currentBalance,
+      newBalance: newBalance,
+    });
+
+    // 3.3 更新禮物統計
     transaction.set(characterGiftStatsRef, stats);
 
-    // 6. 創建交易記錄
-    const { TRANSACTION_TYPES } = await import("../payment/coins.service.js");
+    // 3.4 創建交易記錄
     transaction.set(transactionRef, {
       id: transactionRef.id,
       userId,

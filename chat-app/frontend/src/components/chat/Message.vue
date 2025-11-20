@@ -73,17 +73,6 @@
         >
           您的瀏覽器不支持影片播放。
         </video>
-        <div
-          v-if="message.video.duration || message.video.resolution"
-          class="chat-bubble__video-info"
-        >
-          <span v-if="message.video.duration" class="video-info-badge">{{
-            message.video.duration
-          }}</span>
-          <span v-if="message.video.resolution" class="video-info-badge">{{
-            message.video.resolution
-          }}</span>
-        </div>
       </template>
     </div>
 

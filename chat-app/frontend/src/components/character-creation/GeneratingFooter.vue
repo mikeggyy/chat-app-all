@@ -51,11 +51,12 @@ const handleConfirm = (): void => {
   padding: 14px 20px;
   border: none;
   border-radius: 999px;
-  background: var(--gradient-primary);
+  background: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
   color: #ffffff;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.08em;
+  cursor: pointer;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
@@ -66,6 +67,10 @@ const handleConfirm = (): void => {
 
 .generating__confirm:not(:disabled):hover {
   transform: translateY(-1px);
+}
+
+.generating__confirm:not(:disabled):active {
+  transform: translateY(0);
 }
 
 .generating__confirm:focus-visible {

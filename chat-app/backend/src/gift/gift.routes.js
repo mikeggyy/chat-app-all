@@ -139,11 +139,12 @@ router.get("/pricing", requireFirebaseAuth, relaxedRateLimiter, asyncHandler(asy
  * POST /api/gifts/response
  * 生成AI角色收到禮物的回應（感謝訊息 + 自拍照）
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人生成禮物回應
+ * ✅ 支援選擇現有照片：可傳入 selectedPhotoUrl 使用現有照片而非生成新照片
  */
 router.post("/response", requireFirebaseAuth, standardRateLimiter, asyncHandler(async (req, res, next) => {
   try {
     const userId = req.firebaseUser.uid;
-    const { characterData, giftId, generatePhoto } = req.body;
+    const { characterData, giftId, generatePhoto, selectedPhotoUrl } = req.body;
 
     if (!characterData) {
       return sendError(res, "VALIDATION_ERROR", "缺少必要參數：characterData", {
@@ -161,13 +162,17 @@ router.post("/response", requireFirebaseAuth, standardRateLimiter, asyncHandler(
       characterData,
       giftId,
       userId,
-      { generatePhoto }
+      {
+        generatePhoto,
+        selectedPhotoUrl // ✅ 傳遞選擇的照片 URL
+      }
     );
 
-    logger.info(`[禮物回應 API] 準備返回結果給前端: hasPhoto=${!!result.photo}, hasImageUrl=${!!result.photo?.imageUrl}`);
-    if (result.photo?.imageUrl) {
-      logger.info(`[禮物回應 API] ✅ 照片 URL 將被發送: ${result.photo.imageUrl.substring(0, 100)}...`);
-      logger.info(`[禮物回應 API] ✅ 照片 URL 長度: ${result.photo.imageUrl.length}`);
+    // ✅ 修復：使用正確的字段名稱 photoMessage（與 processGiftResponse 返回的字段一致）
+    logger.info(`[禮物回應 API] 準備返回結果給前端: hasPhotoMessage=${!!result.photoMessage}, hasImageUrl=${!!result.photoMessage?.imageUrl}`);
+    if (result.photoMessage?.imageUrl) {
+      logger.info(`[禮物回應 API] ✅ 照片 URL 將被發送: ${result.photoMessage.imageUrl.substring(0, 100)}...`);
+      logger.info(`[禮物回應 API] ✅ 照片 URL 長度: ${result.photoMessage.imageUrl.length}`);
     } else {
       logger.error(`[禮物回應 API] ❌ 照片 URL 缺失，將發送給前端的結果不包含照片 URL！`);
     }

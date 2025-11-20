@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { SparklesIcon } from "@heroicons/vue/24/solid";
+import { computed } from "vue";
+import AIMagicianButton from "./AIMagicianButton.vue";
+import { useCharacterCreationStore } from "@/stores/characterCreation";
 
 // Types
 interface PersonaForm {
@@ -22,29 +24,29 @@ interface Props {
   maxTaglineLength: number;
   maxHiddenProfileLength: number;
   maxPromptLength: number;
-  isAIMagicianLoading?: boolean;
-  aiMagicianError?: string | null;
 }
 
 interface Emits {
-  (e: "openAIMagician"): void;
+  (e: "open-ai-magician"): void;
   (e: "update:name", value: string): void;
   (e: "update:tagline", value: string): void;
   (e: "update:hiddenProfile", value: string): void;
   (e: "update:prompt", value: string): void;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   selectedResultImage: "",
   selectedResultAlt: "生成角色預覽",
-  isAIMagicianLoading: false,
-  aiMagicianError: null,
 });
 
 const emit = defineEmits<Emits>();
 
+// 使用 store
+const store = useCharacterCreationStore();
+const AI_MAGICIAN_LIMIT = 3;
+
 const handleAIMagician = (): void => {
-  emit("openAIMagician");
+  emit("open-ai-magician");
 };
 
 const handleNameInput = (event: Event): void => {
@@ -69,11 +71,7 @@ const handlePromptInput = (event: Event): void => {
 </script>
 
 <template>
-  <main
-    class="generating__settings"
-    aria-live="polite"
-    aria-label="角色設定"
-  >
+  <main class="generating__settings" aria-live="polite" aria-label="角色設定">
     <section class="generating__settings-hero">
       <div class="generating__settings-portrait">
         <img
@@ -81,9 +79,7 @@ const handlePromptInput = (event: Event): void => {
           :src="selectedResultImage"
           :alt="selectedResultAlt"
         />
-        <div v-else class="generating__settings-portrait-empty">
-          預覽載入中
-        </div>
+        <div v-else class="generating__settings-portrait-empty">預覽載入中</div>
       </div>
     </section>
 
@@ -93,20 +89,12 @@ const handlePromptInput = (event: Event): void => {
           <label class="generating__field-label" for="generating-name">
             角色名
           </label>
-          <button
-            type="button"
-            class="generating__magic-button"
-            :class="{
-              'generating__magic-button--loading': isAIMagicianLoading,
-            }"
-            :disabled="isAIMagicianLoading"
-            aria-label="開啟 AI 魔法師"
-            title="AI魔法師"
+          <AIMagicianButton
+            :is-generating="store.isAIMagicianLoading"
+            :remaining-usage="store.aiMagicianRemainingUsage"
+            :total-usage="AI_MAGICIAN_LIMIT"
             @click="handleAIMagician"
-          >
-            <SparklesIcon aria-hidden="true" />
-            <span>{{ isAIMagicianLoading ? "生成中..." : "AI魔法師" }}</span>
-          </button>
+          />
         </div>
         <input
           id="generating-name"
@@ -123,11 +111,11 @@ const handlePromptInput = (event: Event): void => {
           <span>{{ nameLength }} / {{ maxNameLength }}</span>
         </div>
         <div
-          v-if="aiMagicianError"
+          v-if="store.error"
           class="generating__field-error"
           role="alert"
         >
-          {{ aiMagicianError }}
+          {{ store.error }}
         </div>
       </div>
       <div class="generating__field">
@@ -165,9 +153,7 @@ const handlePromptInput = (event: Event): void => {
           aria-required="true"
         ></textarea>
         <div class="generating__field-meta generating__field-meta--end">
-          <span
-            >{{ hiddenProfileLength }} / {{ maxHiddenProfileLength }}</span
-          >
+          <span>{{ hiddenProfileLength }} / {{ maxHiddenProfileLength }}</span>
         </div>
       </div>
       <div class="generating__field">
@@ -194,20 +180,24 @@ const handlePromptInput = (event: Event): void => {
 </template>
 
 <style scoped>
-:root {
+.generating__settings {
+  /* CSS 變數定義 - 與 appearance 頁面保持一致 */
   --gradient-primary: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
+  --color-white: #ffffff;
+  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --color-warning: #ffa500;
+  --radius-full: 999px;
+  --transition-fast: 0.2s ease;
   --focus-border-color: rgba(255, 119, 195, 0.95);
   --focus-shadow: 0 0 0 3px rgba(255, 119, 195, 0.24);
-}
 
-.generating__settings {
   display: flex;
   flex-direction: column;
   gap: 24px;
   margin-top: 12px;
   overflow-y: auto;
   flex: 1;
-  max-height: calc(100dvh - 280px);
+  max-height: calc(100dvh - 150px);
 }
 
 .generating__settings-hero {
@@ -273,44 +263,6 @@ const handlePromptInput = (event: Event): void => {
   font-size: 14px;
   letter-spacing: 0.07em;
   color: rgba(255, 255, 255, 0.78);
-}
-
-.generating__magic-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: none;
-  background: var(--gradient-primary);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-.generating__magic-button svg {
-  width: 16px;
-  height: 16px;
-}
-
-.generating__magic-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.generating__magic-button--loading svg {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .generating__field-error {

@@ -103,6 +103,8 @@ export interface ModalsState {
     show: boolean;
     selectedUrl: string | null;
     useCard: boolean;
+    forGift: boolean; // ✅ 標記是否用於送禮物
+    pendingGift: any | null; // ✅ 待發送的禮物數據
   };
   imageViewer: {
     show: boolean;
@@ -159,7 +161,7 @@ export interface UseModalManagerReturn {
   closeUnlockConfirm: () => void;
 
   // 便捷方法 - 選擇器類
-  showPhotoSelector: (useCard?: boolean) => void;
+  showPhotoSelector: (useCardOrForGift?: boolean, pendingGift?: any) => void; // ✅ 支援禮物模式
   closePhotoSelector: () => void;
 
   // 便捷方法 - 查看器類
@@ -274,6 +276,8 @@ export function useModalManager(): UseModalManagerReturn {
       show: false,
       selectedUrl: null,
       useCard: false,
+      forGift: false, // ✅ 標記是否用於送禮物
+      pendingGift: null, // ✅ 待發送的禮物數據
     },
 
     // ===== D. 查看器類模態框 =====
@@ -359,6 +363,8 @@ export function useModalManager(): UseModalManagerReturn {
       } else if (modalName === 'photoSelector') {
         modals.photoSelector.selectedUrl = null;
         modals.photoSelector.useCard = false;
+        modals.photoSelector.forGift = false; // ✅ 清空禮物標記
+        modals.photoSelector.pendingGift = null; // ✅ 清空待發送的禮物
       } else if (modalName === 'imageViewer') {
         modals.imageViewer.url = '';
         modals.imageViewer.alt = '';
@@ -446,7 +452,20 @@ export function useModalManager(): UseModalManagerReturn {
   const closeUnlockConfirm = (): void => close('unlockConfirm');
 
   // === 選擇器類模態框 ===
-  const showPhotoSelector = (useCard: boolean = false): void => open('photoSelector', { useCard });
+  /**
+   * 顯示照片選擇器
+   * @param useCardOrForGift - 影片模式時:是否使用影片卡; 禮物模式時:true表示送禮物
+   * @param pendingGift - 待發送的禮物數據（禮物模式時使用）
+   */
+  const showPhotoSelector = (useCardOrForGift: boolean = false, pendingGift?: any): void => {
+    if (pendingGift) {
+      // ✅ 禮物模式
+      open('photoSelector', { forGift: true, pendingGift, useCard: false });
+    } else {
+      // ✅ 影片模式（保持向後兼容）
+      open('photoSelector', { useCard: useCardOrForGift, forGift: false, pendingGift: null });
+    }
+  };
   const closePhotoSelector = (): void => close('photoSelector', true);
 
   // === 查看器類模態框 ===

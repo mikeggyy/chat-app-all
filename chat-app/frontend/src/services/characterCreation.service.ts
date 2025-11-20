@@ -71,7 +71,7 @@ interface ImageGenerationResponse {
 
 interface MatchData {
   flowId: string;
-  display_name: string;
+  display_name: string; // 🔥 修復：後端期望 display_name 而非 name
   gender: string;
   background: string;
   first_message: string;
@@ -101,10 +101,32 @@ interface CurrentUser {
 }
 
 const unwrapFlowResponse = (payload: FlowResponse | null | undefined): CharacterCreationFlow | null => {
-  if (payload && typeof payload === 'object' && (payload as any).flow) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  // 1. 檢查 payload.data.flow（後端 sendSuccess 返回格式）
+  if ((payload as any).data && typeof (payload as any).data === 'object') {
+    if ((payload as any).data.flow) {
+      return (payload as any).data.flow;
+    }
+    // 2. 檢查 payload.data（直接返回 data）
+    if ((payload as any).data.id) {
+      return (payload as any).data;
+    }
+  }
+
+  // 3. 檢查 payload.flow（舊格式）
+  if ((payload as any).flow) {
     return (payload as any).flow;
   }
-  return payload ?? null;
+
+  // 4. 直接返回 payload（如果有 id）
+  if ((payload as any).id) {
+    return payload as CharacterCreationFlow;
+  }
+
+  return null;
 };
 
 const buildHeadersWithIdempotency = (options: GenerationOptions = {}): Record<string, string> => {
@@ -121,10 +143,31 @@ const buildHeadersWithIdempotency = (options: GenerationOptions = {}): Record<st
 export const createCharacterCreationFlow = async (
   payload: Record<string, any> = {}
 ): Promise<CharacterCreationFlow | null> => {
+  // 調試日誌：檢查發送的 payload
+  console.log('[createCharacterCreationFlow] Payload before API call:', {
+    payloadKeys: Object.keys(payload),
+    hasAppearance: !!payload.appearance,
+    appearanceType: typeof payload.appearance,
+    appearanceKeys: payload.appearance ? Object.keys(payload.appearance) : [],
+    hasDescription: !!payload.appearance?.description,
+    descriptionLength: payload.appearance?.description?.length || 0,
+    descriptionPreview: payload.appearance?.description?.substring(0, 50) || '',
+    hasStyles: !!payload.appearance?.styles,
+    stylesCount: payload.appearance?.styles?.length || 0,
+  });
+  console.log('[createCharacterCreationFlow] Raw payload JSON:', JSON.stringify(payload).substring(0, 500));
+
   const response = await apiJson(`${BASE_PATH}/flows`, {
     method: 'POST',
     body: payload,
   }) as FlowResponse;
+
+  // 調試日誌：檢查 API 響應
+  console.log('[createCharacterCreationFlow] API response:', {
+    hasResponse: !!response,
+    responseKeys: response ? Object.keys(response) : [],
+  });
+
   return unwrapFlowResponse(response);
 };
 
@@ -163,6 +206,20 @@ export const updateCharacterCreationStep = async (
   if (!stepId) {
     throw new Error('stepId is required to update creation step');
   }
+
+  // 調試日誌：檢查發送的 payload
+  console.log('[updateCharacterCreationStep] Payload before API call:', {
+    flowId,
+    stepId,
+    hasPayload: !!payload,
+    hasDescription: !!payload.description,
+    descriptionLength: payload.description?.length || 0,
+    descriptionPreview: payload.description?.substring(0, 50) || '',
+    hasStyles: !!payload.styles,
+    stylesCount: payload.styles?.length || 0,
+    fullPayload: JSON.stringify(payload).substring(0, 200) + '...'
+  });
+
   const response = await apiJson(
     `${BASE_PATH}/flows/${flowId}/steps/${stepId}`,
     {
@@ -170,6 +227,13 @@ export const updateCharacterCreationStep = async (
       body: payload,
     }
   ) as FlowResponse;
+
+  // 調試日誌：檢查 API 響應
+  console.log('[updateCharacterCreationStep] API response:', {
+    hasResponse: !!response,
+    responseKeys: response ? Object.keys(response) : [],
+  });
+
   return unwrapFlowResponse(response);
 };
 
@@ -271,15 +335,21 @@ export const generateCharacterPersonaWithAI = async (
     throw new Error('flowId is required to use AI magician');
   }
 
-  const response = await apiJson(
-    `${BASE_PATH}/flows/${flowId}/ai-magician`,
-    {
-      method: 'POST',
-      skipGlobalLoading: true, // 使用按鈕本地的「生成中...」提示
-    }
-  ) as any;
+  try {
+    const response = await apiJson(
+      `${BASE_PATH}/flows/${flowId}/ai-magician`,
+      {
+        method: 'POST',
+        skipGlobalLoading: true,
+      }
+    ) as any;
 
-  return response?.persona ?? null;
+    const data = response?.data || response;
+    return data?.persona ?? null;
+  } catch (error) {
+    console.error('[characterCreation.service] AI 魔法師調用失敗:', error);
+    throw error;
+  }
 };
 
 export const generateAppearanceDescription = async (
@@ -303,11 +373,14 @@ export const generateAppearanceDescription = async (
     }
   ) as any;
 
+  // 🔥 修復：後端使用 sendSuccess 返回，數據在 response.data 中
+  const data = response?.data || response;
+
   return {
-    description: response?.description ?? '',
-    usageCount: response?.usageCount ?? 0,
-    remainingUsage: response?.remainingUsage ?? 0,
-    limit: response?.limit ?? 3,
+    description: data?.description ?? '',
+    usageCount: data?.usageCount ?? 0,
+    remainingUsage: data?.remainingUsage ?? 0,
+    limit: data?.limit ?? 3,
   };
 };
 
@@ -336,10 +409,13 @@ export const generateCharacterImages = async (
     }
   ) as any;
 
+  // 🔥 修復：後端使用 sendSuccess 返回，數據在 response.data 中
+  const data = response?.data || response;
+
   return {
-    flow: response?.flow ?? null,
-    reused: Boolean(response?.reused),
-    images: response?.images ?? [],
+    flow: data?.flow ?? null,
+    reused: Boolean(data?.reused),
+    images: data?.images ?? [],
   };
 };
 
@@ -449,7 +525,7 @@ export const finalizeCharacterCreation = async (
   // 將 flow 資料轉換為 match 格式
   const matchData: MatchData = {
     flowId, // 傳入 flowId，讓後端檢查是否已扣除創建卡
-    display_name: flow.persona?.name || '',
+    display_name: flow.persona?.name || '', // 🔥 修復：後端期望 display_name 字段
     gender: flow.metadata?.gender || '',
     background: flow.persona?.tagline || '',
     first_message: flow.persona?.prompt || '',

@@ -7,10 +7,10 @@
  */
 
 import "dotenv/config";
-import "../src/setup-emulator.js";
-import { getFirestoreDb } from "../src/firebase/index.js";
-import logger from "../src/utils/logger.js";
-import { getAllPackages } from "../../shared/config/assetPackages.js";
+import "../../src/setup-emulator.js";
+import { getFirestoreDb } from "../../src/firebase/index.js";
+import logger from "../../src/utils/logger.js";
+import { getAllPackages } from "../../../shared/config/assetPackages.js";
 
 async function importAssetPackages() {
   try {

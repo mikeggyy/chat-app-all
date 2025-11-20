@@ -135,6 +135,9 @@ export function useMatchFavorites(options: UseMatchFavoritesOptions): UseMatchFa
     lastUserId: '',
   });
 
+  // 🔒 修復競態條件：追蹤正在進行的請求，防止重複 API 調用
+  let loadingFavoritesPromise: Promise<void> | null = null;
+
   /**
    * 同步收藏列表
    * @param favorites - 收藏列表
@@ -155,97 +158,104 @@ export function useMatchFavorites(options: UseMatchFavoritesOptions): UseMatchFa
       return;
     }
 
-    // 防止重複請求
-    if (favoriteRequestState.loading) {
-      return;
+    // 🔒 修復競態條件：如果已有正在進行的請求，重用該 Promise
+    if (loadingFavoritesPromise) {
+      logger.debug('[useMatchFavorites] 重用正在進行的收藏列表請求');
+      return loadingFavoritesPromise;
     }
 
     favoriteRequestState.loading = true;
 
-    let headers: Record<string, string> = {};
-    try {
-      const token = await firebaseAuth.getCurrentUserIdToken();
-      headers = {
-        Authorization: `Bearer ${token}`,
-      };
-    } catch (tokenError) {
-      const currentProfile = user?.value;
-      const profileMismatch =
-        !currentProfile?.id || currentProfile.id !== targetUserId;
-
-      if (profileMismatch) {
-        favoriteRequestState.loading = false;
-        return;
-      }
-
-      const expectedUnauthenticated =
-        (tokenError instanceof Error &&
-          tokenError.message.includes('尚未登入')) ||
-        (typeof (tokenError as TokenError)?.code === 'string' &&
-          (tokenError as TokenError).code!.includes('auth/'));
-
-      if (!expectedUnauthenticated) {
-        logger.warn('獲取認證 token 失敗:', tokenError);
-      }
-    }
-
-    try {
-      const response = await apiJson(
-        `/api/users/${encodeURIComponent(targetUserId)}/favorites`,
-        {
-          method: 'GET',
-          headers: Object.keys(headers).length ? headers : undefined,
-          skipGlobalLoading: options.skipGlobalLoading ?? true,
-        }
-      ) as FavoritesResponse;
-
-      // ✅ 修復：favorites 在 response.data 裡面
-      const responseData = response?.data || response;
-      const favorites = Array.isArray(responseData?.favorites)
-        ? responseData.favorites
-        : [];
-
-      const currentProfile = user?.value;
-      if (currentProfile?.id !== targetUserId) {
-        return;
-      }
-
-      const existingFavorites = Array.isArray(currentProfile.favorites)
-        ? currentProfile.favorites
-        : [];
-
-      const isSameFavorites =
-        existingFavorites.length === favorites.length &&
-        existingFavorites.every((value, index) => value === favorites[index]);
-
-      favoriteRequestState.lastUserId = targetUserId;
-
-      syncFavoriteSet(favorites);
-
-      // 只在數據不同時更新 profile
-      if (!isSameFavorites && onUpdateProfile) {
-        onUpdateProfile({
-          ...currentProfile,
-          favorites,
-        });
-      }
-    } catch (err) {
-      if ((err as ApiError)?.status === 404) {
-        favoriteRequestState.lastUserId = targetUserId;
-        syncFavoriteSet([]);
+    // 🔒 創建並保存正在進行的請求 Promise
+    loadingFavoritesPromise = (async (): Promise<void> => {
+      let headers: Record<string, string> = {};
+      try {
+        const token = await firebaseAuth.getCurrentUserIdToken();
+        headers = {
+          Authorization: `Bearer ${token}`,
+        };
+      } catch (tokenError) {
         const currentProfile = user?.value;
-        if (currentProfile?.id === targetUserId && onUpdateProfile) {
+        const profileMismatch =
+          !currentProfile?.id || currentProfile.id !== targetUserId;
+
+        if (profileMismatch) {
+          return;
+        }
+
+        const expectedUnauthenticated =
+          (tokenError instanceof Error &&
+            tokenError.message.includes('尚未登入')) ||
+          (typeof (tokenError as TokenError)?.code === 'string' &&
+            (tokenError as TokenError).code!.includes('auth/'));
+
+        if (!expectedUnauthenticated) {
+          logger.warn('獲取認證 token 失敗:', tokenError);
+        }
+      }
+
+      try {
+        const response = await apiJson(
+          `/api/users/${encodeURIComponent(targetUserId)}/favorites`,
+          {
+            method: 'GET',
+            headers: Object.keys(headers).length ? headers : undefined,
+            skipGlobalLoading: options.skipGlobalLoading ?? true,
+          }
+        ) as FavoritesResponse;
+
+        // ✅ 修復：favorites 在 response.data 裡面
+        const responseData = response?.data || response;
+        const favorites = Array.isArray(responseData?.favorites)
+          ? responseData.favorites
+          : [];
+
+        const currentProfile = user?.value;
+        if (currentProfile?.id !== targetUserId) {
+          return;
+        }
+
+        const existingFavorites = Array.isArray(currentProfile.favorites)
+          ? currentProfile.favorites
+          : [];
+
+        const isSameFavorites =
+          existingFavorites.length === favorites.length &&
+          existingFavorites.every((value, index) => value === favorites[index]);
+
+        favoriteRequestState.lastUserId = targetUserId;
+
+        syncFavoriteSet(favorites);
+
+        // 只在數據不同時更新 profile
+        if (!isSameFavorites && onUpdateProfile) {
           onUpdateProfile({
             ...currentProfile,
-            favorites: [],
+            favorites,
           });
         }
-        return;
+      } catch (err) {
+        if ((err as ApiError)?.status === 404) {
+          favoriteRequestState.lastUserId = targetUserId;
+          syncFavoriteSet([]);
+          const currentProfile = user?.value;
+          if (currentProfile?.id === targetUserId && onUpdateProfile) {
+            onUpdateProfile({
+              ...currentProfile,
+              favorites: [],
+            });
+          }
+          return;
+        }
+        logger.error('獲取收藏列表失敗:', err);
+      } finally {
+        favoriteRequestState.loading = false;
+        // 🔒 清理 Promise，允許後續請求
+        loadingFavoritesPromise = null;
       }
-      logger.error('獲取收藏列表失敗:', err);
-    } finally {
-      favoriteRequestState.loading = false;
-    }
+    })();
+
+    return loadingFavoritesPromise;
   };
 
   /**

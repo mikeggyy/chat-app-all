@@ -136,7 +136,8 @@ const handleAIMagician = (): void => {
 }
 
 .appearance__textarea::placeholder {
-  color: var(--text-placeholder);
+  color: rgba(255, 255, 255, 0.35);
+  opacity: 1;
 }
 
 .appearance__textarea:focus-visible {
@@ -152,5 +153,20 @@ const handleAIMagician = (): void => {
   color: var(--text-dim);
   pointer-events: none;
   letter-spacing: 0.04em;
+}
+
+/* 強化輸入框邊框 */
+.appearance__textarea {
+  border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.appearance__textarea:hover {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.appearance__textarea:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px rgba(255, 47, 146, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 </style>

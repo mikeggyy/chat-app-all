@@ -4,9 +4,9 @@
  */
 
 import "dotenv/config";
-// import "../src/setup-emulator.js"; // 註釋掉以連接生產環境
-import { getFirestoreDb } from "../src/firebase/index.js";
-import { ASSET_CARDS_BASE_CONFIG } from "../../shared/config/assets.js";
+// import "../../src/setup-emulator.js"; // 註釋掉以連接生產環境
+import { getFirestoreDb } from "../../src/firebase/index.js";
+import { ASSET_CARDS_BASE_CONFIG } from "../../../shared/config/assets.js";
 
 const db = getFirestoreDb();
 
@@ -63,7 +63,7 @@ const BASE_CARDS = [
   {
     baseId: "photo_unlock",
     category: "photo-unlock",
-    name: "拍照卡",
+    name: "照片解鎖卡",
     description: ASSET_CARDS_BASE_CONFIG.PHOTO_UNLOCK.description,
     icon: "📸",
     basePrice: 40, // 低價頻繁服務（成本 1.5 TWD，利潤率 70%）

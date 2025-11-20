@@ -16,7 +16,7 @@
     <button
       type="button"
       class="action-buttons__gift"
-      :disabled="isSendingGift || isRequestingSelfie || isRequestingVideo || disabled"
+      :disabled="isSendingGift || isRequestingSelfie || disabled"
       aria-label="傳送禮物"
       @click="$emit('gift-click')"
     >

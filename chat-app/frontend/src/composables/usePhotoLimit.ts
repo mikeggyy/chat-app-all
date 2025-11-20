@@ -145,11 +145,11 @@ export function usePhotoLimit(): UsePhotoLimitReturn {
   };
 
   /**
-   * 購買拍照卡
+   * 購買照片解鎖卡
    */
   const purchasePhotoCards = async (quantity: number, paymentInfo: PaymentInfo): Promise<any> => {
     if (!userId.value || isGuestUser(userId.value)) {
-      throw new Error('遊客無法購買拍照卡');
+      throw new Error('遊客無法購買照片解鎖卡');
     }
 
     return purchaseCards(userId.value, quantity, paymentInfo);

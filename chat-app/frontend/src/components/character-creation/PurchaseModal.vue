@@ -160,27 +160,32 @@ const handleGoToVIP = (): void => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-2xl);
+  padding: 24px;
 }
 
 .appearance__confirm-backdrop {
   position: absolute;
   inset: 0;
-  background: var(--bg-backdrop);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
 }
 
 .appearance__confirm-panel {
   position: relative;
   width: min(420px, 100%);
-  border-radius: var(--radius-2xl);
-  border: 1px solid var(--border-modal);
-  background: var(--bg-modal);
-  padding: var(--spacing-2xl) 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(30, 30, 30, 0.98),
+    rgba(20, 20, 20, 0.98)
+  );
+  padding: 24px 22px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2xl);
-  box-shadow: var(--shadow-modal);
+  gap: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .appearance__confirm-header {
@@ -195,14 +200,14 @@ const handleGoToVIP = (): void => {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: var(--color-white);
+  color: #ffffff;
 }
 
 .appearance__confirm-header p {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
-  color: var(--text-light);
+  color: rgba(255, 255, 255, 0.85);
   letter-spacing: 0.04em;
 }
 
@@ -214,7 +219,7 @@ const handleGoToVIP = (): void => {
   height: 32px;
   border: none;
   background: transparent;
-  color: var(--text-tertiary);
+  color: rgba(255, 255, 255, 0.5);
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
@@ -222,31 +227,29 @@ const handleGoToVIP = (): void => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color var(--transition-fast),
-    color var(--transition-fast);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .appearance__confirm-close:hover {
-  background: var(--bg-overlay-hover-strong);
-  color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .appearance__confirm-actions {
   display: flex;
-  gap: var(--spacing-md);
+  gap: 12px;
 }
 
 .appearance__confirm-action {
   flex: 1;
-  border-radius: var(--radius-full);
-  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: 999px;
+  padding: 12px 20px;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.06em;
   border: none;
   cursor: pointer;
-  transition: opacity var(--transition-fast), transform var(--transition-fast),
-    background-color var(--transition-fast);
+  transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
 }
 
 .appearance__confirm-action:hover {
@@ -254,57 +257,57 @@ const handleGoToVIP = (): void => {
 }
 
 .appearance__confirm-action--ghost {
-  background: var(--bg-overlay-hover-strong);
-  color: var(--text-bright);
-  border: 1px solid var(--border-ghost);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .appearance__confirm-action--ghost:hover {
-  background: var(--bg-overlay-hover-light);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .appearance__confirm-action--primary {
-  background: var(--gradient-primary);
-  color: var(--color-white);
-  box-shadow: var(--color-primary-shadow-button);
+  background: linear-gradient(90deg, #ff2f92 0%, #ff5abc 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(255, 47, 146, 0.3);
 }
 
 .appearance__confirm-action--primary:hover {
-  box-shadow: var(--shadow-primary-hover);
+  box-shadow: 0 6px 16px rgba(255, 47, 146, 0.4);
 }
 
 /* 購買提示彈窗樣式 */
 .appearance__purchase-options {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 12px;
 }
 
 .appearance__purchase-subtitle {
-  margin: 0 0 var(--spacing-sm) 0;
+  margin: 0 0 8px 0;
   font-size: 14px;
-  color: var(--text-dialog);
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.04em;
 }
 
 .appearance__purchase-option {
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-purchase);
-  background: var(--bg-overlay-weak);
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
   text-align: left;
 }
 
 .appearance__purchase-option:hover {
-  background: var(--bg-overlay-hover-strong);
-  border-color: var(--border-ghost-hover);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .appearance__purchase-option-icon {
@@ -317,17 +320,17 @@ const handleGoToVIP = (): void => {
 }
 
 .appearance__purchase-option-content h3 {
-  margin: 0 0 var(--spacing-xs) 0;
+  margin: 0 0 4px 0;
   font-size: 16px;
   font-weight: 600;
-  color: var(--color-white);
+  color: #ffffff;
   letter-spacing: 0.04em;
 }
 
 .appearance__purchase-option-content p {
   margin: 0;
   font-size: 13px;
-  color: var(--text-tertiary);
+  color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
 }
 </style>

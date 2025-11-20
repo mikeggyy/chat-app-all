@@ -151,7 +151,7 @@ watch(
         );
       } else if (props.type === 'photo') {
         logger.log(
-          `[拍照限制] 已使用: ${props.used} / ${displayTotal.value}, 會員等級: ${props.tier}, 拍照卡: ${props.cards} 張`
+          `[拍照限制] 已使用: ${props.used} / ${displayTotal.value}, 會員等級: ${props.tier}, 照片解鎖卡: ${props.cards} 張`
         );
       } else if (props.type === 'video') {
         logger.log(

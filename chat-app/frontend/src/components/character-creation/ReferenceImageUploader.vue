@@ -422,4 +422,86 @@ const handleFocusChange = (value: string): void => {
   color: var(--text-hint);
   line-height: 1.6;
 }
+
+.appearance__card-titles h2 {
+  color: var(--color-white) !important;
+}
+
+.appearance__card-subtitle {
+  color: var(--text-secondary) !important;
+}
+
+.appearance__reference-clear-link {
+  color: var(--color-primary-lighter) !important;
+}
+
+.appearance__reference-option-label {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.appearance__reference-tip-text {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.appearance__reference-empty-hint {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.appearance__reference-upload span {
+  color: var(--color-white) !important;
+}
+
+/* 參考圖片焦點選項樣式強化 */
+.appearance__reference-option {
+  padding: 12px 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.appearance__reference-option:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.appearance__reference-option.is-active {
+  border-color: var(--color-primary) !important;
+  background: rgba(255, 47, 146, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(255, 47, 146, 0.15);
+}
+
+.appearance__reference-option-indicator {
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+.appearance__reference-option.is-active .appearance__reference-option-indicator {
+  border-color: var(--color-primary) !important;
+  background: var(--color-primary) !important;
+}
+
+/* 強制所有文字為白色 */
+.appearance__reference-action {
+  color: var(--color-white) !important;
+}
+
+.appearance__reference-option-label {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+.appearance__reference-upload {
+  color: var(--color-white) !important;
+}
+
+/* 確保按鈕有邊框和背景 */
+.appearance__reference-action {
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.appearance__reference-action:hover {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
 </style>

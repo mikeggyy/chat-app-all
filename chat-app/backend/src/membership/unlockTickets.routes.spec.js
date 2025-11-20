@@ -321,10 +321,14 @@ describe('UnlockTickets API Routes', () => {
 
   describe('GET /api/unlock-tickets/balances - 獲取所有解鎖券餘額', () => {
     it('應該成功獲取所有解鎖券餘額', async () => {
+      // ✅ 修復：使用新的返回格式（與前端期望匹配）
       const mockBalances = {
-        unlockTickets: 5,
-        photoCards: 10,
-        videoCards: 3,
+        characterUnlockCards: 5,
+        photoUnlockCards: 10,
+        videoUnlockCards: 3,
+        voiceUnlockCards: 2,
+        createCards: 1,
+        usageHistory: [],
       };
       unlockTicketsService.getAllTicketBalances.mockResolvedValueOnce(mockBalances);
 
@@ -337,10 +341,14 @@ describe('UnlockTickets API Routes', () => {
     });
 
     it('應該處理空餘額', async () => {
+      // ✅ 修復：使用新的返回格式
       unlockTicketsService.getAllTicketBalances.mockResolvedValueOnce({
-        unlockTickets: 0,
-        photoCards: 0,
-        videoCards: 0,
+        characterUnlockCards: 0,
+        photoUnlockCards: 0,
+        videoUnlockCards: 0,
+        voiceUnlockCards: 0,
+        createCards: 0,
+        usageHistory: [],
       });
 
       const response = await request(app)
@@ -432,7 +440,15 @@ describe('UnlockTickets API Routes', () => {
         .get('/api/unlock-tickets/balance/unlockTickets');
       expect(response1.status).toBeLessThan(500);
 
-      unlockTicketsService.getAllTicketBalances.mockResolvedValueOnce({ unlockTickets: 5 });
+      // ✅ 修復：使用新的返回格式
+      unlockTicketsService.getAllTicketBalances.mockResolvedValueOnce({
+        characterUnlockCards: 5,
+        photoUnlockCards: 0,
+        videoUnlockCards: 0,
+        voiceUnlockCards: 0,
+        createCards: 0,
+        usageHistory: [],
+      });
       const response2 = await request(app)
         .get('/api/unlock-tickets/balances');
       expect(response2.status).toBeLessThan(500);

@@ -31,6 +31,7 @@ const firebaseAuth = useFirebaseAuth();
 
 // 使用整合的 useProfileData composable
 const {
+  user, // ✅ 添加：用於調試的原始用戶資料
   profile,
   targetUserId,
   displayedId,
@@ -294,12 +295,15 @@ const ensureProfileLoaded = async (id: string | null | undefined): Promise<void>
 
 onMounted(async () => {
   const userId = targetUserId.value;
-  void ensureProfileLoaded(userId);
 
-  // 使用整合的 initializeProfileData 載入所有資料
+  // 🔥 修復：使用整合的 initializeProfileData 載入所有資料
+  // 不再同時調用 ensureProfileLoaded，避免競態條件
   if (userId) {
     try {
       await initializeProfileData(userId);
+      if (import.meta.env.DEV) {
+        console.debug('[ProfileView] 初始化完成, userId:', userId, 'balance:', balance.value);
+      }
     } catch (error) {
       if (import.meta.env.DEV) {
         logger.error("[ProfileView] 初始化資料失敗:", error);
@@ -565,6 +569,7 @@ watch(
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
   }
 
   &__content {

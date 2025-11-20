@@ -96,6 +96,9 @@ const getCoinPackagesFromFirestore = async () => {
         packages.push(doc.data());
       });
 
+      // ✅ 修復：按照 order 欄位排序（升序）
+      packages.sort((a, b) => (a.order || 0) - (b.order || 0));
+
       // ✅ 優化：使用 CacheManager 存儲
       coinPackagesCache.set("all", packages);
 

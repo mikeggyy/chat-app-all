@@ -325,18 +325,53 @@ generationRouter.post(
         return sendError(res, "FORBIDDEN", "無權訪問此創建流程", { flowId });
       }
 
-      if (!currentFlow.appearance || !currentFlow.appearance.description) {
+      // 🎯 自動生成描述：如果用戶沒有提供描述，根據性別和風格自動生成
+      if (!currentFlow.appearance || !currentFlow.appearance.description || currentFlow.appearance.description.trim().length === 0) {
         if (process.env.NODE_ENV !== "test") {
-          logger.error(`[Image Generation API] Missing appearance data:`, {
-            hasAppearance: !!currentFlow.appearance,
-            hasDescription: !!currentFlow?.appearance?.description,
+          logger.info(`[Image Generation API] No description provided, generating random description`);
+        }
+
+        const gender = currentFlow.metadata?.gender || "";
+        const styles = currentFlow.appearance?.styles || [];
+
+        // 生成隨機描述
+        const { generateAppearanceDescription } = await import("../characterCreation.ai.js");
+
+        try {
+          const generatedDescription = await generateAppearanceDescription({
+            gender,
+            styles,
+            referenceInfo: null,
+          });
+
+          if (process.env.NODE_ENV !== "test") {
+            logger.info(`[Image Generation API] Generated description: ${generatedDescription.substring(0, 50)}...`);
+          }
+
+          // 更新 flow 的 appearance
+          await mergeCreationFlow(flowId, {
+            appearance: {
+              ...currentFlow.appearance,
+              description: generatedDescription,
+            },
+          });
+
+          // 更新當前 flow 物件（用於後續生成）
+          currentFlow.appearance = {
+            ...currentFlow.appearance,
+            description: generatedDescription,
+          };
+
+          if (process.env.NODE_ENV !== "test") {
+            logger.info(`[Image Generation API] Updated flow with generated description`);
+          }
+        } catch (descError) {
+          logger.error(`[Image Generation API] Failed to generate description:`, descError);
+          return sendError(res, "INTERNAL_SERVER_ERROR", "自動生成角色描述失敗，請稍後再試", {
+            flowId,
+            error: descError.message,
           });
         }
-        return sendError(res, "VALIDATION_ERROR", "尚未填寫角色形象描述，無法開始生成圖片", {
-          flowId,
-          hasAppearance: !!currentFlow.appearance,
-          hasDescription: !!currentFlow?.appearance?.description,
-        });
       }
 
       // ✅ 檢查是否已經生成過圖片（一個創建流程只能生成一次）
@@ -506,15 +541,21 @@ generationRouter.post(
           throw new Error(transactionError.message || "設置扣除標記失敗，請重試");
         }
 
-        // 步驟 2: 扣除創建卡（獨立的 Transaction）
+        // 步驟 2: 扣除資源（免費次數或創建卡）
         try {
           if (needsCreateCard) {
+            // 2.1 免費次數用完，扣除創建卡
             await consumeUserAsset(userId, "createCards", 1);
             logger.info(`[圖片生成] 用戶 ${userId} 成功扣除 1 張創建卡`);
+          } else {
+            // 2.2 有免費次數，扣除免費次數
+            const { recordCreation } = await import("../characterCreationLimit.service.js");
+            await recordCreation(userId, flowId);
+            logger.info(`[圖片生成] 用戶 ${userId} 成功扣除免費創建次數`);
           }
-          logger.info(`[圖片生成] 用戶 ${userId} 圖片生成成功，AI 魔術師次數已重置${needsCreateCard ? '，創建卡已扣除' : ''}`);
+          logger.info(`[圖片生成] 用戶 ${userId} 圖片生成成功，AI 魔術師次數已重置${needsCreateCard ? '，創建卡已扣除' : '，免費次數已扣除'}`);
         } catch (error) {
-          // 步驟 3: 如果扣除失敗，使用 Transaction 回滾標記
+          // 步驟 3: 如果扣除失敗，使用 Transaction 回滾標記並重置 AI 魔法師次數
           logger.error("[圖片生成] 扣除創建卡失敗，回滾標記:", error);
 
           try {
@@ -527,12 +568,13 @@ generationRouter.post(
                   metadata: {
                     ...(flowData.metadata || {}),
                     deductedOnImageGeneration: false,
+                    aiMagicianUsageCount: 0, // 🔥 回滾時也重置 AI 魔法師次數
                   },
                   updatedAt: new Date().toISOString(),
                 });
               }
             });
-            logger.info("[圖片生成] 成功回滾扣除標記");
+            logger.info("[圖片生成] 成功回滾扣除標記並重置 AI 魔法師次數");
           } catch (rollbackError) {
             logger.error("[圖片生成] 回滾標記失敗:", rollbackError);
           }

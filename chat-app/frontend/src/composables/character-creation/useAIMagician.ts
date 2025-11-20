@@ -132,7 +132,7 @@ export function useAIMagician(savedGender: Ref<string | null>): UseAIMagicianRet
         skipGlobalLoading: true,
       });
 
-      const description = response?.description ?? "";
+      const description = response?.data?.description ?? "";
 
       // 更新使用次數（保存到 sessionStorage）
       const newUsageCount = currentUsage + 1;

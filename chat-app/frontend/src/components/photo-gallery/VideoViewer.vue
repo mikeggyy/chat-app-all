@@ -23,14 +23,6 @@
         >
           您的瀏覽器不支持影片播放。
         </video>
-        <div v-if="video.video" class="video-viewer-info">
-          <span v-if="video.video.duration" class="info-badge">{{
-            video.video.duration
-          }}</span>
-          <span v-if="video.video.resolution" class="info-badge">{{
-            video.video.resolution
-          }}</span>
-        </div>
       </div>
     </div>
   </Teleport>

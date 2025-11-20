@@ -66,6 +66,8 @@ const PROVIDER_CONFIGS = {
   },
 };
 
+const DEFAULT_VIDEO_PROMPT_TEMPLATE = `A short video clip featuring a person. Character context: {角色背景設定}. Current situation: {最近對話內容}. Create a natural, candid video moment. The person can be engaged in daily activities like talking, smiling, walking, or relaxing. Natural expressions, warm lighting, documentary style. The setting can be indoors or outdoors, creating an authentic and relatable atmosphere. Keep the video simple and focused on the person.`;
+
 /**
  * 更新 Firestore 中的影片生成提供者配置
  */
@@ -112,8 +114,20 @@ async function updateVideoProvider(providerName) {
 
     // 2. 更新配置
     logger.info("\n🔄 更新為新配置...");
+    const preservedPrompt =
+      typeof currentVideoConfig.videoPromptTemplate === "string" &&
+      currentVideoConfig.videoPromptTemplate.trim().length > 0
+        ? currentVideoConfig.videoPromptTemplate
+        : DEFAULT_VIDEO_PROMPT_TEMPLATE;
+
+    const mergedConfig = {
+      ...currentVideoConfig,
+      ...newConfig,
+      videoPromptTemplate: preservedPrompt,
+    };
+
     await docRef.update({
-      "videoGeneration": newConfig,
+      "videoGeneration": mergedConfig,
       "updatedAt": new Date().toISOString(),
     });
 

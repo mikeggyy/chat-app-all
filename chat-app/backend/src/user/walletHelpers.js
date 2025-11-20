@@ -66,12 +66,15 @@ export const createWalletUpdate = (newBalance, currency = "TWD") => {
     throw new Error("無效的餘額值");
   }
 
+  // ✅ 修復：同時更新所有格式的金幣字段，確保前後台同步
   return {
     wallet: {
       balance: newBalance,
       currency,
       updatedAt: new Date().toISOString(),
     },
+    walletBalance: newBalance,  // ✅ 舊格式 1（管理後台優先讀取）
+    coins: newBalance,          // ✅ 舊格式 2（向後兼容）
   };
 };
 

@@ -427,11 +427,14 @@ export function useCharacterCreationFlow(
     try {
       await ensureFlowInitialized();
     } catch (error) {
-      return;
+      // 🔥 修復：重新拋出初始化錯誤，讓調用者知道失敗了
+      console.error('[useCharacterCreationFlow] Flow 初始化失敗:', error);
+      throw new Error('無法初始化角色創建流程，請檢查網絡連接');
     }
 
     if (!flowId.value) {
-      return;
+      // 🔥 修復：沒有 flowId 時拋出錯誤
+      throw new Error('缺少角色創建流程 ID，請重新開始創建流程');
     }
 
     try {
@@ -450,6 +453,9 @@ export function useCharacterCreationFlow(
       lastFlowSyncError.value = null;
     } catch (error: any) {
       lastFlowSyncError.value = error;
+      // 🔥 修復：重新拋出同步錯誤，讓調用者知道失敗了
+      console.error('[useCharacterCreationFlow] 同步摘要到後端失敗:', error);
+      throw new Error(error?.message || '保存角色資料失敗，請檢查網絡連接後重試');
     } finally {
       isSyncingSummary.value = false;
     }

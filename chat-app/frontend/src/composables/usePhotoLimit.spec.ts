@@ -4,7 +4,7 @@
  * 測試範圍：
  * - 照片生成限制檢查
  * - 照片統計載入
- * - 拍照卡購買
+ * - 照片解鎖卡購買
  * - 訪客處理
  * - Computed 屬性
  * - 錯誤處理
@@ -213,7 +213,7 @@ describe('usePhotoLimit - 照片限制測試', () => {
 
       await expect(
         photoLimit.purchasePhotoCards(5, { method: 'credit_card' })
-      ).rejects.toThrow('遊客無法購買拍照卡');
+      ).rejects.toThrow('遊客無法購買照片解鎖卡');
     });
 
     it('應該在無用戶時拋出錯誤', async () => {
@@ -225,7 +225,7 @@ describe('usePhotoLimit - 照片限制測試', () => {
 
       await expect(
         photoLimit.purchasePhotoCards(5, { method: 'credit_card' })
-      ).rejects.toThrow('遊客無法購買拍照卡');
+      ).rejects.toThrow('遊客無法購買照片解鎖卡');
     });
   });
 
@@ -281,7 +281,7 @@ describe('usePhotoLimit - 照片限制測試', () => {
       expect(photoLimit.total.value).toBe(20);
     });
 
-    it('cards 應該返回拍照卡數量', async () => {
+    it('cards 應該返回照片解鎖卡數量', async () => {
       const photoLimit = usePhotoLimit();
 
       photoLimit.photoLimitData.value = {

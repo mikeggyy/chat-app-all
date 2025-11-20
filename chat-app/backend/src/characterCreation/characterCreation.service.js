@@ -42,7 +42,21 @@ const sanitizePersona = (value = {}) => {
 };
 
 const sanitizeAppearance = (value = null) => {
+  // 添加調試日誌
+  if (process.env.NODE_ENV !== "test") {
+    logger.info(`[sanitizeAppearance] Input value: ${JSON.stringify({
+      hasValue: !!value,
+      type: typeof value,
+      hasDescription: !!value?.description,
+      descriptionLength: value?.description?.length || 0,
+      descriptionPreview: value?.description?.substring(0, 50) || '',
+      hasStyles: Array.isArray(value?.styles),
+      stylesCount: value?.styles?.length || 0,
+    })}`);
+  }
+
   if (!value || typeof value !== "object") {
+    logger.info(`[sanitizeAppearance] Returning null - invalid input`);
     return null;
   }
 
@@ -54,11 +68,42 @@ const sanitizeAppearance = (value = null) => {
   const styles = Array.isArray(value.styles) ? value.styles : [];
   const referenceInfo = value.referenceInfo || null;
 
-  if (!id && !label && !image && !alt && !description) {
+  // 添加調試日誌
+  if (process.env.NODE_ENV !== "test") {
+    logger.info(`[sanitizeAppearance] After trimString: ${JSON.stringify({
+      id: id,
+      label: label,
+      image: image,
+      alt: alt,
+      description: description?.substring(0, 50) || '',
+      descriptionLength: description?.length || 0,
+      stylesCount: styles.length,
+    })}`);
+  }
+
+  // 🔥 修復：只要有 description 或 styles 就應該保留 appearance
+  // 之前的邏輯要求至少有一個字段（id/label/image/alt/description），但會導致
+  // 當只有 description 和 styles 時被誤判為空而返回 null
+  const hasContent = description || styles.length > 0 || id || label || image || alt;
+
+  if (process.env.NODE_ENV !== "test") {
+    logger.info(`[sanitizeAppearance] hasContent check: ${JSON.stringify({
+      description: !!description,
+      'styles.length': styles.length,
+      id: !!id,
+      label: !!label,
+      image: !!image,
+      alt: !!alt,
+      hasContent: hasContent,
+    })}`);
+  }
+
+  if (!hasContent) {
+    logger.info(`[sanitizeAppearance] Returning null - no content`);
     return null;
   }
 
-  return {
+  const result = {
     id,
     label,
     image,
@@ -67,6 +112,12 @@ const sanitizeAppearance = (value = null) => {
     styles,
     referenceInfo,
   };
+
+  if (process.env.NODE_ENV !== "test") {
+    logger.info(`[sanitizeAppearance] Returning result with description length: ${result.description?.length || 0}`);
+  }
+
+  return result;
 };
 
 const sanitizeVoice = (value = null) => {
@@ -421,12 +472,19 @@ export const generateCreationResult = async (
     flow.status = statusOnFailure;
     flow.updatedAt = completedAt;
 
+    // 🔥 生成失敗時重置 AI 魔法師次數
+    if (flow.metadata) {
+      flow.metadata.aiMagicianUsageCount = 0;
+    } else {
+      flow.metadata = { aiMagicianUsageCount: 0 };
+    }
+
     if (chargeEntry) {
       chargeEntry.status = "void";
       chargeEntry.updatedAt = completedAt;
     }
 
-    // 保存失敗狀態到 Firestore
+    // 保存失敗狀態到 Firestore（包含重置的 AI 魔法師次數）
     await setFlowInFirestore(flowId, flow);
 
     // 標記生成失敗
@@ -441,6 +499,10 @@ export const generateCreationResult = async (
           logger.warn("[Generation Log] Failed to mark as failed:", logError);
         }
       }
+    }
+
+    if (process.env.NODE_ENV !== "test") {
+      logger.info(`[Character Creation] AI 魔法師次數已重置（生成失敗）`);
     }
 
     throw error;

@@ -6,12 +6,14 @@ import { XMarkIcon } from "@heroicons/vue/24/outline";
 import { useGuestGuard } from "../composables/useGuestGuard";
 import { useUserProfile } from "../composables/useUserProfile";
 import { useUnlockTickets } from "../composables/useUnlockTickets";
+import { useDraftFlow } from "../composables/character-creation/useDraftFlow";
 import { apiJson } from "../utils/api";
 import CharacterCreationLimitModal from "../components/CharacterCreationLimitModal.vue";
 import ResumeFlowModal from "../components/ResumeFlowModal.vue";
 import {
   clearStoredCharacterCreationFlowId,
   cancelCharacterCreation,
+  fetchCharacterCreationFlow,
 } from "../services/characterCreation.service.js";
 
 // Types
@@ -23,6 +25,7 @@ interface GenderOption {
 }
 
 interface CreationLimitResponse {
+  // 直接訪問格式（某些舊 API）
   limit?: {
     remaining: number;
     used?: number;
@@ -30,6 +33,19 @@ interface CreationLimitResponse {
     standardTotal?: number;
     isTestAccount?: boolean;
     tier?: string;
+  };
+  // sendSuccess 包裝格式 { success: true, data: {...} }
+  data?: {
+    limit?: {
+      remaining: number;
+      used?: number;
+      total?: number;
+      standardTotal?: number;
+      isTestAccount?: boolean;
+      tier?: string;
+    };
+    stats?: any;
+    remainingFreeCreations?: number;
   };
 }
 
@@ -48,6 +64,7 @@ const router = useRouter();
 const { requireLogin } = useGuestGuard();
 const { user } = useUserProfile();
 const { loadBalance: loadTicketsBalance, createCards } = useUnlockTickets();
+const { checkDraft, clearDraft } = useDraftFlow();
 
 const genderOptions: GenderOption[] = [
   {
@@ -143,6 +160,9 @@ const handleResumeFlowCancel = async (): Promise<void> => {
   // 用戶選擇重新開始，清除所有狀態
   clearStoredCharacterCreationFlowId();
   clearCreationState();
+
+  // ✅ 同時清除草稿
+  clearDraft();
 };
 
 onMounted(async () => {
@@ -153,7 +173,31 @@ onMounted(async () => {
     return;
   }
 
-  // 強制清除所有舊的創建狀態，確保每次都是全新開始
+  // ✅ 檢查是否有未完成的草稿
+  const draft = checkDraft();
+  if (draft && draft.hasGeneratedImages) {
+    // 有草稿，嘗試載入 flow 並顯示恢復對話框
+    try {
+      const flow = await fetchCharacterCreationFlow(draft.flowId);
+      if (flow && flow.generation?.result?.images?.length > 0) {
+        // 確認 flow 確實有生成的圖片
+        pendingFlow.value = flow;
+        showResumeFlowModal.value = true;
+        logger.log("[角色創建] 檢測到未完成的角色創建流程，詢問用戶是否繼續");
+        return; // 不清除狀態，等待用戶選擇
+      } else {
+        // flow 不存在或沒有圖片，清除草稿
+        clearDraft();
+        logger.log("[角色創建] 草稿對應的 flow 無效，已清除");
+      }
+    } catch (error) {
+      // 無法載入 flow，清除草稿
+      clearDraft();
+      logger.error("[角色創建] 無法載入草稿對應的 flow", error);
+    }
+  }
+
+  // 沒有草稿或用戶選擇重新開始，強制清除所有舊的創建狀態
   // 這樣可以避免圖片重用問題和創建卡未扣除問題
   clearStoredCharacterCreationFlowId();
   clearCreationState();
@@ -167,31 +211,40 @@ onMounted(async () => {
         skipGlobalLoading: true,
       });
 
-      if (response?.limit) {
-        // 調試日誌：查看完整的 API 返回數據
+      // 調試日誌：查看完整的 API 返回數據
+      console.log('[角色創建限制] API 返回數據:', response);
+      console.log('[角色創建限制] response.limit:', response?.limit);
+      console.log('[角色創建限制] response.data:', response?.data);
+      console.log('[角色創建限制] response.data?.limit:', response?.data?.limit);
+
+      // 後端使用 sendSuccess() 會將數據包裝為 { success: true, data: {...} }
+      const limitData = response?.data?.limit || response?.limit;
+
+      if (limitData) {
+        console.log('[角色創建限制] 使用的 limitData:', limitData);
 
         // 如果 remaining 是 -1 代表無限制
-        const newValue = response.limit.remaining === -1
+        const newValue = limitData.remaining === -1
           ? "∞"
-          : response.limit.remaining;
+          : limitData.remaining;
         remainingCreations.value = newValue;
 
         // 保存已使用次數、總限制和會員等級資訊
-        if (response.limit.used !== undefined) {
-          usedCreations.value = response.limit.used;
+        if (limitData.used !== undefined) {
+          usedCreations.value = limitData.used;
         }
         // 保存實際限制和標準限制
-        if (response.limit.total !== undefined) {
-          totalLimit.value = response.limit.total === -1 ? "∞" : response.limit.total;
+        if (limitData.total !== undefined) {
+          totalLimit.value = limitData.total === -1 ? "∞" : limitData.total;
         }
-        if (response.limit.standardTotal !== undefined) {
-          standardTotal.value = response.limit.standardTotal === -1 ? "∞" : response.limit.standardTotal;
+        if (limitData.standardTotal !== undefined) {
+          standardTotal.value = limitData.standardTotal === -1 ? "∞" : limitData.standardTotal;
         }
-        if (response.limit.isTestAccount !== undefined) {
-          isTestAccount.value = response.limit.isTestAccount;
+        if (limitData.isTestAccount !== undefined) {
+          isTestAccount.value = limitData.isTestAccount;
         }
-        if (response.limit.tier) {
-          membershipTier.value = response.limit.tier;
+        if (limitData.tier) {
+          membershipTier.value = limitData.tier;
         }
       }
     } catch {

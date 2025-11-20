@@ -156,7 +156,7 @@ const error: Ref<string | null> = ref(null);
 
 /**
  * 解鎖卡系統 composable
- * 管理用戶的角色解鎖券、拍照卡、視訊卡等
+ * 管理用戶的角色解鎖券、照片解鎖卡、視訊卡等
  */
 export function useUnlockTickets(): UseUnlockTicketsReturn {
   /**
@@ -172,9 +172,12 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
     error.value = null;
 
     try {
-      const data: BalanceResponse = await apiJson('/api/unlock-tickets/balances', {
+      const response: any = await apiJson('/api/unlock-tickets/balances', {
         skipGlobalLoading: options.skipGlobalLoading ?? false,
       });
+
+      // ✅ 修復：後端使用 sendSuccess 包裝響應，數據在 response.data 中
+      const data = response?.data || response;
 
       ticketsState.value = {
         characterUnlockCards: data.characterUnlockCards || 0,
@@ -246,9 +249,9 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
   };
 
   /**
-   * 使用拍照卡
+   * 使用照片解鎖卡
    * @param userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
-   * @param characterId - 角色 ID（已廢棄，拍照卡不綁定角色）
+   * @param characterId - 角色 ID（已廢棄，照片解鎖卡不綁定角色）
    * @param options - 選項
    */
   const usePhotoCard = async (
@@ -258,7 +261,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
   ): Promise<UseCardResponse> => {
     // userId 和 characterId 參數已廢棄，保留是為了向後兼容
     // 後端現在從認證 token 自動獲取 userId
-    // 拍照卡是全局的，不綁定特定角色
+    // 照片解鎖卡是全局的，不綁定特定角色
 
     isLoading.value = true;
     error.value = null;
@@ -282,7 +285,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
 
       return data;
     } catch (err) {
-      const errorMessage = (err as any)?.message || '使用拍照卡失敗';
+      const errorMessage = (err as any)?.message || '使用照片解鎖卡失敗';
       error.value = errorMessage;
       throw err;
     } finally {

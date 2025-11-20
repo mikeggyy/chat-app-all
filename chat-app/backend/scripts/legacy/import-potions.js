@@ -3,9 +3,9 @@
  */
 
 import "dotenv/config";
-// import "../src/setup-emulator.js"; // 註釋掉以連接生產環境
-import { getFirestoreDb } from "../src/firebase/index.js";
-import { POTIONS_BASE_CONFIG } from "../../shared/config/potions.js";
+// import "../../src/setup-emulator.js"; // 註釋掉以連接生產環境
+import { getFirestoreDb } from "../../src/firebase/index.js";
+import { POTIONS_BASE_CONFIG } from "../../../shared/config/potions.js";
 
 const db = getFirestoreDb();
 

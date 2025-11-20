@@ -60,10 +60,29 @@ export const getMatchByIdSchema = {
  */
 export const createMatchSchema = {
   body: z.object({
-    // 基本資訊
-    name: z.string().min(1, "角色名稱不得為空").max(50, "角色名稱不得超過50字").trim(),
-    age: z.coerce.number().int().min(18, "角色年齡必須大於等於18").max(120, "無效的年齡"),
+    // 基本資訊 - 向後兼容：同時接受 name 和 display_name
+    name: z.string().min(1, "角色名稱不得為空").max(50, "角色名稱不得超過50字").trim().optional(),
+    display_name: z.string().min(1, "角色名稱不得為空").max(50, "角色名稱不得超過50字").trim().optional(),
+    // age 字段已移除：後端不會保存此字段，且創建流程中沒有輸入步驟
     gender: z.enum(["male", "female", "其他"], { message: "無效的性別" }),
+
+    // 🔥 角色創建流程必要字段（修復：這些字段之前被驗證中間件過濾掉了）
+    background: z.string().max(1000, "角色設定不得超過1000字").trim().optional(),
+    secret_background: z.string().max(1000, "隱藏設定不得超過1000字").trim().optional(),
+    first_message: z.string().max(500, "開場白不得超過500字").trim().optional(),
+    portraitUrl: z.string().optional(), // 接受任何 URL（包括 data: URI 和 https://）
+    appearanceDescription: z.string().max(1000, "外觀描述不得超過1000字").trim().optional(),
+    styles: z.array(z.string()).max(10, "風格不得超過10個").optional(),
+    voice: z.union([
+      z.string(), // 字串形式
+      z.object({
+        id: z.string(),
+        label: z.string().optional(),
+        description: z.string().optional(),
+        gender: z.string().optional(),
+        ageGroup: z.string().optional(),
+      }) // 物件形式
+    ]).optional(),
 
     // 選填資訊
     personality: z.string().max(500, "個性描述不得超過500字").trim().optional(),
@@ -74,9 +93,20 @@ export const createMatchSchema = {
 
     // 系統資訊
     creatorUid: commonSchemas.userId.optional(),
+    creatorDisplayName: z.string().max(100).trim().optional(),
     flowId: z.string().min(1).trim().optional(),
     category: z.string().max(50).trim().optional(),
     isPublic: z.boolean().default(true).optional(),
     tags: z.array(z.string()).max(20, "標籤不得超過20個").optional(),
-  }),
+    plot_hooks: z.array(z.string()).max(20, "劇情鉤子不得超過20個").optional(),
+    totalChatUsers: z.number().int().min(0).optional(),
+    totalFavorites: z.number().int().min(0).optional(),
+    locale: z.string().max(10).optional(),
+  }).refine(
+    (data) => data.name || data.display_name,
+    {
+      message: "必須提供 name 或 display_name 其中之一",
+      path: ["name"],
+    }
+  ),
 };

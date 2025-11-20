@@ -32,7 +32,11 @@ export const fetchUserCharacters = async (
   }
 
   const path = `/api/users/${encodeURIComponent(normalizedId)}/characters`;
-  const data = (await apiJson(path, options)) as Record<string, unknown>;
+  const response = (await apiJson(path, options)) as Record<string, unknown>;
+
+  // 🔥 修復：API 返回結構是 { success: true, data: { characters: [...], total: 5 } }
+  // 需要從 response.data 中提取數據，而不是直接從 response 提取
+  const data = (response?.data || response) as Record<string, unknown>;
 
   const characters = Array.isArray(data?.characters)
     ? (data.characters as Character[])

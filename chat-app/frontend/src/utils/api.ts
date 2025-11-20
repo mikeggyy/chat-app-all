@@ -13,6 +13,7 @@ interface ApiOptions extends Omit<RequestInit, 'body'> {
   baseUrl?: string;
   skipDeduplication?: boolean;
   rawResponse?: boolean;
+  timeoutMs?: number;
 }
 
 /**
@@ -289,7 +290,25 @@ const buildRequestInit = async (options: Partial<ApiOptions> = {}): Promise<Requ
   }
 
   if (isJsonBody(init.body)) {
+    // 調試日誌：記錄序列化前的 body
+    const bodyObj = init.body as Record<string, any>;
+    if (bodyObj?.appearance || bodyObj?.persona || bodyObj?.voice) {
+      console.log('[apiJson] Before JSON.stringify - body object:', {
+        bodyKeys: Object.keys(bodyObj),
+        hasAppearance: !!bodyObj.appearance,
+        appearanceKeys: bodyObj.appearance ? Object.keys(bodyObj.appearance) : [],
+        hasDescription: !!bodyObj.appearance?.description,
+        descriptionLength: bodyObj.appearance?.description?.length || 0,
+      });
+    }
+
     init.body = JSON.stringify(init.body);
+
+    // 調試日誌：記錄序列化後的 body
+    if ((init.body as string).includes('appearance')) {
+      console.log('[apiJson] After JSON.stringify - body string (first 500 chars):', (init.body as string).substring(0, 500));
+    }
+
     init.headers = {
       "Content-Type": "application/json",
       ...init.headers,
@@ -316,11 +335,57 @@ export const apiFetch = async (path: string, options: ApiOptions = {}): Promise<
   }
 
   const request = async (): Promise<Response> => {
+    const controller = typeof timeoutMs === "number" && timeoutMs > 0 ? new AbortController() : null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const requestOptions: ApiOptions = { ...fetchOptions };
+
+    if (controller) {
+      if (requestOptions.signal) {
+        const existingSignal = requestOptions.signal as AbortSignal;
+        if (existingSignal.aborted) {
+          controller.abort();
+        } else {
+          existingSignal.addEventListener("abort", () => controller.abort(), { once: true });
+        }
+      }
+      requestOptions.signal = controller.signal;
+      timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    }
+
     try {
-      const requestInit = await buildRequestInit(fetchOptions);
+      const requestInit = await buildRequestInit(requestOptions);
       const response = await fetch(url, requestInit);
 
       if (!response.ok) {
+        // ✅ 處理 401 錯誤：token 過期，自動重試
+        if (response.status === 401) {
+          console.warn('[API] Token 過期，嘗試重新獲取 token 並重試...');
+
+          // 清除 token 緩存
+          clearTokenCache();
+
+          // 嘗試重新獲取 token
+          try {
+            const { getCurrentUserIdToken } = useFirebaseAuth();
+            const freshToken = await getCurrentUserIdToken(true); // forceRefresh = true
+
+            if (freshToken) {
+              // 使用新 token 重新發送請求
+              const retryInit = await buildRequestInit(requestOptions);
+              const retryResponse = await fetch(url, retryInit);
+
+              if (retryResponse.ok) {
+                console.log('[API] 使用新 token 重試成功');
+                return retryResponse;
+              }
+            }
+          } catch (refreshError) {
+            console.error('[API] Token 重新獲取失敗:', refreshError);
+            // 如果重新獲取失敗，繼續拋出原始錯誤
+          }
+        }
+
         // 嘗試從響應體中獲取錯誤訊息
         let errorMessage = `Request failed with status ${response.status}`;
         try {
@@ -352,6 +417,10 @@ export const apiFetch = async (path: string, options: ApiOptions = {}): Promise<
       }
       networkError.url = url;
       throw networkError;
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   };
 

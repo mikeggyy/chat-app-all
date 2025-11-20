@@ -230,7 +230,7 @@ export function useLimitModalConfig(
         msg += '（VVIP 月度限制）';
       }
       if (props.cards > 0) {
-        msg += `，另有 ${props.cards} 張拍照卡可用。`;
+        msg += `，另有 ${props.cards} 張照片解鎖卡可用。`;
       }
       return msg;
     } else if (props.type === 'video') {

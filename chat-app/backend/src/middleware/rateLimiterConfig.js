@@ -100,11 +100,11 @@ export const veryStrictRateLimiter = createRateLimiter({
 
 /**
  * 購買操作限制：防止惡意購買
- * 10 次/分鐘（每次購買都會有額外的冪等性保護）
+ * 30 次/分鐘（已放寬，每次購買都會有額外的冪等性保護）
  */
 export const purchaseRateLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 分鐘
-  maxRequests: 10,
+  maxRequests: 30, // ✅ 已從 10 次放寬到 30 次，方便測試和正常使用
   keyGenerator: userBasedKeyGenerator,
   onLimit: (req, res, bucket) => {
     const userId = req.user?.uid || req.userId || 'anonymous';

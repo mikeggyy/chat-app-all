@@ -57,13 +57,17 @@ export const requireFirebaseAuth = async (req, res, next) => {
       return;
     }
 
+    // 允許通過 header 覆蓋測試用戶 ID（僅開發環境）
+    const testUserId = req.headers['x-test-user-id'] || TEST_ACCOUNTS.GUEST_USER_ID;
+
     logger.info('[Auth] ✅ 測試帳號驗證成功（開發環境）', {
       hostname,
-      userId: TEST_ACCOUNTS.GUEST_USER_ID,
+      userId: testUserId,
+      overridden: testUserId !== TEST_ACCOUNTS.GUEST_USER_ID,
     });
 
     req.firebaseUser = {
-      uid: TEST_ACCOUNTS.GUEST_USER_ID,
+      uid: testUserId,
       email: "test@example.com",
       name: "測試帳號",
       // 添加標記表示這是測試用戶

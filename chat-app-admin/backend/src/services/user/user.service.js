@@ -134,6 +134,14 @@ export const updateUser = async (userId, updateData) => {
     console.log(`[管理後台] 用戶 ${userId} 的會員資料已更新，已清除會員快取`);
   }
 
+  // ✅ 修復：如果修改了金幣或資產，記錄日誌提醒
+  // 注意：主應用有獨立的 userProfileCache（5分鐘 TTL），需要等待緩存過期
+  if (coins !== undefined || walletBalance !== undefined || assets !== undefined) {
+    console.warn(`[管理後台] ⚠️ 用戶 ${userId} 的金幣/資產已更新`);
+    console.warn(`[管理後台] ⚠️ 主應用的緩存將在 1-5 分鐘內過期並顯示新數據`);
+    console.warn(`[管理後台] ⚠️ 如需立即生效，請用戶重新登入或等待緩存過期`);
+  }
+
   // 返回更新後的用戶數據
   const updatedUser = await auth.getUser(userId);
   const userDoc = await db.collection("users").doc(userId).get();

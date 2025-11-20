@@ -6,6 +6,8 @@ import { useRouter } from 'vue-router';
 import ChatHeader from '../components/chat/ChatHeader.vue';
 import ChatContent from '../components/chat/ChatContent.vue';
 import ChatModals from '../components/chat/ChatModals.vue';
+import VideoCompletionNotification from '../components/chat/VideoCompletionNotification.vue';
+import GenerationFailureNotification from '../components/chat/GenerationFailureNotification.vue';
 
 // 統一 Setup Composable
 import { useChatSetup } from '../composables/chat/useChatSetup';
@@ -135,6 +137,18 @@ const {
   // Dependencies for watchers
   activePotionEffects,
   activeUnlockEffects,
+
+  // Video Completion Notification
+  videoNotification,
+  showVideoNotification,
+  hideVideoNotification,
+  scrollToVideo,
+
+  // Generation Failure Notification
+  generationFailures,
+  clearGenerationFailure,
+  clearAllGenerationFailures,
+  checkForGenerationFailures,
 } = useChatSetup({
   router,
   chatContentRef,
@@ -177,15 +191,64 @@ const { initializeChat } = useChatInitialization({
   loadBalance,
 });
 
+// ====================
+// Generation Failure Notification State
+// ====================
+const currentFailureNotification: Ref<{
+  type: 'photo' | 'video';
+  characterName: string;
+  reason?: string;
+} | null> = ref(null);
+
 onMounted(async () => {
   await initializeChat();
+
+  // ✅ 檢查是否有該角色的生成失敗記錄
+  if (partnerId.value) {
+    const failures = checkForGenerationFailures(partnerId.value);
+    if (failures && failures.length > 0) {
+      // 顯示第一個失敗通知
+      const failure = failures[0];
+      currentFailureNotification.value = {
+        type: failure.type,
+        characterName: failure.characterName,
+        reason: failure.reason,
+      };
+    }
+  }
 });
 
 // ====================
 // Event Handlers (Additional)
 // ====================
+// 處理關閉失敗通知
+const handleCloseFailureNotification = () => {
+  if (currentFailureNotification.value && partnerId.value) {
+    // 找到並清除對應的失敗記錄
+    const failures = checkForGenerationFailures(partnerId.value);
+    if (failures && failures.length > 0) {
+      // 找到第一個匹配的失敗記錄索引
+      const index = generationFailures.value.findIndex(
+        f => f.characterId === partnerId.value &&
+            f.type === currentFailureNotification.value!.type
+      );
+      if (index !== -1) {
+        clearGenerationFailure(index);
+      }
+    }
+  }
+  currentFailureNotification.value = null;
+};
 const handleCloseGiftSelector = () => {
   closeGiftSelector();
+};
+
+// 處理查看影片通知
+const handleViewVideo = () => {
+  if (videoNotification.value && chatContentRef.value?.messageListRef) {
+    scrollToVideo(chatContentRef.value.messageListRef, videoNotification.value.videoMessageId);
+    hideVideoNotification();
+  }
 };
 
 // ====================
@@ -300,6 +363,25 @@ onBeforeUnmount(() => {
       @close-image-viewer="closeImageViewer"
       @close-gift-selector="handleCloseGiftSelector"
       @select-gift="handleSelectGift"
+    />
+
+    <!-- Video Completion Notification -->
+    <VideoCompletionNotification
+      v-if="videoNotification"
+      :is-visible="videoNotification.show"
+      :character-name="videoNotification.characterName"
+      @view-video="handleViewVideo"
+      @close="hideVideoNotification"
+    />
+
+    <!-- Generation Failure Notification -->
+    <GenerationFailureNotification
+      v-if="currentFailureNotification"
+      :is-visible="!!currentFailureNotification"
+      :type="currentFailureNotification.type"
+      :character-name="currentFailureNotification.characterName"
+      :reason="currentFailureNotification.reason"
+      @close="handleCloseFailureNotification"
     />
   </div>
 </template>

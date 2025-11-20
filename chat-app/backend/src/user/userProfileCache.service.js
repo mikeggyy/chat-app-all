@@ -22,8 +22,9 @@ import { getUserById } from "./user.service.js";
  * 用戶檔案緩存配置
  */
 const CACHE_CONFIG = {
-  // 緩存生存時間：5 分鐘（300 秒）
-  stdTTL: 300,
+  // ✅ 修復：改為 1 分鐘（60 秒），解決前後台金幣餘額不同步問題
+  // 原值：300 秒（5 分鐘）- 導致管理後台修改後需等待 5 分鐘才能同步
+  stdTTL: 60,
 
   // 檢查過期條目的間隔：60 秒
   checkperiod: 60,

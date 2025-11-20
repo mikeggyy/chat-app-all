@@ -142,6 +142,8 @@ app.use(httpLogger);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
+// 🔍 DEBUG 中間件已移除（問題已解決：Zod schema 缺少 .passthrough()）
+
 // 🔒 安全性優化（2025-01）：XSS 輸入清理（清理所有請求中的潛在 XSS 攻擊）
 import { xssSanitizer } from "./middleware/xssSanitizer.js";
 app.use(xssSanitizer);

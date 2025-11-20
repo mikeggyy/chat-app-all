@@ -29,6 +29,22 @@ flowRouter.post(
       // 🔒 從認證 token 獲取 userId，防止偽造
       const userId = req.firebaseUser.uid;
 
+      // 添加調試日誌：檢查請求體
+      if (process.env.NODE_ENV !== "test") {
+        logger.info(`[Create Flow] Raw request body: ${JSON.stringify(req.body).substring(0, 500)}`);
+        logger.info(`[Create Flow] Request body details:`, {
+          bodyKeys: Object.keys(req.body || {}),
+          hasAppearance: !!req.body?.appearance,
+          appearanceType: typeof req.body?.appearance,
+          appearanceKeys: req.body?.appearance ? Object.keys(req.body.appearance) : [],
+          hasDescription: !!req.body?.appearance?.description,
+          descriptionLength: req.body?.appearance?.description?.length || 0,
+          descriptionPreview: req.body?.appearance?.description?.substring(0, 50) || '',
+          hasStyles: !!req.body?.appearance?.styles,
+          stylesCount: req.body?.appearance?.styles?.length || 0,
+        });
+      }
+
       const flow = await createCreationFlow({
         userId,
         persona: req.body?.persona,
@@ -37,6 +53,17 @@ flowRouter.post(
         status: req.body?.status,
         metadata: req.body?.metadata,
       });
+
+      // 添加調試日誌：檢查創建後的 flow
+      if (process.env.NODE_ENV !== "test") {
+        logger.info(`[Create Flow] Flow created:`, {
+          flowId: flow.id,
+          hasAppearance: !!flow.appearance,
+          hasDescription: !!flow.appearance?.description,
+          descriptionLength: flow.appearance?.description?.length || 0,
+        });
+      }
+
       sendSuccess(res, { flow }, 201);
     } catch (error) {
       logger.error("建立角色創建流程失敗:", error);
@@ -143,6 +170,16 @@ flowRouter.post(
         payload = { persona: req.body ?? {} };
       } else if (step === "appearance") {
         payload = { appearance: req.body ?? {} };
+
+        // 添加調試日誌
+        if (process.env.NODE_ENV !== "test") {
+          logger.info(`[Update Step] Appearance data:`, {
+            hasDescription: !!req.body?.description,
+            descriptionLength: req.body?.description?.length || 0,
+            hasStyles: !!req.body?.styles,
+            stylesCount: req.body?.styles?.length || 0,
+          });
+        }
       } else if (step === "voice") {
         payload = { voice: req.body ?? {} };
       } else {
@@ -153,6 +190,16 @@ flowRouter.post(
       }
 
       const flow = await mergeCreationFlow(flowId, payload);
+
+      // 添加調試日誌：檢查保存後的 flow
+      if (step === "appearance" && process.env.NODE_ENV !== "test") {
+        logger.info(`[Update Step] Flow after merge:`, {
+          hasAppearance: !!flow.appearance,
+          hasDescription: !!flow.appearance?.description,
+          descriptionLength: flow.appearance?.description?.length || 0,
+        });
+      }
+
       sendSuccess(res, { flow });
     } catch (error) {
       logger.error("更新創建步驟失敗:", error);

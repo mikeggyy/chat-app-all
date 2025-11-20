@@ -82,8 +82,6 @@ const toPositiveInteger = (value: unknown): number => {
   return Math.round(number);
 };
 
-const DEFAULT_CHARACTER_PORTRAIT = "/ai-role/match-role-01.webp";
-
 const metricFormatter = new Intl.NumberFormat("zh-TW");
 const formatMetric = (value: unknown): string => {
   const number = Number(value);
@@ -126,9 +124,8 @@ const decorateCharacter = (character: RawCharacter | null, index: number = 0): D
       : "",
     typeof character.avatar === "string" ? character.avatar.trim() : "",
   ];
-  const portrait =
-    portraitCandidates.find((value) => value.length) ||
-    DEFAULT_CHARACTER_PORTRAIT;
+  // 🔥 修復：沒有圖片時返回空字符串，不使用默認圖片
+  const portrait = portraitCandidates.find((value) => value.length) || "";
 
   const tagline =
     typeof character.tagline === "string" && character.tagline.trim().length
@@ -198,6 +195,8 @@ const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boo
     return;
   }
 
+  console.log('[MyCharacters] 🔄 開始載入角色列表，用戶 ID:', normalizedId);
+
   const currentToken = ++charactersRequestToken;
   isCharactersLoading.value = true;
   charactersError.value = "";
@@ -209,6 +208,12 @@ const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boo
     if (currentToken !== charactersRequestToken) {
       return;
     }
+
+    console.log('[MyCharacters] ✅ 成功載入角色：', {
+      count: response?.characters?.length || 0,
+      characters: response?.characters
+    });
+
     userCharactersRaw.value = Array.isArray(response?.characters)
       ? response.characters
       : [];
@@ -216,6 +221,7 @@ const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boo
     if (currentToken !== charactersRequestToken) {
       return;
     }
+    console.error('[MyCharacters] ❌ 載入角色失敗：', error);
     userCharactersRaw.value = [];
     charactersError.value = error?.message ?? "載入角色列表失敗，請稍後再試。";
     if (import.meta.env.DEV) {
@@ -346,12 +352,19 @@ onMounted(() => {
         >
           <div class="character-card__media">
             <div class="character-card__media-frame">
+              <!-- 🔥 有圖片時顯示圖片 -->
               <LazyImage
+                v-if="character.portrait"
                 :src="character.portrait"
                 :alt="`${character.name} 角色形象`"
                 root-margin="200px"
                 image-class="character-card__portrait"
               />
+              <!-- 🔥 沒有圖片時顯示占位符 -->
+              <div v-else class="character-card__portrait-placeholder">
+                <span class="character-card__portrait-text">{{ character.name.charAt(0) }}</span>
+                <span class="character-card__portrait-hint">未設定圖片</span>
+              </div>
             </div>
           </div>
           <div class="character-card__body">
@@ -663,6 +676,36 @@ onMounted(() => {
     border-radius: 20px;
     object-fit: cover;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  }
+
+  // 🔥 占位符樣式
+  &__portrait-placeholder {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(96, 42, 72, 0.3) 0%, rgba(17, 6, 15, 0.6) 100%);
+    border: 2px dashed rgba(255, 236, 213, 0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  &__portrait-text {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: rgba(255, 236, 213, 0.7);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  &__portrait-hint {
+    font-size: 0.75rem;
+    color: rgba(255, 236, 213, 0.4);
+    letter-spacing: 0.05em;
   }
 
   &__body {

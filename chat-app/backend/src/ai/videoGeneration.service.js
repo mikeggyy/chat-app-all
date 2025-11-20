@@ -43,7 +43,13 @@ const getVertexAIClient = () => {
  * @returns {string} - 影片生成提示詞
  */
 const buildVideoPromptFromTemplate = (template, character, recentMessages = []) => {
-  let prompt = template;
+  const fallbackTemplate = "{角色背景設定} {最近對話內容}".trim();
+  const safeTemplate =
+    typeof template === "string" && template.trim().length
+      ? template
+      : fallbackTemplate;
+
+  let prompt = safeTemplate;
 
   // 替換 {角色背景設定}
   const characterBackground = character.background || "";
@@ -62,6 +68,17 @@ const buildVideoPromptFromTemplate = (template, character, recentMessages = []) 
   prompt = prompt.replace(/\{最近對話內容\}/g, conversationContext);
 
   return prompt;
+};
+
+const previewForLog = (text, limit = 200) => {
+  if (typeof text !== "string") {
+    return text;
+  }
+  const trimmed = text.trim();
+  if (trimmed.length <= limit) {
+    return trimmed;
+  }
+  return `${trimmed.substring(0, limit)}... (len=${trimmed.length})`;
 };
 
 /**
@@ -211,6 +228,74 @@ const generateMockVideo = async (userId, characterId) => {
 };
 
 /**
+ * 處理圖片 URL（將本地路徑或 localhost URL 上傳到 R2）
+ * @param {string} imageUrl - 原始圖片 URL
+ * @param {string} userId - 用戶 ID
+ * @param {string} characterId - 角色 ID
+ * @returns {Promise<string>} - 可公開訪問的圖片 URL
+ */
+const processImageUrl = async (imageUrl, userId, characterId) => {
+  // 如果已經是完整的公開 URL（非 localhost），直接返回
+  if (imageUrl.startsWith("https://") && !imageUrl.includes("localhost") && !imageUrl.includes("127.0.0.1")) {
+    return imageUrl;
+  }
+
+  // 需要上傳到 R2
+  logger.info("[Video] 檢測到本地圖片 URL，準備上傳到 R2:", imageUrl);
+
+  try {
+    let imageBuffer;
+
+    // 如果是相對路徑（如 /ai-role/match-role-03.webp）
+    if (imageUrl.startsWith("/")) {
+      const { readFileSync } = await import("fs");
+      const { join } = await import("path");
+      const { fileURLToPath } = await import("url");
+      const { dirname } = await import("path");
+
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+
+      // 假設圖片在 frontend/public 目錄下
+      const publicPath = join(__dirname, "../../../frontend/public", imageUrl);
+      logger.info("[Video] 從本地文件讀取:", publicPath);
+
+      imageBuffer = readFileSync(publicPath);
+    }
+    // 如果是 localhost URL
+    else if (imageUrl.includes("localhost") || imageUrl.includes("127.0.0.1") || imageUrl.startsWith("http://")) {
+      logger.info("[Video] 從 localhost URL 下載:", imageUrl);
+      const response = await fetch(imageUrl);
+
+      if (!response.ok) {
+        throw new Error(`下載圖片失敗: ${response.statusText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      imageBuffer = Buffer.from(arrayBuffer);
+    }
+    else {
+      // 無法處理的 URL 格式
+      throw new Error(`無法處理的圖片 URL 格式: ${imageUrl}`);
+    }
+
+    // 上傳到 R2
+    const { uploadImageToR2 } = await import("../storage/r2Storage.service.js");
+    const uploadResult = await uploadImageToR2(imageBuffer, userId, characterId, {
+      contentType: "image/webp",
+      extension: "webp",
+    });
+
+    logger.info("[Video] 圖片已上傳到 R2:", uploadResult.url);
+    return uploadResult.url;
+  } catch (error) {
+    logger.error("[Video] 處理圖片 URL 失敗:", error);
+    // 如果上傳失敗，嘗試使用原始 URL（可能在生產環境可以訪問）
+    return imageUrl;
+  }
+};
+
+/**
  * 使用 Replicate Stable Video Diffusion 生成影片
  * @param {string} userId - 用戶 ID
  * @param {string} characterId - 角色 ID
@@ -255,6 +340,9 @@ const generateVideoWithReplicate = async (userId, characterId, character, option
       logger.info("[Replicate SVD] 使用角色預設圖片:", imageUrl);
     }
 
+    // ✅ 處理圖片 URL（如果是本地路徑，上傳到 R2）
+    imageUrl = await processImageUrl(imageUrl, userId, characterId);
+
     // 初始化 Replicate 客戶端
     // 使用 useFileOutput: false 讓 SDK 直接返回 URL 字串，避免處理 FileOutput 物件
     const replicate = new Replicate({
@@ -264,6 +352,15 @@ const generateVideoWithReplicate = async (userId, characterId, character, option
 
     // 調用 Stable Video Diffusion 模型
     logger.info("[Replicate SVD] 發送 API 請求...");
+    logger.debug("[Replicate SVD] 請求 payload:", {
+      condAug: 0.02,
+      decoding: 14,
+      inputImage: imageUrl,
+      videoLength: "25_frames_with_svd_xt",
+      sizingStrategy: "maintain_aspect_ratio",
+      motionBucketId: 127,
+      framesPerSecond: 6,
+    });
 
     const output = await replicate.run(
       "stability-ai/stable-video-diffusion:3f0457e4619daac51203dedb472816fd4af51f3149fa7a9e0b5ffcf1b8172438",
@@ -455,6 +552,9 @@ const generateVideoWithHailuo = async (userId, characterId, character, options =
     // 簡化日誌：只記錄關鍵信息
     logger.info(`[Hailuo 02] 生成影片 - 使用${options.imageUrl ? '自定義' : '預設'}圖片`);
 
+    // ✅ 處理圖片 URL（如果是本地路徑，上傳到 R2）
+    imageUrl = await processImageUrl(imageUrl, userId, characterId);
+
     // 初始化 Replicate 客戶端
     const replicate = new Replicate({
       auth: replicateToken,
@@ -464,6 +564,14 @@ const generateVideoWithHailuo = async (userId, characterId, character, options =
     // 🔥 調用 Hailuo 02 模型（從 Firestore 讀取參數）
     const replicateModel = videoConfig.model || "minimax/hailuo-02";
     logger.info(`[Hailuo 02] 發送 API 請求... (model: ${replicateModel})`);
+    logger.debug("[Hailuo 02] 請求 payload:", {
+      promptPreview: previewForLog(prompt),
+      promptLength: prompt.length,
+      duration: videoConfig.durationSeconds || 10,
+      resolution: videoConfig.resolution || "512p",
+      firstFrameImage: imageUrl,
+      enhancePrompt: videoConfig.enhancePrompt !== false,
+    });
 
     const output = await replicate.run(
       replicateModel,
@@ -707,6 +815,13 @@ const generateVideoWithVeo = async (userId, characterId, character, options = {}
         personGeneration: videoConfig.personGeneration || "allow_adult",
       },
     };
+
+    logger.debug("[Veo] 請求 payload:", {
+      promptPreview: previewForLog(prompt),
+      promptLength: prompt.length,
+      parameters: generateRequest.parameters,
+      hasImage: contentParts.length > 1,
+    });
 
     // 生成影片（Vertex AI 會返回長時間運行的操作）
     logger.info("[Veo] 發送影片生成請求...");

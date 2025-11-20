@@ -58,8 +58,8 @@ export function useShopCategories(
     },
     {
       id: "photo-unlock",
-      label: "拍照卡",
-      description: "用於生成角色AI照片（50金幣/張）",
+      label: "照片解鎖卡",
+      description: "用於生成角色AI照片（40金幣/張）",
     },
     {
       id: "video-unlock",

@@ -137,15 +137,27 @@ npm run test:business-logic
 # 或單獨運行
 npm run test:membership    # 會員升級測試（5 個場景）
 npm run test:unlock        # 角色解鎖購買測試（6 個場景）
+
+# 完整流程測試（2025-01-19 新增）
+node scripts/test-character-creation-flow.js  # 角色創建完整流程測試（10 個步驟）
 ```
 
 **測試內容**：
 - ✅ 會員升級流程（鎖定機制、並發控制、過期鎖定）
 - ✅ 角色解鎖購買（解鎖票、金幣、數據遷移）
+- ✅ 角色創建完整流程（10 步驟端到端測試）
+  - Flow 創建與狀態管理
+  - AI 魔法師生成（外觀描述、角色設定）
+  - 圖片生成與選擇（Gemini API）
+  - 智能截斷驗證（200 字限制）
+  - 資源扣除（創建次數/創建卡）
+  - name/display_name 兼容性
 - ✅ Transaction 完整性
 - ✅ 數據一致性
 
-詳細說明請參考：[TEST_GUIDE.md](TEST_GUIDE.md)
+詳細說明請參考：
+- [TEST_GUIDE.md](TEST_GUIDE.md) - 商業邏輯測試指南
+- [README-CHARACTER-CREATION-TEST.md](README-CHARACTER-CREATION-TEST.md) - 角色創建流程測試指南
 
 #### 其他測試工具
 
@@ -173,6 +185,7 @@ backend/scripts/
 ├── test-all-business-logic.js          # 🧪 運行所有商業邏輯測試（新增）
 ├── test-membership-upgrade.js          # 🧪 會員升級測試（新增）
 ├── test-character-unlock.js            # 🧪 角色解鎖購買測試（新增）
+├── test-character-creation-flow.js     # 🧪 完整角色創建流程測試（新增）
 │
 ├── generateVoicePreviews.js            # 語音預覽生成
 ├── clean-invalid-usage-limits.js       # 清理無效使用限制數據

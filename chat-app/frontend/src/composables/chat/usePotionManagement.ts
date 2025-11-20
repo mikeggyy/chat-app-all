@@ -104,11 +104,17 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
    */
   const activeMemoryBoost = computed(() => {
     const partnerId = getPartnerId();
-    return activePotionEffects.value.find(
+    console.log('[activeMemoryBoost] partnerId:', partnerId);
+    console.log('[activeMemoryBoost] activePotionEffects:', activePotionEffects.value);
+
+    const result = activePotionEffects.value.find(
       (effect) =>
         effect.potionType === 'memory_boost' &&
         effect.characterId === partnerId
     );
+
+    console.log('[activeMemoryBoost] 找到的效果:', result);
+    return result;
   });
 
   /**
@@ -116,11 +122,17 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
    */
   const activeBrainBoost = computed(() => {
     const partnerId = getPartnerId();
-    return activePotionEffects.value.find(
+    console.log('[activeBrainBoost] partnerId:', partnerId);
+    console.log('[activeBrainBoost] activePotionEffects:', activePotionEffects.value);
+
+    const result = activePotionEffects.value.find(
       (effect) =>
         effect.potionType === 'brain_boost' &&
         effect.characterId === partnerId
     );
+
+    console.log('[activeBrainBoost] 找到的效果:', result);
+    return result;
   });
 
   // ====================
@@ -135,12 +147,15 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
     if (!userId) return;
 
     try {
-      const data = await apiJson(
+      const response = await apiJson(
         `/api/users/${encodeURIComponent(userId)}/assets`,
         {
           skipGlobalLoading: true,
         }
       );
+
+      // ✅ 修復：後端使用 sendSuccess 包裝響應，數據在 response.data 中
+      const data = response?.data || response;
 
       if (data?.potions) {
         userPotions.value = {
@@ -168,10 +183,14 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
         skipGlobalLoading: true,
       });
 
-      if (data && data.potions) {
-        activePotionEffects.value = data.potions;
-      }
+      console.log('[loadActivePotions] API 返回數據:', data);
+
+      // ✅ 修復：後端使用 sendSuccess 包裝響應，數據在 data.data 中
+      const potions = data?.data?.potions || data?.potions || [];
+      activePotionEffects.value = potions;
+      console.log('[loadActivePotions] 設置 activePotionEffects:', activePotionEffects.value);
     } catch (error) {
+      console.error('[loadActivePotions] 加載失敗:', error);
       // Silent fail - 不影響用戶體驗
     }
   };
@@ -210,10 +229,14 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
         return false;
       }
 
+      // ✅ 生成 idempotencyKey 防止重複消耗
+      const idempotencyKey = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
       const result = await apiJson(apiEndpoint, {
         method: 'POST',
         body: {
           characterId: partnerId,
+          idempotencyKey, // ✅ 添加冪等性 key
         },
       });
 
@@ -230,7 +253,18 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
 
       return false;
     } catch (error: any) {
-      showError(error.message || '使用藥水失敗');
+      // ✅ 改善錯誤訊息處理
+      let errorMessage = '使用藥水失敗';
+      if (error?.message && typeof error.message === 'string') {
+        errorMessage = error.message;
+      } else if (error?.error && typeof error.error === 'string') {
+        errorMessage = error.error;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
+      console.error('[使用藥水錯誤]', error); // 詳細日誌供調試
+      showError(errorMessage);
       return false;
     }
   };

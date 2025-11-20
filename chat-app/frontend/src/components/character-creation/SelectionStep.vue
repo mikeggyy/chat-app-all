@@ -31,7 +31,13 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const isResultSelected = (resultId: string): boolean => {
-  return resultId === props.selectedResultId;
+  const selected = resultId === props.selectedResultId;
+  console.log('[SelectionStep] isResultSelected:', {
+    resultId,
+    selectedResultId: props.selectedResultId,
+    selected
+  });
+  return selected;
 };
 
 const handleResultSelect = (resultId: string): void => {
@@ -111,15 +117,18 @@ const handleResultSelect = (resultId: string): void => {
   overflow: hidden;
   position: absolute;
   top: 0;
+  bottom: 200px; /* 🔥 為底部縮略圖和按鈕預留空間 */
 }
 
 .generating__hero-frame {
   position: relative;
   width: 100%;
+  height: 100%;
 }
 
 .generating__hero-image {
   width: 100%;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
@@ -139,6 +148,10 @@ const handleResultSelect = (resultId: string): void => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 20px 0 16px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.7) 50%, transparent 100%);
+  position: relative;
+  z-index: 10;
 }
 
 .generating__result-scroll {

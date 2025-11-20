@@ -541,6 +541,7 @@ export const potionSchemas = {
   useMemoryBoost: {
     body: z.object({
       characterId: commonSchemas.characterId,
+      idempotencyKey: commonSchemas.idempotencyKey, // ✅ 添加冪等性 key
     }),
   },
 
@@ -548,6 +549,7 @@ export const potionSchemas = {
   useBrainBoost: {
     body: z.object({
       characterId: commonSchemas.characterId,
+      idempotencyKey: commonSchemas.idempotencyKey, // ✅ 添加冪等性 key
     }),
   },
 

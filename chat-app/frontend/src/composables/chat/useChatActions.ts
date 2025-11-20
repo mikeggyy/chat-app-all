@@ -125,7 +125,7 @@ export interface UseChatActionsReturn {
   isSendingGift: Ref<boolean>;
   openGiftSelector: (loadUserAssets?: (userId: string) => Promise<any>) => Promise<void>;
   closeGiftSelector: () => void;
-  sendGift: (giftData: GiftData, onSuccess?: (giftMessage: Message, replyMessage: Message | null) => void) => Promise<boolean>;
+  sendGift: (giftData: GiftData, onSuccess?: (giftMessage: Message, replyMessage: Message | null) => void, selectedPhotoUrl?: string) => Promise<boolean>;
 
   // 語音相關
   playingVoiceMessageId: Ref<string | null>;
@@ -350,11 +350,13 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
    * 發送禮物
    * @param giftData - 禮物資料
    * @param onSuccess - 成功回調
+   * @param selectedPhotoUrl - 選擇的照片 URL（可選，如果提供則使用選擇的照片而非生成新照片）
    * @returns 是否成功
    */
   const sendGift = async (
     giftData: GiftData,
-    onSuccess?: (giftMessage: Message, replyMessage: Message | null) => void
+    onSuccess?: (giftMessage: Message, replyMessage: Message | null) => void,
+    selectedPhotoUrl?: string
   ): Promise<boolean> => {
     const matchId = partner.value?.id ?? '';
     const userId = unref(currentUserId) ?? '';
@@ -464,7 +466,8 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
               portraitUrl: partner.value?.portraitUrl,
             },
             giftId: giftData.giftId,
-            generatePhoto: true,
+            generatePhoto: !selectedPhotoUrl, // ✅ 如果有選擇照片，則不生成新照片
+            selectedPhotoUrl: selectedPhotoUrl, // ✅ 傳遞選擇的照片 URL
           },
           skipGlobalLoading: true,
         });
@@ -476,23 +479,26 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
         }
 
         if (giftResponse?.success) {
+          // ✅ 修復：後端使用 sendSuccess 包裝，數據在 data 字段中
+          const responseData = giftResponse.data || giftResponse;
+
           // 添加感謝訊息
-          if (giftResponse.thankYouMessage) {
-            messages.value.push(giftResponse.thankYouMessage);
+          if (responseData.thankYouMessage) {
+            messages.value.push(responseData.thankYouMessage);
             if (appendCachedHistory) {
-              appendCachedHistory([giftResponse.thankYouMessage]);
+              appendCachedHistory([responseData.thankYouMessage]);
             }
           }
 
           // 添加照片訊息
-          if (giftResponse.photoMessage) {
-            messages.value.push(giftResponse.photoMessage);
+          if (responseData.photoMessage) {
+            messages.value.push(responseData.photoMessage);
             if (appendCachedHistory) {
-              appendCachedHistory([giftResponse.photoMessage]);
+              appendCachedHistory([responseData.photoMessage]);
             }
 
             if (onSuccess) {
-              onSuccess(giftMessage, giftResponse.photoMessage);
+              onSuccess(giftMessage, responseData.photoMessage);
             }
           } else {
             if (onSuccess) {

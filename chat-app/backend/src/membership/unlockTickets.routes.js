@@ -169,4 +169,54 @@ router.get(
   })
 );
 
+/**
+ * 獲取活躍的解鎖效果（未過期的解鎖）
+ * GET /api/unlock-tickets/active
+ * ✅ 速率限制：60次/分鐘（讀取操作）
+ *
+ * 返回格式：
+ * {
+ *   unlocks: [
+ *     {
+ *       unlockType: 'character',
+ *       characterId: 'match-001',
+ *       activatedAt: '2025-11-20T10:00:00.000Z', // 生效時間
+ *       expiresAt: '2025-11-27T10:00:00.000Z',   // 到期時間
+ *       unlockDays: 7,                            // 解鎖天數
+ *       unlockedBy: 'ticket' | 'vvip' | 'purchase',
+ *       permanent: false,
+ *       remainingDays: 5                          // 剩餘天數
+ *     }
+ *   ]
+ * }
+ */
+router.get(
+  "/api/unlock-tickets/active",
+  requireFirebaseAuth,
+  relaxedRateLimiter, // 讀取操作，限制 60次/分鐘
+  asyncHandler(async (req, res) => {
+    const userId = req.firebaseUser.uid;
+
+    // 動態導入服務函數（避免循環依賴）
+    const { getUserUnlockedCharacters } = await import("./unlockTickets.service.js");
+
+    // 獲取用戶已解鎖的角色列表（自動過濾過期的）
+    const unlockedCharacters = await getUserUnlockedCharacters(userId);
+
+    // 轉換為前端期望的格式
+    const unlocks = unlockedCharacters.map((unlock) => ({
+      unlockType: 'character',
+      characterId: unlock.characterId,
+      activatedAt: unlock.unlockedAt, // ✅ 生效時間（用於前端顯示）
+      expiresAt: unlock.expiresAt,
+      unlockDays: unlock.unlockDays,
+      unlockedBy: unlock.unlockedBy || 'ticket',
+      permanent: unlock.permanent || false,
+      remainingDays: unlock.remainingDays,
+    }));
+
+    sendSuccess(res, { unlocks });
+  })
+);
+
 export default router;

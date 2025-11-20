@@ -146,10 +146,10 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'back'): void;
-  (e: 'menu-action', action: string): void;
-  (e: 'toggle-favorite'): void;
-  (e: 'view-buff-details', buffType: string): void;
+  (e: "back"): void;
+  (e: "menu-action", action: string): void;
+  (e: "toggle-favorite"): void;
+  (e: "view-buff-details", buffType: string): void;
 }
 
 // Props
@@ -296,7 +296,7 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(148, 163, 184, 0.35);
   box-shadow: 0 18px 36px rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(18px);
-  z-index: 10;
+  z-index: 1001;
 }
 
 .chat-header__menu-item {

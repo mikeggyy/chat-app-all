@@ -16,11 +16,11 @@ const userIdSchema = z.string().min(1, "userId 不能為空");
  */
 export const createFlowSchema = {
   body: z.object({
-    persona: z.object({}).optional(),
-    appearance: z.object({}).optional(),
-    voice: z.object({}).optional(),
+    persona: z.object({}).passthrough().optional(),
+    appearance: z.object({}).passthrough().optional(),
+    voice: z.object({}).passthrough().optional(),
     status: z.string().optional(),
-    metadata: z.object({}).optional(),
+    metadata: z.object({}).passthrough().optional(),
   }),
 };
 

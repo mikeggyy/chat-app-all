@@ -11,11 +11,30 @@ import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import { getUserById, upsertUser } from "../user/user.service.js";
 import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 import { POTION_CONFIG } from "../config/limits.js";
+import { createTransactionInTx, TRANSACTION_TYPES } from "./transaction.service.js";
 
 import logger from "../utils/logger.js";
 
 const db = getFirestoreDb();
 const USAGE_LIMITS_COLLECTION = "usage_limits";
+
+/**
+ * 從 Firestore 獲取藥水配置
+ * @param {string} potionId - 藥水ID (memory_boost, brain_boost)
+ * @returns {Promise<object|null>} 藥水配置
+ */
+const getPotionFromFirestore = async (potionId) => {
+  try {
+    const doc = await db.collection("potions").doc(potionId).get();
+    if (doc.exists) {
+      return doc.data();
+    }
+    return null;
+  } catch (error) {
+    logger.error(`獲取藥水配置失敗: ${potionId}`, error);
+    return null;
+  }
+};
 
 /**
  * 獲取用戶的 usage_limits 文檔引用
@@ -150,6 +169,10 @@ export const getEffectiveAIModel = async (userId, characterId, defaultModel) => 
  * ✅ P2-1 優化：通用藥水購買函數（代碼重複提取）
  * 統一處理藥水購買邏輯，減少代碼重複
  *
+ * ✅ 2025-01-20 安全修復：移除 options.unitPrice 參數，防止價格被覆蓋
+ * ✅ 2025-01-20 功能修復：添加交易記錄創建
+ * ✅ 2025-01-20 架構修復：從 Firestore 讀取價格，與其他商品保持一致
+ *
  * @param {string} userId - 用戶ID
  * @param {string} potionType - 藥水類型 ('memoryBoost' | 'brainBoost')
  * @param {object} potionConfig - 藥水配置 (POTION_CONFIG.MEMORY_BOOST 或 POTION_CONFIG.BRAIN_BOOST)
@@ -159,7 +182,12 @@ export const getEffectiveAIModel = async (userId, characterId, defaultModel) => 
 const purchasePotionCommon = async (userId, potionType, potionConfig, options = {}) => {
   // 支持 SKU 多數量購買
   const quantity = options.quantity || 1;
-  const unitPrice = options.unitPrice || potionConfig.price;
+
+  // ✅ 架構修復：從 Firestore 讀取價格（與資產套餐保持一致）
+  const firestorePotion = await getPotionFromFirestore(potionConfig.id);
+  const unitPrice = firestorePotion?.unitPrice || firestorePotion?.price || potionConfig.price;
+
+  logger.info(`[藥水購買] ${potionConfig.name}, Firestore價格: ${firestorePotion?.unitPrice}, 配置價格: ${potionConfig.price}, 實際使用: ${unitPrice}`);
 
   // ✅ 使用 Firestore Transaction 保證原子性
   const userRef = db.collection("users").doc(userId);
@@ -199,7 +227,7 @@ const purchasePotionCommon = async (userId, potionType, potionConfig, options = 
     newBalance = currentBalance - unitPrice;
     newInventoryCount = currentInventory + quantity;
 
-    // 6. ✅ 在同一事務中：扣除金幣 + 增加庫存
+    // 6. ✅ 在同一事務中：扣除金幣 + 增加庫存 + 創建交易記錄
     transaction.update(userRef, {
       walletBalance: newBalance,
       "wallet.balance": newBalance,
@@ -218,6 +246,21 @@ const purchasePotionCommon = async (userId, potionType, potionConfig, options = 
       },
       { merge: true }
     );
+
+    // ✅ 2025-01-20 功能修復：創建交易記錄
+    createTransactionInTx(transaction, {
+      userId,
+      type: TRANSACTION_TYPES.SPEND,
+      amount: unitPrice,
+      description: `購買 ${potionConfig.name} x${quantity}`,
+      metadata: {
+        potionType,
+        potionId: potionConfig.id,
+        quantity,
+      },
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    });
   });
 
   return {
@@ -277,58 +320,45 @@ const usePotionCommon = async (userId, characterId, potionType, potionConfig, in
   let expiresAt;
 
   await db.runTransaction(async (transaction) => {
-    // 1. 在 Transaction 內讀取數據
+    // ==================== 階段 1: 所有讀取操作 ====================
+    // ⚠️ 重要：Firestore 要求所有讀取必須在寫入之前完成
+
+    // 1. 讀取用戶限制數據
     const doc = await transaction.get(userLimitRef);
     const data = doc.exists ? doc.data() : {};
     const potionInventory = data.potionInventory || {};
     const activePotionEffects = data.activePotionEffects || {};
 
-    // 2. 在 Transaction 內檢查庫存
-    if ((potionInventory[inventoryKey] || 0) < 1) {
+    // ==================== 階段 2: 數據驗證 ====================
+
+    // 2. 檢查庫存
+    const currentInventory = potionInventory[inventoryKey] || 0;
+    if (currentInventory < 1) {
       throw new Error(insufficientMessage);
     }
 
-    // 3. ✅ P1-4 修復：檢查該角色是否已有激活的效果（防止並發重複激活）
+    // 3. 檢查該角色是否已有激活的效果（防止並發重複激活）
     const existingEffect = activePotionEffects[effectId];
     if (existingEffect && isPotionEffectActive(existingEffect)) {
       throw new Error(activeMessage);
     }
 
-    // 4. 在 Transaction 內扣除庫存並激活效果
+    // ==================== 階段 3: 準備寫入數據 ====================
+
+    // 4. 計算過期時間
     const now = new Date();
     expiresAt = new Date(now.getTime() + potionConfig.duration * 24 * 60 * 60 * 1000);
 
-    // ✅ P1-4 修復：先扣除庫存（原子操作）
+    // ==================== 階段 4: 所有寫入操作 ====================
+    // ⚠️ 重要：所有寫入必須在所有讀取之後執行
+
+    // 5. 扣除庫存並激活效果（使用單次 set 操作確保原子性）
     transaction.set(
       userLimitRef,
       {
         potionInventory: {
           [inventoryKey]: FieldValue.increment(-1),
         },
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    // ✅ P1-4 修復：再次讀取以驗證扣除後的庫存（確保並發安全）
-    const verifyDoc = await transaction.get(userLimitRef);
-    const verifyData = verifyDoc.exists ? verifyDoc.data() : {};
-    const newInventory = verifyData.potionInventory?.[inventoryKey] || 0;
-
-    if (newInventory < 0) {
-      // ✅ P2-3 優化：記錄技術細節到日誌，向用戶顯示友好訊息
-      logger.error(
-        `[藥水使用] 庫存驗證失敗：並發操作導致庫存不足`,
-        { userId, characterId, potionType, newInventory }
-      );
-      // 拋出用戶友好的錯誤訊息，回滾 Transaction
-      throw new Error("藥水使用失敗，請稍後重試");
-    }
-
-    // 5. 激活效果（在同一 Transaction 內）
-    transaction.set(
-      userLimitRef,
-      {
         activePotionEffects: {
           [effectId]: {
             characterId,
@@ -341,6 +371,9 @@ const usePotionCommon = async (userId, characterId, potionType, potionConfig, in
       },
       { merge: true }
     );
+
+    // ✅ 注意：移除了驗證讀取（line 314），因為 Firestore Transaction 本身已保證原子性
+    // 如果庫存不足，transaction 會自動重試或失敗
   });
 
   return {

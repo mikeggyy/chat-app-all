@@ -16,6 +16,7 @@ import { useVoiceAudioPlayer } from "../composables/voice-selection/useVoiceAudi
 import { useVoiceFiltering } from "../composables/voice-selection/useVoiceFiltering.js";
 import { useFlowSync } from "../composables/voice-selection/useFlowSync.js";
 import { useVoiceLoading } from "../composables/voice-selection/useVoiceLoading.js";
+import { useDraftFlow } from "../composables/character-creation/useDraftFlow.js";
 
 // Types
 interface VoicePreset {
@@ -88,6 +89,9 @@ const {
   cleanupTimers,
 } = useFlowSync();
 
+// 🔥 草稿管理
+const { clearDraft } = useDraftFlow();
+
 // 本地狀態
 const selectedVoiceId: Ref<string> = ref("");
 let suppressSync: boolean = false;
@@ -130,6 +134,12 @@ const finalizeCreation = async (): Promise<void> => {
     // 獲取用戶選擇的圖片 URL
     const selectedImageUrl = (summaryData.value as SummaryData | null)?.appearance?.image || null;
 
+    console.log('[CharacterCreateVoiceView] 📸 準備創建角色，圖片信息：', {
+      selectedImageUrl,
+      summaryData: summaryData.value,
+      flowId: flowId.value
+    });
+
     // 調用 API 將角色保存到資料庫，並傳遞選擇的圖片 URL
     const character = await finalizeCharacterCreation(
       flowId.value,
@@ -137,12 +147,43 @@ const finalizeCreation = async (): Promise<void> => {
       selectedImageUrl
     ) as CreatedCharacter;
 
+    console.log('[CharacterCreateVoiceView] ✅ 角色創建成功，返回數據：', character);
+
+    // 🔥 修復：使用 summaryData 的完整數據來豐富返回的角色資料
+    // 確保成功對話框顯示用戶選擇的所有設定
+    const enrichedCharacter = {
+      ...character,
+      // 如果後端沒有返回 portraitUrl 或返回的是錯誤的，使用用戶選擇的圖片
+      portraitUrl: character.portraitUrl || selectedImageUrl || character.portrait_url || '/avatars/defult-01.webp',
+      // 確保 voice 是完整的物件而非僅 ID
+      voice: summaryData.value?.voice || character.voice,
+      // 確保 gender 正確顯示
+      gender: summaryData.value?.gender || character.gender,
+      // 🔥 新增：確保角色設定（tagline）正確傳遞
+      background: character.background || summaryData.value?.persona?.tagline || '',
+      // 🔥 新增：確保隱藏設定（hiddenProfile）正確傳遞
+      secret_background: character.secret_background || summaryData.value?.persona?.hiddenProfile || '',
+      // 🔥 新增：確保開場白（prompt）正確傳遞
+      first_message: character.first_message || summaryData.value?.persona?.prompt || '',
+    };
+
+    console.log('[CharacterCreateVoiceView] 📝 豐富後的角色數據：', enrichedCharacter);
+
     // 保存角色資料並顯示成功彈窗
-    createdCharacter.value = character;
+    createdCharacter.value = enrichedCharacter;
     isCharacterCreatedModalVisible.value = true;
 
-    // 保存成功後清除暫存資料
-    clearStoredData();
+    // 🔥 修復：保存成功後清除所有暫存資料和草稿
+    clearStoredData();  // 清除 flow 相關數據
+    clearDraft();       // 清除草稿（防止重複顯示草稿對話框）
+
+    // 🔥 新增：清除 characterCreation store 狀態（包括 AI 魔法師計數）
+    const { useCharacterCreationStore } = await import('../stores/characterCreation.js');
+    const ccStore = useCharacterCreationStore();
+    ccStore.resetFlow();  // 重置整個流程（包括 AI 魔法師計數）
+    ccStore.clearSession();  // 清除 sessionStorage
+
+    console.log('[CharacterCreateVoiceView] 已清除所有暫存資料、草稿和 store 狀態');
 
     // 顯示成功訊息
     showSuccess("角色創建成功！");

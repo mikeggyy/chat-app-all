@@ -7,6 +7,7 @@ import {
   clearTestSession,
   hasValidTestSession,
 } from "../services/testAuthSession.js";
+import { ensureAuthState } from "../services/authBootstrap.js";
 import { isGuestUser } from "../../../../shared/config/testAccounts.js";
 
 // 使用動態導入實現路由懶加載
@@ -244,7 +245,11 @@ const ensureAuthTokenOrReset = (): boolean => {
   return hasToken;
 };
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
+  // 🔒 修復競態條件：等待認證狀態完全初始化
+  // 這確保在檢查 hasCompletedOnboarding 之前，用戶資料已經完全載入
+  await ensureAuthState();
+
   const authenticated = isAuthenticated.value;
   const hasToken = hasValidAuthToken();
 
@@ -257,41 +262,40 @@ router.beforeEach((to, _from, next) => {
     return;
   }
 
-  // 🔥 重要：如果有 token 但未認證（認證進行中），直接允許訪問
-  // 不要檢查 onboarding 狀態，因為用戶數據可能還沒載入完成
-  if (hasToken && !authenticated) {
-    next();
-    return;
-  }
-
-  // ✅ 只有在「已完全認證」時才檢查 onboarding 狀態
+  // 🔥 認證狀態已完全初始化，可以安全檢查用戶資料
   if (authenticated && hasToken) {
     const currentUser = user.value;
-    const hasCompletedOnboarding = currentUser?.hasCompletedOnboarding ?? false;
+    // 🔒 修復：認證已完成，hasCompletedOnboarding 應該已經有明確的值
+    const hasCompletedOnboarding = currentUser?.hasCompletedOnboarding;
     const isGuest = isGuestUser(currentUser?.id || '');
 
     // 遊客用戶跳過 onboarding 檢查
     if (!isGuest) {
       // ⚠️ 只在以下情況才重定向到 onboarding：
-      // 1. 用戶未完成 onboarding
+      // 1. 用戶明確未完成 onboarding（=== false，不包括 undefined）
       // 2. 嘗試訪問的不是 login 或 onboarding 頁面
-      if (!hasCompletedOnboarding && to.name !== "onboarding" && to.name !== "login") {
+      // 🔥 修復：使用嚴格相等判斷，避免 undefined 被誤判為 false
+      if (hasCompletedOnboarding === false && to.name !== "onboarding" && to.name !== "login") {
         next({ name: "onboarding" });
         return;
       }
 
       // 如果已完成 onboarding 且在 onboarding 頁面，重定向到 match
-      if (hasCompletedOnboarding && to.name === "onboarding") {
+      if (hasCompletedOnboarding === true && to.name === "onboarding") {
         next({ name: "match" });
         return;
       }
 
       // 如果在登入頁面且已登入，重定向
       if (to.name === "login") {
-        if (!hasCompletedOnboarding) {
+        // 🔒 修復：認證已完成，可以安全判斷 onboarding 狀態
+        if (hasCompletedOnboarding === false) {
           next({ name: "onboarding" });
-        } else {
+        } else if (hasCompletedOnboarding === true) {
           next({ name: "match" });
+        } else {
+          // 如果仍為 undefined（罕見情況），允許訪問以避免阻塞
+          next();
         }
         return;
       }

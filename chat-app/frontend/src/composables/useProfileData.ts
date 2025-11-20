@@ -190,7 +190,7 @@ export function useProfileData(): UseProfileDataReturn {
   const loadMembership = loadMembershipInfo;
 
   // 金幣系統
-  const { balance, formattedBalance, loadBalance } = useCoins();
+  const { balance, formattedBalance, loadBalance, updateBalance } = useCoins();
 
   // 解鎖票券
   const { loadBalance: loadTicketsBalance } = useUnlockTickets();
@@ -255,6 +255,8 @@ export function useProfileData(): UseProfileDataReturn {
       const data = response.data || response;
 
       logger.log('[useProfileData] 解析後的資產數據:', data);
+      console.log('[ProfileView] 🔍 API 返回的 balance:', data.balance);
+      console.log('[ProfileView] 🔍 更新前的 balance.value:', balance.value);
 
       // ✅ 合併：同時更新資產和金幣餘額
       if (data && typeof data === "object") {
@@ -268,10 +270,14 @@ export function useProfileData(): UseProfileDataReturn {
           potions: data.potions ?? userAssets.value.potions,
         };
 
-        // ✅ 同時更新金幣餘額（從同一個 API）
+        // ✅ 優化：從資產 API 同步更新金幣餘額，避免額外的 API 調用
         if (data.balance !== undefined) {
-          balance.value = data.balance;
-          logger.log('[useProfileData] 金幣餘額已更新:', data.balance);
+          console.log('[ProfileView] 🔥 準備更新 balance 為:', data.balance);
+          updateBalance(data.balance);
+          console.log('[ProfileView] ✅ 更新後的 balance.value:', balance.value);
+          logger.log('[useProfileData] 金幣餘額已從資產 API 更新:', data.balance);
+        } else {
+          console.warn('[ProfileView] ⚠️ API 響應中沒有 balance 欄位');
         }
 
         logger.log('[useProfileData] 資產已更新:', userAssets.value);
@@ -289,17 +295,25 @@ export function useProfileData(): UseProfileDataReturn {
   /**
    * 初始化加載所有數據
    * @param userId - 用戶 ID
+   *
+   * ✅ 優化說明：
+   * - loadUserAssets() 會從資產 API 獲取金幣餘額並通過 updateBalance() 更新
+   * - 移除了 loadBalance() 調用，避免重複的 API 請求
+   * - 如需單獨刷新金幣，可調用 refreshProfileData()
+   *
+   * ✅ 修復：使用 force: true 強制繞過緩存，確保顯示最新資料
+   * - 創建角色後會消耗金幣，但緩存可能導致顯示舊的餘額
+   * - 強制刷新可確保用戶總是看到最新的資料狀態
    */
   const initializeProfileData = async (userId: string): Promise<void> => {
     if (!userId || isGuest.value) return;
 
     try {
       await Promise.allSettled([
-        loadUserProfile(userId),
+        loadUserProfile(userId, { force: true }), // ✅ 強制刷新，繞過緩存
         loadMembership(),
-        loadBalance(),
         loadTicketsBalance(),
-        loadUserAssets(userId),
+        loadUserAssets(userId), // ✅ 會同時更新金幣餘額
       ]);
     } catch (error) {
       logger.error("[useProfileData] 初始化資料失敗:", error);
@@ -309,6 +323,10 @@ export function useProfileData(): UseProfileDataReturn {
   /**
    * 刷新用戶資料（強制繞過緩存）
    * @param userId - 用戶 ID
+   *
+   * ✅ 優化說明：
+   * - loadUserAssets() 會同時更新金幣餘額
+   * - 移除了 loadBalance() 調用，避免重複的 API 請求
    */
   const refreshProfileData = async (userId: string): Promise<void> => {
     if (!userId) return;
@@ -316,8 +334,7 @@ export function useProfileData(): UseProfileDataReturn {
     try {
       await Promise.allSettled([
         loadUserProfile(userId, { force: true }), // 強制刷新，繞過緩存
-        loadBalance(),
-        loadUserAssets(userId),
+        loadUserAssets(userId), // ✅ 會同時更新金幣餘額
       ]);
     } catch (error) {
       logger.error("[useProfileData] 刷新資料失敗:", error);

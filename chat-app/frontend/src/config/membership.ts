@@ -101,7 +101,7 @@ export const membershipTiers: MembershipTier[] = [
       {
         icon: GiftIcon,
         title: "開通豪禮",
-        detail: "立即送 600 金幣 + 10 張解鎖票 + 20 張拍照卡 + 10 張創建卡",
+        detail: "立即送 600 金幣 + 10 張解鎖票 + 20 張照片解鎖卡 + 10 張創建卡",
         badge: "立即獲得",
       },
       {
@@ -151,7 +151,7 @@ export const membershipTiers: MembershipTier[] = [
       {
         icon: GiftIcon,
         title: "超值豪華禮包",
-        detail: "立即送 2000 金幣 + 30 張解鎖票 + 60 張拍照卡 + 30 張創建卡",
+        detail: "立即送 2000 金幣 + 30 張解鎖票 + 60 張照片解鎖卡 + 30 張創建卡",
         badge: "價值最高",
       },
       {
@@ -223,7 +223,7 @@ export const comparisonFeatures: ComparisonCategory[] = [
         vvip: "送 30 張",
       },
       {
-        name: "拍照卡",
+        name: "照片解鎖卡",
         free: "-",
         vip: "送 20 張",
         vvip: "送 60 張",

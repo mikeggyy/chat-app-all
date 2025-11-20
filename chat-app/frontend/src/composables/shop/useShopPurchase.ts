@@ -232,7 +232,7 @@ export function useShopPurchase(options: UseShopPurchaseOptions = {} as UseShopP
     // 檢查是否是腦力激盪藥水且用戶是VVIP
     if (
       item.id.includes("brain_boost") &&
-      membership.value?.tier === "vvip"
+      membership?.value?.tier === "vvip"
     ) {
       showError("您的模型已經是最高級了");
       return;

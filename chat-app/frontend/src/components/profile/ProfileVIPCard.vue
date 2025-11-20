@@ -210,6 +210,7 @@ const handleUpgradeClick = () => {
     font-weight: 700;
     color: #f1f5f9;
     line-height: 1.2;
+    white-space: nowrap;
 
     .vip-card--vip & {
       color: #fbbf24;

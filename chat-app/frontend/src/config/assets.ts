@@ -6,14 +6,6 @@
  * - 這裡只添加 UI 相關配置（圖標、顏色等）
  */
 
-import {
-  TicketIcon,
-  PhotoIcon,
-  ChatBubbleBottomCenterIcon,
-  BoltIcon,
-} from '@heroicons/vue/24/outline';
-import { SparklesIcon } from '@heroicons/vue/24/solid';
-
 // 引用共享配置
 import { ASSET_CARDS_BASE_CONFIG } from '../../../shared/config/assets.js';
 import { POTIONS_BASE_CONFIG } from '../../../shared/config/potions.js';
@@ -46,16 +38,17 @@ export const COIN_ICON_PATH: string = '/icons/wallet-coin.png';
 
 /**
  * 圖標配置（UI 專用）
- * ⚠️ 這些 icon 必須與 ShopView 和 StatsModal 保持一致
+ * ⚠️ 使用 emoji 圖標以提供更豐富的視覺效果
+ * 與後端的 CATEGORY_ICONS 保持一致
  */
-const ICON_MAP: Record<string, any> = {
-  'character-unlock': TicketIcon,
-  'photo-unlock': PhotoIcon,
-  'video-unlock': SparklesIcon,
-  'voice-unlock': ChatBubbleBottomCenterIcon,
-  'create': TicketIcon,
-  'memory_boost': SparklesIcon,
-  'brain_boost': BoltIcon,
+const ICON_MAP: Record<string, string> = {
+  'character-unlock': '🎭',
+  'photo-unlock': '📸',
+  'video-unlock': '🎬',
+  'voice-unlock': '🔊',
+  'create': '✨',
+  'memory_boost': '🧠',
+  'brain_boost': '⚡',
 };
 
 /**

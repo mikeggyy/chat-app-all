@@ -178,7 +178,10 @@ export function useShopItems(
             },
           ];
 
-    return pkgs.map((pkg) => ({
+    // ✅ 修復：按照 order 欄位排序（雙重保險）
+    const sortedPkgs = [...pkgs].sort((a, b) => ((a as any).order || 0) - ((b as any).order || 0));
+
+    return sortedPkgs.map((pkg) => ({
       id: `coin-${pkg.id}`,
       category: "coins",
       name: `${pkg.totalCoins || pkg.coins} 金幣`,
@@ -198,7 +201,7 @@ export function useShopItems(
    * 資產卡片商品（從 API 加載）
    */
   const assetCardItems = computed<ShopItem[]>(() => {
-    return assetPackages.value.map((pkg) => {
+    const items = assetPackages.value.map((pkg) => {
       // 從 category 或 baseId 中提取 iconColor
       const mapping: IconMapping =
         ICON_MAPPING[pkg.category] || ICON_MAPPING[pkg.baseId || ""] || { iconColor: "character" };
@@ -218,15 +221,19 @@ export function useShopItems(
         popular: pkg.popular || false,
         badge: pkg.badge || null,
         originalPrice: pkg.originalPrice || null,
+        order: (pkg as any).order || 0, // 保留 order 用於排序
       };
     });
+
+    // ✅ 修復：按照 order 欄位排序（雙重保險）
+    return items.sort((a, b) => (a.order || 0) - (b.order || 0));
   });
 
   /**
    * 道具商品（從 API 加載）
    */
   const potionItems = computed<ShopItem[]>(() => {
-    return potionPackages.value.map((potion) => {
+    const items = potionPackages.value.map((potion) => {
       const mapping: IconMapping = POTION_ICON_MAPPING[potion.baseId || ""] || { iconColor: "memory" };
 
       const iconValue = potion.icon || null;
@@ -252,8 +259,12 @@ export function useShopItems(
         badge: potion.badge || null,
         requiresCharacter: false,
         originalPrice: potion.originalPrice || null,
+        order: (potion as any).order || 0, // 保留 order 用於排序
       };
     });
+
+    // ✅ 修復：按照 order 欄位排序（雙重保險）
+    return items.sort((a, b) => (a.order || 0) - (b.order || 0));
   });
 
   /**

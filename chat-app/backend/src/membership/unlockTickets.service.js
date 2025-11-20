@@ -123,34 +123,43 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
 
   // ✅ 修復：使用 Transaction 確保原子性
   await db.runTransaction(async (transaction) => {
-    // 1. 在 Transaction 內讀取用戶資料
+    // ==================== 階段 1: 所有讀取操作 ====================
+    // ⚠️ 重要：Firestore 要求所有讀取必須在寫入之前完成
+
+    // 1. 讀取用戶資料
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) {
       throw new Error("找不到用戶");
     }
 
+    // 2. 讀取使用限制資料
+    const limitRef = db.collection("usage_limits").doc(userId);
+    const limitDoc = await transaction.get(limitRef);
+
+    // ==================== 階段 2: 數據處理 ====================
+
     const user = userDoc.data();
 
-    // 2. 讀取角色解鎖卡餘額（✅ 統一從 assets 讀取）
+    // 3. 讀取角色解鎖卡餘額（✅ 統一從 assets 讀取）
     const currentCards = user?.assets?.characterUnlockCards || user?.assets?.characterUnlockTickets || 0;
 
-    // 3. 檢查餘額
+    // 4. 檢查餘額
     if (currentCards < 1) {
       throw new Error("角色解鎖票不足");
     }
 
-    // 4. 計算解鎖到期時間（7 天後）
+    // 5. 計算解鎖到期時間（7 天後）
     const now = new Date();
     const unlockDays = 7;
     const unlockUntil = new Date(now.getTime() + unlockDays * 24 * 60 * 60 * 1000);
 
-    // 5. ✅ 統一寫入新位置 assets（不論從哪裡讀取）
+    // 6. 準備用戶資料更新
     const updateData = {
       'assets.characterUnlockCards': currentCards - 1,
       updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // 6. 記錄使用歷史到 unlockTickets（僅用於審計，不用於查詢餘額）
+    // 7. 記錄使用歷史到 unlockTickets（僅用於審計，不用於查詢餘額）
     const usageHistory = user?.unlockTickets?.usageHistory || [];
     usageHistory.push({
       type: "use",
@@ -162,14 +171,7 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
     });
     updateData['unlockTickets.usageHistory'] = usageHistory;
 
-    // 7. 更新用戶資料（在 Transaction 內）
-    transaction.update(userRef, updateData);
-
-    // 7.5 ✅ P2-7 新增：記錄到 unlockedCharacters 欄位（快速查詢已解鎖角色）
-    // 用途：
-    // - 快速查詢用戶已解鎖哪些角色
-    // - 防止重複購買已解鎖的角色
-    // - 提供更好的用戶體驗（顯示已解鎖列表）
+    // 8. 準備 unlockedCharacters 更新
     const unlockedCharactersUpdate = {
       [`unlockedCharacters.${characterId}`]: {
         unlockedAt: FieldValue.serverTimestamp(),
@@ -178,12 +180,8 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
         unlockDays, // 解鎖天數
       },
     };
-    transaction.update(userRef, unlockedCharactersUpdate);
 
-    // 8. 設置解鎖限制（在 Transaction 內）
-    const limitRef = db.collection("usage_limits").doc(userId);
-    const limitDoc = await transaction.get(limitRef);
-
+    // 9. 準備限制資料更新
     let limitData = limitDoc.exists ? limitDoc.data() : {
       userId,
       conversation: {},
@@ -210,9 +208,21 @@ export const useCharacterUnlockTicket = async (userId, characterId) => {
     limitData.conversation[characterId].permanentUnlock = false;
     limitData.updatedAt = FieldValue.serverTimestamp();
 
+    // ==================== 階段 3: 所有寫入操作 ====================
+    // ⚠️ 重要：所有寫入必須在所有讀取之後執行
+
+    // 10. 更新用戶資料（卡片數量和使用歷史）
+    transaction.update(userRef, updateData);
+
+    // 11. 更新解鎖角色記錄
+    transaction.update(userRef, unlockedCharactersUpdate);
+
+    // 12. 更新使用限制
     transaction.set(limitRef, limitData, { merge: true });
 
-    // 8. 設置返回結果
+    // ==================== 階段 4: 準備返回結果 ====================
+
+    // 13. 設置返回結果
     result = {
       success: true,
       characterId,
@@ -371,24 +381,42 @@ export const getTicketBalance = async (userId, ticketType) => {
 
 /**
  * 獲取所有解鎖券餘額
+ * ✅ 修復：返回格式與前端期望匹配
  */
 export const getAllTicketBalances = async (userId) => {
-  const [character, photo, video, voice] = await Promise.all([
-    getTicketBalance(userId, TICKET_TYPES.CHARACTER),
-    getTicketBalance(userId, TICKET_TYPES.PHOTO),
-    getTicketBalance(userId, TICKET_TYPES.VIDEO),
-    getTicketBalance(userId, TICKET_TYPES.VOICE),
-  ]);
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new Error("找不到用戶");
+  }
 
+  // ✅ 統一從 assets 讀取所有卡片數據
+  const assets = user?.assets || {};
+
+  // ✅ 獲取使用歷史
+  const usageHistory = user?.unlockTickets?.usageHistory || [];
+
+  // ✅ 返回前端期望的格式（頂層字段，不嵌套在 balances 中）
   return {
-    userId,
-    balances: {
-      characterUnlock: character.balance,
-      photoUnlock: photo.balance,
-      videoUnlock: video.balance,
-      voiceUnlock: voice.balance,
-    },
+    characterUnlockCards: assets.characterUnlockCards || 0,
+    photoUnlockCards: assets.photoUnlockCards || 0,
+    videoUnlockCards: assets.videoUnlockCards || 0,
+    voiceUnlockCards: assets.voiceUnlockCards || 0,
+    createCards: assets.createCards || 0,
+    usageHistory,
   };
+};
+
+/**
+ * 獲取用戶的照片解鎖卡數量
+ */
+export const getPhotoUnlockCards = async (userId) => {
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new Error("找不到用戶");
+  }
+
+  // ✅ 統一從 assets 讀取
+  return user?.assets?.photoUnlockCards || 0;
 };
 
 /**
@@ -525,10 +553,35 @@ export const getUserUnlockedCharacters = async (userId) => {
     }
 
     if (isValid) {
+      // ✅ 計算剩餘天數
+      let remainingDays = null;
+      if (!unlockData.permanent && unlockData.expiresAt) {
+        try {
+          const expiresAt = new Date(unlockData.expiresAt);
+          if (!isNaN(expiresAt.getTime())) {
+            remainingDays = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+          }
+        } catch (error) {
+          logger.error(`[計算剩餘天數] 用戶 ${userId} 角色 ${characterId} 日期解析失敗`, error);
+        }
+      }
+
+      // ✅ 轉換 Firestore Timestamp 為 ISO 字符串
+      let unlockedAt = unlockData.unlockedAt;
+      if (unlockedAt && typeof unlockedAt.toDate === 'function') {
+        // Firestore Timestamp 對象，轉換為 ISO 字符串
+        unlockedAt = unlockedAt.toDate().toISOString();
+      } else if (unlockedAt instanceof Date) {
+        // JavaScript Date 對象，轉換為 ISO 字符串
+        unlockedAt = unlockedAt.toISOString();
+      }
+
       result.push({
         characterId,
         ...unlockData,
+        unlockedAt, // ✅ 確保是 ISO 字符串格式
         isExpired: false,
+        remainingDays, // ✅ 添加剩餘天數
       });
     }
   }

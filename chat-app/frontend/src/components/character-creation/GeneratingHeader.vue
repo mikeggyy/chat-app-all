@@ -19,6 +19,7 @@ withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const handleBack = (): void => {
+  console.log('[GeneratingHeader] X 按鈕被點擊');
   emit("back");
 };
 </script>

@@ -107,8 +107,8 @@ const handleCoinIconError = () => {
 }
 
 .stat-card__value {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.125rem;
+  font-weight: 600;
   letter-spacing: 0.02em;
   color: #fbbf24;
 }

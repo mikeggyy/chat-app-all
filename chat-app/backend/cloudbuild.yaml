@@ -1,0 +1,15 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--no-cache'
+      - '--build-arg'
+      - 'CACHE_BUST=$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/chat-backend'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/chat-backend:$BUILD_ID'
+      - '.'
+images:
+  - 'gcr.io/$PROJECT_ID/chat-backend'
+  - 'gcr.io/$PROJECT_ID/chat-backend:$BUILD_ID'

@@ -6,7 +6,7 @@ import { characterCreationSchemas } from "../characterCreation.schemas.js";
 import {
   sendSuccess,
   sendError,
-} from "../../../../shared/utils/errorFormatter.js";
+} from "../../../shared/utils/errorFormatter.js";
 import { getGenerationStats } from "../generationLog.service.js";
 import {
   canCreateCharacter,

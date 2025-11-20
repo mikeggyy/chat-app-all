@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireFirebaseAuth } from "../auth/index.js";
 import { requireOwnership, asyncHandler } from "../utils/routeHelpers.js";
-import { sendSuccess, sendError } from "../../../shared/utils/errorFormatter.js";
+import { sendSuccess, sendError } from "../../shared/utils/errorFormatter.js";
 import {
   appendConversationMessages,
   getConversationHistory,

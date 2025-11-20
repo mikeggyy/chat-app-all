@@ -4,4 +4,11 @@
  * 此文件僅用於向後兼容，重新導出共享工具
  */
 
-export * from '../../../../shared/backend-utils/firebase.js';
+export {
+  getFirestoreDb,
+  getFirebaseAdminAuth,
+  db,
+  auth,
+  FieldValue,
+  FieldPath
+} from '../../shared/backend-utils/firebase.js';

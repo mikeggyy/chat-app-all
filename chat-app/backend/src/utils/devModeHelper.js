@@ -5,7 +5,7 @@
  */
 
 import logger from "./logger.js";
-import { isDevUser } from "../../../shared/config/testAccounts.js";
+import { isDevUser } from "../../shared/config/testAccounts.js";
 
 /**
  * 檢查是否可以使用開發模式繞過

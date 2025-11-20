@@ -1,5 +1,5 @@
 import { getFirebaseAdminAuth } from "../firebase/index.js";
-import { TEST_ACCOUNTS, validateTestToken } from "../../../shared/config/testAccounts.js";
+import { TEST_ACCOUNTS, validateTestToken } from "../../shared/config/testAccounts.js";
 
 import logger from "../utils/logger.js";
 // Guest token support v2

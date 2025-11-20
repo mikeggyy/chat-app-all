@@ -21,16 +21,18 @@ const generateCsrfToken = () => {
  * @returns {Function} Express 中間件
  */
 export const csrfProtection = (options = {}) => {
+  const isDevelopment = process.env.NODE_ENV !== 'production';
   const {
     cookieName = '_csrf',
     headerName = 'x-csrf-token',
     ignoreMethods = ['GET', 'HEAD', 'OPTIONS'],
     cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      // ✅ 修復：開發環境使用 'lax'，生產環境使用 'strict'
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      secure: !isDevelopment,
+      // ✅ 修復：生產環境使用 'none' 支持跨域，開發環境不設置
+      sameSite: isDevelopment ? undefined : 'none',
       maxAge: 3600000, // 1 小時
+      path: '/',
     },
   } = options;
 
@@ -85,13 +87,16 @@ export const csrfProtection = (options = {}) => {
  * 用於 GET 請求，將 Token 設置到 Cookie 並返回給客戶端
  */
 export const setCsrfToken = (options = {}) => {
+  const isDevelopment = process.env.NODE_ENV !== 'production';
   const {
     cookieName = '_csrf',
     cookieOptions = {
       httpOnly: false, // ✅ 修復：設為 false 讓 JavaScript 可以讀取
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      secure: !isDevelopment, // 生產環境使用 secure，開發環境不使用
+      // ✅ 修復：生產環境使用 'none' 支持跨域，開發環境不設置
+      sameSite: isDevelopment ? undefined : 'none',
       maxAge: 3600000, // 1 小時
+      path: '/', // ✅ 確保 Cookie 在所有路徑下都可用
     },
   } = options;
 

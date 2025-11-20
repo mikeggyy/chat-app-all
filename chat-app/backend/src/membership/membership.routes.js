@@ -21,7 +21,7 @@ import {
   sendSuccess,
   sendError,
   ApiError,
-} from "../../../shared/utils/errorFormatter.js";
+} from "../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { purchaseRateLimiter, relaxedRateLimiter, standardRateLimiter } from "../middleware/rateLimiterConfig.js";
 import { validateDevModeBypass } from "../utils/devModeHelper.js";

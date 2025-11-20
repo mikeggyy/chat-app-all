@@ -27,10 +27,20 @@ RUN apk add --no-cache dumb-init
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 # Copy dependencies from builder
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules ./node_modules
 
-# Copy application source
-COPY --chown=nodejs:nodejs . .
+# Copy application source (includes shared/ directory)
+COPY . .
+
+# Force cache invalidation for shared directory
+# This ensures new files in shared/ are always copied
+ARG CACHE_BUST=unknown
+RUN echo "Cache bust: $CACHE_BUST"
+
+# Note: shared directory is now at /app/shared/ and can access /app/node_modules/
+
+# Change ownership to nodejs user
+RUN chown -R nodejs:nodejs /app
 
 # Switch to non-root user
 USER nodejs

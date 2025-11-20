@@ -8,7 +8,7 @@ import {
   sendSuccess,
   sendError,
   ApiError,
-} from "../../../shared/utils/errorFormatter.js";
+} from "../../shared/utils/errorFormatter.js";
 import { getFirestoreDb } from "../firebase/index.js";
 import { relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 import { createModuleLogger } from "../utils/logger.js";

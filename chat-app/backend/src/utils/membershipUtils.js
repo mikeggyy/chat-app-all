@@ -5,7 +5,7 @@
 
 import { getUserById } from "../user/user.service.js";
 import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
-import { isDevUser, isGuestUser } from "../../../shared/config/testAccounts.js";
+import { isDevUser, isGuestUser } from "../../shared/config/testAccounts.js";
 import { TEST_ACCOUNT_LIMITS } from "../config/limits.js";
 
 /**

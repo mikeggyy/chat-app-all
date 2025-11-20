@@ -4,7 +4,7 @@
  */
 
 // 引用共享配置
-import { POTIONS_BASE_CONFIG } from "../../../shared/config/potions.js";
+import { POTIONS_BASE_CONFIG } from "../../shared/config/potions.js";
 
 /**
  * 測試帳號專屬限制配置

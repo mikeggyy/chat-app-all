@@ -21,7 +21,7 @@ import {
   purchaseCards as trackPurchaseCards,
   unlockPermanently as trackUnlockPermanently,
 } from "./limitService/limitTracking.js";
-import { isGuestUser } from "../../../shared/config/testAccounts.js";
+import { isGuestUser } from "../../shared/config/testAccounts.js";
 import { LRUCache } from "../utils/LRUCache.js";
 import { serializeFirestoreData } from "../utils/firestoreHelpers.js";
 import logger from "../utils/logger.js";

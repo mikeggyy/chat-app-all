@@ -3,7 +3,8 @@
 # Dependencies
 node_modules/
 */node_modules/
-
+_node_modules_backup/
+**/_node_modules_backup/
 # Logs
 logs/
 *.log

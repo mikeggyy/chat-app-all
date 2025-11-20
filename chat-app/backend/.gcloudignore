@@ -1,0 +1,39 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development files
+.git/
+.gitignore
+*.log
+*.md
+.DS_Store
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+coverage/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+docs/
+scripts/test-*.js
+
+# Deployment files
+deploy-*.sh
+deploy-*.bat
+Dockerfile.dev
+docker-compose.yml

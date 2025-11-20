@@ -5,7 +5,7 @@ import {
   updateDocument,
   queryCollection,
 } from "../utils/firestoreHelpers.js";
-import { normalizeGender, normalizeArray, trimString } from "../../../shared/utils/userUtils.js";
+import { normalizeGender, normalizeArray, trimString } from "../../shared/utils/userUtils.js";
 import { clearConversationHistory } from "../conversation/conversation.service.js";
 import {
   getUserProfileWithCache,

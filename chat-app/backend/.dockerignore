@@ -1,10 +1,24 @@
 # Dependencies
 node_modules
 npm-debug.log
+shared/backend-utils/package.json
+shared/backend-utils/package-lock.json
+shared/backend-utils/node_modules
 
 # Environment files (should be set in Cloud Run)
 .env
 .env.*
+
+# Secrets and credentials (NEVER include in Docker image)
+secrets/
+*.pem
+*.key
+*.p12
+*-service-account.json
+google-cloud-*.json
+firebase-*.json
+credentials.json
+.gcloudignore
 
 # Development files
 .git
@@ -35,6 +49,9 @@ Thumbs.db
 # Logs
 logs/
 *.log
+backend.log
+debug.log
+nul
 
 # Temporary files
 tmp/

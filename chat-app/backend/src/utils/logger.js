@@ -4,5 +4,5 @@
  * 此文件僅用於向後兼容，重新導出共享工具
  */
 
-export * from '../../../../shared/backend-utils/logger.js';
-export { default } from '../../../../shared/backend-utils/logger.js';
+export * from '../../shared/backend-utils/logger.js';
+export { default } from '../../shared/backend-utils/logger.js';

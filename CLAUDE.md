@@ -376,6 +376,21 @@ npm run test:env            # 驗證環境變數配置（推薦首次啟動前�
 
 主應用前端使用 Vue 3 Composition API，關鍵 composables 位於 `frontend/src/composables/`：
 
+**📁 組織結構**：
+```
+composables/
+├── chat/                   # 聊天相關 composables
+├── character-creation/     # 角色創建流程
+├── limit/                  # 限制服務
+├── match/                  # 配對和發現
+├── photo-gallery/          # 照片相簿
+├── ranking/                # 排行榜
+├── search/                 # 搜尋功能
+├── shop/                   # 商城購買
+├── voice-selection/        # 語音選擇
+└── *.ts                    # 核心共用 composables
+```
+
 **核心功能**：
 - `useUserProfile` - 用戶資料和認證狀態管理
 - `useFirebaseAuth` - Firebase 認證整合

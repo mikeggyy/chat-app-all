@@ -620,6 +620,21 @@ console.log(user.customClaims);
 - 主應用架構：[chat-app/CLAUDE.md](chat-app/CLAUDE.md#architecture-overview)
 - Firestore 集合：[chat-app/docs/firestore-collections.md](chat-app/docs/firestore-collections.md)
 
+## 已知問題與修復記錄
+
+本專案持續追蹤和修復問題，以下是重要修復的文檔：
+
+### 2025-01 修復
+- **[PRICE_FIX_SUMMARY_2025-01-20.md](PRICE_FIX_SUMMARY_2025-01-20.md)** - 商品價格不一致修復（25 個問題）
+- **[CHARACTER_CREATION_FIX_SUMMARY.md](CHARACTER_CREATION_FIX_SUMMARY.md)** - 角色創建資料保存修復
+- **[CHARACTER_CREATION_SCHEMA_FIX.md](CHARACTER_CREATION_SCHEMA_FIX.md)** - Schema 驗證修復
+- **[TESTING_CHARACTER_CREATION_FIX.md](TESTING_CHARACTER_CREATION_FIX.md)** - 角色創建測試修復
+
+### 功能整合指南
+- **[GIFT_PHOTO_SELECTION_GUIDE.md](GIFT_PHOTO_SELECTION_GUIDE.md)** - 送禮物照片選擇功能整合
+
+這些文檔記錄了問題的根本原因分析、修復方案和測試結果，可作為未來類似問題的參考。
+
 ## 常見任務
 
 ### 一鍵啟動/停止所有服務

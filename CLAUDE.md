@@ -1008,7 +1008,18 @@ cat chat-app/firestore.indexes.json
 
 **測試框架**: Vitest 4.0.8 + Supertest 7.1.4
 
-**運行所有後端 API 測試**:
+**從根目錄運行所有測試**:
+```bash
+# 主應用後端測試
+cd chat-app/backend && npm test
+
+# 預期結果
+# ✓ Test Files: 31 passed (31)
+# ✓ Tests: 688 passed (688)
+# ✓ Duration: ~1.4s
+```
+
+**從 chat-app/backend 目錄運行**:
 ```bash
 cd chat-app/backend
 npm test

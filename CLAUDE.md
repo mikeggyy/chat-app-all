@@ -21,6 +21,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 📌 最近重要更新
 
+- **2025-01-20**: 🔧 **價格不一致問題修復** - 統一使用 `asset_packages` 集合，修正 25 個價格問題（詳見 [PRICE_FIX_SUMMARY_2025-01-20.md](PRICE_FIX_SUMMARY_2025-01-20.md)）
+- **2025-01-20**: 🛠️ **角色創建資料保存修復** - 修正靜默錯誤吞併問題，確保 persona 欄位正確保存（詳見 [CHARACTER_CREATION_FIX_SUMMARY.md](CHARACTER_CREATION_FIX_SUMMARY.md)）
 - **2025-01-15**: 🎉 **後端 API 測試 100% 完成** - 31 APIs, 688 tests, 10 大系統全覆蓋（含認證系統）（詳見 [chat-app/TEST_SUMMARY_2025-01-15_FINAL_COMPLETE.md](chat-app/TEST_SUMMARY_2025-01-15_FINAL_COMPLETE.md)）
 - **2025-01-12**: 代碼清理與健康度提升（詳見 [CHANGELOG.md](CHANGELOG.md)）
 - **2025-01**: 安全性增強 - 日誌脫敏、速率限制配置、統一錯誤碼
@@ -167,6 +169,9 @@ chat-app-all/            # 根目錄
 # 開發
 npm run dev                 # 啟動所有服務 (主應用 + 管理後臺，共4個服務)
 npm run install:all         # 安裝所有子項目的依賴
+
+# 測試
+cd chat-app/backend && npm test  # 運行主應用後端測試（688 tests）
 
 # 服務管理
 npm run cleanup-ports       # 清理特定端口

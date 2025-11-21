@@ -319,7 +319,39 @@ userRouter.get("/:id/conversations", requireFirebaseAuth, requireOwnership("id")
       cursor,
     });
 
-    const { conversations, nextCursor, hasMore } = result;
+    let { conversations, nextCursor, hasMore } = result;
+
+    // ✅ 向後兼容：如果子集合為空，嘗試從舊的 users/{id}.conversations 陣列讀取
+    if (conversations.length === 0 && !cursor) {
+      const user = await getUserById(id);
+      if (user?.conversations && Array.isArray(user.conversations) && user.conversations.length > 0) {
+        logger.info(`[對話列表] 用戶 ${id} 使用舊數據源（users.conversations 陣列）`);
+
+        // 將舊格式轉換為新格式
+        conversations = user.conversations.slice(0, limit).map(conv => {
+          // 舊格式可能是字串或物件
+          if (typeof conv === 'string') {
+            return {
+              id: conv,
+              conversationId: conv,
+              characterId: conv,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return {
+            id: conv.conversationId || conv.characterId || conv.id,
+            conversationId: conv.conversationId || conv.characterId || conv.id,
+            characterId: conv.characterId || conv.conversationId || conv.id,
+            updatedAt: conv.updatedAt || conv.lastMessageAt || new Date().toISOString(),
+            lastMessage: conv.lastMessage || conv.partnerLastMessage,
+            character: conv.character,
+          };
+        });
+
+        hasMore = user.conversations.length > limit;
+        nextCursor = null; // 舊格式不支持 cursor 分頁
+      }
+    }
 
     // 補充角色詳細信息（包含統計數據）
     const characterIds = conversations

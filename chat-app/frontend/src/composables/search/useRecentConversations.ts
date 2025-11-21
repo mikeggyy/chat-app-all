@@ -31,6 +31,11 @@ interface ConversationItem {
  * API 返回的對話列表響應
  */
 interface ConversationsResponse {
+  success?: boolean;
+  data?: {
+    conversations?: ConversationItem[];
+  };
+  // 兼容直接返回 conversations 的情況
   conversations?: ConversationItem[];
 }
 
@@ -96,8 +101,12 @@ export function useRecentConversations(user: Ref<User | null>) {
         { skipGlobalLoading: true }
       );
 
-      if (response?.conversations && Array.isArray(response.conversations)) {
-        recentConversations.value = response.conversations;
+      // 兼容兩種 API 響應格式：
+      // 1. { success: true, data: { conversations: [...] } }
+      // 2. { conversations: [...] }
+      const conversations = response?.data?.conversations || response?.conversations;
+      if (conversations && Array.isArray(conversations)) {
+        recentConversations.value = conversations;
       }
     } catch (error) {
       logger.error("獲取最近對話失敗:", error);

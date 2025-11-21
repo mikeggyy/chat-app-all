@@ -103,3 +103,8 @@ NUL
 *.rej
 *.tmp
 *~
+
+# 🔒 部署相關敏感文件（包含 API Keys，不應該提交到版本控制）
+cloud-run-env-vars.txt
+*-env-vars.txt
+deploy-*.txt

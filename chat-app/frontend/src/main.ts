@@ -32,7 +32,8 @@ if (typeof window !== "undefined") {
 // 這確保了所有寫操作都有可用的 CSRF Token
 if (typeof window !== "undefined") {
   try {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+    // 使用環境變數或空字串（依賴 Vite 代理）
+    const apiUrl = import.meta.env.VITE_API_URL || '';
     await fetch(`${apiUrl}/api/csrf-token`, {
       credentials: 'include', // 允許設置 Cookie
     });

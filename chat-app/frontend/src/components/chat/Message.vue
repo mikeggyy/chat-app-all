@@ -149,11 +149,11 @@ defineEmits<Emits>();
   line-height: 1.6;
   position: relative;
   color: #f8fafc;
-  background: rgba(51, 65, 85, 0.75);
+  background: rgba(51, 65, 85, 0.92); // ✅ 效能優化：移除 backdrop-filter，改用更不透明的背景
   border: 1px solid rgba(148, 163, 184, 0.3);
   align-self: flex-start;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(8px);
+  // ❌ 移除 backdrop-filter: blur(8px); - 每個消息都使用會造成滾動卡頓
   display: flex;
   flex-direction: column;
   gap: 0.35rem;

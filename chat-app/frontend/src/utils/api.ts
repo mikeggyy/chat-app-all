@@ -238,7 +238,8 @@ export const getApiBaseUrl = (): string => {
   }
 
   if (runtimeOrigin) return runtimeOrigin;
-  return "http://localhost:4000";
+  // 開發環境返回空字串，依賴 Vite 代理
+  return "";
 };
 
 export const withApiBase = (path: string = ""): string => {

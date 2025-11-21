@@ -669,7 +669,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/ai/tts`,
+        `${import.meta.env.VITE_API_URL || ''}/api/ai/tts`,
         {
           method: 'POST',
           headers,

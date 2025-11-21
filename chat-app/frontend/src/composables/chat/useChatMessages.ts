@@ -10,6 +10,7 @@
 import { ref, computed, Ref, unref } from 'vue';
 import { useUserProfile } from '../useUserProfile.js';
 import { useFirebaseAuth } from '../useFirebaseAuth.js';
+import { apiJson } from '../../utils/api.js';
 import {
   fetchConversationHistory,
   appendConversationMessages,
@@ -78,6 +79,8 @@ export function useChatMessages(partnerId: string | Ref<string>) {
   let historyLoadToken = 0;
   let pendingRetryTimerId: number | null = null;
   let pendingSyncInFlight = false;
+  // ✅ 效能優化：追蹤消息重試的 timer，避免組件卸載後繼續執行
+  const messageRetryTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
   // Computed
   const currentPartnerId = computed(() => {
@@ -252,10 +255,13 @@ export function useChatMessages(partnerId: string | Ref<string>) {
           const delay = RETRY_DELAYS[retryCount] || 10000;
           console.log(`[useChatMessages] ${delay / 1000}秒後將自動重試...`);
 
-          setTimeout(() => {
+          // ✅ 效能優化：追蹤 timer 以便在 cleanup 時清理
+          const timerId = setTimeout(() => {
+            messageRetryTimers.delete(userMessageId); // 執行後移除
             console.log(`[useChatMessages] 開始第 ${retryCount + 2} 次嘗試...`);
             syncMessageAndGetReply(userId, charId, text, userMessageId, retryCount + 1);
           }, delay);
+          messageRetryTimers.set(userMessageId, timerId);
         } else {
           // ✅ 修復：達到最大重試次數後，從列表中刪除失敗的消息
           console.error('[useChatMessages] 已達最大重試次數，從列表中刪除失敗消息');
@@ -412,6 +418,11 @@ export function useChatMessages(partnerId: string | Ref<string>) {
       clearTimeout(pendingRetryTimerId);
       pendingRetryTimerId = null;
     }
+    // ✅ 效能優化：清理所有消息重試的 timer
+    messageRetryTimers.forEach((timerId) => {
+      clearTimeout(timerId);
+    });
+    messageRetryTimers.clear();
   };
 
   /**

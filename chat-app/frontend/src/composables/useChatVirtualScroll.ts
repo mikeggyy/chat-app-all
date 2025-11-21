@@ -1,4 +1,4 @@
-import { ref, Ref } from 'vue';
+import { ref, Ref, onUnmounted } from 'vue';
 
 /**
  * 聊天虛擬滾動配置選項
@@ -10,6 +10,8 @@ interface UseChatVirtualScrollOptions {
   incrementCount?: number;
   /** 觸發加載的距離頂部閾值（px），默認 300 */
   scrollThreshold?: number;
+  /** 滾動節流間隔（ms），默認 100 */
+  throttleMs?: number;
 }
 
 /**
@@ -53,8 +55,13 @@ export function useChatVirtualScroll(
   const {
     initialCount = 50,
     incrementCount = 30,
-    scrollThreshold = 300
+    scrollThreshold = 300,
+    throttleMs = 100
   } = options;
+
+  // 節流控制變數
+  let lastScrollTime = 0;
+  let scrollThrottleTimer: ReturnType<typeof setTimeout> | null = null;
 
   // 當前顯示的消息數量（從最新往舊計算）
   const displayedCount: Ref<number> = ref(initialCount);
@@ -92,6 +99,12 @@ export function useChatVirtualScroll(
     displayedCount.value = initialCount;
     isLoadingMore.value = false;
     lastScrollHeight.value = 0;
+    // 清理節流 timer
+    if (scrollThrottleTimer) {
+      clearTimeout(scrollThrottleTimer);
+      scrollThrottleTimer = null;
+    }
+    lastScrollTime = 0;
   };
 
   /**
@@ -133,13 +146,38 @@ export function useChatVirtualScroll(
   };
 
   /**
-   * 處理滾動事件
+   * 處理滾動事件（帶節流優化）
    * @param event - 滾動事件
    * @param totalMessages - 總消息數量
    */
   const handleScroll = (event: Event, totalMessages: number): void => {
     if (isLoadingMore.value) return;
     if (displayedCount.value >= totalMessages) return;
+
+    const now = Date.now();
+    const timeSinceLastScroll = now - lastScrollTime;
+
+    // 節流：如果距離上次處理時間小於 throttleMs，延遲執行
+    if (timeSinceLastScroll < throttleMs) {
+      // 清除之前的延遲執行
+      if (scrollThrottleTimer) {
+        clearTimeout(scrollThrottleTimer);
+      }
+      // 設置新的延遲執行，確保最後一次滾動也能被處理
+      scrollThrottleTimer = setTimeout(() => {
+        handleScrollCore(event, totalMessages);
+      }, throttleMs - timeSinceLastScroll);
+      return;
+    }
+
+    handleScrollCore(event, totalMessages);
+  };
+
+  /**
+   * 核心滾動處理邏輯
+   */
+  const handleScrollCore = (event: Event, totalMessages: number): void => {
+    lastScrollTime = Date.now();
 
     const container = event.target as HTMLElement;
     const scrollTop = container.scrollTop;
@@ -158,6 +196,14 @@ export function useChatVirtualScroll(
   const hasMore = (totalMessages: number): boolean => {
     return displayedCount.value < totalMessages;
   };
+
+  // 組件卸載時清理 timer
+  onUnmounted(() => {
+    if (scrollThrottleTimer) {
+      clearTimeout(scrollThrottleTimer);
+      scrollThrottleTimer = null;
+    }
+  });
 
   return {
     // 狀態

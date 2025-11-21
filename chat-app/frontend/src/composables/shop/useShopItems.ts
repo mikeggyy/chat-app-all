@@ -193,7 +193,7 @@ export function useShopItems(
       popular: pkg.popular || false,
       badge: pkg.bestValue ? "超值" : pkg.popular ? "熱門" : null,
       bonusText: pkg.bonus > 0 ? `+${pkg.bonus} 贈送` : null,
-      useCoinImage: true, // 標記使用金幣圖片
+      useCoinImage: true, // 使用金幣圖片
     }));
   });
 

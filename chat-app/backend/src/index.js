@@ -115,6 +115,9 @@ app.use(helmet({
   } : false,
   // 隱藏 X-Powered-By 標頭
   hidePoweredBy: true,
+  // 🔥 修復：禁用 Cross-Origin-Opener-Policy（允許 Firebase 彈窗登入）
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
 }));
 
 // ⚡ 性能優化（2025-01）：gzip 壓縮響應數據（減少 60-80% 傳輸量）
@@ -158,6 +161,12 @@ app.get('/api/csrf-token', getCsrfTokenHandler);
 // 對所有 POST/PUT/DELETE 請求應用 CSRF 保護
 // 跳過公開端點（如登入、註冊等）
 app.use((req, res, next) => {
+  // ⚠️ 緊急開關：允許通過環境變數臨時禁用 CSRF（僅用於緊急情況）
+  if (process.env.DISABLE_CSRF === 'true') {
+    logger.warn('[CSRF] ⚠️ CSRF 保護已禁用（DISABLE_CSRF=true）');
+    return next();
+  }
+
   const publicPaths = [
     '/api/auth/login',
     '/api/auth/register',

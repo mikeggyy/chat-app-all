@@ -103,6 +103,9 @@ onMounted(() => {
     width: 32px;
     height: 32px;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 
     &-image {
       object-fit: contain;
@@ -111,6 +114,12 @@ onMounted(() => {
 
     &-fallback {
       color: #fbbf24;
+    }
+
+    // 🔥 修復：emoji 樣式
+    &-emoji {
+      font-size: 1.75rem;
+      line-height: 1;
     }
   }
 

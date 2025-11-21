@@ -85,9 +85,16 @@ google-cloud-service-account.json
 .DS_Store
 Thumbs.db
 ehthumbs.db
-Icon?
+# 🔥 修復：Icon? 原本要匹配 macOS 的 Icon\r 文件，但會意外排除 icons/ 目錄
+# 改用更精確的規則：匹配以 Icon 開頭的隱藏文件
+Icon
+Icon[
 desktop.ini
 NUL
+
+# ✅ 允許 public/icons/ 目錄下的文件被追蹤
+!frontend/public/icons/
+!frontend/public/icons/**
 
 # Miscellaneous
 *.swp

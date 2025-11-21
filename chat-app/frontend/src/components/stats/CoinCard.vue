@@ -100,6 +100,12 @@ const handleCoinIconError = () => {
   color: #1e293b;
 }
 
+/* 🔥 修復：emoji 樣式 */
+.stat-card__icon-emoji {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
 .stat-card__label {
   font-size: 0.875rem;
   font-weight: 500;

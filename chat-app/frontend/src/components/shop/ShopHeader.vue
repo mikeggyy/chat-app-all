@@ -195,6 +195,13 @@ const handleCoinIconError = (): void => {
     color: #ec4899;
     filter: drop-shadow(0 4px 12px rgba(236, 72, 153, 0.5));
   }
+
+  // 🔥 修復：emoji 樣式
+  &__icon-emoji {
+    font-size: 4rem;
+    line-height: 1;
+    filter: drop-shadow(0 6px 16px rgba(251, 191, 36, 0.4));
+  }
 }
 
 @keyframes pulse {

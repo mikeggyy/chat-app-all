@@ -45,6 +45,7 @@ const FIELD_SELECTORS = {
   },
 
   // 角色資料 - 列表版本（用於列表顯示）
+  // ✅ 效能優化：移除不必要的字段，減少響應大小
   characterList: {
     include: [
       'id',
@@ -55,8 +56,8 @@ const FIELD_SELECTORS = {
       'totalChatUsers',
       'totalFavorites',
       'background',
-      'first_message',
-      'voice',
+      // 移除 'first_message' - 對話時才需要
+      // 移除 'voice' - 對話時才需要
     ],
     exclude: ['secret_background', 'creatorUid', 'updatedAt'],
   },

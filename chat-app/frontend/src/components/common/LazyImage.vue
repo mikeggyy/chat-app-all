@@ -105,7 +105,12 @@ const cleanup = (): void => {
 };
 
 onMounted(() => {
-  initObserver();
+  // ✅ 效能優化：eager loading 時跳過 IntersectionObserver，直接顯示圖片
+  if (props.loading === 'eager') {
+    isVisible.value = true;
+  } else {
+    initObserver();
+  }
 });
 
 onBeforeUnmount(() => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserProfile } from '../composables/useUserProfile';
 import { useFirebaseAuth } from '../composables/useFirebaseAuth';
@@ -56,8 +56,9 @@ const toast = useToast();
 const matchData = useMatchData({ user });
 const { matches, isLoading, error } = matchData;
 
+// ✅ 效能優化：使用 shallowRef 替代 reactive，減少深度追蹤開銷
 // 當前顯示的角色數據
-const match: Match = reactive<Match>({
+const match = shallowRef<Match>({
   id: '',
   display_name: '',
   locale: '',
@@ -70,11 +71,12 @@ const match: Match = reactive<Match>({
   portraitUrl: '',
 });
 
-// 應用角色數據
+// 應用角色數據（原子更新，觸發一次 reactivity）
 const applyMatchData = (data: any): void => {
   if (!data) return;
 
-  Object.assign(match, {
+  // 創建新物件，觸發單次更新
+  match.value = {
     id: data.id ?? '',
     display_name: data.display_name ?? '',
     locale: data.locale ?? '',
@@ -91,7 +93,7 @@ const applyMatchData = (data: any): void => {
     first_message: data.first_message ?? '',
     secret_background: data.secret_background ?? '',
     portraitUrl: data.portraitUrl ?? '',
-  });
+  };
 };
 
 // 輪播控制
@@ -130,9 +132,12 @@ const favorites = useMatchFavorites({
   requireLogin,
 });
 
-// 當前角色是否已收藏（響應式 - 使用數組確保 Vue 能正確追蹤變化）
+// ✅ 效能優化：使用 Set 進行 O(1) 查找，而非 O(n) 的 includes()
+const favoriteIdSet = computed(() => new Set(favorites.favoriteIds.value));
+
+// 當前角色是否已收藏
 const isFavorited = computed(() => {
-  return favorites.favoriteIds.value.includes(match.id);
+  return favoriteIdSet.value.has(match.value.id);
 });
 
 // 背景對話框
@@ -167,8 +172,8 @@ const handleKeydown = (event: KeyboardEvent): void => {
 
 // 處理收藏操作
 const handleToggleFavorite = async (): Promise<void> => {
-  const matchId = match.id;
-  const matchName = match.display_name;
+  const matchId = match.value.id;
+  const matchName = match.value.display_name;
   const wasFavorited = favorites.favoriteIds.value.includes(matchId);
 
   const success = await favorites.toggleFavorite(matchId);
@@ -185,7 +190,7 @@ const handleToggleFavorite = async (): Promise<void> => {
 
 // 進入聊天室
 const enterChatRoom = (): void => {
-  if (!match.id) {
+  if (!match.value.id) {
     return;
   }
 
@@ -202,7 +207,7 @@ const enterChatRoom = (): void => {
   // 直接跳轉到聊天視窗，對話記錄將在 ChatView 中處理
   router.push({
     name: 'chat',
-    params: { id: match.id },
+    params: { id: match.value.id },
   });
 };
 
@@ -292,16 +297,32 @@ watch(
   { immediate: true }
 );
 
+// ✅ 效能優化：resize 事件節流（debounce），避免頻繁重排
+let resizeTimeoutId: number | undefined;
+const debouncedMeasureCardWidth = () => {
+  if (resizeTimeoutId !== undefined) {
+    clearTimeout(resizeTimeoutId);
+  }
+  resizeTimeoutId = window.setTimeout(() => {
+    carousel.measureCardWidth();
+    resizeTimeoutId = undefined;
+  }, 150);
+};
+
 // 生命週期
 onMounted(() => {
   carousel.measureCardWidth();
-  window.addEventListener('resize', carousel.measureCardWidth);
+  window.addEventListener('resize', debouncedMeasureCardWidth);
   window.addEventListener('keydown', handleKeydown);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', carousel.measureCardWidth);
+  window.removeEventListener('resize', debouncedMeasureCardWidth);
   window.removeEventListener('keydown', handleKeydown);
+  // 清理待處理的 debounce
+  if (resizeTimeoutId !== undefined) {
+    clearTimeout(resizeTimeoutId);
+  }
 });
 </script>
 
@@ -319,6 +340,7 @@ onBeforeUnmount(() => {
     <MatchBackground
       :carousel-matches="carousel.carouselMatches.value"
       :background-track-style="carousel.backgroundTrackStyle.value"
+      :is-image-loaded="carousel.isImageLoaded"
     />
 
     <!-- 內容輪播 -->
@@ -366,6 +388,8 @@ onBeforeUnmount(() => {
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
+  // ✅ 效能優化：CSS containment 限制重排範圍
+  contain: layout style;
 
   &.is-grabbing {
     cursor: grabbing;
@@ -375,10 +399,14 @@ onBeforeUnmount(() => {
     position: relative;
     width: min(520px, 100%);
     overflow: hidden;
+    // ✅ 效能優化：限制重排範圍
+    contain: layout;
 
     .carousel-track {
       display: flex;
       width: 100%;
+      // ✅ 效能優化：提示 GPU 加速 transform
+      will-change: transform;
     }
   }
 }

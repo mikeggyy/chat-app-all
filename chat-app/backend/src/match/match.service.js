@@ -225,22 +225,26 @@ export const listMatchesForUser = async (user) => {
     }
   }
 
-  const decorated = allCharacters.map((match) => {
+  // ✅ 效能優化：使用穩定排序，避免 Math.random() 破壞前端緩存
+  // 優先顯示收藏和有對話的角色，其餘保持原始順序
+  const decorated = allCharacters.map((match, originalIndex) => {
     const isFavorited = favoritesSet.has(match.id);
     const hasConversation = conversationsSet.has(match.id);
-    const priority = !isFavorited && !hasConversation ? 0 : 1;
+    // 收藏和有對話的角色優先顯示（priority 越高越靠前）
+    const priority = (isFavorited ? 2 : 0) + (hasConversation ? 1 : 0);
     return {
       priority,
-      sortKey: Math.random(),
+      originalIndex,  // 使用原始索引確保穩定排序
       data: match,
     };
   });
 
+  // 穩定排序：優先級高的在前，同優先級保持原始順序
   decorated.sort((a, b) => {
     if (a.priority !== b.priority) {
-      return a.priority - b.priority;
+      return b.priority - a.priority;  // 優先級高的在前
     }
-    return a.sortKey - b.sortKey;
+    return a.originalIndex - b.originalIndex;  // 同優先級按原始順序
   });
 
   return decorated.map((item) => cloneMatch(item.data));

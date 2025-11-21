@@ -135,6 +135,10 @@ export function useMatchGestures(options: UseMatchGesturesOptions = {}): UseMatc
   let activePointerId: number | null = null;
   let activePointerTarget: HTMLElement | null = null;
 
+  // ✅ 效能優化：RAF 節流狀態
+  let rafId: number | null = null;
+  let pendingOffsetX: number = 0;
+
   /**
    * 捕獲 Pointer（用於追蹤移動端的多點觸控）
    * @param event - Pointer 事件
@@ -234,6 +238,7 @@ export function useMatchGestures(options: UseMatchGesturesOptions = {}): UseMatc
 
   /**
    * 滑動移動事件處理器
+   * ✅ 效能優化：使用 RAF 節流，減少重排頻率
    * @param event - 事件物件
    */
   const onSwipeMove = (event: PointerEvent | TouchEvent): void => {
@@ -243,18 +248,30 @@ export function useMatchGestures(options: UseMatchGesturesOptions = {}): UseMatc
     const offsetX = point.clientX - swipeStartX.value;
     const offsetY = Math.abs(point.clientY - swipeStartY.value);
 
-    // 垂直滑動超過閾值時取消水平滑動
+    // 垂直滑動超過閾值時取消水平滑動（立即執行）
     if (offsetY > 90) {
+      // 取消待處理的 RAF
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       onSwipeCancel();
       return;
     }
 
-    // 更新水平偏移
-    if (swipeOffsetRef) {
-      swipeOffsetRef.value = offsetX;
+    // ✅ 使用 RAF 批量更新，減少 60-120 次/秒 → 60 次/秒
+    pendingOffsetX = offsetX;
+
+    if (rafId === null) {
+      rafId = requestAnimationFrame(() => {
+        if (swipeOffsetRef && swipeActive.value) {
+          swipeOffsetRef.value = pendingOffsetX;
+        }
+        rafId = null;
+      });
     }
 
-    // 觸發回調
+    // 觸發回調（傳遞即時值，讓調用方決定是否節流）
     if (onSwipeMoveCallback) {
       onSwipeMoveCallback(event, offsetX, offsetY);
     }
@@ -306,6 +323,11 @@ export function useMatchGestures(options: UseMatchGesturesOptions = {}): UseMatc
   // 清理資源
   onBeforeUnmount(() => {
     releaseCapturedPointer();
+    // ✅ 清理待處理的 RAF
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
   });
 
   return {

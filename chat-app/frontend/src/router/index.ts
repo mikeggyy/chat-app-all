@@ -9,11 +9,54 @@ import {
 } from "../services/testAuthSession.js";
 import { ensureAuthState } from "../services/authBootstrap.js";
 import { isGuestUser } from "../../../../shared/config/testAccounts.js";
+import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service.js";
+import { apiJson } from "../utils/api.js";
 
 // 使用動態導入實現路由懶加載
 const LoginView = () => import("../views/LoginView.vue");
 const OnboardingView = () => import("../views/OnboardingView.vue");
-const MatchView = () => import("../views/MatchView.vue");
+// ✅ 效能優化：預加載 MatchView chunk（核心頁面）
+const MatchViewImport = () => import("../views/MatchView.vue");
+const MatchView = MatchViewImport;
+
+/**
+ * ✅ 效能優化：預取配對數據
+ * 在路由導航時提前載入數據，減少頁面等待時間
+ */
+const prefetchMatchData = async (): Promise<void> => {
+  const { user } = useUserProfile();
+  const currentUserId = user.value?.id;
+  const endpoint = currentUserId
+    ? `/match/all?userId=${encodeURIComponent(currentUserId)}`
+    : '/match/all';
+  const key = cacheKeys.matches({ userId: currentUserId || 'guest' });
+
+  // 使用 apiCache 的 fetch 方法，自動處理緩存和去重
+  await apiCache.fetch(
+    key,
+    () => apiJson(endpoint),
+    cacheTTL.MATCHES
+  );
+};
+
+/**
+ * ✅ 效能優化：預加載關鍵路由 chunks
+ * 在空閒時預加載核心頁面的 JavaScript
+ */
+const preloadCriticalRoutes = (): void => {
+  // 使用 requestIdleCallback 在瀏覽器空閒時預加載
+  const preload = () => {
+    MatchViewImport(); // 預加載 MatchView chunk
+  };
+
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(preload, { timeout: 2000 });
+  } else {
+    // 降級：使用 setTimeout
+    setTimeout(preload, 1000);
+  }
+};
+
 const ProfileView = () => import("../views/ProfileView.vue");
 const ChatListView = () => import("../views/ChatListView.vue");
 const ChatView = () => import("../views/ChatView.vue");
@@ -64,6 +107,12 @@ const routes: RouteRecordRaw[] = [
     component: MatchView,
     meta: {
       showBottomNav: true,
+    },
+    // ✅ 效能優化：路由層級數據預取
+    beforeEnter: async (_to, _from, next) => {
+      // 預熱配對數據緩存（不阻塞路由導航）
+      prefetchMatchData().catch(() => {});
+      next();
     },
   },
   {
@@ -430,5 +479,8 @@ routingScope.run(() => {
     stopTokenMonitor();
   });
 });
+
+// ✅ 效能優化：在瀏覽器空閒時預加載關鍵路由
+preloadCriticalRoutes();
 
 export default router;

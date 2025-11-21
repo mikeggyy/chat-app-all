@@ -89,6 +89,7 @@ export interface UseMatchCarouselReturn {
   animateTo: (direction: 'next' | 'prev') => void;
   scheduleReset: () => void;
   initialize: () => void;
+  isImageLoaded: (url: string | undefined) => boolean;
 }
 
 // ==================== Composable 實現 ====================
@@ -115,10 +116,30 @@ export function useMatchCarousel(
   let resetTimerId: number | undefined;
 
   // ✅ P1 優化（2025-01）：智能預加載下一張圖片
+  // ✅ P2 優化：添加去重，避免重複預加載
+  // ✅ P3 優化：追蹤圖片載入狀態，讓組件知道圖片是否已載入完成
+  const preloadedUrls = new Set<string>();
+  const loadedUrls = new Set<string>();
+
   const preloadImage = (url: string | undefined): void => {
     if (!url || typeof url !== 'string') return;
+    if (preloadedUrls.has(url)) return;  // 已預加載，跳過
+    preloadedUrls.add(url);
     const img = new Image();
+    img.onload = () => {
+      loadedUrls.add(url);
+    };
     img.src = url;
+  };
+
+  /**
+   * 檢查圖片是否已載入完成
+   * @param url - 圖片 URL
+   * @returns 是否已載入
+   */
+  const isImageLoaded = (url: string | undefined): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    return loadedUrls.has(url);
   };
 
   /**
@@ -140,7 +161,9 @@ export function useMatchCarousel(
         slot,
         index: idx,
         data,
-        key: `${data?.id ?? 'match'}-${slot}-${currentIndex.value}`,
+        // ✅ 效能優化：使用穩定的 slot 作為 key，避免 DOM 重建
+        // 模板中使用 `key="card-${item.slot}"` 確保重用 DOM 元素
+        key: slot,
       };
     };
 
@@ -284,23 +307,20 @@ export function useMatchCarousel(
   };
 
   // ✅ P1 優化（2025-01）：監聽索引變化，智能預加載相鄰圖片
+  // ✅ P3 優化：擴大預加載範圍到前後各 2 張，解決快速滑動時圖片來不及載入的問題
   watch(currentIndex, (newIndex: number) => {
     const len = matches?.value?.length || 0;
     if (len <= 2) return; // 少於 3 張時無需預加載
 
-    // 預加載下一張圖片
-    const nextIdx = (newIndex + 1) % len;
-    const nextUrl = matches.value?.[nextIdx]?.portraitUrl;
-    if (nextUrl) {
-      preloadImage(nextUrl);
-    }
-
-    // 也預加載前一張（雙向滑動支援）
-    const prevIdx = (newIndex - 1 + len) % len;
-    const prevUrl = matches.value?.[prevIdx]?.portraitUrl;
-    if (prevUrl) {
-      preloadImage(prevUrl);
-    }
+    // 預加載前後各 2 張圖片（共 4 張）
+    const offsets = [-2, -1, 1, 2];
+    offsets.forEach((offset) => {
+      const idx = (newIndex + offset + len) % len;
+      const url = matches.value?.[idx]?.portraitUrl;
+      if (url) {
+        preloadImage(url);
+      }
+    });
   });
 
   // 清理資源
@@ -330,5 +350,6 @@ export function useMatchCarousel(
     animateTo,
     scheduleReset,
     initialize,
+    isImageLoaded,
   };
 }

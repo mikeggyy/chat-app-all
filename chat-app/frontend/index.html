@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>frontend</title>
+
+    <!-- ✅ 效能優化：預連接到關鍵第三方域名，減少 DNS/TCP/TLS 延遲 -->
+    <!-- Firebase Storage (圖片) -->
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com" crossorigin />
+    <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+    <!-- Firebase Auth -->
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <!-- Firebase Firestore -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   </head>
   <body>
     <div id="app"></div>

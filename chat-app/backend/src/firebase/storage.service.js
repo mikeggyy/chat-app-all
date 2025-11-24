@@ -14,22 +14,52 @@ import logger from "../utils/logger.js";
  * @param {string} userId - 用戶 ID
  * @param {string} filename - 文件名（不含路徑，用於提取副檔名）
  * @param {string} contentType - MIME 類型（預設 image/webp）
+ * @param {object} options - 可選參數
+ * @param {string} options.characterId - 角色 ID（如果不提供，會從 filename 解析）
  * @returns {Promise<string>} - R2 中的文件 URL
  */
 export const uploadBase64Image = async (
   base64Data,
   userId,
   filename,
-  contentType = "image/webp"
+  contentType = "image/webp",
+  options = {}
 ) => {
   try {
     // 從 filename 提取副檔名
     const extension = filename.split(".").pop() || "webp";
 
-    // 從 filename 提取角色 ID（如果有）
-    // 格式: selfie-{characterId}-{timestamp}-{random}.webp
-    const filenameParts = filename.split("-");
-    const characterId = filenameParts.length >= 2 ? filenameParts[1] : "general";
+    // ✅ 修復：優先使用傳入的 characterId，否則從 filename 解析
+    // filename 格式: {prefix}-{characterId}-{timestamp}-{random}.webp
+    // 例如: selfie-match-001-1234567890-abc123.webp
+    let characterId = options.characterId;
+
+    if (!characterId) {
+      const filenameParts = filename.split("-");
+      // 處理 characterId 可能包含連字符的情況（如 match-001）
+      // prefix-characterId-timestamp-random.webp
+      if (filenameParts.length >= 4) {
+        // 嘗試識別 timestamp（純數字且長度 >= 10）
+        let timestampIndex = -1;
+        for (let i = 2; i < filenameParts.length; i++) {
+          if (/^\d{10,}$/.test(filenameParts[i])) {
+            timestampIndex = i;
+            break;
+          }
+        }
+
+        if (timestampIndex > 1) {
+          // characterId 是從 index 1 到 timestampIndex-1 的部分
+          characterId = filenameParts.slice(1, timestampIndex).join("-");
+        } else {
+          characterId = filenameParts[1];
+        }
+      } else if (filenameParts.length >= 2) {
+        characterId = filenameParts[1];
+      } else {
+        characterId = "general";
+      }
+    }
 
     logger.debug(`[Storage] 上傳圖片到 R2: userId=${userId}, characterId=${characterId}, extension=${extension}`);
 

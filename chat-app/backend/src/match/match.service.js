@@ -431,7 +431,8 @@ export const createMatch = async (matchData) => {
         portraitUrl,
         creatorUid || "system",
         filename,
-        "image/webp"
+        "image/webp",
+        { characterId: id }
       );
 
       if (process.env.NODE_ENV !== "test") {

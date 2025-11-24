@@ -2,7 +2,7 @@
 import { ref, type Ref } from 'vue';
 import { apiJsonCached } from '../../utils/api.js';
 import { logger } from '../../utils/logger.js';
-import { cacheKeys, cacheTTL } from '../../services/apiCache.service.js';
+import { apiCache, cacheKeys, cacheTTL } from '../../services/apiCache.service.js';
 import type { Partner } from '../../types';
 
 /**
@@ -51,7 +51,7 @@ interface UsePhotoGalleryReturn {
     characterPortrait: string,
     onCharacterLoaded?: (character: Partner) => void
   ) => Promise<void>;
-  deletePhotos: (selectedIds: Set<string>, userId: string) => Promise<DeletePhotosResult>;
+  deletePhotos: (selectedIds: Set<string>, userId: string, characterId?: string) => Promise<DeletePhotosResult>;
   openPhotoViewer: (photo: Photo) => void;
   closePhotoViewer: () => void;
 }
@@ -70,13 +70,13 @@ export function usePhotoGallery(): UsePhotoGalleryReturn {
    * 載入照片列表
    * @param userId - 用戶 ID
    * @param characterId - 角色 ID
-   * @param characterPortrait - 角色立繪 URL
+   * @param fallbackPortrait - 備用角色立繪 URL（當 API 沒有返回角色資訊時使用）
    * @param onCharacterLoaded - 角色資訊載入後的回調函數
    */
   const loadPhotos = async (
     userId: string,
     characterId: string,
-    characterPortrait: string,
+    fallbackPortrait: string,
     onCharacterLoaded?: (character: Partner) => void
   ): Promise<void> => {
     if (!userId || !characterId) {
@@ -105,10 +105,16 @@ export function usePhotoGallery(): UsePhotoGalleryReturn {
         onCharacterLoaded(response.character);
       }
 
+      // ✅ 修復：優先使用 API 返回的角色立繪，確保顯示正確的角色圖片
+      const portraitUrl = response?.character?.portraitUrl ||
+                          response?.character?.portrait ||
+                          response?.character?.image ||
+                          fallbackPortrait;
+
       // 在開頭插入預設照片（角色立繪）
       const defaultPhoto: Photo = {
         id: 'default-portrait',
-        imageUrl: characterPortrait,
+        imageUrl: portraitUrl,
         text: '角色立繪',
         createdAt: new Date(0).toISOString(), // 最早的時間
         role: 'partner',
@@ -128,11 +134,13 @@ export function usePhotoGallery(): UsePhotoGalleryReturn {
    * 刪除照片
    * @param selectedIds - 選中的照片 ID
    * @param userId - 用戶 ID
+   * @param characterId - 角色 ID（用於清除緩存）
    * @returns 刪除結果
    */
   const deletePhotos = async (
     selectedIds: Set<string>,
-    userId: string
+    userId: string,
+    characterId?: string
   ): Promise<DeletePhotosResult> => {
     if (selectedIds.size === 0 || !userId) {
       return { success: false, error: '沒有選中的照片' };
@@ -149,7 +157,9 @@ export function usePhotoGallery(): UsePhotoGalleryReturn {
 
     try {
       // 使用相簿 API 刪除照片（不影響對話歷史）
-      await apiJsonCached(`/api/photos/${encodeURIComponent(userId)}`, {
+      logger.info(`[PhotoGallery] 開始刪除照片: userId=${userId}, photoIds=`, photoIdsToDelete);
+
+      const response = await apiJsonCached(`/api/photos/${encodeURIComponent(userId)}`, {
         method: 'DELETE',
         body: {
           photoIds: photoIdsToDelete,
@@ -158,9 +168,24 @@ export function usePhotoGallery(): UsePhotoGalleryReturn {
         skipCache: true, // 刪除操作不使用緩存
       });
 
+      logger.info(`[PhotoGallery] 刪除照片 API 回應:`, response);
+
+      // ✅ 修復：刪除成功後清除照片緩存，確保重新載入時獲取最新數據
+      if (characterId) {
+        const cacheKey = cacheKeys.photoAlbum(characterId);
+        apiCache.clear(cacheKey);
+        logger.info(`[PhotoGallery] 已清除照片緩存: ${cacheKey}`);
+      }
+
       return { success: true, deletedCount: photoIdsToDelete.length };
-    } catch (err) {
+    } catch (err: any) {
       logger.error('[PhotoGallery] 刪除照片失敗:', err);
+      logger.error('[PhotoGallery] 錯誤詳情:', {
+        message: err?.message,
+        status: err?.status,
+        url: err?.url,
+        isNetworkError: err?.isNetworkError,
+      });
       return { success: false, error: '刪除照片失敗，請稍後再試' };
     }
   };

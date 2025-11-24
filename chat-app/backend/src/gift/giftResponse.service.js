@@ -182,7 +182,7 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
       try {
         logger.info(`[禮物照片] 開始上傳禮物照片到 Storage: userId=${userId}, characterId=${characterData.id}, giftId=${giftId}`);
         const filename = generateFilename('gift', characterData.id);
-        finalImageUrl = await uploadBase64Image(imageDataUrl, userId, filename, 'image/webp');
+        finalImageUrl = await uploadBase64Image(imageDataUrl, userId, filename, 'image/webp', { characterId: characterData.id });
         logger.info(`[禮物照片] ✅ 禮物照片已成功上傳到 Storage: ${filename}`);
         logger.info(`[禮物照片] ✅ Storage URL: ${finalImageUrl}`);
         logger.info(`[禮物照片] ✅ Storage URL 長度: ${finalImageUrl.length}`);

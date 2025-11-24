@@ -234,7 +234,7 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
     // 上傳圖片到 Firebase Storage（避免 Firestore 大小限制）
     logger.info(`[圖片生成] 開始上傳自拍照片到 Storage: userId=${userId}, characterId=${characterId}`);
     const filename = generateFilename('selfie', characterId);
-    const imageUrl = await uploadBase64Image(imageDataUrl, userId, filename, 'image/webp');
+    const imageUrl = await uploadBase64Image(imageDataUrl, userId, filename, 'image/webp', { characterId });
     logger.info(`[圖片生成] 自拍照片已上傳到 Storage: ${filename}`);
 
     // 隨機選擇照片描述文字

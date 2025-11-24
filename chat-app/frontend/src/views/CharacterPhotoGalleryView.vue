@@ -194,9 +194,11 @@ const handleDeletePhotos = async (): Promise<void> => {
 
   isDeleting.value = true;
 
+  // ✅ 修復：傳入 characterId 以清除照片緩存
   const result = await gallery.deletePhotos(
     editMode.selectedIds.value,
-    user.value.id
+    user.value.id,
+    characterId.value
   );
 
   if (result.success) {

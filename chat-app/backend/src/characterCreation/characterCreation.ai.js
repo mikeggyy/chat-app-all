@@ -664,7 +664,8 @@ export const generateCharacterImages = async ({
             base64Data,
             userId || "system",
             filename,
-            "image/png"
+            "image/png",
+            { characterId: flowId }
           );
 
           if (process.env.NODE_ENV !== "test") {

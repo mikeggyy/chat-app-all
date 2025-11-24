@@ -472,6 +472,16 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
   // 非 GET 請求或跳過去重的請求，直接執行
   const response = await apiFetch(path, otherOptions);
 
+  // DEBUG: 追蹤非 GET 請求的回應
+  if (method === 'DELETE') {
+    console.log('[apiJson] DELETE 請求完成:', {
+      path,
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    });
+  }
+
   if (otherOptions.rawResponse) {
     return response as any;
   }
@@ -480,7 +490,14 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
     return null as any;
   }
 
-  return response.json();
+  const jsonData = await response.json();
+
+  // DEBUG: 追蹤 DELETE 請求的 JSON 回應
+  if (method === 'DELETE') {
+    console.log('[apiJson] DELETE 請求 JSON 回應:', jsonData);
+  }
+
+  return jsonData;
 };
 
 /**

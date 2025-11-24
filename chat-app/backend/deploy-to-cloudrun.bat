@@ -78,7 +78,7 @@ gcloud run deploy %SERVICE_NAME% ^
   --cpu-throttling ^
   --execution-environment gen2 ^
   --cpu-boost ^
-  --timeout 60 ^
+  --timeout 300 ^
   --set-env-vars "NODE_ENV=production" ^
   --set-env-vars "USE_FIREBASE_EMULATOR=false" ^
   --quiet

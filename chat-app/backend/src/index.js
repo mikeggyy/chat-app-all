@@ -67,7 +67,12 @@ const configureCORS = () => {
 
   // 開發環境的預設值
   if (!corsOrigin) {
-    const developmentOrigins = ["http://localhost:5173", "http://localhost:3000"];
+    const developmentOrigins = [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "http://127.0.0.1:5173",
+      "http://192.168.1.107:5173",  // 區域網 IP
+    ];
     logger.info(`[CORS] 開發環境使用預設 origins: ${developmentOrigins.join(", ")}`);
     return developmentOrigins;
   }
@@ -165,6 +170,11 @@ app.use((req, res, next) => {
   // ⚠️ 緊急開關：允許通過環境變數臨時禁用 CSRF（僅用於緊急情況）
   if (process.env.DISABLE_CSRF === 'true') {
     logger.warn('[CSRF] ⚠️ CSRF 保護已禁用（DISABLE_CSRF=true）');
+    return next();
+  }
+
+  // 🔧 開發環境自動禁用 CSRF（避免跨域 Cookie 問題）
+  if (process.env.NODE_ENV !== 'production') {
     return next();
   }
 

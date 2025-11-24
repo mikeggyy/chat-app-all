@@ -245,39 +245,25 @@ const processImageUrl = async (imageUrl, userId, characterId) => {
 
   try {
     let imageBuffer;
+    let fetchUrl = imageUrl;
 
-    // 如果是相對路徑（如 /ai-role/match-role-03.webp）
+    // ✅ 生產環境修復：將相對路徑轉換為完整 URL
     if (imageUrl.startsWith("/")) {
-      const { readFileSync } = await import("fs");
-      const { join } = await import("path");
-      const { fileURLToPath } = await import("url");
-      const { dirname } = await import("path");
-
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = dirname(__filename);
-
-      // 假設圖片在 frontend/public 目錄下
-      const publicPath = join(__dirname, "../../../frontend/public", imageUrl);
-      logger.info("[Video] 從本地文件讀取:", publicPath);
-
-      imageBuffer = readFileSync(publicPath);
+      const frontendBaseUrl = process.env.FRONTEND_URL || "https://chat-app-all.pages.dev";
+      fetchUrl = `${frontendBaseUrl}${imageUrl}`;
+      logger.info("[Video] 將相對路徑轉換為完整 URL:", fetchUrl);
     }
-    // 如果是 localhost URL
-    else if (imageUrl.includes("localhost") || imageUrl.includes("127.0.0.1") || imageUrl.startsWith("http://")) {
-      logger.info("[Video] 從 localhost URL 下載:", imageUrl);
-      const response = await fetch(imageUrl);
 
-      if (!response.ok) {
-        throw new Error(`下載圖片失敗: ${response.statusText}`);
-      }
+    // 從 URL 下載圖片
+    logger.info("[Video] 從 URL 下載:", fetchUrl);
+    const response = await fetch(fetchUrl);
 
-      const arrayBuffer = await response.arrayBuffer();
-      imageBuffer = Buffer.from(arrayBuffer);
+    if (!response.ok) {
+      throw new Error(`下載圖片失敗: ${response.statusText}`);
     }
-    else {
-      // 無法處理的 URL 格式
-      throw new Error(`無法處理的圖片 URL 格式: ${imageUrl}`);
-    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    imageBuffer = Buffer.from(arrayBuffer);
 
     // 上傳到 R2
     const { uploadImageToR2 } = await import("../storage/r2Storage.service.js");

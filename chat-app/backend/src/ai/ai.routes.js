@@ -42,6 +42,7 @@ import {
   handleVideoPayment,
   logError,
 } from "./ai.helpers.js";
+import { addPointsFromChat, addPointsFromSelfie, addPointsFromVideo } from "../level/level.service.js";
 import { validateRequest } from "../middleware/validation.middleware.js";
 import { aiSchemas } from "./ai.schemas.js";
 import { requireSameUser } from "../middleware/authorization.js";
@@ -94,7 +95,16 @@ aiRouter.post(
             }
           }
 
-          return { message, messages: history };
+          // ✅ 添加等級點數（聊天獎勵）
+          let levelProgress = null;
+          try {
+            levelProgress = await addPointsFromChat(userId, characterId);
+            logger.info(`[等級] 用戶 ${userId} 獲得 ${levelProgress.pointsAdded} 點（聊天）`);
+          } catch (levelError) {
+            logger.error("[等級] 添加聊天點數失敗:", levelError);
+          }
+
+          return { message, messages: history, levelProgress };
         },
         { ttl: IDEMPOTENCY_TTL.AI_REPLY }
       );
@@ -256,9 +266,20 @@ aiRouter.post(
         requestId,
         async () => {
           // 生成照片（內部會處理限制檢查和扣卡邏輯）
-          return await generateSelfieForCharacter(userId, characterId, {
+          const selfieResult = await generateSelfieForCharacter(userId, characterId, {
             usePhotoUnlockCard: usePhotoCard || false
           });
+
+          // ✅ 添加等級點數（自拍獎勵）
+          try {
+            const levelProgress = await addPointsFromSelfie(userId, characterId);
+            selfieResult.levelProgress = levelProgress;
+            logger.info(`[等級] 用戶 ${userId} 獲得 ${levelProgress.pointsAdded} 點（自拍）`);
+          } catch (levelError) {
+            logger.error("[等級] 添加自拍點數失敗:", levelError);
+          }
+
+          return selfieResult;
         },
         { ttl: IDEMPOTENCY_TTL.IMAGE_GENERATION }
       );
@@ -374,6 +395,15 @@ aiRouter.post(
             useVideoCard,
             recordFn: recordVideoGeneration,
           });
+
+          // ✅ 添加等級點數（影片獎勵）
+          try {
+            const levelProgress = await addPointsFromVideo(userId, characterId);
+            videoResult.levelProgress = levelProgress;
+            logger.info(`[等級] 用戶 ${userId} 獲得 ${levelProgress.pointsAdded} 點（影片）`);
+          } catch (levelError) {
+            logger.error("[等級] 添加影片點數失敗:", levelError);
+          }
 
           return videoResult;
         },

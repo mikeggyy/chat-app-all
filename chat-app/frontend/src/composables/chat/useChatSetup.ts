@@ -143,6 +143,7 @@ export interface UseChatSetupReturn {
   closeImageViewer: UseChatModalsReturn['closeImageViewer'];
   closeGiftSelector: UseChatFeaturesReturn['closeGiftSelector'];
   handleSelectGift: UseChatFeaturesReturn['handleSelectGift'];
+  closeCharacterRanking: UseChatModalsReturn['closeCharacterRanking'];
 
   // ==================== Loaders & Cleanup ====================
   loadPartner: UseChatCoreReturn['loadPartner'];
@@ -297,6 +298,8 @@ export function useChatSetup({
     closeBuffDetails,
     showGiftAnimation,
     closeGiftAnimation,
+    showCharacterRanking,
+    closeCharacterRanking,
     setLoading,
     updateModal,
     handleWatchAd,
@@ -444,6 +447,7 @@ export function useChatSetup({
     showUnlockConfirm,
     showPotionLimit,
     showPotionConfirm,
+    showCharacterRanking,
     closeResetConfirm,
     closePhotoSelector,
     closeVideoLimit,
@@ -576,6 +580,7 @@ export function useChatSetup({
     closeImageViewer,
     closeGiftSelector: closeGiftSelectorFromFeatures,
     handleSelectGift,
+    closeCharacterRanking,
 
     // Loaders & Cleanup
     loadPartner,

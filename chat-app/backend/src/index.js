@@ -40,6 +40,7 @@ import shopRouter from "./shop/shop.routes.js";
 import aiSettingsRouter from "./ai/aiSettings.routes.js";
 import cronRouter from "./routes/cron.routes.js";
 import monitoringRouter from "./routes/monitoring.routes.js";
+import levelRouter from "./level/level.routes.js";
 import { cleanupInactiveUsers, getAllUsers } from "./user/user.service.js";
 import { conversationLimitService } from "./conversation/conversationLimit.service.js";
 import { voiceLimitService } from "./ai/voiceLimit.service.js";
@@ -206,6 +207,7 @@ app.use("/api/photo-limit", photoLimitRouter);
 app.use("/api/voices", voicesRouter);
 app.use("/api/gifts", giftRouter);
 app.use("/api/potions", potionRouter);
+app.use("/api/levels", levelRouter);
 app.use("/api/photos", photoAlbumRouter);
 app.use("/api/character-styles", characterStylesRouter);
 app.use(assetPurchaseRouter);
@@ -293,8 +295,8 @@ app.post("/auth/test", (_, res) => {
 // ✅ 優化：使用統一的 AppError 錯誤處理器
 app.use(errorHandler);
 
-app.listen(port, async () => {
-  logger.info(`API 伺服器已啟動於 http://localhost:${port}`);
+app.listen(port, '0.0.0.0', async () => {
+  logger.info(`API 伺服器已啟動於 http://0.0.0.0:${port} (可透過 http://localhost:${port} 或區域網路 IP 訪問)`);
   logger.info(`環境: ${process.env.NODE_ENV || "development"}`);
   logger.info(`日誌級別: ${logger.level}`);
 

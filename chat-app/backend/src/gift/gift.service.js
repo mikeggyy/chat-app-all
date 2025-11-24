@@ -15,6 +15,7 @@ import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 import { getWalletBalance, createWalletUpdate } from "../user/walletHelpers.js";
 import { TRANSACTION_TYPES } from "../payment/coins.service.js";
+import { addPointsFromGift } from "../level/level.service.js";
 
 /**
  * 計算禮物價格（考慮會員折扣）
@@ -195,6 +196,16 @@ export const sendGift = async (userId, characterId, giftId) => {
   });
 
   logger.info(`[禮物] 用戶 ${userId} 送禮物 ${gift.name} 給角色 ${characterId}，花費 ${pricing.finalPrice} 金幣`);
+
+  // ✅ 添加等級點數（送禮獎勵）
+  try {
+    const levelResult = await addPointsFromGift(userId, characterId, pricing.finalPrice, gift.rarity);
+    result.levelProgress = levelResult;
+    logger.info(`[等級] 用戶 ${userId} 獲得 ${levelResult.pointsAdded} 點（送禮 ${gift.name}）`);
+  } catch (levelError) {
+    // 等級系統錯誤不應影響送禮成功
+    logger.error(`[等級] 添加點數失敗: ${levelError.message}`);
+  }
 
   return result;
 };

@@ -86,6 +86,8 @@ export function useChatModals({
     closeImageViewer,
     showGiftAnimation,
     closeGiftAnimation,
+    showCharacterRanking,
+    closeCharacterRanking,
     setLoading,
     hasOpenModal,
     hasLoadingAction,
@@ -126,6 +128,7 @@ export function useChatModals({
     showGiftSelector,
     showPhotoSelector,
     showImageViewer,
+    showCharacterRanking,
 
     // Modal Close Methods
     closeResetConfirm,
@@ -142,6 +145,7 @@ export function useChatModals({
     closeGiftSelector,
     closePhotoSelector,
     closeImageViewer,
+    closeCharacterRanking,
 
     // Modal Actions
     handleWatchAd,

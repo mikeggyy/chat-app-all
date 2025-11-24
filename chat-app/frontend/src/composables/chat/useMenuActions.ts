@@ -48,7 +48,8 @@ export type MenuAction =
   | 'memory-boost'
   | 'brain'
   | 'brain-boost'
-  | 'share';
+  | 'share'
+  | 'ranking';
 
 /**
  * useMenuActions 返回類型
@@ -122,6 +123,11 @@ export const useMenuActions = (deps: UseMenuActionsDeps): UseMenuActionsReturn =
       case "share":
         // 分享對話
         handleShare();
+        break;
+
+      case "ranking":
+        // 顯示貢獻排行榜
+        modals.showCharacterRanking();
         break;
 
       default:

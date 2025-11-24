@@ -107,6 +107,7 @@ export interface UseChatHandlersParams {
   showUnlockConfirm: () => void;
   showPotionLimit: () => void;
   showPotionConfirm: () => void;
+  showCharacterRanking: () => void;
   closeResetConfirm: () => void;
   closePhotoSelector: () => void;
   closeVideoLimit: () => void;
@@ -208,6 +209,7 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     showUnlockConfirm,
     showPotionLimit,
     showPotionConfirm,
+    showCharacterRanking,
     closeResetConfirm,
     closePhotoSelector,
     closeVideoLimit,
@@ -276,6 +278,7 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
       showUnlockConfirm,
       showPotionLimit,
       showPotionConfirm,
+      showCharacterRanking,
     },
     userPotions,
     unlockTickets: {

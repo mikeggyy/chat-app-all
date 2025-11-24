@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 // Chat 組件
 import ChatHeader from '../components/chat/ChatHeader.vue';
+
+// Level System
+import { useLevel } from '../composables/useLevel';
 import ChatContent from '../components/chat/ChatContent.vue';
 import ChatModals from '../components/chat/ChatModals.vue';
 import VideoCompletionNotification from '../components/chat/VideoCompletionNotification.vue';
@@ -118,6 +121,7 @@ const {
   closeImageViewer,
   closeGiftSelector,
   handleSelectGift,
+  closeCharacterRanking,
 
   // Loaders & Cleanup
   loadPartner,
@@ -155,6 +159,32 @@ const {
   chatPageRef,
   draft,
 });
+
+// ====================
+// Level System
+// ====================
+const { fetchCharacterLevel, getCharacterLevel, updateLocalLevel } = useLevel();
+
+// 當前角色的等級數據
+const currentLevel = ref(1);
+const currentLevelProgress = ref(0);
+
+// 加載角色等級
+const loadCharacterLevel = async () => {
+  if (!partnerId.value) return;
+  const levelData = await fetchCharacterLevel(partnerId.value);
+  if (levelData) {
+    currentLevel.value = levelData.level;
+    currentLevelProgress.value = levelData.progress;
+  }
+};
+
+// 監聽 partnerId 變化來加載等級
+watch(partnerId, (newId) => {
+  if (newId) {
+    loadCharacterLevel();
+  }
+}, { immediate: true });
 
 // ====================
 // Watchers
@@ -281,6 +311,8 @@ onBeforeUnmount(() => {
       :active-character-unlock="activeCharacterUnlock"
       :character-unlock-cards="characterTickets"
       :is-character-unlocked="isCharacterUnlocked"
+      :level="currentLevel"
+      :level-progress="currentLevelProgress"
       @back="handleBack"
       @menu-action="handleMenuAction"
       @toggle-favorite="toggleFavorite"
@@ -363,6 +395,7 @@ onBeforeUnmount(() => {
       @close-image-viewer="closeImageViewer"
       @close-gift-selector="handleCloseGiftSelector"
       @select-gift="handleSelectGift"
+      @close-character-ranking="closeCharacterRanking"
     />
 
     <!-- Video Completion Notification -->

@@ -49,7 +49,7 @@ srctemp.txt
 dist/
 build/
 .cache/
-
+_env_backup/
 # Firebase
 .firebase/
 firebase-debug.log

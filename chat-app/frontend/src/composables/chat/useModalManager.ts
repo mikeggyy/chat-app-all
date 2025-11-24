@@ -123,6 +123,23 @@ export interface ModalsState {
     emoji: string;
     name: string;
   };
+  // Level System
+  comboAnimation: {
+    show: boolean;
+    comboCount: number;
+    multiplier: number;
+    effect: string | null;
+  };
+  levelUpAnimation: {
+    show: boolean;
+    previousLevel: number;
+    newLevel: number;
+    badgeName: string | null;
+    badgeColor: string | null;
+  };
+  characterRanking: {
+    show: boolean;
+  };
 }
 
 /**
@@ -175,6 +192,14 @@ export interface UseModalManagerReturn {
   // 便捷方法 - 動畫類
   showGiftAnimation: (emoji: string, name: string) => void;
   closeGiftAnimation: () => void;
+
+  // 便捷方法 - 等級系統
+  showComboAnimation: (comboCount: number, multiplier: number, effect: string | null) => void;
+  closeComboAnimation: () => void;
+  showLevelUpAnimation: (previousLevel: number, newLevel: number, badgeName?: string | null, badgeColor?: string | null) => void;
+  closeLevelUpAnimation: () => void;
+  showCharacterRanking: () => void;
+  closeCharacterRanking: () => void;
 
   // Computed
   hasOpenModal: ComputedRef<boolean>;
@@ -301,6 +326,26 @@ export function useModalManager(): UseModalManagerReturn {
       show: false,
       emoji: '🎁',
       name: '禮物',
+    },
+
+    // ===== F. 等級系統 =====
+    comboAnimation: {
+      show: false,
+      comboCount: 0,
+      multiplier: 1,
+      effect: null,
+    },
+
+    levelUpAnimation: {
+      show: false,
+      previousLevel: 1,
+      newLevel: 2,
+      badgeName: null,
+      badgeColor: null,
+    },
+
+    characterRanking: {
+      show: false,
     },
   });
 
@@ -482,6 +527,25 @@ export function useModalManager(): UseModalManagerReturn {
   const showGiftAnimation = (emoji: string, name: string): void => open('giftAnimation', { emoji, name });
   const closeGiftAnimation = (): void => close('giftAnimation');
 
+  // === 等級系統 ===
+  const showComboAnimation = (comboCount: number, multiplier: number, effect: string | null): void => {
+    open('comboAnimation', { comboCount, multiplier, effect });
+  };
+  const closeComboAnimation = (): void => close('comboAnimation');
+
+  const showLevelUpAnimation = (
+    previousLevel: number,
+    newLevel: number,
+    badgeName: string | null = null,
+    badgeColor: string | null = null
+  ): void => {
+    open('levelUpAnimation', { previousLevel, newLevel, badgeName, badgeColor });
+  };
+  const closeLevelUpAnimation = (): void => close('levelUpAnimation');
+
+  const showCharacterRanking = (): void => open('characterRanking');
+  const closeCharacterRanking = (): void => close('characterRanking');
+
   // ====================
   // Computed 屬性（提供便捷訪問）
   // ====================
@@ -548,6 +612,14 @@ export function useModalManager(): UseModalManagerReturn {
     // 便捷方法 - 動畫類
     showGiftAnimation,
     closeGiftAnimation,
+
+    // 便捷方法 - 等級系統
+    showComboAnimation,
+    closeComboAnimation,
+    showLevelUpAnimation,
+    closeLevelUpAnimation,
+    showCharacterRanking,
+    closeCharacterRanking,
 
     // Computed
     hasOpenModal,

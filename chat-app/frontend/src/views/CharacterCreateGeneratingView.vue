@@ -55,7 +55,10 @@ const generatedResults = computed(() =>
     alt: img.alt,
   }))
 );
-const selectedResultId = computed(() => store.selectedImageId);
+const selectedResultId = computed({
+  get: () => store.selectedImageId,
+  set: (value: string) => store.selectImage(value),
+});
 const selectedResult = computed(() =>
   store.generatedImages.find(img => img.id === store.selectedImageId)
 );

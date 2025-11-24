@@ -12,7 +12,19 @@
 
     <!-- 角色資訊 -->
     <div class="chat-header__meta">
-      <h1>{{ partnerName }}</h1>
+      <div class="chat-header__name-row">
+        <h1>{{ partnerName }}</h1>
+        <!-- 等級徽章 -->
+        <LevelBadge
+          v-if="level > 0"
+          :level="level"
+          :progress="levelProgress"
+          :show-badge="false"
+          size="sm"
+          class="chat-header__level"
+          @click="$emit('menu-action', 'ranking')"
+        />
+      </div>
       <!-- Buff 圖標 -->
       <div
         v-if="activeMemoryBoost || activeBrainBoost || activeCharacterUnlock"
@@ -105,6 +117,13 @@
       <button
         type="button"
         class="chat-header__menu-item"
+        @click="handleMenuAction('ranking')"
+      >
+        🏆 貢獻排行榜
+      </button>
+      <button
+        type="button"
+        class="chat-header__menu-item"
         @click="handleMenuAction('share')"
       >
         分享
@@ -129,6 +148,7 @@ import {
   HeartIcon as HeartOutline,
 } from "@heroicons/vue/24/outline";
 import { HeartIcon as HeartSolid } from "@heroicons/vue/24/solid";
+import LevelBadge from "../LevelBadge.vue";
 
 // Types
 interface Props {
@@ -143,6 +163,9 @@ interface Props {
   activeCharacterUnlock?: any;
   characterUnlockCards?: number;
   isCharacterUnlocked?: boolean;
+  // Level System
+  level?: number;
+  levelProgress?: number;
 }
 
 interface Emits {
@@ -164,6 +187,8 @@ withDefaults(defineProps<Props>(), {
   activeCharacterUnlock: undefined,
   characterUnlockCards: 0,
   isCharacterUnlocked: false,
+  level: 1,
+  levelProgress: 0,
 });
 
 // Emits
@@ -248,6 +273,21 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.5rem;
   padding-left: 42px;
+}
+
+.chat-header__name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-header__level {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
 }
 
 .chat-header__action {

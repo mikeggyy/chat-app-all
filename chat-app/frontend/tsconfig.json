@@ -44,10 +44,5 @@
     "dist",
     "**/*.spec.ts",
     "**/*.spec.js"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
   ]
 }

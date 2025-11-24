@@ -184,9 +184,12 @@ export function useVoiceLoading(): UseVoiceLoadingReturn {
     try {
       const response = await fetchAllVoices() as unknown as FetchVoicesResponse;
 
-      if (response?.voices && Array.isArray(response.voices)) {
+      // 支援兩種格式：response.voices 或 response.data.voices
+      const voices = response?.voices || (response as any)?.data?.voices;
+
+      if (voices && Array.isArray(voices)) {
         // 轉換 API 返回的語音格式
-        voicePresetsFromAPI.value = response.voices.map((voice: VoiceAPIResponse): VoicePreset => ({
+        voicePresetsFromAPI.value = voices.map((voice: VoiceAPIResponse): VoicePreset => ({
           id: voice.id,
           label: voice.name || voice.id,
           description: voice.description || '',

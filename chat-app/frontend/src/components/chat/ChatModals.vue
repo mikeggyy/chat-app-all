@@ -18,6 +18,11 @@ import ResetConfirmModal from './modals/ResetConfirmModal.vue';
 import CharacterInfoModal from './modals/CharacterInfoModal.vue';
 import BuffDetailsModal from './modals/BuffDetailsModal.vue';
 
+// Level System Components
+import ComboAnimation from '../ComboAnimation.vue';
+import LevelUpAnimation from '../LevelUpAnimation.vue';
+import CharacterRanking from '../CharacterRanking.vue';
+
 // Types
 interface UserPotions {
   memoryBoost: number;
@@ -44,6 +49,10 @@ interface Modals {
   photoSelector: ModalState;
   imageViewer: ModalState & { url?: string; alt?: string };
   giftAnimation: ModalState & { emoji?: string; name?: string };
+  // Level System
+  comboAnimation: ModalState & { comboCount?: number; multiplier?: number; effect?: string | null };
+  levelUpAnimation: ModalState & { previousLevel?: number; newLevel?: number; badgeName?: string | null; badgeColor?: string | null };
+  characterRanking: ModalState;
   [key: string]: any;
 }
 
@@ -93,6 +102,10 @@ interface Emits {
   (e: 'close-image-viewer'): void;
   (e: 'close-gift-selector'): void;
   (e: 'select-gift', value: any): void;
+  // Level System
+  (e: 'combo-animation-complete'): void;
+  (e: 'levelup-animation-complete'): void;
+  (e: 'close-character-ranking'): void;
 }
 
 withDefaults(defineProps<Props>(), {
@@ -282,5 +295,32 @@ const handleCloseGiftSelector = (): void => {
     :show="modals.giftAnimation.show"
     :gift-emoji="modals.giftAnimation.emoji"
     :gift-name="modals.giftAnimation.name"
+  />
+
+  <!-- Level System: Combo Animation -->
+  <ComboAnimation
+    :show="modals.comboAnimation.show"
+    :combo-count="modals.comboAnimation.comboCount"
+    :multiplier="modals.comboAnimation.multiplier"
+    :effect="modals.comboAnimation.effect"
+    @complete="emit('combo-animation-complete')"
+  />
+
+  <!-- Level System: Level Up Animation -->
+  <LevelUpAnimation
+    :show="modals.levelUpAnimation.show"
+    :previous-level="modals.levelUpAnimation.previousLevel"
+    :new-level="modals.levelUpAnimation.newLevel"
+    :badge-name="modals.levelUpAnimation.badgeName"
+    :badge-color="modals.levelUpAnimation.badgeColor"
+    @complete="emit('levelup-animation-complete')"
+  />
+
+  <!-- Level System: Character Ranking -->
+  <CharacterRanking
+    :character-id="partnerId"
+    :character-name="partnerDisplayName"
+    :show="modals.characterRanking.show"
+    @close="emit('close-character-ranking')"
   />
 </template>

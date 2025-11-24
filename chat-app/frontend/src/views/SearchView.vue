@@ -4,12 +4,14 @@ import { useUserProfile } from "../composables/useUserProfile";
 import { useSearchLogic } from "../composables/search/useSearchLogic";
 import { useRecentConversations } from "../composables/search/useRecentConversations";
 import { usePopularRanking } from "../composables/search/usePopularRanking";
+import { useContributionRanking } from "../composables/search/useContributionRanking";
 import { useRecordDetail } from "../composables/search/useRecordDetail";
 
 // 組件
 import SearchBar from "../components/search/SearchBar.vue";
 import RecentConversationsPanel from "../components/search/RecentConversationsPanel.vue";
 import PopularRankingPanel from "../components/search/PopularRankingPanel.vue";
+import ContributionRankingPanel from "../components/search/ContributionRankingPanel.vue";
 import SearchResults from "../components/search/SearchResults.vue";
 import RecordDetailPanel from "../components/search/RecordDetailPanel.vue";
 
@@ -44,6 +46,12 @@ const {
   popularRanking,
   fetchPopularCharacters,
 } = usePopularRanking();
+
+// 貢獻排行
+const {
+  contributionRanking,
+  isLoadingContribution,
+} = useContributionRanking();
 
 // 記錄詳情面板
 const {
@@ -101,6 +109,14 @@ const openChat = (profile: CharacterProfile | null): void => {
         <PopularRankingPanel
           :characters="popularRanking"
           :is-loading="isLoadingPopular"
+          @open-panel="openRecentRecords"
+          @character-click="openChat"
+        />
+
+        <!-- 貢獻排行面板 -->
+        <ContributionRankingPanel
+          :characters="contributionRanking"
+          :is-loading="isLoadingContribution"
           @open-panel="openRecentRecords"
           @character-click="openChat"
         />

@@ -295,12 +295,16 @@ const ensureAuthTokenOrReset = (): boolean => {
 };
 
 router.beforeEach(async (to, _from, next) => {
+  console.log('[Router Guard] 🔵 導航至:', to.name, '來自:', _from.name);
+
   // 🔒 修復競態條件：等待認證狀態完全初始化
   // 這確保在檢查 hasCompletedOnboarding 之前，用戶資料已經完全載入
   await ensureAuthState();
+  console.log('[Router Guard] 🟢 ensureAuthState 完成');
 
   const authenticated = isAuthenticated.value;
   const hasToken = hasValidAuthToken();
+  console.log('[Router Guard] 🔵 認證狀態:', { authenticated, hasToken });
 
   // 允許訪問登入頁、onboarding 頁和遊客升級頁
   const publicPages = ["login", "onboarding", "guest-upgrade"];

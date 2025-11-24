@@ -112,7 +112,10 @@ const handleFirebaseAuthError = (error: FirebaseError | Error | unknown): void =
 
 // ✅ 簡化的 Google 登入處理：只負責 Firebase Auth
 const handleGoogleLogin = async (): Promise<void> => {
-  if (isLoading.value) return;
+  if (isLoading.value) {
+    return;
+  }
+
   isLoading.value = true;
   setStatus("loading", "正在連線至 Google 登入服務...");
 
@@ -121,31 +124,68 @@ const handleGoogleLogin = async (): Promise<void> => {
     const outcome = await signInWithGoogle();
 
     if (outcome.redirected) {
+      console.log('[LoginView] 🟡 使用 redirect 登入方式');
       redirecting = true;
       setStatus("loading", "即將重新導向至 Google 登入頁面，請稍候...");
       return;
     }
 
     if (!outcome.result) {
+      console.log('[LoginView] ❌ 登入未取得有效結果');
       throw new Error("Google 登入未取得有效結果，請重新操作。");
     }
 
+    console.log('[LoginView] 🟢 Popup 登入成功！準備處理後續流程');
     // ✅ 登入成功！authBootstrap 會自動處理：
     // 1. onAuthStateChanged 偵測到登入
     // 2. GET /api/users/:id (或 POST 創建新用戶)
     // 3. setUserProfile(用戶資料)
-    // 4. Router Guard 根據 hasCompletedOnboarding 自動導航
+    // 4. 導航到適當的頁面
     clearTestSession();
     resetGuestMessageCount();
+    console.log('[LoginView] 🟢 設置狀態訊息：登入成功！正在載入您的資料...');
     setStatus("success", "登入成功！正在載入您的資料...");
 
-    // ✅ 保持 loading 狀態，直到 router guard 完成導航
-    // isLoading 不在這裡設為 false，讓頁面保持 loading 直到導航完成
+    // ✅ 等待 authBootstrap 完成後再導航
+    // 給 authBootstrap 一些時間來設置用戶資料
+    console.log('[LoginView] 🔵 設置 setTimeout (1000ms) 等待 authBootstrap');
+    setTimeout(async () => {
+      console.log('[LoginView] 🟡 setTimeout 執行中，檢查用戶資料');
+      const { user } = useUserProfile();
+      const { isGuestUser } = await import("../../../../shared/config/testAccounts.js");
+
+      console.log('[LoginView] 🔵 用戶資料:', user.value);
+      if (user.value) {
+        const isGuest = isGuestUser(user.value.id || '');
+        const hasCompletedOnboarding = user.value.hasCompletedOnboarding !== false;
+
+        console.log('[LoginView] 🟡 導航決策:', {
+          isGuest,
+          hasCompletedOnboarding,
+          userId: user.value.id
+        });
+
+        if (isGuest) {
+          console.log('[LoginView] 🟢 導航至 match (遊客)');
+          await router.push({ name: "match" });
+        } else if (hasCompletedOnboarding) {
+          console.log('[LoginView] 🟢 導航至 match (已完成 onboarding)');
+          await router.push({ name: "match" });
+        } else {
+          console.log('[LoginView] 🟢 導航至 onboarding (新用戶)');
+          await router.push({ name: "onboarding" });
+        }
+      } else {
+        console.log('[LoginView] ⚠️ setTimeout 執行時用戶資料不存在');
+      }
+    }, 1000); // 等待 1 秒讓 authBootstrap 完成
   } catch (err) {
+    console.error('[LoginView] ❌ handleGoogleLogin 錯誤:', err);
     handleFirebaseAuthError(err);
     isLoading.value = false; // ❌ 只在錯誤時才清除 loading
   } finally {
     if (redirecting) {
+      console.log('[LoginView] 🔵 保持 loading 狀態 (redirect 模式)');
       // redirect 時保持 loading 狀態
       // 不設置 isLoading = false
     }
@@ -211,10 +251,14 @@ const handleTestLogin = async (): Promise<void> => {
 
 // ✅ 處理 Google 登入重定向結果
 onMounted(async () => {
+  console.log('[LoginView] 🔵 onMounted 執行');
   try {
+    console.log('[LoginView] 🔵 檢查 redirect 登入結果');
     const redirectOutcome = await resolveRedirectResult();
+    console.log('[LoginView] 🟢 resolveRedirectResult 完成', redirectOutcome);
 
     if (redirectOutcome?.result) {
+      console.log('[LoginView] 🟢 Redirect 登入成功！處理後續流程');
       // ✅ Google 登入重定向成功！
       // authBootstrap 會自動處理後續流程：
       // 1. onAuthStateChanged 偵測到登入
@@ -225,12 +269,49 @@ onMounted(async () => {
       setStatus("loading", "登入成功！正在載入您的資料...");
       clearTestSession();
       resetGuestMessageCount();
+
+      // ✅ 等待 authBootstrap 完成後再導航
+      console.log('[LoginView] 🔵 設置 setTimeout 等待 authBootstrap (redirect 模式)');
+      setTimeout(async () => {
+        console.log('[LoginView] 🟡 setTimeout 執行中 (redirect)，檢查用戶資料');
+        const { user } = useUserProfile();
+        const { isGuestUser } = await import("../../../../shared/config/testAccounts.js");
+
+        console.log('[LoginView] 🔵 用戶資料 (redirect):', user.value);
+        if (user.value) {
+          const isGuest = isGuestUser(user.value.id || '');
+          const hasCompletedOnboarding = user.value.hasCompletedOnboarding !== false;
+
+          console.log('[LoginView] 🟡 導航決策 (redirect):', {
+            isGuest,
+            hasCompletedOnboarding,
+            userId: user.value.id
+          });
+
+          if (isGuest) {
+            console.log('[LoginView] 🟢 導航至 match (遊客, redirect)');
+            await router.push({ name: "match" });
+          } else if (hasCompletedOnboarding) {
+            console.log('[LoginView] 🟢 導航至 match (已完成 onboarding, redirect)');
+            await router.push({ name: "match" });
+          } else {
+            console.log('[LoginView] 🟢 導航至 onboarding (新用戶, redirect)');
+            await router.push({ name: "onboarding" });
+          }
+        } else {
+          console.log('[LoginView] ⚠️ setTimeout 執行時用戶資料不存在 (redirect)');
+        }
+      }, 1000);
+    } else {
+      console.log('[LoginView] 🟡 沒有 redirect 登入結果（正常頁面載入）');
     }
   } catch (error) {
+    console.error('[LoginView] ❌ onMounted 錯誤:', error);
     handleFirebaseAuthError(error);
   } finally {
     // 注意：不在這裡設置 isLoading = false，讓它保持 loading 狀態
     // 直到 authBootstrap 完成並導航到目標頁面
+    console.log('[LoginView] 🔵 onMounted 完成');
   }
 });
 
@@ -260,7 +341,7 @@ onMounted(async () => {
         <button
           type="button"
           class="btn google"
-          @click="handleGoogleLogin"
+          @click="handleGoogleLogin()"
           :disabled="isLoading"
         >
           <span class="btn-icon">

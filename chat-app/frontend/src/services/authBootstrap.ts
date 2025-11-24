@@ -111,8 +111,14 @@ export const ensureAuthState = (): Promise<void> => {
     resolve = promiseResolve;
 
     onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      console.log('[AuthBootstrap] 🔵 onAuthStateChanged 觸發', {
+        hasUser: !!firebaseUser,
+        uid: firebaseUser?.uid,
+      });
+
       try {
         if (!firebaseUser) {
+          console.log('[AuthBootstrap] 🟡 沒有 Firebase 用戶，檢查測試會話');
           // 沒有 Firebase 使用者時，嘗試使用測試登入會話恢復狀態
           const testSession = loadTestSession() as TestSession | null;
 
@@ -137,8 +143,13 @@ export const ensureAuthState = (): Promise<void> => {
         }
 
         const fallbackProfile = buildFallbackProfile(firebaseUser);
+        console.log('[AuthBootstrap] 🔵 Fallback profile 建立完成', {
+          uid: fallbackProfile.uid,
+          displayName: fallbackProfile.displayName,
+        });
 
         const syncProfile = async (): Promise<void> => {
+          console.log('[AuthBootstrap] 🔵 開始同步用戶資料');
           // 檢查網路狀態
           const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
@@ -148,6 +159,7 @@ export const ensureAuthState = (): Promise<void> => {
           const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
           try {
+            console.log('[AuthBootstrap] 🔵 GET /api/users/:id');
             // 嘗試從後端獲取現有用戶資料
             const existing = await apiJson(
               `/api/users/${encodeURIComponent(firebaseUser.uid)}`,
@@ -155,6 +167,7 @@ export const ensureAuthState = (): Promise<void> => {
             ) as ApiResponse<UserProfile>;
 
             clearTimeout(timeoutId);
+            console.log('[AuthBootstrap] 🟢 成功獲取用戶資料', existing.data || existing);
             // 成功獲取後端數據，使用最新的完整資料
             setUserProfile(existing.data || existing as unknown as UserProfile);
             return;
@@ -178,11 +191,13 @@ export const ensureAuthState = (): Promise<void> => {
 
             // 404 錯誤：用戶不存在，嘗試創建新用戶
             if (notFound) {
+              console.log('[AuthBootstrap] 🟡 用戶不存在 (404)，準備創建新用戶');
               // ✅ 2025-11-25：新用戶創建也需要超時機制
               const createController = new AbortController();
               const createTimeoutId = setTimeout(() => createController.abort(), timeoutMs);
 
               try {
+                console.log('[AuthBootstrap] 🔵 POST /api/users (創建新用戶)');
                 const idToken = await firebaseUser.getIdToken();
                 const created = await apiJson('/api/users', {
                   method: 'POST',
@@ -194,6 +209,7 @@ export const ensureAuthState = (): Promise<void> => {
                 }) as ApiResponse<UserProfile>;
 
                 clearTimeout(createTimeoutId);
+                console.log('[AuthBootstrap] 🟢 成功創建新用戶', created.data || created);
                 // 使用後端返回的新建用戶資料（包含所有正確的預設值）
                 setUserProfile(created.data || created as unknown as UserProfile);
                 return;
@@ -213,6 +229,7 @@ export const ensureAuthState = (): Promise<void> => {
         };
 
         await syncProfile();
+        console.log('[AuthBootstrap] 🟢 syncProfile 完成，準備 resolve');
         resolveOnce();
       } catch (error) {
         clearUserProfile();

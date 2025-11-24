@@ -21,6 +21,7 @@ import type { FirebaseAuthService } from '../../types';
 export interface UnlockEffect {
   unlockType: 'character' | 'content' | 'feature';
   characterId?: string;
+  activatedAt?: string; // ✅ 2025-11-25 新增：生效時間（解鎖開始時間）
   expiresAt?: string;
   unlockDays?: number;
 }
@@ -166,9 +167,14 @@ export function useCharacterUnlock(deps: UseCharacterUnlockDeps): UseCharacterUn
 
     try {
       // ✅ 啟用：後端已實現 /api/unlock-tickets/active 端點
-      const data = await apiJson<{ unlocks: UnlockEffect[] }>(`/api/unlock-tickets/active`, {
+      const response = await apiJson<any>(`/api/unlock-tickets/active`, {
         skipGlobalLoading: true,
       });
+
+      // ✅ 2025-11-25 修復：後端使用 sendSuccess 包裝回應為 { success: true, data: { unlocks: [...] } }
+      // 需要訪問 response.data 來獲取實際數據
+      const data = response.data || response;
+
       if (data && data.unlocks) {
         activeUnlockEffects.value = data.unlocks;
       }
@@ -202,7 +208,7 @@ export function useCharacterUnlock(deps: UseCharacterUnlockDeps): UseCharacterUn
       const requestId = generateUnlockCharacterRequestId(userId, matchId);
 
       // 調用後端 API 使用解鎖卡
-      const result = await apiJson<UnlockResult>('/api/unlock-tickets/use/character', {
+      const response = await apiJson<any>('/api/unlock-tickets/use/character', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -214,15 +220,46 @@ export function useCharacterUnlock(deps: UseCharacterUnlockDeps): UseCharacterUn
         skipGlobalLoading: true,
       });
 
-      if (result.success) {
+      // ✅ 2025-11-25 修復：後端使用 sendSuccess 包裝回應為 { success: true, data: { ... } }
+      // 需要訪問 response.data 來獲取實際數據
+      const result = response.data || response;
+
+      if (result.success || response.success) {
         // 關閉模態框
         closeUnlockConfirm();
 
-        // 重新加載解鎖卡餘額和活躍解鎖效果
-        await Promise.all([loadTicketsBalance(userId), loadActiveUnlocks()]);
+        // ✅ 2025-11-25 修復：直接使用 API 返回的數據更新狀態，避免時序問題
+        // 不需要等待 Firestore 寫入完成再讀取
+        const unlockDays = result.unlockDays || 7;
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + unlockDays * 24 * 60 * 60 * 1000);
+
+        // 立即更新 activeUnlockEffects，讓 UI 立即響應
+        const newUnlock: UnlockEffect = {
+          unlockType: 'character',
+          characterId: matchId,
+          activatedAt: now.toISOString(), // ✅ 生效時間（現在）
+          expiresAt: result.expiresAt || expiresAt.toISOString(), // 優先使用後端返回的 expiresAt
+          unlockDays: unlockDays,
+        };
+
+        // 添加到活躍解鎖列表（如果不存在）
+        const existingIndex = activeUnlockEffects.value.findIndex(
+          (u) => u.unlockType === 'character' && u.characterId === matchId
+        );
+        if (existingIndex === -1) {
+          activeUnlockEffects.value.push(newUnlock);
+        } else {
+          activeUnlockEffects.value[existingIndex] = newUnlock;
+        }
+
+        // 確保數據加載完成標記為 true
+        isUnlockDataLoaded.value = true;
+
+        // 重新加載解鎖卡餘額（背景更新，不影響 UI）
+        loadTicketsBalance(userId).catch(console.error);
 
         // 顯示解鎖成功訊息
-        const unlockDays = result.unlockDays || 7;
         const characterName = getPartnerDisplayName() || '角色';
         showSuccess(`解鎖成功！與「${characterName}」可暢聊 ${unlockDays} 天 🎉`);
       }

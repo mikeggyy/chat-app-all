@@ -66,10 +66,14 @@ export function generateAiReplyRequestId(userId: string, characterId: string, us
  * @param userId - 用戶ID
  * @param characterId - 角色ID
  * @returns 請求ID
+ *
+ * ✅ 2025-11-25 修復：使用每日確定性ID，防止重複點擊扣卡
+ * 策略：同一天內對同一角色的解鎖使用相同ID，啟用冪等性保護
  */
 export function generateUnlockCharacterRequestId(userId: string, characterId: string): string {
-  // 每次解鎖都是新請求，使用時間戳保證唯一性
-  return generateRequestId(`unlock-character-${userId}-${characterId}`);
+  // 使用每日確定性ID：同一天內相同用戶+角色的解鎖使用相同ID
+  const today = new Date().toISOString().split('T')[0]; // 格式：2025-11-25
+  return `unlock-character-${userId}-${characterId}-${today}`;
 }
 
 /**

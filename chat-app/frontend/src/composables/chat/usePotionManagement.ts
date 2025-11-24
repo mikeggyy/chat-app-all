@@ -125,6 +125,16 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
     console.log('[activeBrainBoost] partnerId:', partnerId);
     console.log('[activeBrainBoost] activePotionEffects:', activePotionEffects.value);
 
+    // ✅ 2025-11-25 調試：詳細記錄每個效果的字段
+    activePotionEffects.value.forEach((effect, index) => {
+      console.log(`[activeBrainBoost] Effect ${index}:`, {
+        potionType: effect.potionType,
+        characterId: effect.characterId,
+        id: effect.id,
+        matches: effect.potionType === 'brain_boost' && effect.characterId === partnerId
+      });
+    });
+
     const result = activePotionEffects.value.find(
       (effect) =>
         effect.potionType === 'brain_boost' &&
@@ -240,9 +250,14 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
         },
       });
 
-      if (result.success) {
+      // ✅ 2025-11-25 修復：後端使用 sendSuccess 包裝回應為 { success: true, data: { ... } }
+      // 需要訪問 result.data 來獲取實際數據
+      const responseData = result.data || result;
+
+      if (responseData.success || result.success) {
+        const duration = responseData.duration || 7; // 預設 7 天
         showSuccess(
-          `${potionName}使用成功！效果將持續 ${result.duration} 天`
+          `${potionName}使用成功！效果將持續 ${duration} 天`
         );
 
         // 重新載入活躍藥水效果和藥水數量

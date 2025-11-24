@@ -161,10 +161,11 @@ const normalizeThread = (
     normalizeId(character.name) ||
     '神聖的艾米莉雅';
 
-  // 提取最後一條消息
+  // ✅ 2025-11-25 修復：優先顯示 AI 的回覆，而不是用戶的訊息
+  // 提取最後一條消息（優先順序：AI 回覆 > 用戶訊息 > 預覽 > 角色首句 > fallback）
   const lastMessage =
-    normalizeId(source.lastMessage) ||
-    normalizeId(source.partnerLastMessage) ||
+    normalizeId(source.partnerLastMessage) ||  // ✅ 優先：AI 的最後一條訊息
+    normalizeId(source.lastMessage) ||         // 次要：最後一條訊息（可能是用戶的）
     normalizeId(source.preview) ||
     normalizeId(source.last_message) ||
     normalizeId(character.first_message) ||

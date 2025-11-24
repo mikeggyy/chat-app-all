@@ -28,6 +28,11 @@ interface Logger {
   log: (...args: any[]) => void;
 
   /**
+   * 資訊日誌 - 僅開發環境
+   */
+  info: (...args: any[]) => void;
+
+  /**
    * 錯誤日誌 - 開發和生產環境都記錄
    * 生產環境可集成到錯誤追蹤服務
    */
@@ -50,6 +55,13 @@ const logger: Logger = {
    */
   log: (...args: any[]): void => {
     if (isDev) console.log(...args);
+  },
+
+  /**
+   * 資訊日誌 - 僅開發環境
+   */
+  info: (...args: any[]): void => {
+    if (isDev) console.info(...args);
   },
 
   /**

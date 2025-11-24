@@ -444,25 +444,33 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
 
       // ✅ 解包 sendSuccess 的響應格式 { success: true, data: {...} }
       const limitCheck: VideoLimitCheckResult = response.data || response;
+      const videoCards = limitCheck.videoCards || limitCheck.videoUnlockCards || limitCheck.cards || 0;
 
-      // ✅ 關鍵修復：如果有影片卡可用，直接顯示照片選擇器
-      if (limitCheck.allowedWithCard && limitCheck.videoCards > 0) {
-        showPhotoSelector();
-        return;
-      }
-
-      // 如果免費額度用完且沒有卡片，顯示彈窗
-      if (!limitCheck.allowed) {
-        // ✅ 修復：正確傳遞 videoUnlockCards 字段名
+      // ✅ 2025-11-25 修復：如果有影片卡，顯示彈窗讓用戶選擇是否使用影片卡
+      // 無論是否有免費額度，都應該顯示彈窗讓用戶知道可以使用影片卡
+      if (videoCards > 0) {
         const modalData = {
           ...createLimitModalData(limitCheck, 'video'),
-          videoUnlockCards: limitCheck.videoCards || limitCheck.videoUnlockCards || limitCheck.cards || 0,
+          videoUnlockCards: videoCards,
+          // 讓彈窗知道用戶還有免費額度可用
+          allowed: limitCheck.allowed,
+          remaining: limitCheck.remaining,
         };
         showVideoLimit(modalData);
         return;
       }
 
-      // ✅ 權限檢查通過，顯示照片選擇器
+      // 如果免費額度用完且沒有卡片，顯示彈窗
+      if (!limitCheck.allowed) {
+        const modalData = {
+          ...createLimitModalData(limitCheck, 'video'),
+          videoUnlockCards: 0,
+        };
+        showVideoLimit(modalData);
+        return;
+      }
+
+      // ✅ 權限檢查通過且沒有影片卡，直接顯示照片選擇器
       showPhotoSelector();
     } catch (error: any) {
       showError(error instanceof Error ? error.message : '檢查影片權限失敗');

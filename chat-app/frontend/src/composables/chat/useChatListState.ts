@@ -55,6 +55,7 @@ export interface ConversationThread {
   portrait: string;
   lastMessage: string;
   timeLabel: string;
+  timestamp: number;  // 用於排序的時間戳
   isFavorite: boolean;
 }
 
@@ -178,12 +179,14 @@ const normalizeThread = (
   // 是否收藏
   const isFavorite = Boolean(source.isFavorite ?? source.favorite);
 
-  // 生成時間標籤
+  // 生成時間標籤和時間戳
+  let timestamp = 0;
   const timeLabel = (() => {
     if (updatedAt) {
       try {
         const date = new Date(updatedAt);
         if (!Number.isNaN(date.getTime())) {
+          timestamp = date.getTime();  // 保存時間戳用於排序
           const now = new Date();
           const isSameDay =
             date.getFullYear() === now.getFullYear() &&
@@ -211,6 +214,7 @@ const normalizeThread = (
     portrait,
     lastMessage,
     timeLabel,
+    timestamp,
     isFavorite,
   };
 };
@@ -371,14 +375,17 @@ export function useChatListState(options: UseChatListStateOptions): UseChatListS
       return [];
     }
 
-    // 確保收藏狀態正確
-    return normalized.map((thread) => ({
-      ...thread,
-      isFavorite: favoritesSet.has(thread.id) || thread.isFavorite,
-    }));
+    // 確保收藏狀態正確，並按最後對話時間排序
+    return normalized
+      .map((thread) => ({
+        ...thread,
+        isFavorite: favoritesSet.has(thread.id) || thread.isFavorite,
+      }))
+      // ✅ 2025-11-25：按最後對話時間排序（時間戳大的在前面，即最新的在最上面）
+      .sort((a, b) => b.timestamp - a.timestamp);
   });
 
-  // 收藏線程列表
+  // 收藏線程列表（按最後對話時間排序）
   const favoriteThreads = computed<ConversationThread[]>(() => {
     const favorites = favoriteIds.value;
     const threads = conversationThreads.value;
@@ -386,7 +393,7 @@ export function useChatListState(options: UseChatListStateOptions): UseChatListS
     const result: ConversationThread[] = [];
     const processed = new Set<string>();
 
-    // 按收藏順序處理
+    // 收集所有收藏的對話
     favorites.forEach((favoriteId, index) => {
       const existingThread = byId.get(favoriteId);
       if (existingThread) {
@@ -440,7 +447,8 @@ export function useChatListState(options: UseChatListStateOptions): UseChatListS
       }
     });
 
-    return result;
+    // ✅ 按最後對話時間排序（時間戳大的在前面，即最新的在最上面）
+    return result.sort((a, b) => b.timestamp - a.timestamp);
   });
 
   // 當前可見的線程（根據標籤頁過濾）

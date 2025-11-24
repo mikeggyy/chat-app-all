@@ -59,7 +59,10 @@ const signInWithGoogle = async (): Promise<SignInResult> => {
   // 在 Emulator 模式下，直接使用 redirect 避免 "No matching frame" 錯誤
   const useEmulator = import.meta.env.VITE_USE_EMULATOR === "true";
 
-  if (useEmulator) {
+  // ✅ 2025-11-25：檢測是否為手機設備，手機上直接使用 redirect
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (useEmulator || isMobile) {
     await signInWithRedirect(auth, provider);
     return {
       result: null,
@@ -68,7 +71,7 @@ const signInWithGoogle = async (): Promise<SignInResult> => {
     };
   }
 
-  // 生產環境使用 popup，失敗時降級為 redirect
+  // 桌面環境使用 popup，失敗時降級為 redirect
   try {
     const result = await signInWithPopup(auth, provider);
     return {
@@ -77,7 +80,7 @@ const signInWithGoogle = async (): Promise<SignInResult> => {
       redirected: false,
     };
   } catch (error: any) {
-    if (error?.code === "auth/popup-blocked") {
+    if (error?.code === "auth/popup-blocked" || error?.code === "auth/popup-closed-by-user") {
       await signInWithRedirect(auth, provider);
       return {
         result: null,

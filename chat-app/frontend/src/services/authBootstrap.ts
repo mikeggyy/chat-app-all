@@ -142,32 +142,46 @@ export const ensureAuthState = (): Promise<void> => {
           // 檢查網路狀態
           const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
+          // ✅ 2025-11-25：添加超時機制，避免手機上無限等待
+          const timeoutMs = 15000; // 15 秒超時
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
           try {
             // 嘗試從後端獲取現有用戶資料
             const existing = await apiJson(
-              `/api/users/${encodeURIComponent(firebaseUser.uid)}`
+              `/api/users/${encodeURIComponent(firebaseUser.uid)}`,
+              { signal: controller.signal }
             ) as ApiResponse<UserProfile>;
 
+            clearTimeout(timeoutId);
             // 成功獲取後端數據，使用最新的完整資料
             setUserProfile(existing.data || existing as unknown as UserProfile);
             return;
           } catch (error: any) {
+            clearTimeout(timeoutId);
             const notFound = error?.status === 404;
             const networkError = isNetworkError(error);
+            const isTimeout = error?.name === 'AbortError';
 
-            // 如果不是 404 且不是網路錯誤，拋出異常
-            if (!notFound && !networkError) {
+            // 如果不是 404 且不是網路錯誤且不是超時，拋出異常
+            if (!notFound && !networkError && !isTimeout) {
               throw error;
             }
 
-            // 網路錯誤或離線：無法確定用戶狀態，不設置錯誤的預設值
-            if (networkError || isOffline) {
-              // 不設置 fallbackProfile，保持未認證狀態
+            // ✅ 2025-11-25 修復：網路錯誤、離線或超時時，使用 fallback profile 而非卡住
+            if (networkError || isOffline || isTimeout) {
+              console.warn('[AuthBootstrap] 網路問題或超時，使用本地 fallback profile');
+              setUserProfile(fallbackProfile);
               return;
             }
 
             // 404 錯誤：用戶不存在，嘗試創建新用戶
             if (notFound) {
+              // ✅ 2025-11-25：新用戶創建也需要超時機制
+              const createController = new AbortController();
+              const createTimeoutId = setTimeout(() => createController.abort(), timeoutMs);
+
               try {
                 const idToken = await firebaseUser.getIdToken();
                 const created = await apiJson('/api/users', {
@@ -176,13 +190,22 @@ export const ensureAuthState = (): Promise<void> => {
                   headers: {
                     Authorization: `Bearer ${idToken}`,
                   },
+                  signal: createController.signal,
                 }) as ApiResponse<UserProfile>;
 
+                clearTimeout(createTimeoutId);
                 // 使用後端返回的新建用戶資料（包含所有正確的預設值）
                 setUserProfile(created.data || created as unknown as UserProfile);
                 return;
-              } catch (createError) {
-                // 創建失敗，不設置錯誤的 fallbackProfile
+              } catch (createError: any) {
+                clearTimeout(createTimeoutId);
+                // ✅ 2025-11-25 修復：創建失敗或超時時也使用 fallback profile
+                const isCreateTimeout = createError?.name === 'AbortError';
+                console.warn('[AuthBootstrap] 創建用戶失敗或超時，使用本地 fallback profile', {
+                  isTimeout: isCreateTimeout,
+                  error: createError?.message,
+                });
+                setUserProfile(fallbackProfile);
                 return;
               }
             }

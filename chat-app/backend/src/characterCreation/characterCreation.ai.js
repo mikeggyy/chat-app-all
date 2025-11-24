@@ -581,7 +581,10 @@ export const generateCharacterImages = async ({
   // 🔥 使用 Firestore 設定的參數
   const imageModel = imageConfig.model || "gpt-image-1-mini";
   const imageSize = imageConfig.size || "1024x1536";
-  const imageQuality = quality || imageConfig.quality || "high";
+  // ✅ 2025-11-25 修復：OpenAI API 現在只支持 low/medium/high/auto，將 standard 映射為 medium
+  const rawQuality = quality || imageConfig.quality || "high";
+  const qualityMapping = { standard: "medium", premium: "high" };
+  const imageQuality = qualityMapping[rawQuality] || rawQuality;
   const imageCount = count || imageConfig.count || 4;
 
   if (process.env.NODE_ENV !== "test") {

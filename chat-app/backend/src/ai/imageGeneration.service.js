@@ -72,12 +72,24 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
   }
 
   // 獲取角色參考照片並轉換為 base64
-  const portraitPath = character.portraitUrl;
+  let portraitPath = character.portraitUrl;
 
   if (!portraitPath) {
     const error = new Error("角色沒有參考照片，無法生成自拍");
     error.status = 400;
     throw error;
+  }
+
+  // ✅ 生產環境修復：將相對路徑轉換為完整 URL
+  // 在 Cloud Run 中無法讀取本地文件，需要從前端域名下載
+  if (!portraitPath.startsWith("http://") && !portraitPath.startsWith("https://")) {
+    // 確保路徑以 / 開頭
+    const cleanPath = portraitPath.startsWith("/") ? portraitPath : `/${portraitPath}`;
+
+    // 生產環境使用 Cloudflare Pages 域名，開發環境使用本地前端
+    const frontendBaseUrl = process.env.FRONTEND_URL || "https://chat-app-all.pages.dev";
+    portraitPath = `${frontendBaseUrl}${cleanPath}`;
+    logger.info(`[圖片生成] 將相對路徑轉換為完整 URL: ${portraitPath}`);
   }
 
   // 讀取圖片並轉為 base64（支援本地路徑和 Firebase Storage URL）
@@ -86,7 +98,7 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
     let imageBuffer;
     let imageExtension;
 
-    // 檢查是否為 HTTP/HTTPS URL（Cloudflare R2 或 Firebase Storage）
+    // 從遠端 URL 下載圖片（Cloudflare R2、Firebase Storage 或前端靜態資源）
     if (portraitPath.startsWith("http://") || portraitPath.startsWith("https://")) {
       logger.info(`[圖片生成] 從遠端下載角色照片: ${portraitPath}`);
 
@@ -143,19 +155,6 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
         }
         throw fetchError;
       }
-    } else {
-      // 本地文件路徑
-      logger.info(`[圖片生成] 從本地讀取角色照片: ${portraitPath}`);
-
-      // 前端的 public 目錄路徑
-      const frontendPublicPath = join(__dirname, "..", "..", "..", "frontend", "public");
-      const imagePath = join(frontendPublicPath, portraitPath);
-
-      // 讀取文件
-      imageBuffer = readFileSync(imagePath);
-
-      // 獲取圖片格式
-      imageExtension = portraitPath.split(".").pop().toLowerCase();
     }
 
     // 轉換為 base64

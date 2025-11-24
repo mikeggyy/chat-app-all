@@ -49,6 +49,7 @@ const {
 
 // 貢獻排行
 const {
+  contributionCharacters,
   contributionRanking,
   isLoadingContribution,
 } = useContributionRanking();
@@ -68,7 +69,8 @@ const {
   recentConversations,
   popularCharacters,
   popularHasMore,
-  fetchPopularCharacters
+  fetchPopularCharacters,
+  contributionCharacters
 );
 
 // 打開聊天
@@ -143,6 +145,7 @@ const openChat = (profile: CharacterProfile | null): void => {
       :badge-icon="panel.badgeIcon.value"
       :description="panel.description.value"
       :records="recentRecordEntries"
+      :contribution-data="contributionCharacters"
       :has-more="hasMoreRecords"
       :is-loading="isLoadingMoreRecords"
       @close="closeRecentRecords"

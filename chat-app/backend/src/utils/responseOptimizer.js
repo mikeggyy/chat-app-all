@@ -68,8 +68,9 @@ const FIELD_SELECTORS = {
   },
 
   // 消息資料
+  // ✅ 2025-11-24 修復：添加 video 字段（影片對象），確保影片消息正確返回
   message: {
-    include: ['id', 'role', 'text', 'imageUrl', 'videoUrl', 'createdAt'],
+    include: ['id', 'role', 'text', 'imageUrl', 'video', 'createdAt'],
     exclude: ['userId', 'characterId', 'metadata'],
   },
 

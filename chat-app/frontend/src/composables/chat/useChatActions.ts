@@ -478,10 +478,10 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           messages.value.splice(tempPhotoIndex, 1);
         }
 
-        if (giftResponse?.success) {
-          // ✅ 修復：後端使用 sendSuccess 包裝，數據在 data 字段中
-          const responseData = giftResponse.data || giftResponse;
+        // ✅ 修復：後端使用 sendSuccess 包裝，數據在 data 字段中
+        const responseData = giftResponse?.data || giftResponse;
 
+        if (responseData?.success) {
           // 添加感謝訊息
           if (responseData.thankYouMessage) {
             messages.value.push(responseData.thankYouMessage);
@@ -508,8 +508,55 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
 
           await nextTick();
           if (scrollToBottom) scrollToBottom();
+        } else if (responseData?.needsRefund) {
+          // ✅ 2025-11-24：禮物回應生成失敗，需要退款
+          console.error('[禮物] 禮物回應生成失敗，正在處理退款:', responseData.error, responseData.errorMessage);
+
+          // 移除禮物消息（因為生成失敗了）
+          const giftMsgIndex = messages.value.findIndex((m) => m.id === giftMessageId);
+          if (giftMsgIndex !== -1) {
+            messages.value.splice(giftMsgIndex, 1);
+          }
+
+          // ✅ 2025-11-24：從資料庫刪除禮物消息
+          try {
+            await apiJson(`/api/conversations/${userId}/${matchId}/messages`, {
+              method: 'DELETE',
+              body: { messageIds: [giftMessageId] },
+              skipGlobalLoading: true,
+            });
+            console.log('[禮物] ✅ 已從資料庫刪除禮物訊息:', giftMessageId);
+          } catch (deleteError) {
+            console.error('[禮物] ❌ 從資料庫刪除禮物訊息失敗:', deleteError);
+          }
+
+          // 調用退款 API
+          try {
+            const refundResult = await apiJson('/api/gifts/refund', {
+              method: 'POST',
+              body: {
+                giftId: giftData.giftId,
+                amount: giftData.priceInfo?.finalPrice || gift.price,
+                reason: responseData.errorMessage || '禮物回應生成失敗',
+                characterId: matchId,
+                requestId: requestId,
+              },
+              skipGlobalLoading: true,
+            });
+
+            if (refundResult?.success || refundResult?.data?.success) {
+              toast.error(`禮物回應生成失敗，已退款 ${giftData.priceInfo?.finalPrice || gift.price} 金幣`);
+            } else {
+              toast.error('禮物回應生成失敗，退款處理中，請稍後檢查餘額');
+            }
+          } catch (refundError) {
+            console.error('[禮物] 退款失敗:', refundError);
+            toast.error('禮物回應生成失敗，退款處理中，請稍後檢查餘額');
+          }
+
+          return false;
         } else {
-          toast.error('禮物回應生成失敗');
+          toast.error(responseData?.errorMessage || '禮物回應生成失敗');
           if (onSuccess) {
             onSuccess(giftMessage, null);
           }
@@ -520,9 +567,46 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           messages.value.splice(tempPhotoIndex, 1);
         }
 
-        if (onSuccess) {
-          onSuccess(giftMessage, null);
+        // ✅ 2025-11-24：網絡錯誤也嘗試退款
+        console.error('[禮物] 禮物回應請求失敗，嘗試退款:', photoError);
+
+        // 移除禮物消息
+        const giftMsgIndex = messages.value.findIndex((m) => m.id === giftMessageId);
+        if (giftMsgIndex !== -1) {
+          messages.value.splice(giftMsgIndex, 1);
         }
+
+        // ✅ 2025-11-24：從資料庫刪除禮物消息
+        try {
+          await apiJson(`/api/conversations/${userId}/${matchId}/messages`, {
+            method: 'DELETE',
+            body: { messageIds: [giftMessageId] },
+            skipGlobalLoading: true,
+          });
+          console.log('[禮物] ✅ 已從資料庫刪除禮物訊息:', giftMessageId);
+        } catch (deleteError) {
+          console.error('[禮物] ❌ 從資料庫刪除禮物訊息失敗:', deleteError);
+        }
+
+        try {
+          await apiJson('/api/gifts/refund', {
+            method: 'POST',
+            body: {
+              giftId: giftData.giftId,
+              amount: giftData.priceInfo?.finalPrice || gift.price,
+              reason: '禮物回應請求失敗',
+              characterId: matchId,
+              requestId: requestId,
+            },
+            skipGlobalLoading: true,
+          });
+          toast.error(`禮物回應生成失敗，已退款 ${giftData.priceInfo?.finalPrice || gift.price} 金幣`);
+        } catch (refundError) {
+          console.error('[禮物] 退款失敗:', refundError);
+          toast.error('禮物回應生成失敗，退款處理中');
+        }
+
+        return false;
       }
 
       return true;

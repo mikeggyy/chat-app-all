@@ -31,14 +31,14 @@ if /i "%CONFIRM%"=="n" (
 
 echo.
 echo [1/4] 檢查 GCP 登入狀態...
-gcloud auth list --filter=status:ACTIVE --format="value(account)" >nul 2>&1
-if errorlevel 1 (
+for /f "tokens=*" %%a in ('gcloud auth list --format^="value(account)" 2^>nul') do set GCP_ACCOUNT=%%a
+if not defined GCP_ACCOUNT (
     echo [錯誤] 未登入 GCP
     echo 請執行: gcloud auth login
     pause
     exit /b 1
 )
-echo [OK] GCP 已登入
+echo [OK] 已登入: %GCP_ACCOUNT%
 
 echo.
 echo [2/4] 設置 GCP 專案...

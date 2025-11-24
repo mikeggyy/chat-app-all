@@ -6,14 +6,15 @@ import {
   SparklesIcon,
   FireIcon,
   StarIcon,
-  BoltIcon
+  BoltIcon,
+  TrophyIcon
 } from '@heroicons/vue/24/solid';
 import { logger } from '../utils/logger.js';
 
 /**
  * Icon map types
  */
-type IconKey = 'heart' | 'sparkles' | 'fire' | 'star' | 'bolt';
+type IconKey = 'heart' | 'sparkles' | 'fire' | 'star' | 'bolt' | 'trophy';
 
 /**
  * Icon component type (Vue component)
@@ -95,7 +96,8 @@ export function usePanelManager(
     sparkles: SparklesIcon,
     fire: FireIcon,
     star: StarIcon,
-    bolt: BoltIcon
+    bolt: BoltIcon,
+    trophy: TrophyIcon
   };
 
   // Panel 狀態

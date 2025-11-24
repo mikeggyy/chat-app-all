@@ -664,18 +664,21 @@ export const getTopContributedCharacters = async (options = {}) => {
       .flatMap(c => c.topContributors?.map(tc => tc.userId) || [])
   )];
 
-  const userNames = {};
+  const userInfo = {};
   if (allContributorIds.length > 0) {
-    // 批次查詢用戶名稱
+    // 批次查詢用戶名稱和頭像
     for (const userId of allContributorIds) {
       try {
         const userDoc = await db.collection('users').doc(userId).get();
         if (userDoc.exists) {
           const userData = userDoc.data();
-          userNames[userId] = userData.displayName || userData.name || '匿名用戶';
+          userInfo[userId] = {
+            displayName: userData.displayName || userData.name || '匿名用戶',
+            photoURL: userData.photoURL || null
+          };
         }
       } catch (err) {
-        logger.warn(`[等級] 無法獲取用戶 ${userId} 名稱:`, err);
+        logger.warn(`[等級] 無法獲取用戶 ${userId} 資料:`, err);
       }
     }
   }
@@ -691,7 +694,8 @@ export const getTopContributedCharacters = async (options = {}) => {
       rank: idx + 1,
       userId: tc.userId,
       points: tc.points,
-      displayName: userNames[tc.userId] || '匿名用戶'
+      displayName: userInfo[tc.userId]?.displayName || '匿名用戶',
+      photoURL: userInfo[tc.userId]?.photoURL || null
     }))
   }));
 

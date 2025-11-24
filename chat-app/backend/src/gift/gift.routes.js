@@ -12,6 +12,7 @@ import {
   ApiError,
 } from "../../shared/utils/errorFormatter.js";
 import { sendGift, getUserGiftHistory, getCharacterGiftStats, getGiftPricing } from "./gift.service.js";
+import { refundCoins } from "../payment/coins.service.js";
 import { processGiftResponse } from "./giftResponse.service.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";
 import { requireFirebaseAuth } from "../auth/index.js";
@@ -140,6 +141,7 @@ router.get("/pricing", requireFirebaseAuth, relaxedRateLimiter, asyncHandler(asy
  * 生成AI角色收到禮物的回應（感謝訊息 + 自拍照）
  * 🔒 安全增強：從認證 token 獲取 userId，防止代他人生成禮物回應
  * ✅ 支援選擇現有照片：可傳入 selectedPhotoUrl 使用現有照片而非生成新照片
+ * ✅ 2025-11-24：如果生成失敗，返回 success: false 和 needsRefund: true
  */
 router.post("/response", requireFirebaseAuth, standardRateLimiter, asyncHandler(async (req, res, next) => {
   try {
@@ -168,18 +170,78 @@ router.post("/response", requireFirebaseAuth, standardRateLimiter, asyncHandler(
       }
     );
 
+    // ✅ 2025-11-24 修復：處理失敗情況
+    if (!result.success) {
+      logger.error(`[禮物回應 API] ❌ 處理失敗: error=${result.error}, needsRefund=${result.needsRefund}`);
+      // 返回失敗狀態給前端，讓前端處理退款
+      return sendSuccess(res, result);
+    }
+
     // ✅ 修復：使用正確的字段名稱 photoMessage（與 processGiftResponse 返回的字段一致）
-    logger.info(`[禮物回應 API] 準備返回結果給前端: hasPhotoMessage=${!!result.photoMessage}, hasImageUrl=${!!result.photoMessage?.imageUrl}`);
+    logger.info(`[禮物回應 API] ✅ 處理成功: hasPhotoMessage=${!!result.photoMessage}, hasImageUrl=${!!result.photoMessage?.imageUrl}`);
     if (result.photoMessage?.imageUrl) {
       logger.info(`[禮物回應 API] ✅ 照片 URL 將被發送: ${result.photoMessage.imageUrl.substring(0, 100)}...`);
-      logger.info(`[禮物回應 API] ✅ 照片 URL 長度: ${result.photoMessage.imageUrl.length}`);
-    } else {
-      logger.error(`[禮物回應 API] ❌ 照片 URL 缺失，將發送給前端的結果不包含照片 URL！`);
     }
 
     sendSuccess(res, result);
   } catch (error) {
     logger.error("生成禮物回應失敗:", error);
+    next(error);
+  }
+}));
+
+/**
+ * POST /api/gifts/refund
+ * 退款禮物（當禮物回應生成失敗時使用）
+ * 🔒 安全增強：從認證 token 獲取 userId，只能退款自己的禮物
+ * ✅ 2025-11-24：新增 API，用於處理禮物回應生成失敗時的退款
+ */
+router.post("/refund", requireFirebaseAuth, standardRateLimiter, asyncHandler(async (req, res, next) => {
+  try {
+    const userId = req.firebaseUser.uid;
+    const { giftId, amount, reason, characterId, requestId } = req.body;
+
+    if (!giftId) {
+      return sendError(res, "VALIDATION_ERROR", "缺少必要參數：giftId", {
+        field: "giftId",
+      });
+    }
+
+    if (!amount || amount <= 0) {
+      return sendError(res, "VALIDATION_ERROR", "退款金額無效", {
+        field: "amount",
+      });
+    }
+
+    // 使用冪等性處理防止重複退款
+    const idempotencyKey = `gift_refund_${requestId || `${userId}_${giftId}_${Date.now()}`}`;
+
+    const result = await handleIdempotentRequest(
+      idempotencyKey,
+      async () => {
+        logger.info(`[禮物退款] 開始退款: userId=${userId}, giftId=${giftId}, amount=${amount}, reason=${reason || '禮物回應生成失敗'}`);
+
+        const refundResult = await refundCoins(
+          userId,
+          amount,
+          reason || `禮物回應生成失敗（禮物ID：${giftId}，角色：${characterId || '未知'}）`
+        );
+
+        logger.info(`[禮物退款] ✅ 退款成功: userId=${userId}, amount=${amount}, newBalance=${refundResult.newBalance}`);
+
+        return {
+          success: true,
+          refundedAmount: amount,
+          newBalance: refundResult.newBalance,
+          giftId,
+        };
+      },
+      { ttl: IDEMPOTENCY_TTL.GIFT }
+    );
+
+    sendSuccess(res, result);
+  } catch (error) {
+    logger.error("禮物退款失敗:", error);
     next(error);
   }
 }));

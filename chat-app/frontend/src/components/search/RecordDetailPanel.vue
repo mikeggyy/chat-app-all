@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // Types
-
+import { ref } from "vue";
 import { ArrowLeftIcon, ArrowRightIcon } from "@heroicons/vue/24/outline";
 import { HeartIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
 import LazyImage from '@/components/common/LazyImage.vue';
+import CharacterContributionModal from "./CharacterContributionModal.vue";
 
 const props = defineProps({
   isOpen: {
@@ -34,6 +35,11 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  // 貢獻排行專用：完整的貢獻數據（包含 topContributors）
+  contributionData: {
+    type: Array,
+    default: () => [],
+  },
   hasMore: {
     type: Boolean,
     default: false,
@@ -44,7 +50,35 @@ const props = defineProps({
   },
 });
 
+// 獲取排名標籤
+const getRankLabel = (rank: number): string => {
+  switch (rank) {
+    case 1: return "榜一";
+    case 2: return "榜二";
+    case 3: return "榜三";
+    default: return `第${rank}`;
+  }
+};
+
+// 獲取排名樣式類
+const getRankClass = (rank: number): string => {
+  switch (rank) {
+    case 1: return "rank-gold";
+    case 2: return "rank-silver";
+    case 3: return "rank-bronze";
+    default: return "";
+  }
+};
+
 const emit = defineEmits(["close", "scroll", "entry-click"]);
+
+// 角色貢獻排行 Modal 狀態
+const showContributionModal = ref(false);
+const selectedCharacterForModal = ref<{
+  id: string;
+  name: string;
+  image: string;
+} | null>(null);
 
 const handleClose = () => {
   emit("close");
@@ -54,8 +88,25 @@ const handleScroll = (event) => {
   emit("scroll", event);
 };
 
-const handleEntryClick = (entry) => {
+const handleEntryClick = (entry, index: number) => {
+  // 貢獻排行模式：打開角色詳細排行榜 Modal
+  if (props.panelType === "contribution" && props.contributionData[index]) {
+    const data = props.contributionData[index];
+    selectedCharacterForModal.value = {
+      id: data.matchId || entry.matchId,
+      name: data.name || entry.name,
+      image: data.image || entry.image,
+    };
+    showContributionModal.value = true;
+    return;
+  }
+  // 其他模式：進入聊天
   emit("entry-click", entry);
+};
+
+const closeContributionModal = () => {
+  showContributionModal.value = false;
+  selectedCharacterForModal.value = null;
 };
 </script>
 
@@ -157,14 +208,41 @@ const handleEntryClick = (entry) => {
                 <button
                   type="button"
                   class="recent-record-card__arrow"
-                  :aria-label="`與 ${entry.name} 開啟對話`"
-                  @click="handleEntryClick(entry)"
+                  :aria-label="panelType === 'contribution' ? `查看 ${entry.name} 的貢獻排行榜` : `與 ${entry.name} 開啟對話`"
+                  @click="handleEntryClick(entry, records.indexOf(entry))"
                 >
                   <ArrowRightIcon />
                 </button>
               </div>
             </header>
             <p class="recent-record-card__description">{{ entry.description }}</p>
+
+            <!-- 貢獻排行專用：顯示前3名貢獻者 -->
+            <div
+              v-if="panelType === 'contribution' && contributionData[records.indexOf(entry)]?.topContributors?.length"
+              class="contribution-top-contributors"
+            >
+              <div
+                v-for="contributor in contributionData[records.indexOf(entry)].topContributors"
+                :key="contributor.userId"
+                class="contributor-row"
+                :class="getRankClass(contributor.rank)"
+              >
+                <span class="contributor-rank">{{ getRankLabel(contributor.rank) }}</span>
+                <div class="contributor-info">
+                  <img
+                    v-if="contributor.photoURL"
+                    :src="contributor.photoURL"
+                    :alt="contributor.displayName"
+                    class="contributor-avatar"
+                  />
+                  <div v-else class="contributor-avatar placeholder">
+                    {{ contributor.displayName?.charAt(0) || '?' }}
+                  </div>
+                  <span class="contributor-name">{{ contributor.displayName }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </article>
 
@@ -176,13 +254,26 @@ const handleEntryClick = (entry) => {
 
         <!-- 已全部載入提示 -->
         <div v-else-if="!hasMore && records.length > 0" class="records-end">
-          <p v-if="panelType === 'ranking'">
+          <p v-if="panelType === 'contribution'">
+            已顯示全部 {{ records.length }} 個角色的貢獻排行
+          </p>
+          <p v-else-if="panelType === 'ranking'">
             已顯示全部 {{ records.length }} 個角色
           </p>
           <p v-else>已顯示全部 {{ records.length }} 則對話記錄</p>
         </div>
       </div>
     </section>
+
+    <!-- 角色貢獻排行榜 Modal -->
+    <CharacterContributionModal
+      v-if="selectedCharacterForModal"
+      :show="showContributionModal"
+      :character-id="selectedCharacterForModal.id"
+      :character-name="selectedCharacterForModal.name"
+      :character-image="selectedCharacterForModal.image"
+      @close="closeContributionModal"
+    />
   </div>
 </template>
 
@@ -600,6 +691,96 @@ const handleEntryClick = (entry) => {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+// 貢獻排行專用樣式
+.contribution-top-contributors {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.contributor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.5rem;
+  background: rgba(71, 85, 105, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 8px;
+
+  .contributor-rank {
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: rgba(226, 232, 240, 0.7);
+  }
+
+  .contributor-info {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    max-width: 70%;
+    overflow: hidden;
+  }
+
+  .contributor-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+
+    &.placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(71, 85, 105, 0.6);
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: rgba(226, 232, 240, 0.8);
+    }
+  }
+
+  .contributor-name {
+    font-size: 0.75rem;
+    color: rgba(226, 232, 240, 0.85);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // 榜一 - 金色
+  &.rank-gold {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+    border-color: rgba(251, 191, 36, 0.3);
+
+    .contributor-rank { color: #fbbf24; }
+    .contributor-avatar { border-color: rgba(251, 191, 36, 0.5); }
+  }
+
+  // 榜二 - 銀色
+  &.rank-silver {
+    background: linear-gradient(135deg, rgba(148, 163, 184, 0.15), rgba(100, 116, 139, 0.1));
+    border-color: rgba(148, 163, 184, 0.3);
+
+    .contributor-rank { color: #94a3b8; }
+    .contributor-avatar { border-color: rgba(148, 163, 184, 0.5); }
+  }
+
+  // 榜三 - 銅色
+  &.rank-bronze {
+    background: linear-gradient(135deg, rgba(205, 127, 50, 0.15), rgba(160, 82, 45, 0.1));
+    border-color: rgba(205, 127, 50, 0.3);
+
+    .contributor-rank { color: #cd7f32; }
+    .contributor-avatar { border-color: rgba(205, 127, 50, 0.5); }
+  }
 }
 
 @media (max-width: 640px) {

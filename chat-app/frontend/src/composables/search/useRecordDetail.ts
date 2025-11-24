@@ -1,7 +1,7 @@
 // @ts-nocheck
-import { computed, type Ref, type ComputedRef } from "vue";
+import { ref, computed, type Ref, type ComputedRef } from "vue";
 import { useRoute, useRouter, type Router, type RouteLocationNormalizedLoaded } from "vue-router";
-import { HeartIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
+import { HeartIcon, ChatBubbleLeftRightIcon, TrophyIcon } from "@heroicons/vue/24/solid";
 import { usePanelManager } from "../usePanelManager.js";
 import { useVirtualScroll } from "../useVirtualScroll.js";
 import { fallbackMatches } from "../../utils/matchFallback.js";
@@ -19,12 +19,12 @@ type HeroIcon = FunctionalComponent<SVGAttributes>;
 /**
  * Panel type identifier
  */
-type PanelType = "reconnect" | "ranking";
+type PanelType = "reconnect" | "ranking" | "contribution";
 
 /**
  * Icon key for badge display
  */
-type IconKey = "heart" | "fire";
+type IconKey = "heart" | "fire" | "trophy";
 
 /**
  * Panel configuration structure
@@ -87,6 +87,29 @@ interface Character {
  */
 interface PopularCharacter extends Character {
   // Inherits all Character fields
+}
+
+/**
+ * Contribution character data (from API)
+ */
+interface ContributionCharacter {
+  id: string;
+  matchId: string;
+  rank: number;
+  name: string;
+  description: string;
+  image: string;
+  totalPoints: number;
+  totalSpent: number;
+  contributorCount: number;
+  totalPointsFormatted: string;
+  totalSpentFormatted: string;
+  topContributors: Array<{
+    rank: number;
+    userId: string;
+    points: number;
+    displayName: string;
+  }>;
 }
 
 /**
@@ -177,6 +200,13 @@ const PANEL_CONFIGS: PanelConfigsMap = {
     iconKey: "fire",
     heroImage: "/banner/ranking-hero.webp",
   },
+  contribution: {
+    description: "粉絲送禮排行榜，看看誰最受寵愛！",
+    badgeLabel: "貢獻排行",
+    icon: TrophyIcon,
+    iconKey: "trophy",
+    heroImage: "/banner/ranking-hero.webp",
+  },
 };
 
 // ============================================================================
@@ -202,7 +232,8 @@ export function useRecordDetail(
   recentConversations: Ref<Conversation[]>,
   popularCharacters: Ref<PopularCharacter[]>,
   popularHasMore: Ref<boolean>,
-  fetchPopularCharacters: FetchPopularCharactersFn
+  fetchPopularCharacters: FetchPopularCharactersFn,
+  contributionCharacters: Ref<ContributionCharacter[]> = ref([])
 ): UseRecordDetailReturn {
   const router: Router = useRouter();
   const route: RouteLocationNormalizedLoaded = useRoute();
@@ -248,6 +279,34 @@ export function useRecordDetail(
               label: "對話數",
               value: formatNumber(item.messageCount || item.totalChatUsers || 0),
               icon: ChatBubbleLeftRightIcon,
+            },
+          ],
+        };
+      });
+    }
+
+    // If contribution panel, use contributionCharacters
+    if (panel.currentType.value === "contribution") {
+      return contributionCharacters.value.map((item: ContributionCharacter, index: number): RecordEntry => {
+        return {
+          id: `contribution-record-${item.id}-${index}`,
+          matchId: item.matchId,
+          name: item.name || "未知角色",
+          description: item.description || "",
+          image: item.image || "/ai-role/match-role-01.webp",
+          tagline: "",
+          metrics: [
+            {
+              key: "contributors",
+              label: "粉絲數",
+              value: formatNumber(item.contributorCount || 0),
+              icon: HeartIcon,
+            },
+            {
+              key: "points",
+              label: "總貢獻",
+              value: item.totalPointsFormatted || formatNumber(item.totalPoints || 0),
+              icon: TrophyIcon,
             },
           ],
         };
@@ -300,8 +359,8 @@ export function useRecordDetail(
 
   // Displayed records (virtual scrolling)
   const recentRecordEntries: ComputedRef<RecordEntry[]> = computed(() => {
-    // If ranking panel, show all loaded data (no virtual scroll slicing)
-    if (panel.currentType.value === "ranking") {
+    // If ranking or contribution panel, show all loaded data (no virtual scroll slicing)
+    if (panel.currentType.value === "ranking" || panel.currentType.value === "contribution") {
       return allRecentRecordEntries.value;
     }
     // Other panels use virtual scrolling
@@ -313,6 +372,10 @@ export function useRecordDetail(
     // If ranking panel, use API hasMore state
     if (panel.currentType.value === "ranking") {
       return popularHasMore.value;
+    }
+    // Contribution panel - no pagination for now
+    if (panel.currentType.value === "contribution") {
+      return false;
     }
     // Other panels use virtual scrolling
     return displayedRecordsCount.value < allRecentRecordEntries.value.length;
@@ -331,6 +394,9 @@ export function useRecordDetail(
     // If ranking panel, use API loading
     if (panel.currentType.value === "ranking") {
       handleVirtualScroll(event, hasMoreRecords.value, loadMoreRecordsForRanking);
+    } else if (panel.currentType.value === "contribution") {
+      // Contribution panel - no additional loading needed
+      return;
     } else {
       // Other panels use local virtual scrolling
       handleVirtualScroll(event, hasMoreRecords.value);

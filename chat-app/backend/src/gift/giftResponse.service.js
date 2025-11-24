@@ -7,7 +7,7 @@ import logger from "../utils/logger.js";
 import { getGiftById } from "../config/gifts.js";
 import { getOpenAIClient } from "../ai/ai.service.js";
 import { generateGeminiImage } from "../ai/gemini.service.js";
-import { getConversationHistory, appendConversationMessage } from "../conversation/conversation.service.js";
+import { getConversationHistory, appendConversationMessage, deleteConversationMessages } from "../conversation/conversation.service.js";
 import { savePhotoToAlbum } from "../photoAlbum/photoAlbum.service.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 import fs from "fs/promises";
@@ -332,8 +332,10 @@ Focus on showing both the character and the gift (${gift.name} ${gift.emoji}) na
  * 包含感謝訊息和自拍照
  * 統一參照自拍照片的邏輯：在後端直接保存到對話歷史
  *
- * ✅ 穩健性增強：即使發生錯誤，也確保至少返回基本的感謝訊息
- * （避免用戶已扣款但完全沒有得到任何回應的情況）
+ * ✅ 2025-11-24 修復：
+ * - 先生成所有內容（感謝訊息 + 照片），確認成功後才保存到對話歷史
+ * - 如果照片生成失敗，回滾已保存的訊息並返回失敗狀態
+ * - 前端根據 success 狀態決定是否需要退款
  *
  * ✅ 支援選擇現有照片：如果 options.selectedPhotoUrl 有值，使用該照片而非生成新照片
  */
@@ -345,15 +347,26 @@ export const processGiftResponse = async (characterData, giftId, userId, options
   let photoMessage = null;
   const gift = getGiftById(giftId);
 
-  try {
-    // 生成感謝訊息
-    const thankYouMessage = await generateGiftThankYouMessage(
-      characterData,
-      giftId,
-      userId
-    );
+  // 追蹤已保存的訊息 ID（用於失敗時回滾）
+  const savedMessageIds = [];
+  let photoGenerationFailed = false;
+  let photoGenerationError = null;
 
-    // 創建並保存感謝訊息到對話歷史
+  try {
+    // ✅ 步驟 1: 生成感謝訊息（不保存）
+    let thankYouMessage;
+    try {
+      thankYouMessage = await generateGiftThankYouMessage(
+        characterData,
+        giftId,
+        userId
+      );
+    } catch (msgError) {
+      logger.warn(`[禮物回應] 生成感謝訊息失敗，使用預設訊息: ${msgError.message}`);
+      thankYouMessage = gift?.thankYouMessage || `謝謝你的${gift?.name || '禮物'}！我好開心！${gift?.emoji || ''}`;
+    }
+
+    // 創建感謝訊息對象（但還不保存）
     thankYouMessageObj = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       role: "partner",
@@ -361,90 +374,133 @@ export const processGiftResponse = async (characterData, giftId, userId, options
       createdAt: new Date().toISOString(),
     };
 
-    // 先保存感謝訊息
-    try {
-      await appendConversationMessage(userId, characterData.id, thankYouMessageObj);
-      logger.info(`[禮物回應] 感謝訊息已保存到對話歷史: userId=${userId}, characterId=${characterData.id}`);
-    } catch (saveError) {
-      // 即使保存失敗，也繼續流程（至少返回訊息給前端）
-      logger.error(`[禮物回應] 保存感謝訊息到對話歷史失敗，但繼續流程: userId=${userId}, characterId=${characterData.id}`, saveError);
-    }
-
-    // 處理照片（使用選中的照片作為參考生成新照片，或直接生成）
+    // ✅ 步驟 2: 如果需要生成照片，先生成照片
+    let finalImageUrl = null;
     if (generatePhoto || selectedPhotoUrl) {
       try {
-        let finalImageUrl = null;
-
-        // ✅ 使用選中的照片作為參考圖片生成新的禮物照片
         if (selectedPhotoUrl) {
           logger.info(`[禮物回應] 使用選中照片作為參考生成新的禮物照片: userId=${userId}, characterId=${characterData.id}, referenceUrl=${selectedPhotoUrl.substring(0, 100)}...`);
-
-          // 生成新的禮物照片（使用選中的照片作為參考）
           const photoResult = await generateGiftSelfie(characterData, giftId, userId, selectedPhotoUrl);
-          logger.info(`[禮物回應] 基於參考照片生成成功: userId=${userId}, characterId=${characterData.id}, hasImageUrl=${!!photoResult?.imageUrl}, imageUrlLength=${photoResult?.imageUrl?.length}`);
           finalImageUrl = photoResult?.imageUrl;
+          logger.info(`[禮物回應] 基於參考照片生成成功: userId=${userId}, characterId=${characterData.id}, hasImageUrl=${!!finalImageUrl}`);
         } else if (generatePhoto) {
-          // 生成新的自拍照（使用角色肖像作為參考）
           const photoResult = await generateGiftSelfie(characterData, giftId, userId);
-          logger.info(`[禮物回應] 禮物照片生成成功: userId=${userId}, characterId=${characterData.id}, hasImageUrl=${!!photoResult?.imageUrl}, imageUrlLength=${photoResult?.imageUrl?.length}`);
           finalImageUrl = photoResult?.imageUrl;
+          logger.info(`[禮物回應] 禮物照片生成成功: userId=${userId}, characterId=${characterData.id}, hasImageUrl=${!!finalImageUrl}`);
         }
-
-        if (finalImageUrl) {
-          // 創建包含圖片的消息（參照自拍照片的格式）
-          photoMessage = {
-            id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            role: "partner",
-            text: `收到${gift?.name || '禮物'}的感謝照片 ${gift?.emoji || ''}`,
-            imageUrl: finalImageUrl,
-            createdAt: new Date().toISOString(),
-          };
-
-          // 保存照片消息到對話歷史（在後端，統一邏輯）
-          try {
-            await appendConversationMessage(userId, characterData.id, photoMessage);
-            logger.info(`[禮物回應] ✅ 照片消息已保存到對話歷史: userId=${userId}, characterId=${characterData.id}, imageUrl=${finalImageUrl.substring(0, 100)}...`);
-          } catch (savePhotoError) {
-            // 即使保存失敗，也繼續流程（至少返回照片給前端）
-            logger.error(`[禮物回應] 保存照片消息到對話歷史失敗，但繼續流程: userId=${userId}, characterId=${characterData.id}`, savePhotoError);
-          }
-        }
-      } catch (error) {
-        logger.error(`[禮物回應] 處理禮物照片失敗，但繼續流程: userId=${userId}, characterId=${characterData.id}`, error);
-        // 即使照片處理失敗，也返回感謝訊息
+      } catch (photoError) {
+        // ✅ 照片生成失敗 - 記錄錯誤，稍後決定是否回滾
+        photoGenerationFailed = true;
+        photoGenerationError = photoError;
+        logger.error(`[禮物回應] ❌ 照片生成失敗: userId=${userId}, characterId=${characterData.id}`, photoError);
       }
     }
-  } catch (criticalError) {
-    // ✅ 最後防線：即使感謝訊息生成完全失敗，也返回一個默認訊息
-    // 確保用戶不會扣款後完全沒有收到任何回應
-    logger.error(`[禮物回應] ❌ 禮物回應生成失敗，使用降級訊息: userId=${userId}, characterId=${characterData.id}`, criticalError);
 
-    thankYouMessageObj = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      role: "partner",
-      text: gift?.thankYouMessage || `謝謝你的${gift?.name || '禮物'}！我好開心！${gift?.emoji || ''}`,
-      createdAt: new Date().toISOString(),
-    };
+    // ✅ 步驟 3: 根據生成結果決定是否保存
+    if (photoGenerationFailed && (generatePhoto || selectedPhotoUrl)) {
+      // 照片生成失敗且用戶期望有照片 - 不保存任何訊息，返回失敗
+      logger.error(`[禮物回應] ❌ 照片生成失敗，不保存任何訊息，需要退款: userId=${userId}, characterId=${characterData.id}`);
 
-    // 嘗試保存降級訊息
+      return {
+        success: false,
+        error: "PHOTO_GENERATION_FAILED",
+        errorMessage: photoGenerationError?.message || "照片生成失敗，請稍後再試",
+        needsRefund: true,
+        thankYouMessage: null,
+        photoMessage: null,
+        gift: gift,
+      };
+    }
+
+    // ✅ 步驟 4: 保存感謝訊息
     try {
       await appendConversationMessage(userId, characterData.id, thankYouMessageObj);
-    } catch (fallbackSaveError) {
-      // 即使降級訊息也無法保存，至少返回給前端
-      logger.error(`[禮物回應] 保存降級訊息也失敗，僅返回給前端: userId=${userId}, characterId=${characterData.id}`, fallbackSaveError);
+      savedMessageIds.push(thankYouMessageObj.id);
+      logger.info(`[禮物回應] ✅ 感謝訊息已保存: userId=${userId}, characterId=${characterData.id}, msgId=${thankYouMessageObj.id}`);
+    } catch (saveError) {
+      logger.error(`[禮物回應] ❌ 保存感謝訊息失敗: userId=${userId}, characterId=${characterData.id}`, saveError);
+      return {
+        success: false,
+        error: "SAVE_MESSAGE_FAILED",
+        errorMessage: "保存訊息失敗，請稍後再試",
+        needsRefund: true,
+        thankYouMessage: null,
+        photoMessage: null,
+        gift: gift,
+      };
     }
+
+    // ✅ 步驟 5: 如果有照片，保存照片訊息
+    if (finalImageUrl) {
+      photoMessage = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        role: "partner",
+        text: `收到${gift?.name || '禮物'}的感謝照片 ${gift?.emoji || ''}`,
+        imageUrl: finalImageUrl,
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        await appendConversationMessage(userId, characterData.id, photoMessage);
+        savedMessageIds.push(photoMessage.id);
+        logger.info(`[禮物回應] ✅ 照片消息已保存: userId=${userId}, characterId=${characterData.id}, msgId=${photoMessage.id}`);
+      } catch (savePhotoError) {
+        // 照片保存失敗 - 回滾已保存的感謝訊息
+        logger.error(`[禮物回應] ❌ 保存照片消息失敗，正在回滾: userId=${userId}, characterId=${characterData.id}`, savePhotoError);
+
+        try {
+          await deleteConversationMessages(userId, characterData.id, savedMessageIds);
+          logger.info(`[禮物回應] ✅ 回滾成功，已刪除訊息: ${savedMessageIds.join(', ')}`);
+        } catch (rollbackError) {
+          logger.error(`[禮物回應] ❌ 回滾失敗: ${rollbackError.message}`);
+        }
+
+        return {
+          success: false,
+          error: "SAVE_PHOTO_FAILED",
+          errorMessage: "保存照片失敗，請稍後再試",
+          needsRefund: true,
+          thankYouMessage: null,
+          photoMessage: null,
+          gift: gift,
+        };
+      }
+    }
+
+    // ✅ 成功返回
+    const response = {
+      success: true,
+      thankYouMessage: thankYouMessageObj,
+      photoMessage: photoMessage,
+      gift: gift,
+    };
+
+    logger.info(`[禮物回應] ✅ 禮物回應處理成功: userId=${userId}, characterId=${characterData.id}, hasPhotoMessage=${!!photoMessage}`);
+    return response;
+
+  } catch (criticalError) {
+    // ✅ 嚴重錯誤 - 嘗試回滾所有已保存的訊息
+    logger.error(`[禮物回應] ❌ 禮物回應生成發生嚴重錯誤: userId=${userId}, characterId=${characterData.id}`, criticalError);
+
+    if (savedMessageIds.length > 0) {
+      try {
+        await deleteConversationMessages(userId, characterData.id, savedMessageIds);
+        logger.info(`[禮物回應] ✅ 嚴重錯誤回滾成功，已刪除訊息: ${savedMessageIds.join(', ')}`);
+      } catch (rollbackError) {
+        logger.error(`[禮物回應] ❌ 嚴重錯誤回滾失敗: ${rollbackError.message}`);
+      }
+    }
+
+    return {
+      success: false,
+      error: "CRITICAL_ERROR",
+      errorMessage: criticalError.message || "處理禮物回應時發生錯誤",
+      needsRefund: true,
+      thankYouMessage: null,
+      photoMessage: null,
+      gift: gift,
+    };
   }
-
-  // 返回結果（統一格式，與自拍照片一致）
-  const response = {
-    success: true,
-    thankYouMessage: thankYouMessageObj,
-    photoMessage: photoMessage,
-    gift: gift,
-  };
-
-  logger.info(`[禮物回應] 返回結果: hasPhotoMessage=${!!photoMessage}`);
-  return response;
 };
 
 export default {

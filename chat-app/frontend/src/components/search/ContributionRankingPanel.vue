@@ -9,6 +9,7 @@ interface TopContributor {
   userId: string;
   points: number;
   displayName: string;
+  photoURL?: string;
 }
 
 interface ContributionItem {
@@ -29,20 +30,28 @@ interface ContributionItem {
 // 排名標籤
 const getRankLabel = (rank: number): string => {
   switch (rank) {
-    case 1: return '榜一';
-    case 2: return '榜二';
-    case 3: return '榜三';
-    default: return `第${rank}`;
+    case 1:
+      return "榜一";
+    case 2:
+      return "榜二";
+    case 3:
+      return "榜三";
+    default:
+      return `第${rank}`;
   }
 };
 
 // 排名樣式類
 const getRankClass = (rank: number): string => {
   switch (rank) {
-    case 1: return 'rank-gold';
-    case 2: return 'rank-silver';
-    case 3: return 'rank-bronze';
-    default: return '';
+    case 1:
+      return "rank-gold";
+    case 2:
+      return "rank-silver";
+    case 3:
+      return "rank-bronze";
+    default:
+      return "";
   }
 };
 
@@ -149,8 +158,21 @@ const formatForCard = (item: ContributionItem) => {
             class="contributor-row"
             :class="getRankClass(contributor.rank)"
           >
-            <span class="contributor-rank">{{ getRankLabel(contributor.rank) }}</span>
-            <span class="contributor-name">{{ contributor.displayName }}</span>
+            <span class="contributor-rank">{{
+              getRankLabel(contributor.rank)
+            }}</span>
+            <div class="contributor-info">
+              <img
+                v-if="contributor.photoURL"
+                :src="contributor.photoURL"
+                :alt="contributor.displayName"
+                class="contributor-avatar"
+              />
+              <div v-else class="contributor-avatar placeholder">
+                {{ contributor.displayName?.charAt(0) || '?' }}
+              </div>
+              <span class="contributor-name">{{ contributor.displayName }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -223,7 +245,7 @@ const formatForCard = (item: ContributionItem) => {
   .contributor-row {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    justify-content: space-between;
     padding: 0.2rem 0.4rem;
     background: rgba(71, 85, 105, 0.3);
     border: 1px solid rgba(148, 163, 184, 0.2);
@@ -237,6 +259,34 @@ const formatForCard = (item: ContributionItem) => {
       color: rgba(226, 232, 240, 0.7);
     }
 
+    .contributor-info {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      min-width: 0;
+      max-width: 70%;
+      overflow: hidden;
+    }
+
+    .contributor-avatar {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      object-fit: cover;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+
+      &.placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(71, 85, 105, 0.6);
+        font-size: 0.55rem;
+        font-weight: 600;
+        color: rgba(226, 232, 240, 0.8);
+      }
+    }
+
     .contributor-name {
       font-size: 0.7rem;
       color: rgba(226, 232, 240, 0.85);
@@ -247,31 +297,55 @@ const formatForCard = (item: ContributionItem) => {
 
     // 榜一 - 金色
     &.rank-gold {
-      background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
+      background: linear-gradient(
+        135deg,
+        rgba(251, 191, 36, 0.2),
+        rgba(245, 158, 11, 0.15)
+      );
       border-color: rgba(251, 191, 36, 0.35);
 
       .contributor-rank {
         color: #fbbf24;
       }
+
+      .contributor-avatar {
+        border-color: rgba(251, 191, 36, 0.6);
+      }
     }
 
     // 榜二 - 銀色
     &.rank-silver {
-      background: linear-gradient(135deg, rgba(148, 163, 184, 0.2), rgba(100, 116, 139, 0.15));
+      background: linear-gradient(
+        135deg,
+        rgba(148, 163, 184, 0.2),
+        rgba(100, 116, 139, 0.15)
+      );
       border-color: rgba(148, 163, 184, 0.35);
 
       .contributor-rank {
         color: #94a3b8;
       }
+
+      .contributor-avatar {
+        border-color: rgba(148, 163, 184, 0.6);
+      }
     }
 
     // 榜三 - 銅色
     &.rank-bronze {
-      background: linear-gradient(135deg, rgba(205, 127, 50, 0.2), rgba(160, 82, 45, 0.15));
+      background: linear-gradient(
+        135deg,
+        rgba(205, 127, 50, 0.2),
+        rgba(160, 82, 45, 0.15)
+      );
       border-color: rgba(205, 127, 50, 0.35);
 
       .contributor-rank {
         color: #cd7f32;
+      }
+
+      .contributor-avatar {
+        border-color: rgba(205, 127, 50, 0.6);
       }
     }
   }
@@ -279,8 +353,8 @@ const formatForCard = (item: ContributionItem) => {
 
 .rank-badge {
   position: absolute;
-  top: -8px;
-  left: -8px;
+  top: 2px;
+  left: 2px;
   z-index: 10;
   width: 28px;
   height: 28px;

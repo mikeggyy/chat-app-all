@@ -36,6 +36,7 @@ export interface UseCoinsReturn {
   purchasePackage: (userId: string | undefined, packageId: string, options?: PurchaseOptions) => Promise<any>;
   loadPricing: (userId?: string, options?: UseCoinsOptions) => Promise<any>;
   updateBalance: (newBalance: number) => void; // 新增：直接更新餘額
+  resetCoins: () => void; // 新增：重置金幣狀態（用於登出或訪客模式）
 
   // Computed
   balance: ComputedRef<number>;
@@ -295,6 +296,19 @@ export function useCoins(): UseCoinsReturn {
     logger.log('[useCoins] 金幣餘額已更新:', newBalance, '時間戳:', ts);
   };
 
+  /**
+   * 重置金幣狀態（用於登出或訪客模式）
+   * ✅ 修復：登出或切換訪客時清除舊用戶的金幣資料
+   */
+  const resetCoins = (): void => {
+    coinsState.value.balance = 0;
+    coinsState.value.transactions = [];
+    // 保留 packages，因為這是公開資料
+    lastBalanceUpdateTimestamp = 0;
+    error.value = null;
+    logger.log('[useCoins] 金幣狀態已重置');
+  };
+
   // Computed properties
   const balance = computed(() => coinsState.value.balance);
   const packages = computed(() => coinsState.value.packages);
@@ -333,6 +347,7 @@ export function useCoins(): UseCoinsReturn {
     purchasePackage,
     loadPricing,
     updateBalance, // 新增：直接更新餘額
+    resetCoins, // 新增：重置金幣狀態（用於登出或訪客模式）
 
     // Computed
     balance,

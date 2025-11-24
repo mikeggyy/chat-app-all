@@ -329,22 +329,20 @@ router.beforeEach(async (to, _from, next) => {
         return;
       }
 
-      // 如果已完成 onboarding 且在 onboarding 頁面，重定向到 match
-      if (hasCompletedOnboarding === true && to.name === "onboarding") {
+      // ✅ 2025-11-24 修復：已完成 onboarding 或舊帳號（undefined）在 onboarding 頁面，重定向到 match
+      // 只有明確是 false 的新帳號才需要留在 onboarding 頁面
+      if (hasCompletedOnboarding !== false && to.name === "onboarding") {
         next({ name: "match" });
         return;
       }
 
       // 如果在登入頁面且已登入，重定向
       if (to.name === "login") {
-        // 🔒 修復：認證已完成，可以安全判斷 onboarding 狀態
+        // ✅ 2025-11-24 修復：只有明確 false 才需要 onboarding，否則直接去 match
         if (hasCompletedOnboarding === false) {
           next({ name: "onboarding" });
-        } else if (hasCompletedOnboarding === true) {
-          next({ name: "match" });
         } else {
-          // 如果仍為 undefined（罕見情況），允許訪問以避免阻塞
-          next();
+          next({ name: "match" });
         }
         return;
       }
@@ -445,7 +443,9 @@ routingScope.run(() => {
       if (authenticated && hasToken) {
         if (current?.name === "login") {
           const currentUser = user.value;
-          const hasCompletedOnboarding = currentUser?.hasCompletedOnboarding ?? false;
+          // ✅ 2025-11-24 修復：舊帳號沒有 hasCompletedOnboarding 字段時，視為已完成
+          // 只有明確是 false 時才需要 onboarding（新帳號首次登入）
+          const hasCompletedOnboarding = currentUser?.hasCompletedOnboarding !== false;
           const isGuest = isGuestUser(currentUser?.id || '');
 
           // 遊客用戶直接導向 match，非遊客用戶根據 onboarding 狀態導向

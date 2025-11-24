@@ -7,6 +7,7 @@ import { useCoins } from "../composables/useCoins";
 import { useMembership } from "../composables/useMembership";
 import { useToast } from "../composables/useToast";
 import { usePurchaseConfirm } from "../composables/usePurchaseConfirm";
+import { isGuestUser } from "../../../../shared/config/testAccounts.js";
 import PurchaseConfirmDialog from "../components/PurchaseConfirmDialog.vue";
 import ShopHeader from "../components/shop/ShopHeader.vue";
 import ShopCategories from "../components/shop/ShopCategories.vue";
@@ -35,6 +36,7 @@ const {
   loadBalance,
   loadPackages,
   purchasePackage,
+  resetCoins,
   isLoading: isCoinsLoading,
 } = useCoins();
 const { membership, loadMembership } = useMembership();
@@ -127,7 +129,7 @@ onMounted(async () => {
     initializeCategoryFromQuery(route.query.category);
   }
 
-  // 加載所有商品數據
+  // 加載所有商品數據（公開 API，不需要認證）
   isLoadingPackages.value = true;
   try {
     await Promise.all([loadAssetPackages(), loadPotionPackages()]);
@@ -137,12 +139,25 @@ onMounted(async () => {
     isLoadingPackages.value = false;
   }
 
-  if (user.value?.id) {
+  // ✅ 修復：訪客用戶不調用需要認證的 API
+  const userId = user.value?.id;
+  const isGuest = userId ? isGuestUser(userId) : true;
+
+  if (isGuest) {
+    // 訪客用戶：重置金幣狀態，只載入公開的套餐資料
+    resetCoins();
+    try {
+      await loadPackages({ skipGlobalLoading: true });
+    } catch (err) {
+      logger.warn("訪客載入套餐失敗:", err);
+    }
+  } else if (userId) {
+    // 已登入用戶：載入完整的用戶資料
     try {
       await Promise.all([
-        loadBalance(user.value.id, { skipGlobalLoading: true }),
+        loadBalance(userId, { skipGlobalLoading: true }),
         loadPackages({ skipGlobalLoading: true }),
-        loadMembership(user.value.id, { skipGlobalLoading: true }),
+        loadMembership(userId, { skipGlobalLoading: true }),
       ]);
     } catch (err) {
       const message = err?.message || "載入資料失敗";

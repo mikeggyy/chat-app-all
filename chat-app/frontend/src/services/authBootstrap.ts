@@ -118,24 +118,12 @@ export const ensureAuthState = (): Promise<void> => {
 
           if (isTestSessionValid(testSession)) {
             const fallbackProfile = testSession?.profile ?? null;
+
+            // ✅ 修復：訪客用戶直接使用 fallbackProfile，不調用後端 API
+            // 因為訪客的 test-token 在後端是無效的，會導致 401 錯誤
+            // 訪客用戶的資料完全在本地管理
             if (fallbackProfile) {
               setUserProfile(fallbackProfile);
-            }
-
-            try {
-              await loadUserProfile(testSession!.userId, {
-                force: true,
-                fallback: fallbackProfile ?? undefined,
-              });
-            } catch (sessionError: any) {
-              if (sessionError?.status === 404) {
-                clearTestSession();
-                clearUserProfile();
-              } else if (fallbackProfile) {
-                setUserProfile(fallbackProfile);
-              } else {
-                clearUserProfile();
-              }
             }
 
             resolveOnce();

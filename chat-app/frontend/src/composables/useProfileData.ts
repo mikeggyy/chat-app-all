@@ -105,6 +105,7 @@ interface UseProfileDataReturn {
   balance: Ref<number>;
   formattedBalance: Ref<string>;
   loadBalance: () => Promise<void>;
+  resetCoins: () => void;
 
   // 解鎖票券
   loadTicketsBalance: (userId: string, options?: any) => Promise<any>;
@@ -190,7 +191,7 @@ export function useProfileData(): UseProfileDataReturn {
   const loadMembership = loadMembershipInfo;
 
   // 金幣系統
-  const { balance, formattedBalance, loadBalance, updateBalance } = useCoins();
+  const { balance, formattedBalance, loadBalance, updateBalance, resetCoins } = useCoins();
 
   // 解鎖票券
   const { loadBalance: loadTicketsBalance } = useUnlockTickets();
@@ -381,6 +382,7 @@ export function useProfileData(): UseProfileDataReturn {
     balance,
     formattedBalance,
     loadBalance,
+    resetCoins,
 
     // 解鎖票券
     loadTicketsBalance,

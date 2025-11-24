@@ -63,12 +63,19 @@ let tokenExpiry: number | null = null;
 /**
  * 獲取緩存的 token
  * @returns token 或 null
+ *
+ * ✅ 修復：訪客用戶的測試 token 不會被添加到 API 請求中
+ * 這樣可以避免公開 API 因無效 token 而返回 401 錯誤
  */
 const getCachedToken = async (): Promise<string | null> => {
   const now = Date.now();
 
   // 如果有緩存且未過期，返回緩存的 token
   if (cachedToken && tokenExpiry && now < tokenExpiry) {
+    // ✅ 修復：不返回測試 token，因為它在後端是無效的
+    if (cachedToken === 'test-token') {
+      return null;
+    }
     return cachedToken;
   }
 
@@ -78,20 +85,17 @@ const getCachedToken = async (): Promise<string | null> => {
     const token = await getCurrentUserIdToken();
 
     if (token) {
-      cachedToken = token;
-      // ✅ 修復: 測試 token 緩存時間縮短為 5 分鐘，降低安全風險
-      const isTestEnv = import.meta.env.DEV;
-      const isTestToken = token === 'test-token';
-
-      // 禁止生產環境使用測試 token
-      if (isTestToken && !isTestEnv) {
-        console.error('❌ 測試 token 不應在生產環境使用');
-        throw new Error('Invalid token in production');
+      // ✅ 修復：測試 token 不添加到 API 請求中
+      // 訪客用戶使用的是假 token，後端無法驗證
+      // 對於公開 API，不帶 token 可以正常訪問
+      // 對於需要認證的 API，訪客用戶應該被前端邏輯阻擋
+      if (token === 'test-token') {
+        return null;
       }
 
-      tokenExpiry = isTestToken
-        ? now + 5 * 60 * 1000  // 測試 token 緩存 5 分鐘（從 24 小時縮短）
-        : now + 50 * 60 * 1000; // Firebase token 緩存 50 分鐘（留 10 分鐘緩衝）
+      cachedToken = token;
+      // Firebase token 緩存 50 分鐘（留 10 分鐘緩衝）
+      tokenExpiry = now + 50 * 60 * 1000;
       return token;
     }
   } catch (error) {

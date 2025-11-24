@@ -50,6 +50,7 @@ const {
   balance,
   formattedBalance,
   loadBalance, // ✅ 添加：金幣餘額加載函數
+  resetCoins, // ✅ 添加：登出時重置金幣狀態
   hasUnreadNotifications,
   requireLogin,
   isGuest,
@@ -103,6 +104,7 @@ const openProfileEditor = () => {
 const handleLogout = async () => {
   await firebaseAuth.signOut();
   clearUserProfile();
+  resetCoins(); // ✅ 修復：登出時重置金幣狀態，避免訪客看到舊用戶的餘額
   clearTestSession();
   await router.replace({ name: "login" });
 };

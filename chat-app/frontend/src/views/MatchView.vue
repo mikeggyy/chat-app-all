@@ -397,7 +397,9 @@ onBeforeUnmount(() => {
 
   .content-wrapper {
     position: relative;
-    width: min(520px, 100%);
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
     overflow: hidden;
     // ✅ 效能優化：限制重排範圍
     contain: layout;

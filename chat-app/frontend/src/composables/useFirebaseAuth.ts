@@ -56,14 +56,28 @@ const getAuthInstance = (): Auth => {
 const signInWithGoogle = async (): Promise<SignInResult> => {
   const auth = getAuthInstance();
 
-  // ✅ 2025-11-25：統一使用 redirect 避免 popup blocker 問題
-  // Popup 經常被瀏覽器阻擋，導致登入失敗
-  // Redirect 更可靠，且用戶體驗一致
-  await signInWithRedirect(auth, provider);
+  // 在 Emulator 模式下，直接使用 redirect 避免 "No matching frame" 錯誤
+  const useEmulator = import.meta.env.VITE_USE_EMULATOR === "true";
+
+  // ✅ 2025-11-25：檢測是否為手機設備，手機上直接使用 redirect
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (useEmulator || isMobile) {
+    await signInWithRedirect(auth, provider);
+    return {
+      result: null,
+      method: "redirect",
+      redirected: true,
+    };
+  }
+
+  // ✅ 桌面環境使用 popup（需要允許彈窗）
+  // 如果 popup 被阻擋，會拋出錯誤讓 LoginView 處理
+  const result = await signInWithPopup(auth, provider);
   return {
-    result: null,
-    method: "redirect",
-    redirected: true,
+    result,
+    method: "popup",
+    redirected: false,
   };
 };
 

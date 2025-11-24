@@ -74,6 +74,12 @@ const mapFirebaseErrorMessage = (error: FirebaseError | Error | unknown): string
       return "Firebase 組態似乎不完整，請確認環境變數檔案設定。";
     case "auth/redirect-cancelled-by-user":
       return "您已取消 Google 登入流程。";
+    case "auth/popup-blocked":
+      return "瀏覽器阻擋了登入彈窗。請在瀏覽器地址欄右側點擊彈窗圖示，允許此網站彈出視窗後再試一次。";
+    case "auth/popup-closed-by-user":
+      return "您關閉了登入彈窗。請重新點擊登入按鈕。";
+    case "auth/cancelled-popup-request":
+      return "已有登入彈窗正在處理中，請稍候。";
     default:
       if (error instanceof Error && error.message) {
         return error.message;
@@ -132,11 +138,16 @@ const handleGoogleLogin = async (): Promise<void> => {
     clearTestSession();
     resetGuestMessageCount();
     setStatus("success", "登入成功！正在載入您的資料...");
+
+    // ✅ 保持 loading 狀態，直到 router guard 完成導航
+    // isLoading 不在這裡設為 false，讓頁面保持 loading 直到導航完成
   } catch (err) {
     handleFirebaseAuthError(err);
+    isLoading.value = false; // ❌ 只在錯誤時才清除 loading
   } finally {
-    if (!redirecting) {
-      isLoading.value = false;
+    if (redirecting) {
+      // redirect 時保持 loading 狀態
+      // 不設置 isLoading = false
     }
   }
 };

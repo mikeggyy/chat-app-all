@@ -45,9 +45,6 @@ nul
 NUL
 srctemp.txt
 
-# Cleanup scripts (temporary)
-cleanup-*.js
-
 # Build outputs
 dist/
 build/

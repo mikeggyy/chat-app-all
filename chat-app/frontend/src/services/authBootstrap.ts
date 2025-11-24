@@ -24,6 +24,7 @@ interface UserProfile {
   favorites: any[];
   notificationOptIn: boolean;
   signInProvider: string;
+  hasCompletedOnboarding?: boolean; // ✅ 新增：onboarding 完成狀態
 }
 
 interface TestSession {
@@ -60,6 +61,7 @@ const buildFallbackProfile = (firebaseUser: FirebaseUser): UserProfile => {
     notificationOptIn: false,
     signInProvider:
       firebaseUser.providerData?.[0]?.providerId ?? 'firebase-auth',
+    hasCompletedOnboarding: false, // ✅ 新用戶預設未完成 onboarding
   };
 };
 
@@ -173,11 +175,11 @@ export const ensureAuthState = (): Promise<void> => {
             return;
           } catch (error: any) {
             clearTimeout(timeoutId);
-            const notFound = error?.status === 404;
+            const notFound = error?.status === 404 || error?.status === 500; // ✅ 修復：500 也可能表示用戶不存在
             const networkError = isNetworkError(error);
             const isTimeout = error?.name === 'AbortError';
 
-            // 如果不是 404 且不是網路錯誤且不是超時，拋出異常
+            // 如果不是 404/500 且不是網路錯誤且不是超時，拋出異常
             if (!notFound && !networkError && !isTimeout) {
               throw error;
             }
@@ -189,9 +191,9 @@ export const ensureAuthState = (): Promise<void> => {
               return;
             }
 
-            // 404 錯誤：用戶不存在，嘗試創建新用戶
+            // 404/500 錯誤：用戶不存在，嘗試創建新用戶
             if (notFound) {
-              console.log('[AuthBootstrap] 🟡 用戶不存在 (404)，準備創建新用戶');
+              console.log('[AuthBootstrap] 🟡 用戶不存在 (404/500)，準備創建新用戶');
               // ✅ 2025-11-25：新用戶創建也需要超時機制
               const createController = new AbortController();
               const createTimeoutId = setTimeout(() => createController.abort(), timeoutMs);

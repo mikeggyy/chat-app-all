@@ -326,9 +326,11 @@ router.beforeEach(async (to, _from, next) => {
     if (!isGuest) {
       // ⚠️ 只在以下情況才重定向到 onboarding：
       // 1. 用戶明確未完成 onboarding（=== false，不包括 undefined）
-      // 2. 嘗試訪問的不是 login 或 onboarding 頁面
+      // 2. 嘗試訪問的不是 login、onboarding 或 profile 頁面
       // 🔥 修復：使用嚴格相等判斷，避免 undefined 被誤判為 false
-      if (hasCompletedOnboarding === false && to.name !== "onboarding" && to.name !== "login") {
+      // ✅ 2025-11-25 修復：允許新用戶訪問 profile 頁面，避免白屏
+      const allowedPagesForNewUser = ["onboarding", "login", "profile"];
+      if (hasCompletedOnboarding === false && !allowedPagesForNewUser.includes(to.name as string)) {
         next({ name: "onboarding" });
         return;
       }

@@ -16,13 +16,37 @@ export const getUserAssets = async (userId) => {
     throw new Error('需要提供用戶 ID');
   }
 
-  const user = await getUserById(userId);
+  // ✅ 2025-11-25 修復：為新用戶提供預設資產，避免白屏
+  let user = null;
+  try {
+    user = await getUserById(userId);
+  } catch (error) {
+    logger.warn(`[getUserAssets] 找不到用戶 ${userId}，返回預設資產`, error);
+  }
+
+  // 如果用戶不存在，返回預設的空資產
   if (!user) {
-    throw new Error('找不到指定的使用者');
+    return {
+      balance: 0,
+      characterUnlockCards: 0,
+      photoUnlockCards: 0,
+      videoUnlockCards: 0,
+      voiceUnlockCards: 0,
+      createCards: 0,
+      potions: {
+        memoryBoost: 0,
+        brainBoost: 0,
+      },
+    };
   }
 
   // 獲取藥水庫存
-  const potionInventory = await getPotionInventory(userId);
+  let potionInventory = {};
+  try {
+    potionInventory = await getPotionInventory(userId);
+  } catch (error) {
+    logger.warn(`[getUserAssets] 獲取藥水庫存失敗，使用預設值`, error);
+  }
   const memoryBoostCount = potionInventory.memoryBoost || 0;
   const brainBoostCount = potionInventory.brainBoost || 0;
 

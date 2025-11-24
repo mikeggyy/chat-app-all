@@ -303,7 +303,11 @@ const updateUserProfileDetails = async (patch: UpdateUserProfilePatch = {}): Pro
     }
   );
 
-  const cached = cacheUserProfile(updated);
+  // ✅ 2025-11-25 修復：處理嵌套的 API 響應格式
+  // API 可能返回 { success: true, data: {...} } 或直接返回 {...}
+  const data = (updated as any)?.data || updated;
+
+  const cached = cacheUserProfile(data);
 
   return cached;
 };

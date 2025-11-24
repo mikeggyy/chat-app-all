@@ -63,6 +63,13 @@ const {
 
 const avatarPreview: Ref<string> = ref(FALLBACK_USER.photoURL);
 
+// ✅ 2025-11-25 修復：必須先初始化 avatarUpload，因為下方的 watch 會立即執行並引用它
+const avatarUpload = useAvatarUpload({
+  // @ts-ignore - UserProfile 和 AvatarUpdateResult 類型不完全兼容
+  onUpdate: updateUserAvatar,
+  avatarPreview,
+});
+
 watch(
   () => profile.value.photoURL,
   (next) => {
@@ -74,12 +81,6 @@ watch(
   },
   { immediate: true }
 );
-
-const avatarUpload = useAvatarUpload({
-  // @ts-ignore - UserProfile 和 AvatarUpdateResult 類型不完全兼容
-  onUpdate: updateUserAvatar,
-  avatarPreview,
-});
 
 const openAvatarEditor = () => {
   if (requireLogin({ feature: "編輯頭像" })) {

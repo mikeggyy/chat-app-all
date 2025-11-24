@@ -34,52 +34,65 @@ gcloud services enable containerregistry.googleapis.com
 
 REM 構建 Docker 映像
 echo 構建 Docker 映像...
-gcloud builds submit --tag %IMAGE_NAME%
+gcloud builds submit --tag %IMAGE_NAME% --quiet
 
-REM 部署到 Cloud Run（成本優化配置）
-echo 部署到 Cloud Run（成本優化配置）...
+REM 獲取新構建的映像 digest
+echo 獲取映像 digest...
+for /f "tokens=*" %%i in ('gcloud container images describe %IMAGE_NAME%:latest --format="value(image_summary.digest)"') do set IMAGE_DIGEST=%%i
+set FULL_IMAGE=%IMAGE_NAME%@%IMAGE_DIGEST%
+echo ✅ 映像: %FULL_IMAGE%
+
+REM 部署到 Cloud Run（只更新映像，保留所有環境變數）
+echo.
+echo 部署到 Cloud Run...
+echo 注意：保留所有現有環境變數，只更新 Docker 映像
 gcloud run deploy %SERVICE_NAME% ^
-  --image %IMAGE_NAME% ^
-  --platform managed ^
+  --image %FULL_IMAGE% ^
   --region %REGION% ^
-  --allow-unauthenticated ^
-  --memory 512Mi ^
-  --cpu 1 ^
-  --min-instances 0 ^
-  --max-instances 3 ^
-  --concurrency 80 ^
-  --cpu-throttling ^
-  --execution-environment gen2 ^
-  --cpu-boost ^
-  --timeout 60 ^
-  --set-env-vars "NODE_ENV=production" ^
-  --set-env-vars "USE_FIREBASE_EMULATOR=false"
+  --platform managed ^
+  --quiet
 
-REM 成本優化說明
+REM 檢查部署狀態
 echo.
-echo ✅ 已套用成本優化配置：
-echo   - 記憶體：512Mi（比 1Gi 便宜 50%%）
-echo   - 最小實例：0（無流量時不計費）
-echo   - 最大實例：3（限制突發費用）
-echo   - CPU 節流：已啟用（空閒時降低成本）
-echo   - 執行環境：Gen2（冷啟動快 2-3 倍）
-echo   - CPU Boost：已啟用（加速啟動）
-echo.
+echo 檢查部署狀態...
 
-REM 注意：敏感環境變數（OPENAI_API_KEY, REPLICATE_API_TOKEN 等）
-REM 請使用 Secret Manager 或在 Cloud Run 控制台手動設置
-
-REM 獲取服務 URL
-echo.
-echo 部署完成！
+REM 獲取服務 URL 和當前 revision
 for /f "tokens=*" %%i in ('gcloud run services describe %SERVICE_NAME% --region %REGION% --format "value(status.url)"') do set SERVICE_URL=%%i
+for /f "tokens=*" %%i in ('gcloud run services describe %SERVICE_NAME% --region %REGION% --format "value(status.traffic[0].revisionName)"') do set CURRENT_REVISION=%%i
+
+echo ✅ 當前 revision: %CURRENT_REVISION%
+echo ✅ 服務 URL: !SERVICE_URL!
+
+REM 測試 health endpoint
+echo.
+echo 測試服務健康狀態...
+curl -sf "!SERVICE_URL!/health" >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo ✅ 服務健康檢查通過
+    echo.
+    echo 🎉 部署成功！
+) else (
+    echo ⚠️  警告：健康檢查失敗，請檢查日誌
+    echo    日誌 URL: https://console.cloud.google.com/run/detail/%REGION%/%SERVICE_NAME%/logs?project=%PROJECT_ID%
+)
+
+REM 顯示最終狀態
+echo.
+echo === 部署完成 ===
 echo 服務 URL: !SERVICE_URL!
+echo Revision: %CURRENT_REVISION%
+echo 映像: %FULL_IMAGE%
 
 echo.
-echo 後續步驟：
-echo 1. 在 Cloud Run 控制台設置環境變數（API Keys）
-echo 2. 更新 firebase.json 中的 serviceId 為: %SERVICE_NAME%
-echo 3. 更新前端 .env 中的 VITE_API_URL 為: !SERVICE_URL!
-echo 4. 執行 'firebase deploy --only hosting' 部署前端
+echo 後續操作：
+echo 1. 測試 API: curl !SERVICE_URL!/health
+echo 2. 查看日誌: gcloud run services logs read %SERVICE_NAME% --region %REGION%
+echo 3. 管理服務: https://console.cloud.google.com/run/detail/%REGION%/%SERVICE_NAME%?project=%PROJECT_ID%
+
+echo.
+echo 💡 提示：
+echo • 環境變數已保留，無需重新設置
+echo • 如需修改環境變數，請在 Cloud Run 控制台手動設置
+echo • 下次部署直接執行此腳本即可
 
 endlocal

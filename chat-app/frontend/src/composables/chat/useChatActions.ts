@@ -510,7 +510,11 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           if (scrollToBottom) scrollToBottom();
         } else if (responseData?.needsRefund) {
           // ✅ 2025-11-24：禮物回應生成失敗，需要退款
-          console.error('[禮物] 禮物回應生成失敗，正在處理退款:', responseData.error, responseData.errorMessage);
+          console.error('[禮物] 禮物回應生成失敗，正在處理退款:', {
+            error: responseData.error,
+            message: responseData.errorMessage,
+            technical: responseData.technicalDetails
+          });
 
           // 移除禮物消息（因為生成失敗了）
           const giftMsgIndex = messages.value.findIndex((m) => m.id === giftMessageId);
@@ -545,13 +549,14 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
             });
 
             if (refundResult?.success || refundResult?.data?.success) {
-              toast.error(`禮物回應生成失敗，已退款 ${giftData.priceInfo?.finalPrice || gift.price} 金幣`);
+              // 🔥 使用詳細的錯誤訊息
+              toast.error(`${responseData.errorMessage}，已退款 ${giftData.priceInfo?.finalPrice || gift.price} 金幣`);
             } else {
-              toast.error('禮物回應生成失敗，退款處理中，請稍後檢查餘額');
+              toast.error(`${responseData.errorMessage}，退款處理中，請稍後檢查餘額`);
             }
           } catch (refundError) {
             console.error('[禮物] 退款失敗:', refundError);
-            toast.error('禮物回應生成失敗，退款處理中，請稍後檢查餘額');
+            toast.error(`${responseData.errorMessage}，退款處理中，請稍後檢查餘額`);
           }
 
           return false;

@@ -151,10 +151,10 @@ export const useSendMessage = (params: UseSendMessageParams): UseSendMessageRetu
         incrementGuestMessageCount();
       }
 
-      // Focus input
-      await nextTick();
-      const messageInputRef = getMessageInputRef();
-      messageInputRef?.focus();
+      // Focus input - 已移除自動聚焦功能
+      // await nextTick();
+      // const messageInputRef = getMessageInputRef();
+      // messageInputRef?.focus();
     } catch (error) {
       showError(error instanceof Error ? error.message : "發送消息失敗");
     }

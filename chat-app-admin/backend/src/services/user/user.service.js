@@ -96,7 +96,8 @@ export const updateUser = async (userId, updateData) => {
   firestoreUpdates.updatedAt = new Date().toISOString();
 
   if (Object.keys(firestoreUpdates).length > 1) { // > 1 因為至少有 updatedAt
-    await db.collection("users").doc(userId).update(firestoreUpdates);
+    // ✅ 修復：使用 set() with merge 而非 update()，避免文檔不存在時報錯
+    await db.collection("users").doc(userId).set(firestoreUpdates, { merge: true });
   }
 
   // 同步更新子集合（主應用優先從子集合讀取資產）

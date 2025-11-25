@@ -73,6 +73,7 @@ const handleKeyup = (event, profile) => {
           <LazyImage
             :src="profile.image"
             :alt="profile.name"
+            loading="eager"
             root-margin="100px"
             image-class="result-image"
           />
@@ -299,6 +300,13 @@ const handleKeyup = (event, profile) => {
       height: auto;
       padding-top: 100%;
       border-radius: 16px;
+
+      :deep(.lazy-image) {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
 
       :deep(.result-image) {
         position: absolute;

@@ -93,7 +93,9 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
   try {
     const gift = getGiftById(giftId);
     if (!gift) {
-      throw new Error(`找不到禮物：${giftId}`);
+      const error = new Error(`找不到禮物：${giftId}`);
+      error.errorType = 'GIFT_NOT_FOUND';
+      throw error;
     }
 
     // 讀取角色肖像作為參考（支援本地路徑和 Firebase Storage URL）
@@ -121,7 +123,10 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
           clearTimeout(timeout);
 
           if (!response.ok) {
-            throw new Error(`下載失敗: ${response.status} ${response.statusText}`);
+            const error = new Error(`下載失敗: ${response.status} ${response.statusText}`);
+            error.errorType = 'DOWNLOAD_FAILED';
+            error.httpStatus = response.status;
+            throw error;
           }
 
           // 獲取圖片數據
@@ -132,7 +137,13 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
         } catch (fetchError) {
           clearTimeout(timeout);
           if (fetchError.name === 'AbortError') {
-            throw new Error('下載超時（10秒）');
+            const error = new Error('下載角色肖像超時（10秒），請檢查網絡連接');
+            error.errorType = 'DOWNLOAD_TIMEOUT';
+            throw error;
+          }
+          // 保留原有 errorType（如果已設置）
+          if (!fetchError.errorType) {
+            fetchError.errorType = 'DOWNLOAD_FAILED';
           }
           throw fetchError;
         }
@@ -152,6 +163,10 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
       }
     } catch (err) {
       logger.warn(`無法讀取角色肖像:`, err.message);
+      // 如果下載失敗且有 errorType，拋出錯誤而非降級
+      if (err.errorType) {
+        throw err;
+      }
       referenceImageBuffer = null;
     }
 
@@ -159,10 +174,19 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
     const imagePrompt = buildGiftSelfiePrompt(characterData, gift);
 
     // 使用Gemini生成圖片
-    const geminiResult = await generateGeminiImage(
-      referenceImageBuffer ? referenceImageBuffer.toString('base64') : null,
-      imagePrompt
-    );
+    let geminiResult;
+    try {
+      geminiResult = await generateGeminiImage(
+        referenceImageBuffer ? referenceImageBuffer.toString('base64') : null,
+        imagePrompt
+      );
+    } catch (geminiError) {
+      logger.error("[禮物照片] ❌ Gemini API 調用失敗:", geminiError);
+      const error = new Error('AI 圖片生成失敗，請稍後再試');
+      error.errorType = 'GEMINI_API_FAILED';
+      error.originalError = geminiError.message;
+      throw error;
+    }
 
     const imageDataUrl = geminiResult.imageDataUrl;
     const usageMetadata = geminiResult.usageMetadata;
@@ -187,8 +211,11 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
         logger.info(`[禮物照片] ✅ Storage URL: ${finalImageUrl}`);
         logger.info(`[禮物照片] ✅ Storage URL 長度: ${finalImageUrl.length}`);
       } catch (uploadError) {
-        logger.error("[禮物照片] ❌ 上傳到 Storage 失敗，使用 base64 fallback:", uploadError);
-        // 降級使用 base64（雖然可能有大小問題）
+        logger.error("[禮物照片] ❌ 上傳到 Storage 失敗:", uploadError);
+        const error = new Error('圖片上傳到雲端儲存失敗');
+        error.errorType = 'STORAGE_UPLOAD_FAILED';
+        error.originalError = uploadError.message;
+        throw error;
       }
     }
 
@@ -221,7 +248,11 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
     };
   } catch (error) {
     logger.error("生成禮物自拍照失敗:", error);
-    throw new Error(`生成禮物自拍照失敗: ${error.message}`);
+    // 保留 errorType 信息
+    const wrappedError = new Error(error.message || '生成禮物自拍照失敗');
+    wrappedError.errorType = error.errorType || 'UNKNOWN_ERROR';
+    wrappedError.originalError = error.originalError || error.message;
+    throw wrappedError;
   }
 };
 
@@ -399,12 +430,37 @@ export const processGiftResponse = async (characterData, giftId, userId, options
     // ✅ 步驟 3: 根據生成結果決定是否保存
     if (photoGenerationFailed && (generatePhoto || selectedPhotoUrl)) {
       // 照片生成失敗且用戶期望有照片 - 不保存任何訊息，返回失敗
-      logger.error(`[禮物回應] ❌ 照片生成失敗，不保存任何訊息，需要退款: userId=${userId}, characterId=${characterData.id}`);
+      logger.error(`[禮物回應] ❌ 照片生成失敗，不保存任何訊息，需要退款: userId=${userId}, characterId=${characterData.id}, errorType=${photoGenerationError?.errorType}`);
+
+      // 🔥 根據錯誤類型返回詳細的錯誤訊息
+      let userFriendlyMessage = "照片生成失敗，請稍後再試";
+      const errorType = photoGenerationError?.errorType || "UNKNOWN_ERROR";
+
+      switch (errorType) {
+        case 'DOWNLOAD_TIMEOUT':
+          userFriendlyMessage = "下載角色照片超時，網絡可能不穩定，請稍後再試";
+          break;
+        case 'DOWNLOAD_FAILED':
+          userFriendlyMessage = "無法載入角色照片，請稍後再試";
+          break;
+        case 'GEMINI_API_FAILED':
+          userFriendlyMessage = "AI 圖片生成服務暫時不可用，請稍後再試";
+          break;
+        case 'STORAGE_UPLOAD_FAILED':
+          userFriendlyMessage = "圖片上傳失敗，儲存空間可能已滿或網絡不穩定";
+          break;
+        case 'GIFT_NOT_FOUND':
+          userFriendlyMessage = "禮物資料錯誤，請重新選擇禮物";
+          break;
+        default:
+          userFriendlyMessage = photoGenerationError?.message || "照片生成失敗，請稍後再試";
+      }
 
       return {
         success: false,
-        error: "PHOTO_GENERATION_FAILED",
-        errorMessage: photoGenerationError?.message || "照片生成失敗，請稍後再試",
+        error: errorType,
+        errorMessage: userFriendlyMessage,
+        technicalDetails: photoGenerationError?.originalError || photoGenerationError?.message,
         needsRefund: true,
         thankYouMessage: null,
         photoMessage: null,
@@ -422,7 +478,8 @@ export const processGiftResponse = async (characterData, giftId, userId, options
       return {
         success: false,
         error: "SAVE_MESSAGE_FAILED",
-        errorMessage: "保存訊息失敗，請稍後再試",
+        errorMessage: "訊息保存失敗，資料庫連接可能有問題，請稍後再試",
+        technicalDetails: saveError.message,
         needsRefund: true,
         thankYouMessage: null,
         photoMessage: null,
@@ -458,7 +515,8 @@ export const processGiftResponse = async (characterData, giftId, userId, options
         return {
           success: false,
           error: "SAVE_PHOTO_FAILED",
-          errorMessage: "保存照片失敗，請稍後再試",
+          errorMessage: "照片訊息保存失敗，資料庫連接可能有問題，請稍後再試",
+          technicalDetails: savePhotoError.message,
           needsRefund: true,
           thankYouMessage: null,
           photoMessage: null,
@@ -494,7 +552,8 @@ export const processGiftResponse = async (characterData, giftId, userId, options
     return {
       success: false,
       error: "CRITICAL_ERROR",
-      errorMessage: criticalError.message || "處理禮物回應時發生錯誤",
+      errorMessage: "系統處理禮物回應時發生未預期的錯誤，請聯繫客服",
+      technicalDetails: criticalError.message || "Unknown error",
       needsRefund: true,
       thankYouMessage: null,
       photoMessage: null,

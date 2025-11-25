@@ -246,7 +246,11 @@ const updateUserAvatar = async (photoURL: string): Promise<User> => {
     }
   );
 
-  return cacheUserProfile(updated);
+  // ✅ 2025-11-25 修復：處理嵌套的 API 響應格式
+  // API 可能返回 { success: true, data: {...} } 或直接返回 {...}
+  const data = (updated as any)?.data || updated;
+
+  return cacheUserProfile(data);
 };
 
 const updateUserProfileDetails = async (patch: UpdateUserProfilePatch = {}): Promise<User> => {

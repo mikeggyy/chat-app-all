@@ -366,21 +366,13 @@ function setupMemoryCleanup() {
       const userCleanupResult = await cleanupInactiveUsers(INACTIVE_DAYS_THRESHOLD);
       logger.info(`[記憶體清理] 用戶清理完成`, userCleanupResult);
 
-      // 2. 獲取活躍用戶 ID 列表
-      const { users: allUsers } = await getAllUsers({ limit: 1000 }); // 獲取前 1000 個用戶用於清理
-      const activeUserIds = new Set(allUsers.map((user) => user.id));
+      // 2. 限制服務使用 LRU 緩存自動清理不活躍數據（無需手動清理）
+      // - conversationLimitService, voiceLimitService, photoLimitService
+      // - 緩存大小: 5000 個用戶, TTL: 60 秒
+      // - Firestore 數據保留（用戶可能回來）
+      logger.info(`[記憶體清理] 限制服務使用 LRU 緩存自動清理`);
 
-      // 3. 清理各個限制服務的記錄
-      const conversationCleanup = conversationLimitService.cleanupInactiveUsers(activeUserIds);
-      logger.info(`[記憶體清理] 對話限制清理完成`, conversationCleanup);
-
-      const voiceCleanup = voiceLimitService.cleanupInactiveUsers(activeUserIds);
-      logger.info(`[記憶體清理] 語音限制清理完成`, voiceCleanup);
-
-      const photoCleanup = photoLimitService.cleanupInactiveUsers(activeUserIds);
-      logger.info(`[記憶體清理] 拍照限制清理完成`, photoCleanup);
-
-      // 4. 記錄冪等性快取統計（自動清理已在 idempotency.js 中啟動）
+      // 3. 記錄冪等性快取統計（自動清理已在 idempotency.js 中啟動）
       const { getIdempotencyStats } = await import("./utils/idempotency.js");
       const idempotencyStats = getIdempotencyStats();
       logger.info(`[記憶體清理] 冪等性快取統計`, {
@@ -391,12 +383,12 @@ function setupMemoryCleanup() {
         note: "冪等性快取每 5 分鐘自動清理一次過期條目"
       });
 
-      // 5. 清理舊的交易記錄（保留 90 天）
+      // 4. 清理舊的交易記錄（保留 90 天）
       // TODO: 實現 cleanupOldTransactions 函數
       // const transactionCleanup = cleanupOldTransactions(90);
       // logger.info(`[記憶體清理] 交易記錄清理完成`, transactionCleanup);
 
-      // 6. 記錄對話緩存統計（LRU 會自動管理，無需手動清理）
+      // 5. 記錄對話緩存統計（LRU 會自動管理，無需手動清理）
       const conversationCacheStats = getConversationCacheStats();
       logger.info(`[記憶體清理] 對話緩存統計`, conversationCacheStats);
 

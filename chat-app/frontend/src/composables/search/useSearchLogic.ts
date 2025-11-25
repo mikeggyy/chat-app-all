@@ -1,5 +1,6 @@
-import { ref, computed, type Ref, type ComputedRef } from "vue";
+import { ref, computed, onMounted, type Ref, type ComputedRef } from "vue";
 import { fallbackMatches } from "../../utils/matchFallback.js";
+import { apiJsonCached } from "../../utils/api.js";
 
 // 定義角色匹配介面
 interface Match {
@@ -39,11 +40,45 @@ interface UseSearchLogicReturn {
   isFallbackResult: ComputedRef<boolean>;
   handleSearch: () => void;
   resetSearch: () => void;
+  isLoadingCharacters: Ref<boolean>;
 }
 
 export function useSearchLogic(): UseSearchLogicReturn {
   const searchQuery: Ref<string> = ref("");
   const submittedQuery: Ref<string> = ref("");
+  const allCharacters: Ref<Match[]> = ref([]);
+  const isLoadingCharacters: Ref<boolean> = ref(false);
+
+  // 從後端 API 獲取所有角色
+  const loadAllCharacters = async (): Promise<void> => {
+    try {
+      isLoadingCharacters.value = true;
+      const data = await apiJsonCached("/match/all", {
+        cacheKey: "search-all-characters",
+        cacheTTL: 300000, // 5 分鐘緩存
+        skipGlobalLoading: true,
+      });
+
+      if (Array.isArray(data) && data.length > 0) {
+        allCharacters.value = data;
+        console.log(`[搜尋] 成功載入 ${data.length} 個角色`);
+      } else {
+        console.warn("[搜尋] API 返回空數據，使用 fallback 數據");
+        allCharacters.value = fallbackMatches;
+      }
+    } catch (error) {
+      console.error("[搜尋] 載入角色失敗:", error);
+      // 失敗時使用 fallback 數據
+      allCharacters.value = fallbackMatches;
+    } finally {
+      isLoadingCharacters.value = false;
+    }
+  };
+
+  // 組件掛載時載入角色數據
+  onMounted(() => {
+    loadAllCharacters();
+  });
 
   // 是否已提交搜尋
   const hasSubmittedQuery: ComputedRef<boolean> = computed(
@@ -58,7 +93,12 @@ export function useSearchLogic(): UseSearchLogicReturn {
 
     const keyword: string = submittedQuery.value.trim().toLowerCase();
 
-    return fallbackMatches.filter((match: Match) => {
+    // 使用從 API 獲取的角色數據進行搜尋（如果已載入）
+    const charactersToSearch = allCharacters.value.length > 0
+      ? allCharacters.value
+      : fallbackMatches;
+
+    return charactersToSearch.filter((match: Match) => {
       const name: string = match.display_name?.toLowerCase() ?? "";
       const background: string = match.background?.toLowerCase() ?? "";
 
@@ -147,5 +187,6 @@ export function useSearchLogic(): UseSearchLogicReturn {
     isFallbackResult,
     handleSearch,
     resetSearch,
+    isLoadingCharacters,
   };
 }

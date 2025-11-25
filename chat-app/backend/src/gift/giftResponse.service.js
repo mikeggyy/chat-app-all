@@ -98,7 +98,7 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
       throw error;
     }
 
-    // 讀取角色肖像作為參考（支援本地路徑和 Firebase Storage URL）
+    // 讀取角色肖像作為參考（支援本地路徑、Firebase Storage URL 和 data URL）
     let referenceImageBuffer;
     try {
       // ✅ 優先使用用戶選擇的參考圖片，否則使用角色肖像
@@ -110,8 +110,16 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
         logger.info(`[禮物回應] 使用角色肖像作為參考: ${portraitUrl}`);
       }
 
+      // ✅ 檢查是否為 data URL（base64 編碼的圖片）
+      if (portraitUrl && portraitUrl.startsWith("data:")) {
+        logger.info(`[禮物回應] 檢測到 data URL，直接解析 base64`);
+        // 提取 base64 部分（移除 data:image/xxx;base64, 前綴）
+        const base64Data = portraitUrl.replace(/^data:image\/\w+;base64,/, "");
+        referenceImageBuffer = Buffer.from(base64Data, "base64");
+        logger.info(`[禮物回應] ✅ 成功解析 data URL (${Math.round(referenceImageBuffer.length / 1024)} KB)`);
+      }
       // 檢查是否為 HTTP/HTTPS URL（Cloudflare R2 或 Firebase Storage）
-      if (portraitUrl && (portraitUrl.startsWith("http://") || portraitUrl.startsWith("https://"))) {
+      else if (portraitUrl && (portraitUrl.startsWith("http://") || portraitUrl.startsWith("https://"))) {
         logger.info(`[禮物回應] 從遠端下載角色肖像: ${portraitUrl}`);
 
         // 從 URL 下載圖片（帶超時控制）
@@ -170,6 +178,14 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
       referenceImageBuffer = null;
     }
 
+    // ✅ 檢查是否成功獲取參考圖片
+    if (!referenceImageBuffer) {
+      const error = new Error('無法獲取角色參考照片，請確認角色資料完整');
+      error.errorType = 'REFERENCE_IMAGE_MISSING';
+      logger.error("[禮物照片] ❌ 參考圖片缺失: characterId=" + characterData.id);
+      throw error;
+    }
+
     // 構建圖片生成提示詞
     const imagePrompt = buildGiftSelfiePrompt(characterData, gift);
 
@@ -177,7 +193,7 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
     let geminiResult;
     try {
       geminiResult = await generateGeminiImage(
-        referenceImageBuffer ? referenceImageBuffer.toString('base64') : null,
+        referenceImageBuffer.toString('base64'),
         imagePrompt
       );
     } catch (geminiError) {
@@ -442,6 +458,9 @@ export const processGiftResponse = async (characterData, giftId, userId, options
           break;
         case 'DOWNLOAD_FAILED':
           userFriendlyMessage = "無法載入角色照片，請稍後再試";
+          break;
+        case 'REFERENCE_IMAGE_MISSING':
+          userFriendlyMessage = "角色參考照片缺失，無法生成禮物照片，請聯繫客服";
           break;
         case 'GEMINI_API_FAILED':
           userFriendlyMessage = "AI 圖片生成服務暫時不可用，請稍後再試";

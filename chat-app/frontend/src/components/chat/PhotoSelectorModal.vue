@@ -8,7 +8,7 @@
       <div class="photo-selector-container">
         <!-- 標題欄 -->
         <div class="photo-selector-header">
-          <h2 class="header-title">選擇照片生成影片</h2>
+          <h2 class="header-title">選擇照片</h2>
           <button
             type="button"
             class="close-button"

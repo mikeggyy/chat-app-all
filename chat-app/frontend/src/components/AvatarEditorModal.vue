@@ -258,18 +258,21 @@ const emitClose = (): void => {
 .avatar-editor {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 1600;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: clamp(1.5rem, 4vw, 3rem);
+  padding-bottom: calc(clamp(1.5rem, 4vw, 3rem) + 80px);
   background: rgba(12, 14, 28, 0.75);
   backdrop-filter: blur(6px);
+  overflow-y: auto;
 }
 
 .avatar-editor__panel {
   width: 23rem;
-  max-height: 87vh;
+  max-width: calc(100vw - 3rem);
+  max-height: calc(100vh - 160px);
   background: #141520;
   border-radius: 24px;
   border: 1px solid rgba(148, 163, 184, 0.12);
@@ -277,6 +280,7 @@ const emitClose = (): void => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin: auto;
 }
 
 .avatar-editor__header {

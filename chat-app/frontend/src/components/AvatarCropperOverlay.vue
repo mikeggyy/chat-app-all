@@ -461,18 +461,21 @@ onBeforeUnmount(() => {
 .avatar-cropper {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 1610;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(10, 12, 24, 0.82);
   backdrop-filter: blur(8px);
   padding: clamp(1rem, 3vw, 2.5rem);
+  padding-bottom: calc(clamp(1rem, 3vw, 2.5rem) + 80px);
+  overflow-y: auto;
 }
 
 .avatar-cropper__panel {
   width: min(1080px, 100%);
-  max-height: 95vh;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 160px);
   background: #101119;
   border-radius: 28px;
   border: 1px solid rgba(148, 163, 184, 0.16);
@@ -480,6 +483,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin: auto;
 }
 
 .avatar-cropper__header {

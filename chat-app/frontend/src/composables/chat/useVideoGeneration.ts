@@ -125,7 +125,7 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
   // 狀態
   // ====================
   const isRequestingVideo: Ref<boolean> = ref(false);
-  const VIDEO_GENERATION_TIMEOUT_MS = 4 * 60 * 1000;
+  const VIDEO_GENERATION_TIMEOUT_MS = 5 * 60 * 1000; // ✅ 增加到 5 分鐘（Hailuo 02 可能需要更長時間）
 
   // ====================
   // 輔助方法
@@ -296,6 +296,15 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         skipGlobalLoading: true, // ✅ 允許用戶繼續聊天
       });
 
+      // 🔍 詳細調試日誌 - 檢查回應格式
+      console.log('[DEBUG] ===== 影片 API 原始回應 =====');
+      console.log('[DEBUG] 回應類型:', typeof videoResult);
+      console.log('[DEBUG] 完整回應:', JSON.stringify(videoResult, null, 2));
+      console.log('[DEBUG] 是否有 videoUrl:', videoResult && 'videoUrl' in videoResult);
+      console.log('[DEBUG] videoUrl 值:', videoResult?.videoUrl);
+      console.log('[DEBUG] 是否有 data.videoUrl:', videoResult?.data?.videoUrl);
+      console.log('[DEBUG] ============================');
+
       const normalizedResult =
         videoResult && typeof videoResult === 'object' && 'videoUrl' in videoResult
           ? videoResult
@@ -304,14 +313,28 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
       logger.log('[VideoGeneration] 影片 API 回應', {
         requestId,
         hasData: Boolean(normalizedResult),
+        normalizedResult,
+        videoUrl: normalizedResult?.videoUrl,
       });
 
       if (!normalizedResult || !normalizedResult.videoUrl) {
+        // 🔍 詳細錯誤日誌
+        console.error('[DEBUG] ===== 影片生成失敗檢查 =====');
+        console.error('[DEBUG] hasNormalizedResult:', Boolean(normalizedResult));
+        console.error('[DEBUG] normalizedResult:', normalizedResult);
+        console.error('[DEBUG] hasVideoUrl:', Boolean(normalizedResult?.videoUrl));
+        console.error('[DEBUG] videoUrl:', normalizedResult?.videoUrl);
+        console.error('[DEBUG] ================================');
+
         // 移除臨時消息
         const tempIndex = messages.value.findIndex((m) => m.id === tempVideoMessageId);
         if (tempIndex !== -1) {
           messages.value.splice(tempIndex, 1);
         }
+
+        // ✅ 更新緩存（確保刷新頁面後訊息不會再出現）
+        writeCachedHistory(userId, matchId, messages.value);
+
         throw new Error('影片生成失敗：未返回有效的影片 URL');
       }
 
@@ -388,6 +411,9 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
       if (tempIndex !== -1) {
         messages.value.splice(tempIndex, 1);
       }
+
+      // ✅ 更新緩存（確保刷新頁面後訊息不會再出現）
+      writeCachedHistory(userId, matchId, messages.value);
 
       logger.error('[VideoGeneration] 影片生成流程失敗', error);
       const errorMessage = error instanceof Error ? error.message : '生成影片失敗';

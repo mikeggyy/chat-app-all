@@ -6,6 +6,7 @@ import { useFirebaseAuth } from '../composables/useFirebaseAuth';
 import { usePaginatedConversations } from '../composables/usePaginatedConversations';
 import { useInfiniteScroll } from '../composables/useInfiniteScroll';
 import { useChatListState } from '../composables/chat/useChatListState';
+import { useIsMounted } from '../composables/useIsMounted';
 import { apiJson } from '../utils/api';
 
 // 子組件
@@ -49,6 +50,9 @@ const router = useRouter();
 const { user, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
 
+// ✅ 追蹤組件掛載狀態，防止快速路由切換時的競態條件
+const isMounted = useIsMounted();
+
 // ==========================================
 // 分頁對話列表
 // ==========================================
@@ -73,6 +77,11 @@ watch(
   async (newUserId) => {
     if (newUserId) {
       await loadInitial();
+
+      // ✅ 檢查組件是否已卸載
+      if (!isMounted.value) {
+        return;
+      }
     }
   },
   { immediate: true }

@@ -3,6 +3,7 @@ import { ref, computed, watch, type Ref, type ComputedRef } from "vue";
 import { apiJson } from "../../utils/api.js";
 import { fallbackMatches } from "../../utils/matchFallback.js";
 import { logger } from "../../utils/logger.js";
+import { useIsMounted } from "../useIsMounted.js";
 
 /**
  * 對話記錄的角色資訊
@@ -86,6 +87,9 @@ export function useRecentConversations(user: Ref<User | null>) {
   const recentConversations = ref<ConversationItem[]>([]);
   const isLoadingRecent = ref<boolean>(false);
 
+  // ✅ 追蹤組件掛載狀態，防止快速路由切換時的競態條件
+  const isMounted = useIsMounted();
+
   /**
    * 獲取真實的最近對話列表
    */
@@ -100,6 +104,11 @@ export function useRecentConversations(user: Ref<User | null>) {
         `/api/users/${encodeURIComponent(user.value.id)}/conversations?limit=10`,
         { skipGlobalLoading: true }
       );
+
+      // ✅ 檢查組件是否已卸載
+      if (!isMounted.value) {
+        return;
+      }
 
       // 兼容兩種 API 響應格式：
       // 1. { success: true, data: { conversations: [...] } }
@@ -119,9 +128,14 @@ export function useRecentConversations(user: Ref<User | null>) {
   // 當用戶登入時自動獲取
   watch(
     () => user.value?.id,
-    (newId) => {
+    async (newId) => {
       if (newId) {
-        fetchRecentConversations();
+        await fetchRecentConversations();
+
+        // ✅ 檢查組件是否已卸載
+        if (!isMounted.value) {
+          return;
+        }
       }
     },
     { immediate: true }

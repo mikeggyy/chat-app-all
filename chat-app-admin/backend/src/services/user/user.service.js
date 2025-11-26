@@ -66,12 +66,20 @@ export const updateUser = async (userId, updateData) => {
   if (membershipStatus !== undefined) firestoreUpdates.membershipStatus = membershipStatus;
   if (membershipAutoRenew !== undefined) firestoreUpdates.membershipAutoRenew = membershipAutoRenew;
 
-  // 錢包餘額（支援三種格式，確保前台能正確讀取）
+  // 錢包餘額（支援三種格式，確保前後台同步）
   if (coins !== undefined || walletBalance !== undefined) {
     const newBalance = coins !== undefined ? coins : walletBalance;
-    firestoreUpdates.walletBalance = newBalance;      // 主要字段（前台使用）
-    firestoreUpdates["wallet.balance"] = newBalance;  // wallet 對象內的 balance
-    firestoreUpdates.coins = newBalance;              // 兼容舊格式
+
+    // ✅ 修復：正確更新 wallet 物件（使用巢狀結構）
+    firestoreUpdates.wallet = {
+      balance: newBalance,
+      currency: "TWD",
+      updatedAt: new Date().toISOString(),
+    };
+
+    // ✅ 同時更新舊格式欄位（向後兼容）
+    firestoreUpdates.walletBalance = newBalance;
+    firestoreUpdates.coins = newBalance;
   }
 
   // 資產卡片

@@ -248,6 +248,9 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           messages.value.splice(tempIndex, 1);
         }
 
+        // ✅ 更新緩存（確保刷新頁面後訊息不會再出現）
+        writeCachedHistory(userId, matchId, messages.value);
+
         // 處理限制錯誤 (403 錯誤)
         if (error.status === 403 && error.data?.limitExceeded) {
           if (onLimitExceeded) {
@@ -303,6 +306,10 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
       if (tempIndex !== -1) {
         messages.value.splice(tempIndex, 1);
       }
+
+      // ✅ 更新緩存（確保刷新頁面後訊息不會再出現）
+      writeCachedHistory(userId, matchId, messages.value);
+
       toast.error(error instanceof Error ? error.message : '請求自拍失敗');
       return null;
     } finally {
@@ -521,6 +528,9 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           if (giftMsgIndex !== -1) {
             messages.value.splice(giftMsgIndex, 1);
           }
+
+          // ✅ 更新緩存（確保刷新頁面後訊息不會再出現）
+          writeCachedHistory(userId, matchId, messages.value);
 
           // ✅ 2025-11-24：從資料庫刪除禮物消息
           try {

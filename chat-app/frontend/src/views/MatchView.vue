@@ -9,6 +9,7 @@ import { useMatchGestures } from '../composables/match/useMatchGestures';
 import { useMatchFavorites } from '../composables/match/useMatchFavorites';
 import { useMatchData } from '../composables/match/useMatchData';
 import { useToast } from '../composables/useToast';
+import { useIsMounted } from '../composables/useIsMounted';
 import MatchBackground from '../components/match/MatchBackground.vue';
 import MatchCard from '../components/match/MatchCard.vue';
 import BackgroundDialog from '../components/match/BackgroundDialog.vue';
@@ -51,6 +52,9 @@ const { user, loadUserProfile, setUserProfile } = useUserProfile();
 const firebaseAuth = useFirebaseAuth();
 const { requireLogin } = useGuestGuard();
 const toast = useToast();
+
+// ✅ 追蹤組件掛載狀態，防止快速路由切換時的競態條件
+const isMounted = useIsMounted();
 
 // 角色數據管理
 const matchData = useMatchData({ user });
@@ -224,7 +228,12 @@ watch(
       favorites.syncFavoriteSet([]);
       await matchData.loadMatches();
 
-      // 檢查競態條件：如果加載期間用戶已登入，忽略遊客數據
+      // ✅ 檢查競態條件：如果組件已卸載或加載期間用戶已登入，忽略遊客數據
+      if (!isMounted.value) {
+        logger.warn('組件已卸載，忽略遊客數據載入');
+        return;
+      }
+
       if (user.value?.id) {
         logger.warn('遊客加載期間已登入，等待登入數據載入');
         return;
@@ -257,7 +266,12 @@ watch(
           matchData.loadMatches(),
         ]);
 
-      // 檢查競態條件：如果請求完成時用戶已切換，忽略這些數據
+      // ✅ 檢查競態條件：如果組件已卸載或用戶已切換，忽略這些數據
+      if (!isMounted.value) {
+        logger.warn('組件已卸載，忽略數據載入');
+        return;
+      }
+
       if (user.value?.id !== requestUserId) {
         logger.warn('用戶已切換，忽略過期的數據載入');
         return;

@@ -7,8 +7,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import sharp from "sharp";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import logger from "../utils/logger.js";
 import { getAiServiceSettings } from "../services/aiSettings.service.js";
+import { shouldUseMockMode } from "../utils/envModeHelper.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * 獲取 Gemini AI 客戶端
@@ -121,6 +126,32 @@ export const generateGeminiImage = async (characterImageBase64, prompt, options 
   try {
     // 🔥 從 Firestore 讀取圖片生成設定
     const imageConfig = await getAiServiceSettings("imageGeneration");
+
+    // 🔧 測試模式：返回測試圖片，不消耗 Gemini API 配額
+    // 自動根據環境判斷：NODE_ENV, Git 分支, 主機名等
+    if (shouldUseMockMode('image')) {
+      logger.info(`[Gemini] 🧪 測試模式啟用，使用測試圖片替代 Gemini API 調用`);
+
+      // 讀取測試圖片並轉為 base64
+      const testImagePath = path.join(__dirname, "..", "..", "..", "frontend", "public", "test", "test.webp");
+      const testImageBuffer = fs.readFileSync(testImagePath);
+      const testImageBase64 = testImageBuffer.toString("base64");
+      const imageDataUrl = `data:image/webp;base64,${testImageBase64}`;
+
+      logger.info(`[Gemini] 🧪 測試圖片載入成功，大小: ${Math.round(testImageBase64.length / 1024)} KB`);
+
+      // 返回測試圖片（模擬 Gemini API 的返回格式）
+      return {
+        imageDataUrl,
+        selectedScenario: options.selectedScenario || null,
+        usageMetadata: {
+          promptTokenCount: 0,
+          candidatesTokenCount: 0,
+          totalTokenCount: 0,
+          note: "測試模式 - 未調用 API"
+        }
+      };
+    }
 
     const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({

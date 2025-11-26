@@ -235,35 +235,74 @@ const generateMockVideo = async (userId, characterId) => {
  * @returns {Promise<string>} - 可公開訪問的圖片 URL
  */
 const processImageUrl = async (imageUrl, userId, characterId) => {
+  // ✅ 檢查是否為 data URL（base64 編碼的圖片）
+  if (imageUrl.startsWith("data:")) {
+    logger.info("[Video] 檢測到 data URL，直接解析並上傳到 R2");
+    try {
+      // 提取 base64 部分
+      const base64Data = imageUrl.replace(/^data:image\/\w+;base64,/, "");
+      const imageBuffer = Buffer.from(base64Data, "base64");
+      logger.info(`[Video] 成功解析 data URL (${Math.round(imageBuffer.length / 1024)} KB)`);
+
+      // 上傳到 R2
+      const { uploadImageToR2 } = await import("../storage/r2Storage.service.js");
+      const uploadResult = await uploadImageToR2(imageBuffer, userId, characterId, {
+        contentType: "image/webp",
+        extension: "webp",
+      });
+
+      logger.info("[Video] data URL 圖片已上傳到 R2:", uploadResult.url);
+      return uploadResult.url;
+    } catch (error) {
+      logger.error("[Video] 處理 data URL 失敗:", error);
+      throw new Error(`處理 data URL 失敗: ${error.message}`);
+    }
+  }
+
   // 如果已經是完整的公開 URL（非 localhost），直接返回
-  if (imageUrl.startsWith("https://") && !imageUrl.includes("localhost") && !imageUrl.includes("127.0.0.1")) {
+  if ((imageUrl.startsWith("https://") || imageUrl.startsWith("http://")) &&
+      !imageUrl.includes("localhost") &&
+      !imageUrl.includes("127.0.0.1") &&
+      !imageUrl.includes("192.168.")) {
     return imageUrl;
   }
 
   // 需要上傳到 R2
-  logger.info("[Video] 檢測到本地圖片 URL，準備上傳到 R2:", imageUrl);
+  logger.info("[Video] 檢測到本地圖片 URL，準備上傳到 R2:", imageUrl.substring(0, 100));
 
   try {
     let imageBuffer;
     let fetchUrl = imageUrl;
 
-    // ✅ 生產環境修復：將相對路徑轉換為完整 URL
+    // ✅ 開發環境修復：處理 localhost URL（包括完整 URL 和相對路徑）
     if (imageUrl.startsWith("/")) {
-      const frontendBaseUrl = process.env.FRONTEND_URL || "https://chat-app-all.pages.dev";
+      // 相對路徑：根據環境選擇基礎 URL
+      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const frontendBaseUrl = isDevelopment
+        ? (process.env.FRONTEND_DEV_URL || "http://localhost:5173")
+        : (process.env.FRONTEND_URL || "https://chat-app-all.pages.dev");
       fetchUrl = `${frontendBaseUrl}${imageUrl}`;
       logger.info("[Video] 將相對路徑轉換為完整 URL:", fetchUrl);
+    } else if (imageUrl.includes("localhost") || imageUrl.includes("127.0.0.1") || imageUrl.includes("192.168.")) {
+      // 完整的 localhost URL：將 localhost 轉換為 127.0.0.1（避免 IPv6 問題）
+      logger.info("[Video] 檢測到 localhost URL，將從本地下載並上傳到 R2");
+      fetchUrl = imageUrl.replace(/localhost/g, "127.0.0.1");
+      if (fetchUrl !== imageUrl) {
+        logger.info(`[Video] 已將 localhost 轉換為 127.0.0.1: ${fetchUrl}`);
+      }
     }
 
     // 從 URL 下載圖片
-    logger.info("[Video] 從 URL 下載:", fetchUrl);
+    logger.info("[Video] 從 URL 下載:", fetchUrl.substring(0, 100));
     const response = await fetch(fetchUrl);
 
     if (!response.ok) {
-      throw new Error(`下載圖片失敗: ${response.statusText}`);
+      throw new Error(`下載圖片失敗: ${response.status} ${response.statusText}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
     imageBuffer = Buffer.from(arrayBuffer);
+    logger.info(`[Video] ✅ 成功下載圖片 (${Math.round(imageBuffer.length / 1024)} KB)`);
 
     // 上傳到 R2
     const { uploadImageToR2 } = await import("../storage/r2Storage.service.js");
@@ -272,11 +311,18 @@ const processImageUrl = async (imageUrl, userId, characterId) => {
       extension: "webp",
     });
 
-    logger.info("[Video] 圖片已上傳到 R2:", uploadResult.url);
+    logger.info("[Video] ✅ 圖片已上傳到 R2:", uploadResult.url);
     return uploadResult.url;
   } catch (error) {
     logger.error("[Video] 處理圖片 URL 失敗:", error);
-    // 如果上傳失敗，嘗試使用原始 URL（可能在生產環境可以訪問）
+
+    // ⚠️ 如果是本地 URL 處理失敗，應該拋出錯誤而非回退
+    if (imageUrl.includes("localhost") || imageUrl.includes("127.0.0.1") || imageUrl.includes("192.168.") || imageUrl.startsWith("/")) {
+      throw new Error(`無法處理本地圖片 URL: ${error.message}`);
+    }
+
+    // 對於其他 URL，嘗試使用原始 URL（可能在生產環境可以訪問）
+    logger.warn("[Video] ⚠️ 圖片處理失敗，嘗試使用原始 URL");
     return imageUrl;
   }
 };

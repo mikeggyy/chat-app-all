@@ -218,6 +218,12 @@ const handleSelect = (item: NavItem): void => {
   color: rgba(148, 163, 184, 0.55);
 }
 
+.icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

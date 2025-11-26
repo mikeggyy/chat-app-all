@@ -104,10 +104,23 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
       // ✅ 優先使用用戶選擇的參考圖片，否則使用角色肖像
       const portraitUrl = referenceImageUrl || characterData.portraitUrl;
 
+      // 🔍 調試日誌：記錄 URL 類型和長度
+      logger.info(`[禮物回應] 📋 參考圖片 URL 信息:`, {
+        hasReferenceImageUrl: !!referenceImageUrl,
+        hasPortraitUrl: !!characterData.portraitUrl,
+        urlType: portraitUrl ? (
+          portraitUrl.startsWith("data:") ? "data URL" :
+          portraitUrl.startsWith("http") ? "HTTP URL" :
+          "local path"
+        ) : "none",
+        urlLength: portraitUrl ? portraitUrl.length : 0,
+        urlPrefix: portraitUrl ? portraitUrl.substring(0, 100) : "null"
+      });
+
       if (referenceImageUrl) {
-        logger.info(`[禮物回應] 使用用戶選擇的參考圖片生成禮物照片: ${referenceImageUrl.substring(0, 100)}...`);
+        logger.info(`[禮物回應] 使用用戶選擇的參考圖片生成禮物照片`);
       } else {
-        logger.info(`[禮物回應] 使用角色肖像作為參考: ${portraitUrl}`);
+        logger.info(`[禮物回應] 使用角色肖像作為參考`);
       }
 
       // ✅ 檢查是否為 data URL（base64 編碼的圖片）

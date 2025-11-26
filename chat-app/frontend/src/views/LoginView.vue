@@ -54,6 +54,7 @@ const statusMessage = ref<string>("");
 const statusType = ref<StatusType>("idle");
 const isLoading = ref<boolean>(false);
 const waitingForNavigation = ref<boolean>(false);
+let navigationTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 const setStatus = (type: StatusType, message: string): void => {
   statusType.value = type;
@@ -151,6 +152,13 @@ const handleGoogleLogin = async (): Promise<void> => {
     // 移除固定時間的 setTimeout，避免 authBootstrap 尚未完成時就嘗試導航
     console.log('[LoginView] 🔵 設置 waitingForNavigation = true，等待 authBootstrap 完成');
     waitingForNavigation.value = true;
+
+    // ✅ 2025-11-26 修復：添加 3 秒超時自動刷新機制
+    // 如果 3 秒內沒有自動導航（watch 沒有被觸發），就刷新頁面
+    navigationTimeoutId = setTimeout(() => {
+      console.warn('[LoginView] ⚠️ 3秒內未自動導航，刷新頁面');
+      window.location.reload();
+    }, 3000);
   } catch (err) {
     console.error('[LoginView] ❌ handleGoogleLogin 錯誤:', err);
     handleFirebaseAuthError(err);
@@ -239,6 +247,13 @@ watch(
     // 清除等待標記，避免重複導航
     waitingForNavigation.value = false;
 
+    // ✅ 2025-11-26 修復：清除超時計時器，因為準備正常導航了
+    if (navigationTimeoutId) {
+      clearTimeout(navigationTimeoutId);
+      navigationTimeoutId = null;
+      console.log('[LoginView] 🟢 清除超時計時器');
+    }
+
     try {
       const { isGuestUser } = await import("../../../../shared/config/testAccounts.js");
       const isGuest = isGuestUser(newUser.id || '');
@@ -262,6 +277,13 @@ watch(
       }
     } catch (error) {
       console.error('[LoginView] ❌ 導航錯誤:', error);
+
+      // ✅ 2025-11-26 修復：導航錯誤時也清除超時計時器
+      if (navigationTimeoutId) {
+        clearTimeout(navigationTimeoutId);
+        navigationTimeoutId = null;
+      }
+
       setStatus("error", "導航失敗，請重新整理頁面");
       isLoading.value = false;
     }
@@ -293,6 +315,12 @@ onMounted(async () => {
       // ✅ 2025-11-25 修復：設置等待導航標記，讓 watch(user) 在資料載入完成後自動導航
       console.log('[LoginView] 🔵 設置 waitingForNavigation = true (redirect 模式)');
       waitingForNavigation.value = true;
+
+      // ✅ 2025-11-26 修復：添加 3 秒超時自動刷新機制
+      navigationTimeoutId = setTimeout(() => {
+        console.warn('[LoginView] ⚠️ 3秒內未自動導航，刷新頁面');
+        window.location.reload();
+      }, 3000);
     } else {
       console.log('[LoginView] 🟡 沒有 redirect 登入結果（正常頁面載入）');
     }

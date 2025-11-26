@@ -96,7 +96,7 @@ describe('AssetPackages API Routes', () => {
       expect(response.body.packages[0].id).toBe('video-unlock-1');
 
       // 驗證 Firestore 查詢
-      expect(mockFirestoreCollection).toHaveBeenCalledWith('unlock_cards');
+      expect(mockFirestoreCollection).toHaveBeenCalledWith('asset_packages');
       expect(mockFirestoreWhere).toHaveBeenCalledWith('status', '==', 'active');
       expect(mockFirestoreGet).toHaveBeenCalled();
     });

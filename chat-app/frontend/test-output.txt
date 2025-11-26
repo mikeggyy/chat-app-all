@@ -1,0 +1,545 @@
+
+> frontend@0.0.0 test
+> vitest usePotionManagement.spec.ts
+
+
+[1m[46m RUN [49m[22m [36mv4.0.8 [39m[90mD:/project/chat-app-all/chat-app/frontend[39m
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mloadActivePotions[2m > [22m[2m應該成功載入活躍藥水效果
+[22m[39m[loadActivePotions] API 返回數據: {
+  potions: [
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-001'[39m,
+      expiresAt: [32m'2025-01-20'[39m
+    },
+    {
+      potionType: [32m'brain_boost'[39m,
+      characterId: [32m'char-002'[39m,
+      expiresAt: [32m'2025-01-22'[39m
+    }
+  ]
+}
+[loadActivePotions] 設置 activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  },
+  {
+    potionType: [32m'brain_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-22'[39m
+  }
+]
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mloadActivePotions[2m > [22m[2m應該在載入前清空舊數據
+[22m[39m[loadActivePotions] API 返回數據: { potions: [ { potionType: [32m'brain_boost'[39m, characterId: [32m'new-char'[39m } ] }
+[loadActivePotions] 設置 activePotionEffects: [ { potionType: [32m'brain_boost'[39m, characterId: [32m'new-char'[39m } ]
+
+[90mstderr[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mloadActivePotions[2m > [22m[2m應該靜默處理載入錯誤
+[22m[39m[loadActivePotions] 加載失敗: Error: API error
+    at D:/project/chat-app-all/chat-app/frontend/src/composables/chat/usePotionManagement.spec.ts:255:56
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:157:11
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:753:26
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1636:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1602:10[90m)[39m
+    at runTest [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1309:12[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2musePotion[2m > [22m[2m應該成功使用記憶增強藥水
+[22m[39m[loadActivePotions] API 返回數據: { potions: [] }
+[loadActivePotions] 設置 activePotionEffects: []
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2musePotion[2m > [22m[2m應該成功使用腦力激盪藥水
+[22m[39m[loadActivePotions] API 返回數據: { potions: [] }
+[loadActivePotions] 設置 activePotionEffects: []
+
+[90mstderr[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2musePotion[2m > [22m[2m應該處理 API 錯誤
+[22m[39m[使用藥水錯誤] Error: 使用失敗
+    at D:/project/chat-app-all/chat-app/frontend/src/composables/chat/usePotionManagement.spec.ts:348:56
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:157:11
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:753:26
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1636:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1602:10[90m)[39m
+    at runTest [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1309:12[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2musePotion[2m > [22m[2m應該在使用成功後重新載入藥水和效果
+[22m[39m[loadActivePotions] API 返回數據: { potions: [] }
+[loadActivePotions] 設置 activePotionEffects: []
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mhandleConfirmUsePotion[2m > [22m[2m應該成功確認並使用藥水
+[22m[39m[loadActivePotions] API 返回數據: { potions: [] }
+[loadActivePotions] 設置 activePotionEffects: []
+
+[90mstderr[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mhandleConfirmUsePotion[2m > [22m[2m應該在使用失敗時不關閉彈窗
+[22m[39m[使用藥水錯誤] Error: 使用失敗
+    at D:/project/chat-app-all/chat-app/frontend/src/composables/chat/usePotionManagement.spec.ts:410:56
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:157:11
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:753:26
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1636:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1602:10[90m)[39m
+    at runTest [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1309:12[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+
+[90mstderr[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mhandleConfirmUsePotion[2m > [22m[2m應該確保 finally 清除 loading 狀態
+[22m[39m[使用藥水錯誤] Error: 使用失敗
+    at D:/project/chat-app-all/chat-app/frontend/src/composables/chat/usePotionManagement.spec.ts:419:56
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:157:11
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:753:26
+    at [90mfile:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1636:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1602:10[90m)[39m
+    at runTest [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1309:12[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+    at runSuite [90m(file:///D:/project/chat-app-all/chat-app/frontend/[39mnode_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2mactiveMemoryBoost 應該返回當前角色的記憶增強效果
+[22m[39m[loadActivePotions] API 返回數據: {
+  potions: [
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-001'[39m,
+      expiresAt: [32m'2025-01-20'[39m
+    },
+    {
+      potionType: [32m'brain_boost'[39m,
+      characterId: [32m'char-001'[39m,
+      expiresAt: [32m'2025-01-22'[39m
+    },
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-002'[39m,
+      expiresAt: [32m'2025-01-21'[39m
+    }
+  ]
+}
+[loadActivePotions] 設置 activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  },
+  {
+    potionType: [32m'brain_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-22'[39m
+  },
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-21'[39m
+  }
+]
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2mactiveMemoryBoost 應該返回當前角色的記憶增強效果
+[22m[39m[activeMemoryBoost] partnerId: char-001
+[activeMemoryBoost] activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  },
+  {
+    potionType: [32m'brain_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-22'[39m
+  },
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-21'[39m
+  }
+]
+[activeMemoryBoost] 找到的效果: {
+  potionType: [32m'memory_boost'[39m,
+  characterId: [32m'char-001'[39m,
+  expiresAt: [32m'2025-01-20'[39m
+}
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2mactiveBrainBoost 應該返回當前角色的腦力激盪效果
+[22m[39m[loadActivePotions] API 返回數據: {
+  potions: [
+    {
+      potionType: [32m'brain_boost'[39m,
+      characterId: [32m'char-001'[39m,
+      expiresAt: [32m'2025-01-22'[39m
+    },
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-001'[39m,
+      expiresAt: [32m'2025-01-20'[39m
+    }
+  ]
+}
+[loadActivePotions] 設置 activePotionEffects: [
+  {
+    potionType: [32m'brain_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-22'[39m
+  },
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  }
+]
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2mactiveBrainBoost 應該返回當前角色的腦力激盪效果
+[22m[39m[activeBrainBoost] partnerId: char-001
+[activeBrainBoost] activePotionEffects: [
+  {
+    potionType: [32m'brain_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-22'[39m
+  },
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  }
+]
+[activeBrainBoost] Effect 0: {
+  potionType: [32m'brain_boost'[39m,
+  characterId: [32m'char-001'[39m,
+  id: [90mundefined[39m,
+  matches: [33mtrue[39m
+}
+[activeBrainBoost] Effect 1: {
+  potionType: [32m'memory_boost'[39m,
+  characterId: [32m'char-001'[39m,
+  id: [90mundefined[39m,
+  matches: [33mfalse[39m
+}
+[activeBrainBoost] 找到的效果: {
+  potionType: [32m'brain_boost'[39m,
+  characterId: [32m'char-001'[39m,
+  expiresAt: [32m'2025-01-22'[39m
+}
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2m應該在沒有匹配效果時返回 undefined
+[22m[39m[loadActivePotions] API 返回數據: {
+  potions: [
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-002'[39m,
+      expiresAt: [32m'2025-01-20'[39m
+    }
+  ]
+}
+[loadActivePotions] 設置 activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  }
+]
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2m應該在沒有匹配效果時返回 undefined
+[22m[39m[activeMemoryBoost] partnerId: char-001
+[activeMemoryBoost] activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  }
+]
+[activeMemoryBoost] 找到的效果: [90mundefined[39m
+[activeBrainBoost] partnerId: char-001
+[activeBrainBoost] activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  }
+]
+[activeBrainBoost] Effect 0: {
+  potionType: [32m'memory_boost'[39m,
+  characterId: [32m'char-002'[39m,
+  id: [90mundefined[39m,
+  matches: [33mfalse[39m
+}
+[activeBrainBoost] 找到的效果: [90mundefined[39m
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2m應該在活躍效果列表更新時重新計算 computed
+[22m[39m[loadActivePotions] API 返回數據: {
+  potions: [
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-001'[39m,
+      expiresAt: [32m'2025-01-20'[39m
+    }
+  ]
+}
+[loadActivePotions] 設置 activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  }
+]
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2m應該在活躍效果列表更新時重新計算 computed
+[22m[39m[activeMemoryBoost] partnerId: char-001
+[activeMemoryBoost] activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  }
+]
+[activeMemoryBoost] 找到的效果: {
+  potionType: [32m'memory_boost'[39m,
+  characterId: [32m'char-001'[39m,
+  expiresAt: [32m'2025-01-20'[39m
+}
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2m應該在活躍效果列表更新時重新計算 computed
+[22m[39m[loadActivePotions] API 返回數據: {
+  potions: [
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-001'[39m,
+      expiresAt: [32m'2025-01-20'[39m
+    },
+    {
+      potionType: [32m'memory_boost'[39m,
+      characterId: [32m'char-002'[39m,
+      expiresAt: [32m'2025-01-21'[39m
+    }
+  ]
+}
+[loadActivePotions] 設置 activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  },
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-21'[39m
+  }
+]
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2mComputed 屬性[2m > [22m[2m應該在活躍效果列表更新時重新計算 computed
+[22m[39m[activeMemoryBoost] partnerId: char-001
+[activeMemoryBoost] activePotionEffects: [
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-001'[39m,
+    expiresAt: [32m'2025-01-20'[39m
+  },
+  {
+    potionType: [32m'memory_boost'[39m,
+    characterId: [32m'char-002'[39m,
+    expiresAt: [32m'2025-01-21'[39m
+  }
+]
+[activeMemoryBoost] 找到的效果: {
+  potionType: [32m'memory_boost'[39m,
+  characterId: [32m'char-001'[39m,
+  expiresAt: [32m'2025-01-20'[39m
+}
+
+[90mstdout[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2m邊界情況[2m > [22m[2m應該處理空的活躍效果響應
+[22m[39m[loadActivePotions] API 返回數據: { potions: [] }
+[loadActivePotions] 設置 activePotionEffects: []
+
+[90mstderr[2m | src/composables/chat/usePotionManagement.spec.ts[2m > [22m[2musePotionManagement - 藥水管理測試[2m > [22m[2m邊界情況[2m > [22m[2m應該處理非標準錯誤對象
+[22m[39m[使用藥水錯誤] 字符串錯誤
+
+ [31m❯[39m src/composables/chat/usePotionManagement.spec.ts [2m([22m[2m30 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 110[2mms[22m[39m
+       [32m✓[39m 應該初始化為空狀態[32m 63[2mms[22m[39m
+       [32m✓[39m 應該暴露所有必要的屬性和方法[32m 1[2mms[22m[39m
+       [32m✓[39m 應該成功載入用戶藥水數量[32m 3[2mms[22m[39m
+       [32m✓[39m 應該處理缺少某個藥水類型的情況[32m 1[2mms[22m[39m
+       [32m✓[39m 應該在沒有用戶 ID 時不載入[32m 1[2mms[22m[39m
+       [32m✓[39m 應該靜默處理載入錯誤[32m 1[2mms[22m[39m
+       [32m✓[39m 應該處理 API 返回 null[32m 1[2mms[22m[39m
+       [32m✓[39m 應該成功載入活躍藥水效果[32m 2[2mms[22m[39m
+       [32m✓[39m 應該在載入前清空舊數據[32m 2[2mms[22m[39m
+       [32m✓[39m 應該在沒有用戶 ID 時不載入[32m 1[2mms[22m[39m
+       [32m✓[39m 應該靜默處理載入錯誤[32m 3[2mms[22m[39m
+[31m       [31m×[31m 應該成功使用記憶增強藥水[39m[32m 5[2mms[22m[39m
+[31m       [31m×[31m 應該成功使用腦力激盪藥水[39m[32m 2[2mms[22m[39m
+       [32m✓[39m 應該在沒有用戶 ID 時拒絕使用[32m 1[2mms[22m[39m
+       [32m✓[39m 應該在沒有角色 ID 時拒絕使用[32m 1[2mms[22m[39m
+       [32m✓[39m 應該拒絕無效的藥水類型[32m 1[2mms[22m[39m
+       [32m✓[39m 應該處理 API 錯誤[32m 1[2mms[22m[39m
+       [32m✓[39m 應該在使用成功後重新載入藥水和效果[32m 1[2mms[22m[39m
+       [32m✓[39m 應該處理 API 返回 success: false[32m 1[2mms[22m[39m
+       [32m✓[39m 應該成功確認並使用藥水[32m 1[2mms[22m[39m
+       [32m✓[39m 應該在沒有藥水類型時顯示錯誤[32m 1[2mms[22m[39m
+       [32m✓[39m 應該在使用失敗時不關閉彈窗[32m 2[2mms[22m[39m
+       [32m✓[39m 應該確保 finally 清除 loading 狀態[32m 1[2mms[22m[39m
+       [32m✓[39m activeMemoryBoost 應該返回當前角色的記憶增強效果[32m 1[2mms[22m[39m
+       [32m✓[39m activeBrainBoost 應該返回當前角色的腦力激盪效果[32m 3[2mms[22m[39m
+       [32m✓[39m 應該在沒有匹配效果時返回 undefined[32m 3[2mms[22m[39m
+       [32m✓[39m 應該在活躍效果列表更新時重新計算 computed[32m 1[2mms[22m[39m
+       [32m✓[39m 應該處理空的藥水數量響應[32m 1[2mms[22m[39m
+       [32m✓[39m 應該處理空的活躍效果響應[32m 1[2mms[22m[39m
+[31m       [31m×[31m 應該處理非標準錯誤對象[39m[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/composables/chat/usePotionManagement.spec.ts[2m > [22musePotionManagement - 藥水管理測試[2m > [22musePotion[2m > [22m應該成功使用記憶增強藥水
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with arguments: [ …(2) ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    "/api/potions/use/memory-boost",[22m
+[2m    {[22m
+[2m      "body": {[22m
+[2m        "characterId": "char-001",[22m
+[31m+       "idempotencyKey": "1764136336729-x39rz",[90m
+[2m      },[22m
+[2m      "method": "POST",[22m
+[2m    },[22m
+[2m  ][22m
+
+[1m  2nd vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "/api/potions/use/memory-boost",[90m
+[31m+   "/api/potions/active",[90m
+[2m    {[22m
+[32m-     "body": {[90m
+[32m-       "characterId": "char-001",[90m
+[32m-     },[90m
+[32m-     "method": "POST",[90m
+[31m+     "skipGlobalLoading": true,[90m
+[2m    },[22m
+[2m  ][22m
+
+[1m  3rd vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "/api/potions/use/memory-boost",[90m
+[31m+   "/api/users/user-123/assets",[90m
+[2m    {[22m
+[32m-     "body": {[90m
+[32m-       "characterId": "char-001",[90m
+[32m-     },[90m
+[32m-     "method": "POST",[90m
+[31m+     "skipGlobalLoading": true,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m3[22m
+[31m[39m
+[36m [2m❯[22m src/composables/chat/usePotionManagement.spec.ts:[2m279:32[22m[39m
+    [90m277| [39m
+    [90m278| [39m      [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m279| [39m      [34mexpect[39m(apiUtils[33m.[39mapiJson)[33m.[39m[34mtoHaveBeenCalledWith[39m(
+    [90m   | [39m                               [31m^[39m
+    [90m280| [39m        [32m'/api/potions/use/memory-boost'[39m[33m,[39m
+    [90m281| [39m        {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/composables/chat/usePotionManagement.spec.ts[2m > [22musePotionManagement - 藥水管理測試[2m > [22musePotion[2m > [22m應該成功使用腦力激盪藥水
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with arguments: [ Array(2) ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[2m    "/api/potions/use/brain-boost",[22m
+[2m    {[22m
+[2m      "body": {[22m
+[2m        "characterId": "char-001",[22m
+[31m+       "idempotencyKey": "1764136336734-dl7yuif",[90m
+[2m      },[22m
+[2m      "method": "POST",[22m
+[2m    },[22m
+[2m  ][22m
+
+[1m  2nd vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "/api/potions/use/brain-boost",[90m
+[31m+   "/api/potions/active",[90m
+[2m    {[22m
+[32m-     "body": {[90m
+[32m-       "characterId": "char-001",[90m
+[32m-     },[90m
+[32m-     "method": "POST",[90m
+[31m+     "skipGlobalLoading": true,[90m
+[2m    },[22m
+[2m  ][22m
+
+[1m  3rd vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "/api/potions/use/brain-boost",[90m
+[31m+   "/api/users/user-123/assets",[90m
+[2m    {[22m
+[32m-     "body": {[90m
+[32m-       "characterId": "char-001",[90m
+[32m-     },[90m
+[32m-     "method": "POST",[90m
+[31m+     "skipGlobalLoading": true,[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m3[22m
+[31m[39m
+[36m [2m❯[22m src/composables/chat/usePotionManagement.spec.ts:[2m304:32[22m[39m
+    [90m302| [39m
+    [90m303| [39m      [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m304| [39m      [34mexpect[39m(apiUtils[33m.[39mapiJson)[33m.[39m[34mtoHaveBeenCalledWith[39m(
+    [90m   | [39m                               [31m^[39m
+    [90m305| [39m        [32m'/api/potions/use/brain-boost'[39m[33m,[39m
+    [90m306| [39m        {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/composables/chat/usePotionManagement.spec.ts[2m > [22musePotionManagement - 藥水管理測試[2m > [22m邊界情況[2m > [22m應該處理非標準錯誤對象
+[31m[1mAssertionError[22m: expected "vi.fn()" to be called with arguments: [ '使用藥水失敗' ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   "使用藥水失敗",[90m
+[31m+   "字符串錯誤",[90m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[36m [2m❯[22m src/composables/chat/usePotionManagement.spec.ts:[2m578:34[22m[39m
+    [90m576| [39m
+    [90m577| [39m      [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m578| [39m      [34mexpect[39m(mockDeps[33m.[39mshowError)[33m.[39m[34mtoHaveBeenCalledWith[39m([32m'使用藥水失敗'[39m)[33m;[39m
+    [90m   | [39m                                 [31m^[39m
+    [90m579| [39m    })[33m;[39m
+    [90m580| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m27 passed[39m[22m[90m (30)[39m
+[2m   Start at [22m 13:52:16
+[2m   Duration [22m 483ms[2m (transform 71ms, setup 0ms, collect 106ms, tests 110ms, environment 164ms, prepare 6ms)[22m
+

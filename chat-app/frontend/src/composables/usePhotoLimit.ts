@@ -99,7 +99,7 @@ export function usePhotoLimit(): UsePhotoLimitReturn {
 
   const cards = computed(() => {
     const data = photoLimitData.value as PhotoLimitInfo | null;
-    return data?.cards || 0; // ✅ 修復：後端返回的是 photoCards
+    return (data as any)?.photoCards || 0; // ✅ 修復：後端返回的是 photoCards
   });
 
   const resetPeriod = computed(() => {

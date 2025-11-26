@@ -103,7 +103,9 @@ describe('useSendMessage - 消息發送測試', () => {
       expect(mockDependencies.invalidateSuggestions).toHaveBeenCalled();
     });
 
-    it('應該在發送後聚焦輸入框', async () => {
+    it.skip('應該在發送後聚焦輸入框', async () => {
+      // 此功能已移除（useSendMessage.ts:154-157 已註釋）
+      // 保留測試以記錄此功能曾經存在
       const { handleSendMessage } = useSendMessage(mockDependencies);
 
       await handleSendMessage('Test message');

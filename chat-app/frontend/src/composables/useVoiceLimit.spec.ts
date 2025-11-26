@@ -31,7 +31,7 @@ vi.mock('./useBaseLimitService.js', () => ({
       checkLimit: vi.fn(async (userId: string, characterId: string) => {
         const key = characterId;
         limitData.value[key] = {
-          canPlay: true,
+          allowed: true,  // 修復：使用 allowed 而非 canPlay
           remaining: 10,
           limit: 20,
         };
@@ -39,12 +39,12 @@ vi.mock('./useBaseLimitService.js', () => ({
       }),
       getStats: vi.fn(async () => {
         limitData.value['char-001'] = {
-          canPlay: true,
+          allowed: true,  // 修復：使用 allowed 而非 canPlay
           remaining: 5,
           limit: 20,
         };
         limitData.value['char-002'] = {
-          canPlay: false,
+          allowed: false,  // 修復：使用 allowed 而非 canPlay
           remaining: 0,
           limit: 20,
         };
@@ -89,7 +89,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
       const result = await voiceLimit.checkVoiceLimit('user-123', 'char-001');
 
       expect(result).toBeDefined();
-      expect(result.canPlay).toBe(true);
+      expect(result.allowed).toBe(true);  // 修復：使用 allowed 而非 canPlay
       expect(result.remaining).toBe(10);
       expect(result.limit).toBe(20);
     });
@@ -121,7 +121,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
       await voiceLimit.loadVoiceStats('user-123');
 
       expect(voiceLimit.voiceStats.value['char-001']).toBeDefined();
-      expect(voiceLimit.voiceStats.value['char-001'].canPlay).toBe(true);
+      expect(voiceLimit.voiceStats.value['char-001'].allowed).toBe(true);  // 修復：使用 allowed 而非 canPlay
       expect(voiceLimit.voiceStats.value['char-001'].remaining).toBe(5);
     });
 
@@ -132,7 +132,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
 
       expect(voiceLimit.voiceStats.value['char-001']).toBeDefined();
       expect(voiceLimit.voiceStats.value['char-002']).toBeDefined();
-      expect(voiceLimit.voiceStats.value['char-002'].canPlay).toBe(false);
+      expect(voiceLimit.voiceStats.value['char-002'].allowed).toBe(false);  // 修復：使用 allowed 而非 canPlay
     });
 
     it('應該支持選項參數', async () => {
@@ -172,7 +172,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
 
       await nextTick();
       expect(status.value).toBeDefined();
-      expect(status.value.canPlay).toBe(true);
+      expect(status.value.allowed).toBe(true);  // 修復：使用 allowed 而非 canPlay
       expect(status.value.remaining).toBe(5);
     });
 
@@ -234,7 +234,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
 
       // 手動設置無限次數狀態
       voiceLimit.voiceStats.value['char-vip'] = {
-        canPlay: true,
+        allowed: true,  // 修復：使用 allowed 而非 canPlay
         remaining: -1,
         limit: -1,
       };
@@ -326,7 +326,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
       const voiceLimit = useVoiceLimit();
 
       voiceLimit.voiceStats.value['char-test'] = {
-        canPlay: true,
+        allowed: true,  // 修復：使用 allowed 而非 canPlay
         remaining: null,
         limit: 20,
       };
@@ -363,8 +363,8 @@ describe('useVoiceLimit - 語音限制測試', () => {
 
       await nextTick();
 
-      expect(status1.value.canPlay).toBe(true);
-      expect(status2.value.canPlay).toBe(false);
+      expect(status1.value.allowed).toBe(true);  // 修復：使用 allowed 而非 canPlay
+      expect(status2.value.allowed).toBe(false);  // 修復：使用 allowed 而非 canPlay
       expect(canPlay1.value).toBe(true);
       expect(canPlay2.value).toBe(false);
     });
@@ -434,7 +434,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
       const voiceLimit = useVoiceLimit();
 
       voiceLimit.voiceStats.value['char-empty'] = {
-        canPlay: false,
+        allowed: false,  // 修復：使用 allowed 而非 canPlay
         remaining: 0,
         limit: 20,
       };
@@ -451,7 +451,7 @@ describe('useVoiceLimit - 語音限制測試', () => {
       const voiceLimit = useVoiceLimit();
 
       voiceLimit.voiceStats.value['char-partial'] = {
-        canPlay: true,
+        allowed: true,  // 修復：使用 allowed 而非 canPlay
         // 缺少 remaining 和 limit
       };
 

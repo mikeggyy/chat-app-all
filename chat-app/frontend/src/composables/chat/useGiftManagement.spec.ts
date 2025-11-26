@@ -22,10 +22,12 @@ interface GiftData {
 interface MockDependencies {
   getCurrentUserId: () => string | null;
   openGiftSelector: (callback?: () => Promise<void>) => Promise<void>;
-  sendGift: (giftData: GiftData, onSuccess?: () => Promise<void>) => Promise<void>;
+  sendGift: (giftData: GiftData, onSuccess?: () => Promise<void>, selectedPhotoUrl?: string) => Promise<void>;
   loadBalance: (userId: string) => Promise<void>;
   showGiftAnimation: (emoji: string, name: string) => void;
   closeGiftAnimation: () => void;
+  showPhotoSelector: (forGift: boolean, pendingGift: GiftData) => void; // ✅ 新增
+  closeGiftSelector: () => void; // ✅ 新增
 }
 
 // Mock dependencies
@@ -61,13 +63,15 @@ describe('useGiftManagement - 禮物管理測試', () => {
         // 模擬打開選擇器並執行回調
         if (callback) await callback();
       }),
-      sendGift: vi.fn(async (giftData: GiftData, onSuccess?: () => Promise<void>) => {
+      sendGift: vi.fn(async (giftData: GiftData, onSuccess?: () => Promise<void>, selectedPhotoUrl?: string) => {
         // 模擬發送成功並執行回調
         if (onSuccess) await onSuccess();
       }),
       loadBalance: vi.fn(async () => {}),
       showGiftAnimation: vi.fn(),
       closeGiftAnimation: vi.fn(),
+      showPhotoSelector: vi.fn(), // ✅ 新增: 模擬打開照片選擇器
+      closeGiftSelector: vi.fn(), // ✅ 新增: 模擬關閉禮物選擇器
     };
 
     // 導入 composable
@@ -127,48 +131,24 @@ describe('useGiftManagement - 禮物管理測試', () => {
     });
   });
 
-  describe('handleSelectGift', () => {
-    it('應該成功發送禮物（完整流程）', async () => {
+  describe('handleSelectGift - 新流程 (2025-11-25)', () => {
+    // ✅ 新的送禮流程：選擇禮物 → 選擇照片 → 發送（照片選擇後處理）
+    // handleSelectGift 只負責關閉禮物選擇器並打開照片選擇器
+    // 實際的發送、動畫、餘額重載在照片選擇後處理
+
+    it('應該關閉禮物選擇器並打開照片選擇器', async () => {
       const giftData = { giftId: 'gift-1', quantity: 1 };
 
       const giftMgmt = useGiftManagement(mockDeps);
       await giftMgmt.handleSelectGift(giftData);
 
-      // 驗證調用順序
+      // 驗證調用
       expect(mockDeps.getCurrentUserId).toHaveBeenCalled();
-      expect(giftsConfig.getGiftById).toHaveBeenCalledWith('gift-1');
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalledWith('🌹', '玫瑰');
-      expect(mockDeps.sendGift).toHaveBeenCalledWith(giftData, expect.any(Function));
-      expect(mockDeps.loadBalance).toHaveBeenCalledWith('user-123');
+      expect(mockDeps.closeGiftSelector).toHaveBeenCalled();
+      expect(mockDeps.showPhotoSelector).toHaveBeenCalledWith(true, giftData);
     });
 
-    it('應該顯示禮物動畫', async () => {
-      const giftData = { giftId: 'gift-2', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalledWith('💎', '鑽石');
-    });
-
-    it('應該在 2 秒後自動關閉動畫', async () => {
-      const giftData = { giftId: 'gift-1', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      // 動畫應該立即顯示
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalled();
-      expect(mockDeps.closeGiftAnimation).not.toHaveBeenCalled();
-
-      // 前進 2 秒
-      vi.advanceTimersByTime(2000);
-
-      // 動畫應該關閉
-      expect(mockDeps.closeGiftAnimation).toHaveBeenCalled();
-    });
-
-    it('應該在沒有用戶 ID 時不發送禮物', async () => {
+    it('應該在沒有用戶 ID 時不執行任何操作', async () => {
       mockDeps.getCurrentUserId = vi.fn(() => null);
 
       const giftData = { giftId: 'gift-1', quantity: 1 };
@@ -176,166 +156,44 @@ describe('useGiftManagement - 禮物管理測試', () => {
       const giftMgmt = useGiftManagement(mockDeps);
       await giftMgmt.handleSelectGift(giftData);
 
-      expect(mockDeps.sendGift).not.toHaveBeenCalled();
-      expect(mockDeps.showGiftAnimation).not.toHaveBeenCalled();
+      expect(mockDeps.closeGiftSelector).not.toHaveBeenCalled();
+      expect(mockDeps.showPhotoSelector).not.toHaveBeenCalled();
     });
 
-    it('應該處理不存在的禮物', async () => {
-      const giftData = { giftId: 'invalid-gift', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      // 不應該顯示動畫（因為找不到禮物）
-      expect(mockDeps.showGiftAnimation).not.toHaveBeenCalled();
-
-      // 但仍然會嘗試發送（由 sendGift 處理錯誤）
-      expect(mockDeps.sendGift).toHaveBeenCalledWith(giftData, expect.any(Function));
-    });
-
-    it('應該在發送成功後重新載入餘額', async () => {
-      const giftData = { giftId: 'gift-1', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      expect(mockDeps.loadBalance).toHaveBeenCalledWith('user-123');
-      expect(mockDeps.loadBalance).toHaveBeenCalledTimes(1);
-    });
-
-    it('應該處理發送禮物錯誤', async () => {
-      mockDeps.sendGift = vi.fn(async () => {
-        throw new Error('Gift send failed');
-      });
-
-      const giftData = { giftId: 'gift-1', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-
-      await expect(giftMgmt.handleSelectGift(giftData)).rejects.toThrow('Gift send failed');
-    });
-
-    it('應該處理重新載入餘額錯誤', async () => {
-      mockDeps.loadBalance = vi.fn(async () => {
-        throw new Error('Balance load failed');
-      });
-
-      const giftData = { giftId: 'gift-1', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-
-      await expect(giftMgmt.handleSelectGift(giftData)).rejects.toThrow('Balance load failed');
-    });
-  });
-
-  describe('禮物動畫時序', () => {
-    it('應該在發送禮物前顯示動畫', async () => {
-      const callOrder: string[] = [];
-
-      mockDeps.showGiftAnimation = vi.fn(() => {
-        callOrder.push('showAnimation');
-      });
-      mockDeps.sendGift = vi.fn(async () => {
-        callOrder.push('sendGift');
-      });
-      mockDeps.loadBalance = vi.fn(async () => {
-        callOrder.push('loadBalance');
-      });
+    it('應該在用戶 ID 為空字符串時不執行任何操作', async () => {
+      mockDeps.getCurrentUserId = vi.fn(() => '');
 
       const giftData = { giftId: 'gift-1', quantity: 1 };
 
       const giftMgmt = useGiftManagement(mockDeps);
       await giftMgmt.handleSelectGift(giftData);
 
-      // 動畫應該在發送禮物之前顯示
-      expect(callOrder).toEqual(['showAnimation', 'sendGift', 'loadBalance']);
+      expect(mockDeps.closeGiftSelector).not.toHaveBeenCalled();
+      expect(mockDeps.showPhotoSelector).not.toHaveBeenCalled();
     });
 
-    it('應該在動畫播放期間完成禮物發送', async () => {
-      const giftData = { giftId: 'gift-1', quantity: 1 };
+    it('應該傳遞完整的 giftData 給照片選擇器', async () => {
+      const giftData = {
+        giftId: 'gift-2',
+        quantity: 5,
+        customProperty: 'test',
+      };
 
       const giftMgmt = useGiftManagement(mockDeps);
       await giftMgmt.handleSelectGift(giftData);
 
-      // 此時動畫應該還在播放
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalled();
-      expect(mockDeps.closeGiftAnimation).not.toHaveBeenCalled();
-
-      // 禮物應該已經發送完成
-      expect(mockDeps.sendGift).toHaveBeenCalled();
-      expect(mockDeps.loadBalance).toHaveBeenCalled();
-
-      // 等待動畫結束
-      vi.advanceTimersByTime(2000);
-      expect(mockDeps.closeGiftAnimation).toHaveBeenCalled();
-    });
-  });
-
-  describe('不同禮物類型', () => {
-    it('應該正確處理玫瑰禮物', async () => {
-      const giftData = { giftId: 'gift-1', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalledWith('🌹', '玫瑰');
+      expect(mockDeps.showPhotoSelector).toHaveBeenCalledWith(true, giftData);
     });
 
-    it('應該正確處理鑽石禮物', async () => {
-      const giftData = { giftId: 'gift-2', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalledWith('💎', '鑽石');
-    });
-
-    it('應該正確處理巧克力禮物', async () => {
-      const giftData = { giftId: 'gift-3', quantity: 1 };
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalledWith('🍫', '巧克力');
-    });
-  });
-
-  describe('邊界情況', () => {
-    it('應該處理 giftData 缺少 giftId', async () => {
-      const giftData = { quantity: 1 } as any; // 沒有 giftId
-
-      const giftMgmt = useGiftManagement(mockDeps);
-      await giftMgmt.handleSelectGift(giftData);
-
-      expect(mockDeps.showGiftAnimation).not.toHaveBeenCalled();
-      expect(mockDeps.sendGift).toHaveBeenCalledWith(giftData, expect.any(Function));
-    });
-
-    it('應該處理多個禮物連續發送', async () => {
+    it('應該為不同禮物正確打開照片選擇器', async () => {
       const giftMgmt = useGiftManagement(mockDeps);
 
       await giftMgmt.handleSelectGift({ giftId: 'gift-1', quantity: 1 });
-      await giftMgmt.handleSelectGift({ giftId: 'gift-2', quantity: 1 });
-      await giftMgmt.handleSelectGift({ giftId: 'gift-3', quantity: 1 });
+      await giftMgmt.handleSelectGift({ giftId: 'gift-2', quantity: 2 });
+      await giftMgmt.handleSelectGift({ giftId: 'gift-3', quantity: 3 });
 
-      expect(mockDeps.sendGift).toHaveBeenCalledTimes(3);
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalledTimes(3);
-      expect(mockDeps.loadBalance).toHaveBeenCalledTimes(3);
-    });
-
-    it('應該處理快速連續發送（動畫重疊）', async () => {
-      const giftMgmt = useGiftManagement(mockDeps);
-
-      // 快速發送兩個禮物
-      await giftMgmt.handleSelectGift({ giftId: 'gift-1', quantity: 1 });
-      await giftMgmt.handleSelectGift({ giftId: 'gift-2', quantity: 1 });
-
-      // 兩個動畫都應該被觸發
-      expect(mockDeps.showGiftAnimation).toHaveBeenCalledTimes(2);
-
-      // 等待 2 秒，兩個定時器都會觸發（因為設置的時間相同）
-      vi.advanceTimersByTime(2000);
-      expect(mockDeps.closeGiftAnimation).toHaveBeenCalledTimes(2);
+      expect(mockDeps.closeGiftSelector).toHaveBeenCalledTimes(3);
+      expect(mockDeps.showPhotoSelector).toHaveBeenCalledTimes(3);
     });
   });
 

@@ -278,12 +278,13 @@ describe('usePotionManagement - 藥水管理測試', () => {
       expect(result).toBe(true);
       expect(apiUtils.apiJson).toHaveBeenCalledWith(
         '/api/potions/use/memory-boost',
-        {
+        expect.objectContaining({
           method: 'POST',
-          body: {
+          body: expect.objectContaining({
             characterId: 'char-001',
-          },
-        }
+            idempotencyKey: expect.any(String), // 動態生成的冪等性 key
+          }),
+        })
       );
       expect(mockDeps.showSuccess).toHaveBeenCalledWith('記憶增強藥水使用成功！效果將持續 7 天');
     });
@@ -303,12 +304,13 @@ describe('usePotionManagement - 藥水管理測試', () => {
       expect(result).toBe(true);
       expect(apiUtils.apiJson).toHaveBeenCalledWith(
         '/api/potions/use/brain-boost',
-        {
+        expect.objectContaining({
           method: 'POST',
-          body: {
+          body: expect.objectContaining({
             characterId: 'char-001',
-          },
-        }
+            idempotencyKey: expect.any(String), // 動態生成的冪等性 key
+          }),
+        })
       );
       expect(mockDeps.showSuccess).toHaveBeenCalledWith('腦力激盪藥水使用成功！效果將持續 3 天');
     });
@@ -575,7 +577,8 @@ describe('usePotionManagement - 藥水管理測試', () => {
       const result = await potionMgmt.usePotion('memoryBoost');
 
       expect(result).toBe(false);
-      expect(mockDeps.showError).toHaveBeenCalledWith('使用藥水失敗');
+      // 當錯誤是字符串時，使用該字符串作為錯誤消息（而非默認的 "使用藥水失敗"）
+      expect(mockDeps.showError).toHaveBeenCalledWith('字符串錯誤');
     });
   });
 });

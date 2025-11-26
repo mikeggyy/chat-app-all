@@ -537,13 +537,13 @@ const handleReferenceFocusUpdate = (value: string): void => {
   gap: var(--spacing-xl);
   overflow-y: auto;
   flex: 1;
-  max-height: calc(100dvh - 240px - var(--bottom-nav-offset, 0px));
+  max-height: calc(100dvh - 240px);
   padding-bottom: var(--spacing-2xl);
 }
 
 .appearance__footer {
   margin-top: 2rem;
-  padding-bottom: calc(var(--bottom-nav-offset, 0px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .appearance__generate {

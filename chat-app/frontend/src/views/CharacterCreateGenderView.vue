@@ -585,7 +585,6 @@ const handleClose = (): void => {
 
 .create-gender__footer {
   margin-top: 32px;
-  padding-bottom: calc(var(--bottom-nav-offset, 0px) + env(safe-area-inset-bottom, 0px));
 }
 
 .create-gender__confirm {

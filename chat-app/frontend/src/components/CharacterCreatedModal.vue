@@ -185,17 +185,15 @@ const handleViewCharacter = (): void => {
   align-items: center;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
-  z-index: 1620;
+  z-index: 1000;
   padding: 20px;
-  padding-bottom: calc(20px + 80px);
-  overflow-y: auto;
 }
 
 .modal-content {
   position: relative;
   width: 100%;
   max-width: 480px;
-  max-height: calc(100vh - 160px);
+  max-height: 90vh;
   overflow-y: auto;
   background: linear-gradient(
     180deg,
@@ -206,7 +204,6 @@ const handleViewCharacter = (): void => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   padding: 32px 24px;
-  margin: auto;
 }
 
 .modal-close {

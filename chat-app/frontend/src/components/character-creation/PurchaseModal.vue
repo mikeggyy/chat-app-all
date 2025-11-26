@@ -156,13 +156,11 @@ const handleGoToVIP = (): void => {
 .appearance__confirm-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1620;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  padding-bottom: calc(24px + 80px);
-  overflow-y: auto;
 }
 
 .appearance__confirm-backdrop {
@@ -175,7 +173,6 @@ const handleGoToVIP = (): void => {
 .appearance__confirm-panel {
   position: relative;
   width: min(420px, 100%);
-  max-height: calc(100vh - 160px);
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: linear-gradient(

@@ -10,6 +10,7 @@ import { generateGeminiImage } from "../ai/gemini.service.js";
 import { getConversationHistory, appendConversationMessage, deleteConversationMessages } from "../conversation/conversation.service.js";
 import { savePhotoToAlbum } from "../photoAlbum/photoAlbum.service.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
+import { smartFetch } from "../utils/networkFetch.js";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -140,7 +141,8 @@ export const generateGiftSelfie = async (characterData, giftId, userId = null, r
         const timeout = setTimeout(() => controller.abort(), 10000); // 10秒超時
 
         try {
-          const response = await fetch(portraitUrl, { signal: controller.signal });
+          // 使用智能 fetch 解決 IPv6 連接問題
+          const response = await smartFetch(portraitUrl, { signal: controller.signal });
           clearTimeout(timeout);
 
           if (!response.ok) {

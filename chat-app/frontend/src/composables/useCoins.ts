@@ -62,6 +62,12 @@ const coinsState: Ref<CoinsState> = ref({
 const isLoading = ref(false);
 const error: Ref<string | null> = ref(null);
 
+/**
+ * 最後更新時間戳（防止舊資料覆蓋新資料）
+ * ✅ 修復：移到模塊級別，確保所有 useCoins() 實例共享同一個時間戳
+ */
+let lastBalanceUpdateTimestamp = 0;
+
 // ==================== Composable 主函數 ====================
 
 /**
@@ -259,11 +265,6 @@ export function useCoins(): UseCoinsReturn {
       throw err;
     }
   };
-
-  /**
-   * 最後更新時間戳（防止舊資料覆蓋新資料）
-   */
-  let lastBalanceUpdateTimestamp = 0;
 
   /**
    * 直接更新金幣餘額（用於避免重複 API 調用）

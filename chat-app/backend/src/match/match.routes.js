@@ -328,7 +328,7 @@ matchRouter.get(
   relaxedRateLimiter,
   asyncHandler(async (req, res) => {
     const idsParam = req.query.ids || "";
-    const limit = Math.min(parseInt(req.query.limit) || 50, 100); // 最多 100 個
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100); // 最多 100 個
 
     // 解析 ID 列表
     const ids = idsParam

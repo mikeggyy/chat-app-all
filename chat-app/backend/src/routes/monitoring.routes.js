@@ -68,8 +68,8 @@ router.get("/ad-watch/anomalies", async (req, res) => {
     const { limit, minTodayCount } = req.query;
 
     const result = await getAbnormalAdWatchUsers({
-      limit: limit ? parseInt(limit) : 100,
-      minTodayCount: minTodayCount ? parseInt(minTodayCount) : 8,
+      limit: limit ? parseInt(limit, 10) : 100,
+      minTodayCount: minTodayCount ? parseInt(minTodayCount, 10) : 8,
     });
 
     res.json({
@@ -95,7 +95,7 @@ router.get("/ad-watch/user/:userId", async (req, res) => {
     const { days } = req.query;
 
     const result = await detectAdWatchAnomalies(userId, {
-      days: days ? parseInt(days) : 7,
+      days: days ? parseInt(days, 10) : 7,
     });
 
     res.json({
@@ -160,8 +160,8 @@ router.get("/refunds/high-frequency-users", async (req, res) => {
     const { minRefunds, days } = req.query;
 
     const result = await getHighRefundUsers({
-      minRefunds: minRefunds ? parseInt(minRefunds) : 3,
-      days: days ? parseInt(days) : 30,
+      minRefunds: minRefunds ? parseInt(minRefunds, 10) : 3,
+      days: days ? parseInt(days, 10) : 30,
     });
 
     res.json({

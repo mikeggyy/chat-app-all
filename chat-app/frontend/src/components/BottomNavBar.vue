@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type Component } from "vue";
-import { useRoute, useRouter, type Router, type RouteRecordName, type RouteLocationRaw } from "vue-router";
+import { useRoute, useRouter, type Router, type RouteLocationRaw } from "vue-router";
 import {
   HomeIcon,
   MagnifyingGlassIcon,

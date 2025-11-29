@@ -26,8 +26,8 @@ interface Props {
   tier?: string;
   tierName?: string;
   isPaidMember?: boolean;
-  formattedExpiryDate?: string | null;
-  daysUntilExpiry?: number | null;
+  formattedExpiryDate?: string;
+  daysUntilExpiry?: number;
   isExpiringSoon?: boolean;
   currentPhotoUsage?: number;
   currentCharacterCreations?: number;
@@ -48,8 +48,8 @@ const props = withDefaults(defineProps<Props>(), {
   tier: "free",
   tierName: "免費會員",
   isPaidMember: false,
-  formattedExpiryDate: null,
-  daysUntilExpiry: null,
+  formattedExpiryDate: undefined,
+  daysUntilExpiry: undefined,
   isExpiringSoon: false,
   currentPhotoUsage: 0,
   currentCharacterCreations: 0,
@@ -126,16 +126,12 @@ const handleUseUnlockCard = (cardType: string): void => {
   emit("use-unlock-card", cardType);
 };
 
-// 處理使用藥水
-const handleUsePotion = (potionType: string): void => {
-  emit("use-potion", potionType);
-};
-
 // 獲取所有資產卡片（從共用配置動態生成）
 const assetCardsList = computed(() => {
   const cards = getAssetCardsList();
   return cards.map((card) => {
-    const count = props[card.assetKey] || 0;
+    const assetKey = card.assetKey as keyof Props;
+    const count = (props[assetKey] as number | undefined) || 0;
     // 檢查是否有上限限制（必須同時滿足：1. 配置中有hasLimit 2. 達到上限）
     const hasLimit =
       (card.hasLimit && card.assetKey === "photoUnlockCards" && isPhotoLimitReached.value) ||
@@ -156,7 +152,7 @@ const potionsList = computed(() => {
   const potions = getPotionsList();
   return potions.map((potion) => ({
     ...potion,
-    count: props.potions?.[potion.assetKey] || 0,
+    count: (props.potions?.[potion.assetKey as keyof Potions] as number | undefined) || 0,
   }));
 });
 </script>

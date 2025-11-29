@@ -120,10 +120,11 @@ export function useInfiniteScroll(
       oldEl.removeEventListener('scroll', scrollHandler);
     }
 
-    // 為新元素添加事件監聽
+    // 為新元素添加事件監聯
     if (newEl) {
       scrollHandler = handleScroll as any;
-      newEl.addEventListener('scroll', handleScroll, { passive: true });
+      // ✅ 修復：使用 scrollHandler 確保添加和移除使用相同的引用
+      newEl.addEventListener('scroll', scrollHandler, { passive: true });
     }
   }, { immediate: true });
 

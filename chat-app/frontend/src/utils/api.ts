@@ -258,6 +258,43 @@ const isJsonBody = (value: any): boolean =>
   !(value instanceof ArrayBuffer);
 
 /**
+ * ✅ 修復：安全解析 JSON 響應
+ * 處理非 JSON 響應和解析錯誤
+ * @param response - Fetch Response 對象
+ * @returns 解析後的 JSON 數據
+ */
+const safeJsonParse = async <T = any>(response: Response): Promise<T> => {
+  const contentType = response.headers.get('content-type');
+
+  // 檢查是否為 JSON 響應
+  if (!contentType || !contentType.includes('application/json')) {
+    // 非 JSON 響應，嘗試讀取文字內容
+    const text = await response.text();
+
+    // 如果是空內容，返回 null
+    if (!text || text.trim() === '') {
+      return null as T;
+    }
+
+    // 嘗試作為 JSON 解析（某些服務器可能未設置正確的 Content-Type）
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      console.warn('[API] 響應不是有效的 JSON:', text.substring(0, 100));
+      throw new Error(`Expected JSON response but received: ${contentType || 'unknown'}`);
+    }
+  }
+
+  // JSON 響應，嘗試解析
+  try {
+    return await response.json() as T;
+  } catch (parseError) {
+    console.error('[API] JSON 解析失敗:', parseError);
+    throw new Error('Failed to parse JSON response');
+  }
+};
+
+/**
  * 從 Cookie 中獲取 CSRF Token
  * @returns CSRF Token 或 null
  */
@@ -329,6 +366,7 @@ export const apiFetch = async (path: string, options: ApiOptions = {}): Promise<
     absolute = false,
     baseUrl = getApiBaseUrl(),
     skipDeduplication = false, // 允許跳過去重（某些特殊情況）
+    timeoutMs,
     ...fetchOptions
   } = options;
 
@@ -394,14 +432,25 @@ export const apiFetch = async (path: string, options: ApiOptions = {}): Promise<
         // 嘗試從響應體中獲取錯誤訊息
         let errorMessage = `Request failed with status ${response.status}`;
         try {
-          const errorData: ApiErrorResponse = await response.json();
-          if (errorData.message) {
-            errorMessage = errorData.message;
-          } else if (errorData.error) {
-            errorMessage = errorData.error;
+          // ✅ 修復：先檢查 Content-Type 再嘗試解析 JSON
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData: ApiErrorResponse = await response.json();
+            if (errorData.message) {
+              errorMessage = errorData.message;
+            } else if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } else {
+            // 非 JSON 響應，嘗試讀取文字內容
+            const text = await response.text();
+            if (text && text.length < 200) {
+              errorMessage = `${errorMessage}: ${text}`;
+            }
           }
         } catch (parseError) {
-          // 如果無法解析 JSON，使用預設訊息
+          // ✅ 修復：記錄解析錯誤以便調試
+          console.warn('[API] 無法解析錯誤響應:', parseError instanceof Error ? parseError.message : parseError);
         }
 
         const error = new Error(errorMessage) as ApiError;
@@ -469,7 +518,8 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
         return null as any;
       }
 
-      return response.json();
+      // ✅ 修復：使用 safeJsonParse 處理 JSON 解析錯誤
+      return safeJsonParse(response);
     });
   }
 
@@ -494,7 +544,8 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
     return null as any;
   }
 
-  const jsonData = await response.json();
+  // ✅ 修復：使用 safeJsonParse 處理 JSON 解析錯誤
+  const jsonData = await safeJsonParse(response);
 
   // DEBUG: 追蹤 DELETE 請求的 JSON 回應
   if (method === 'DELETE') {

@@ -14,7 +14,7 @@ interface Props {
   photoUnlockCards?: number;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   isOpen: false,
   used: 0,
   remaining: 0,

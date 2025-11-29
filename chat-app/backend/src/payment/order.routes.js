@@ -46,8 +46,8 @@ router.get(
     const { limit, offset, type, status, startDate, endDate } = req.query;
 
     const options = {
-      limit: limit ? parseInt(limit) : 50,
-      offset: offset ? parseInt(offset) : 0,
+      limit: limit ? parseInt(limit, 10) : 50,
+      offset: offset ? parseInt(offset, 10) : 0,
     };
 
     if (type) options.type = type;

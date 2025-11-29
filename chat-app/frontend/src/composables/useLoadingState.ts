@@ -202,12 +202,17 @@ export function useLoadingState(
 
         return result;
       } catch (error) {
+        // ✅ 修復：統一錯誤處理邏輯，使行為更清晰
+        // onError 是可選的錯誤回調，用於日誌記錄等副作用
+        // 錯誤始終會被重新拋出，讓調用者能夠處理
         if (onError && typeof onError === 'function') {
-          onError(error as Error);
-          throw error; // 仍然需要拋出錯誤以保持 Promise 語義
-        } else {
-          throw error; // 如果沒有錯誤處理，重新拋出
+          try {
+            onError(error as Error);
+          } catch (callbackError) {
+            console.error('[useLoadingState] onError callback threw:', callbackError);
+          }
         }
+        throw error;
       } finally {
         stopLoading(key);
 
@@ -338,9 +343,10 @@ export function useDataLoading(): UseDataLoadingReturn {
           data.value.set(key, result);
         }
       },
+      // ✅ 修復：onError 只用於記錄錯誤，不再重複 throw
+      // withLoading 會自動重新拋出錯誤
       onError: (error: Error) => {
         errors.value.set(key, error);
-        throw error;
       },
     });
 

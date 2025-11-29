@@ -290,8 +290,9 @@ const verifyWithAdMobSSV = async (verificationToken, queryParams = {}) => {
 
     // 5. 驗證 reward_amount（如果有提供）
     if (queryParams.reward_amount && verified.reward_amount) {
-      if (parseInt(queryParams.reward_amount) !== verified.reward_amount) {
-        logger.warn("[廣告服務] 獎勵金額不匹配");
+      const rewardAmount = parseInt(queryParams.reward_amount, 10);
+      if (isNaN(rewardAmount) || rewardAmount !== verified.reward_amount) {
+        logger.warn("[廣告服務] 獎勵金額不匹配或無效");
         return false;
       }
     }

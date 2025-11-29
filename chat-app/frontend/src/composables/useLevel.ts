@@ -4,7 +4,7 @@
  * 管理用戶與角色的等級、點數和排行榜
  */
 
-import { ref, computed, type Ref, type ComputedRef } from 'vue';
+import { ref } from 'vue';
 import { apiJson } from '../utils/api.js';
 
 // ==================== 類型定義 ====================

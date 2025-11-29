@@ -3,7 +3,7 @@
  * Toast 通知系統 Composable（TypeScript 版本）
  */
 
-import { ref, computed, type Ref, type ComputedRef } from 'vue';
+import { ref, computed, onBeforeUnmount, type Ref, type ComputedRef } from 'vue';
 
 // ==================== 類型定義 ====================
 
@@ -58,6 +58,11 @@ export const TOAST_TYPES = {
 const toasts: Ref<ToastItem[]> = ref([]);
 let toastIdCounter = 0;
 
+// ✅ 修復：追蹤所有定時器以便清理
+const autoCloseTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const dismissAnimationTimers = new Map<number, ReturnType<typeof setTimeout>>();
+let dismissAllTimer: ReturnType<typeof setTimeout> | null = null;
+
 // ==================== Composable 主函數 ====================
 
 /**
@@ -89,10 +94,13 @@ export function useToast(): UseToastReturn {
     toasts.value.push(toast);
 
     // 自動關閉
+    // ✅ 修復：追蹤定時器
     if (duration > 0) {
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
+        autoCloseTimers.delete(id);
         dismissToast(id);
       }, duration);
+      autoCloseTimers.set(id, timerId);
     }
 
     return id;
@@ -162,10 +170,24 @@ export function useToast(): UseToastReturn {
     const index = toasts.value.findIndex(toast => toast.id === id);
     if (index !== -1) {
       toasts.value[index].isVisible = false;
+      // ✅ 修復：清理自動關閉定時器
+      const autoCloseTimer = autoCloseTimers.get(id);
+      if (autoCloseTimer) {
+        clearTimeout(autoCloseTimer);
+        autoCloseTimers.delete(id);
+      }
+      // ✅ 修復：清理之前的動畫定時器（如果存在）
+      const existingAnimTimer = dismissAnimationTimers.get(id);
+      if (existingAnimTimer) {
+        clearTimeout(existingAnimTimer);
+      }
       // 延遲移除以允許動畫完成
-      setTimeout(() => {
+      // ✅ 修復：追蹤動畫定時器
+      const animTimerId = setTimeout(() => {
+        dismissAnimationTimers.delete(id);
         toasts.value = toasts.value.filter(toast => toast.id !== id);
       }, 300);
+      dismissAnimationTimers.set(id, animTimerId);
     }
   };
 
@@ -173,10 +195,23 @@ export function useToast(): UseToastReturn {
    * 關閉所有 toast
    */
   const dismissAll = (): void => {
+    // ✅ 修復：清理所有自動關閉定時器
+    autoCloseTimers.forEach((timer) => clearTimeout(timer));
+    autoCloseTimers.clear();
+    // ✅ 修復：清理所有動畫定時器
+    dismissAnimationTimers.forEach((timer) => clearTimeout(timer));
+    dismissAnimationTimers.clear();
+
     toasts.value.forEach(toast => {
       toast.isVisible = false;
     });
-    setTimeout(() => {
+
+    // ✅ 修復：清理之前的 dismissAll 定時器
+    if (dismissAllTimer) {
+      clearTimeout(dismissAllTimer);
+    }
+    dismissAllTimer = setTimeout(() => {
+      dismissAllTimer = null;
       toasts.value = [];
     }, 300);
   };
@@ -184,6 +219,21 @@ export function useToast(): UseToastReturn {
   // Computed
   const activeToasts = computed(() => toasts.value);
   const hasToasts = computed(() => toasts.value.length > 0);
+
+  // ✅ 修復：組件卸載時清理所有定時器
+  onBeforeUnmount(() => {
+    // 清理自動關閉定時器
+    autoCloseTimers.forEach((timer) => clearTimeout(timer));
+    autoCloseTimers.clear();
+    // 清理動畫定時器
+    dismissAnimationTimers.forEach((timer) => clearTimeout(timer));
+    dismissAnimationTimers.clear();
+    // 清理 dismissAll 定時器
+    if (dismissAllTimer) {
+      clearTimeout(dismissAllTimer);
+      dismissAllTimer = null;
+    }
+  });
 
   return {
     // State

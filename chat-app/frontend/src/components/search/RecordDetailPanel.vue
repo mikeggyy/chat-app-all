@@ -1,53 +1,66 @@
 <script setup lang="ts">
 // Types
-import { ref } from "vue";
+import { ref, type Component } from "vue";
 import { ArrowLeftIcon, ArrowRightIcon } from "@heroicons/vue/24/outline";
-import { HeartIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
+import { HeartIcon } from "@heroicons/vue/24/solid";
 import LazyImage from '@/components/common/LazyImage.vue';
 import CharacterContributionModal from "./CharacterContributionModal.vue";
 
-const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    default: false,
-  },
-  panelType: {
-    type: String,
-    default: "reconnect",
-  },
-  heroImage: {
-    type: String,
-    default: "/banner/reconnect-hero.webp",
-  },
-  badgeLabel: {
-    type: String,
-    default: "重新連線",
-  },
-  badgeIcon: {
-    type: [Object, Function],
-    default: () => HeartIcon,
-  },
-  description: {
-    type: String,
-    default: "",
-  },
-  records: {
-    type: Array,
-    default: () => [],
-  },
-  // 貢獻排行專用：完整的貢獻數據（包含 topContributors）
-  contributionData: {
-    type: Array,
-    default: () => [],
-  },
-  hasMore: {
-    type: Boolean,
-    default: false,
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
+// 類型定義
+interface RecordMetric {
+  key: string;
+  icon: Component;
+  value: string | number;
+}
+
+interface RecordEntry {
+  id: string;
+  matchId?: string;
+  name: string;
+  image: string;
+  tagline?: string;
+  description?: string;
+  metrics?: RecordMetric[];
+}
+
+interface Contributor {
+  userId: string;
+  displayName?: string;
+  photoURL?: string;
+  rank: number;
+}
+
+interface ContributionDataItem {
+  matchId?: string;
+  name?: string;
+  image?: string;
+  topContributors?: Contributor[];
+}
+
+interface Props {
+  isOpen?: boolean;
+  panelType?: string;
+  heroImage?: string;
+  badgeLabel?: string;
+  badgeIcon?: Component;
+  description?: string;
+  records?: RecordEntry[];
+  contributionData?: ContributionDataItem[];
+  hasMore?: boolean;
+  isLoading?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isOpen: false,
+  panelType: "reconnect",
+  heroImage: "/banner/reconnect-hero.webp",
+  badgeLabel: "重新連線",
+  badgeIcon: () => HeartIcon,
+  description: "",
+  records: () => [],
+  contributionData: () => [],
+  hasMore: false,
+  isLoading: false,
 });
 
 // 獲取排名標籤
@@ -80,20 +93,20 @@ const selectedCharacterForModal = ref<{
   image: string;
 } | null>(null);
 
-const handleClose = () => {
+const handleClose = (): void => {
   emit("close");
 };
 
-const handleScroll = (event) => {
+const handleScroll = (event: Event): void => {
   emit("scroll", event);
 };
 
-const handleEntryClick = (entry, index: number) => {
+const handleEntryClick = (entry: RecordEntry, index: number): void => {
   // 貢獻排行模式：打開角色詳細排行榜 Modal
   if (props.panelType === "contribution" && props.contributionData[index]) {
     const data = props.contributionData[index];
     selectedCharacterForModal.value = {
-      id: data.matchId || entry.matchId,
+      id: data.matchId || entry.matchId || entry.id,
       name: data.name || entry.name,
       image: data.image || entry.image,
     };

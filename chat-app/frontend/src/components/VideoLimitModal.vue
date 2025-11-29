@@ -15,7 +15,7 @@ interface Props {
   videoUnlockCards?: number;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   characterName: '角色',
   used: 0,
   remaining: 0,

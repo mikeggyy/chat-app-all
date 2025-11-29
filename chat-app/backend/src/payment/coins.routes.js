@@ -163,8 +163,8 @@ router.get(
     const { limit, offset } = req.query;
 
     const history = await getTransactionHistory(userId, {
-      limit: limit ? parseInt(limit) : undefined,
-      offset: offset ? parseInt(offset) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
     });
 
     res.json({

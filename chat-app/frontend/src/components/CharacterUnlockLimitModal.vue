@@ -7,7 +7,7 @@ interface Props {
   characterName?: string;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   characterName: '角色',
 });
 

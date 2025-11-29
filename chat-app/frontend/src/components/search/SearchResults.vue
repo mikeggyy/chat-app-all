@@ -1,34 +1,40 @@
 <script setup lang="ts">
-// Types
-
 import LazyImage from '@/components/common/LazyImage.vue';
 
-const props = defineProps({
-  results: {
-    type: Array,
-    default: () => [],
-  },
-  query: {
-    type: String,
-    default: "",
-  },
-  isFallback: {
-    type: Boolean,
-    default: false,
-  },
+interface CharacterProfile {
+  id: string;
+  name: string;
+  image: string;
+  author?: string;
+  description?: string;
+}
+
+interface Props {
+  results?: CharacterProfile[];
+  query?: string;
+  isFallback?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  results: () => [],
+  query: "",
+  isFallback: false,
 });
 
-const emit = defineEmits(["reset", "result-click"]);
+const emit = defineEmits<{
+  reset: [];
+  "result-click": [profile: CharacterProfile];
+}>();
 
 const handleReset = () => {
   emit("reset");
 };
 
-const handleResultClick = (profile) => {
+const handleResultClick = (profile: CharacterProfile) => {
   emit("result-click", profile);
 };
 
-const handleKeyup = (event, profile) => {
+const handleKeyup = (event: KeyboardEvent, profile: CharacterProfile) => {
   if (event.key === "Enter") {
     handleResultClick(profile);
   }

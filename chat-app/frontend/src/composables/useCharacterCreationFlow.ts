@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { ref, Ref } from "vue";
+import { ref, Ref, onBeforeUnmount } from "vue";
 import {
   createCharacterCreationFlow,
   fetchCharacterCreationFlow,
@@ -540,6 +540,11 @@ export function useCharacterCreationFlow(
   const setSuppressSync = (value: boolean): void => {
     suppressSync = value;
   };
+
+  // ✅ 修復：自動清理定時器，防止記憶體洩漏
+  onBeforeUnmount(() => {
+    cleanup();
+  });
 
   return {
     // 狀態

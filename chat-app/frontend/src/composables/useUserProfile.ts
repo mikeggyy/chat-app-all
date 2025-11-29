@@ -6,7 +6,7 @@
 import { computed, reactive, type ComputedRef } from "vue";
 import { apiJson } from "../utils/api";
 import { useFirebaseAuth } from "./useFirebaseAuth.js";
-import { generateUid, normalizeArray, normalizeGender } from "../../../shared/utils/userUtils.js";
+import { normalizeArray, normalizeGender } from "../../../shared/utils/userUtils.js";
 import { generateRandomUserName } from "../utils/randomUserName.js";
 import { isGuestUser } from "../../../../shared/config/testAccounts.js";
 import type { User, Wallet, UserAssets } from "../types";

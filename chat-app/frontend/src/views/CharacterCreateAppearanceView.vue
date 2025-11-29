@@ -278,8 +278,9 @@ const handleClose = (): void => {
 };
 
 // 參考圖片處理（包裝 composable 函數）
-const handleCropConfirmWrapper = (result: CropResult): void => {
-  handleCropConfirm(result as any, saveAppearanceState);
+const handleCropConfirmWrapper = (result: string | CropResult): void => {
+  const cropResult = typeof result === 'string' ? { croppedImage: result } : result;
+  handleCropConfirm(cropResult as any, saveAppearanceState);
 };
 
 const handleReferenceClearWrapper = (): void => {

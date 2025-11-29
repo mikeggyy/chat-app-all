@@ -66,6 +66,12 @@ export function useConfirmDialog(): UseConfirmDialogReturn {
    */
   const confirm = (message: string, options: ConfirmOptions = {}): Promise<boolean> => {
     return new Promise((resolve, reject) => {
+      // ✅ 修復：如果有正在進行的對話框，先關閉它（返回 false）
+      if (dialogState.value.isOpen && dialogState.value.resolve) {
+        console.warn('[useConfirmDialog] 覆蓋正在進行的確認對話框');
+        dialogState.value.resolve(false);
+      }
+
       dialogState.value = {
         isOpen: true,
         title: options.title || '確認操作',
@@ -86,6 +92,9 @@ export function useConfirmDialog(): UseConfirmDialogReturn {
       dialogState.value.resolve(true);
     }
     dialogState.value.isOpen = false;
+    // ✅ 修復：清理 resolve/reject 引用，防止重複調用
+    dialogState.value.resolve = null;
+    dialogState.value.reject = null;
   };
 
   /**
@@ -96,6 +105,9 @@ export function useConfirmDialog(): UseConfirmDialogReturn {
       dialogState.value.resolve(false);
     }
     dialogState.value.isOpen = false;
+    // ✅ 修復：清理 resolve/reject 引用，防止重複調用
+    dialogState.value.resolve = null;
+    dialogState.value.reject = null;
   };
 
   return {

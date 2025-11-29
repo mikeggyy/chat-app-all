@@ -11,7 +11,7 @@ interface Props {
   characterUnlockCards?: number;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   characterName: '角色',
   remainingMessages: 0,
   dailyAdLimit: 10,

@@ -15,20 +15,6 @@ import {
 // ==================== 類型定義 ====================
 
 /**
- * 用戶資產響應數據
- */
-interface UserAssetsResponse {
-  createCards?: number;
-}
-
-/**
- * 限制數據響應
- */
-interface LimitsResponse {
-  remainingFreeCreations?: number;
-}
-
-/**
  * 角色外觀數據
  */
 interface AppearanceData {

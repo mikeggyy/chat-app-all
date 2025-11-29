@@ -75,7 +75,7 @@ const loadNotification = (): void => {
   // 模擬 API 請求
   setTimeout(() => {
     const id = notificationId.value;
-    notification.value = getNotificationById(id) as NotificationDetail | null;
+    notification.value = getNotificationById(id) as unknown as NotificationDetail | null;
     isLoading.value = false;
 
     // 標記為已讀

@@ -21,13 +21,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 📌 最近重要更新
 
-- **2025-01-20**: 🔧 **價格不一致問題修復** - 統一使用 `asset_packages` 集合，修正 25 個價格問題（詳見 [PRICE_FIX_SUMMARY_2025-01-20.md](PRICE_FIX_SUMMARY_2025-01-20.md)）
-- **2025-01-20**: 🛠️ **角色創建資料保存修復** - 修正靜默錯誤吞併問題，確保 persona 欄位正確保存（詳見 [CHARACTER_CREATION_FIX_SUMMARY.md](CHARACTER_CREATION_FIX_SUMMARY.md)）
-- **2025-01-15**: 🎉 **後端 API 測試 100% 完成** - 31 APIs, 688 tests, 10 大系統全覆蓋（含認證系統）（詳見 [chat-app/TEST_SUMMARY_2025-01-15_FINAL_COMPLETE.md](chat-app/TEST_SUMMARY_2025-01-15_FINAL_COMPLETE.md)）
-- **2025-01-12**: 代碼清理與健康度提升（詳見 [CHANGELOG.md](CHANGELOG.md)）
+- **2025-01**: 價格不一致問題修復、角色創建資料保存修復
+- **2025-01**: 後端 API 測試 100% 完成 - 31 APIs, 688 tests
 - **2025-01**: 安全性增強 - 日誌脫敏、速率限制配置、統一錯誤碼
-- **2025-01**: 冪等性系統優化 - 統一 TTL 配置
-- **2024**: Cloudflare Pages 部署支援（快速指南：[docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md)）
+- **2024**: Cloudflare Pages 部署支援（[docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md)）
 
 ## 首次設置檢查清單
 
@@ -581,13 +578,11 @@ console.log(user.customClaims);
 - **[CHANGELOG.md](CHANGELOG.md)** - 版本更新日誌 📋
 - **[PORTS.md](PORTS.md)** - 端口配置詳細說明
 - **[會員機制說明.md](docs/會員機制說明.md)** - 會員系統完整說明
-- **[docs/CODE_CLEANUP_2025-01.md](docs/CODE_CLEANUP_2025-01.md)** - 代碼清理報告（2025年1月）🧹
 
 ### 部署相關文檔
 
 - **[docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md)** ⚡ - Cloudflare Pages 快速部署（5 分鐘）
 - **[docs/cloudflare-pages-deployment.md](docs/cloudflare-pages-deployment.md)** - Cloudflare Pages 完整部署指南
-- **[docs/cloudflare-pages-migration-summary.md](docs/cloudflare-pages-migration-summary.md)** - 遷移總結和檢查清單
 
 ### AI 服務文檔
 
@@ -622,18 +617,11 @@ console.log(user.customClaims);
 
 ## 已知問題與修復記錄
 
-本專案持續追蹤和修復問題，以下是重要修復的文檔：
-
-### 2025-01 修復
-- **[PRICE_FIX_SUMMARY_2025-01-20.md](PRICE_FIX_SUMMARY_2025-01-20.md)** - 商品價格不一致修復（25 個問題）
-- **[CHARACTER_CREATION_FIX_SUMMARY.md](CHARACTER_CREATION_FIX_SUMMARY.md)** - 角色創建資料保存修復
-- **[CHARACTER_CREATION_SCHEMA_FIX.md](CHARACTER_CREATION_SCHEMA_FIX.md)** - Schema 驗證修復
-- **[TESTING_CHARACTER_CREATION_FIX.md](TESTING_CHARACTER_CREATION_FIX.md)** - 角色創建測試修復
-
-### 功能整合指南
-- **[GIFT_PHOTO_SELECTION_GUIDE.md](GIFT_PHOTO_SELECTION_GUIDE.md)** - 送禮物照片選擇功能整合
-
-這些文檔記錄了問題的根本原因分析、修復方案和測試結果，可作為未來類似問題的參考。
+歷史修復文檔已歸檔至 `docs/archived/fixes-2025/`，包含：
+- 商品價格不一致修復
+- 角色創建資料保存修復
+- CSRF 安全修復
+- 錢包同步修復
 
 ## 常見任務
 

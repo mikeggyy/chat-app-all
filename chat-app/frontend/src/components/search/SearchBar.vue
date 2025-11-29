@@ -1,22 +1,25 @@
 <script setup lang="ts">
-// Types
-
 import { ref } from "vue";
 import { MagnifyingGlassIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({
-  modelValue: {
-    type: String,
-    default: "",
-  },
+interface Props {
+  modelValue?: string;
+}
+
+withDefaults(defineProps<Props>(), {
+  modelValue: "",
 });
 
-const emit = defineEmits(["update:modelValue", "submit"]);
+const emit = defineEmits<{
+  "update:modelValue": [value: string];
+  submit: [];
+}>();
 
-const searchInputRef = ref(null);
+const searchInputRef = ref<HTMLInputElement | null>(null);
 
-const handleInput = (event) => {
-  emit("update:modelValue", event.target.value);
+const handleInput = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit("update:modelValue", target.value);
 };
 
 const handleSubmit = () => {

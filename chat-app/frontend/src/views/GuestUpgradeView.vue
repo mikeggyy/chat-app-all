@@ -17,14 +17,22 @@ const featureName = (route.query.feature as string) || '完整功能';
 
 const handleGoogleLogin = async (): Promise<void> => {
   try {
-    const { profile } = await signInWithGoogle();
+    const signInResult = await signInWithGoogle();
+    const user = signInResult.result?.user;
 
     // 清除測試 session 和遊客計數
     clearTestSession();
     resetGuestMessageCount();
 
-    // 設定用戶資料
-    setUserProfile(profile);
+    // 設定用戶資料（從 Firebase user 物件提取）
+    if (user) {
+      setUserProfile({
+        id: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || '',
+      } as any);
+    }
 
     // 導向首頁
     router.push({ name: 'match' });

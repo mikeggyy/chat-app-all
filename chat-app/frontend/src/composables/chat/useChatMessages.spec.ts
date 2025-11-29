@@ -51,6 +51,20 @@ vi.mock('../../utils/conversationCache', () => ({
   clearPendingMessages: vi.fn(),
 }));
 
+// Mock ApiCache service to prevent timer conflicts with vi.useFakeTimers()
+vi.mock('../../services/apiCache.service', () => ({
+  apiCache: {
+    get: vi.fn(),
+    set: vi.fn(),
+    has: vi.fn(() => false),
+    delete: vi.fn(),
+    clear: vi.fn(),
+    getStats: vi.fn(() => ({ size: 0, hits: 0, misses: 0 })),
+  },
+  cacheKeys: {},
+  cacheTTL: {},
+}));
+
 describe('useChatMessages - 聊天消息管理測試', () => {
   let useChatMessages: any;
   let conversationUtils: any;
@@ -300,7 +314,7 @@ describe('useChatMessages - 聊天消息管理測試', () => {
           text: 'AI response',
           createdAt: '2025-01-13T10:00:00Z',
         },
-        history: [{ id: 'ai-msg-1', text: 'AI response' }],
+        messages: [{ id: 'ai-msg-1', role: 'partner', text: 'AI response' }], // ✅ 修復：應該是 messages 而不是 history
       };
 
       conversationUtils.requestAiReply.mockResolvedValueOnce(mockReply);
@@ -348,7 +362,10 @@ describe('useChatMessages - 聊天消息管理測試', () => {
   });
 
   describe('重試機制', () => {
-    it('應該在發送失敗時自動重試', async () => {
+    it.skip('應該在發送失敗時自動重試', async () => {
+      // ✅ 2025-11-24 修復：已移除自動重試機制
+      // 新行為：發送失敗時直接刪除消息
+      // 此測試基於舊的自動重試行為，已過時
       conversationUtils.appendConversationMessages
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({ history: [] });
@@ -363,7 +380,10 @@ describe('useChatMessages - 聊天消息管理測試', () => {
       expect(chat.messages.value[0].state).toBe('sent');
     });
 
-    it('應該在達到最大重試次數後標記為失敗', async () => {
+    it.skip('應該在達到最大重試次數後標記為失敗', async () => {
+      // ✅ 2025-11-24 修復：已移除自動重試機制
+      // 新行為：發送失敗時直接刪除消息
+      // 此測試基於舊的自動重試行為，已過時
       conversationUtils.appendConversationMessages.mockRejectedValue(new Error('Network error'));
 
       const chat = useChatMessages('char-001');
@@ -379,7 +399,10 @@ describe('useChatMessages - 聊天消息管理測試', () => {
       expect(failedMsg.retryCount).toBe(4); // 初始 + 3 次重試
     });
 
-    it('應該使用遞增的重試延遲', async () => {
+    it.skip('應該使用遞增的重試延遲', async () => {
+      // ✅ 2025-11-24 修復：已移除自動重試機制
+      // 新行為：發送失敗時直接刪除消息
+      // 此測試基於舊的自動重試行為，已過時
       conversationUtils.appendConversationMessages.mockRejectedValue(new Error('Network error'));
 
       const chat = useChatMessages('char-001');
@@ -396,6 +419,20 @@ describe('useChatMessages - 聊天消息管理測試', () => {
       // 第三次重試：10000ms
       await vi.advanceTimersByTimeAsync(10000);
       expect(conversationUtils.appendConversationMessages).toHaveBeenCalledTimes(4);
+    });
+
+    it('應該在發送失敗時刪除消息（新行為）', async () => {
+      // ✅ 2025-11-24 修復：發送失敗時直接刪除消息
+      conversationUtils.appendConversationMessages.mockRejectedValue(new Error('Network error'));
+
+      const chat = useChatMessages('char-001');
+      await chat.sendMessage('Test');
+
+      await nextTick();
+
+      // 新行為：消息應該被刪除
+      expect(chat.messages.value.length).toBe(0);
+      expect(conversationUtils.appendConversationMessages).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -516,7 +553,10 @@ describe('useChatMessages - 聊天消息管理測試', () => {
       );
     });
 
-    it('應該在無法獲取 token 時標記消息為失敗', async () => {
+    it.skip('應該在無法獲取 token 時標記消息為失敗', async () => {
+      // ✅ 2025-11-24 修復：發送失敗時直接刪除消息
+      // 新行為：無法獲取 token 會導致消息被刪除
+      // 此測試基於舊的失敗標記行為，已過時
       useFirebaseAuth.mockReturnValueOnce({
         getCurrentUserIdToken: vi.fn(async () => null),
       });
@@ -531,6 +571,22 @@ describe('useChatMessages - 聊天消息管理測試', () => {
       const msg = chat.messages.value.find((m: any) => m.text === 'Test');
       expect(msg.state).toBe('failed');
       expect(msg.error).toBeDefined();
+    });
+
+    it('應該在無法獲取 token 時刪除消息（新行為）', async () => {
+      // ✅ 2025-11-24 修復：發送失敗時直接刪除消息
+      useFirebaseAuth.mockReturnValueOnce({
+        getCurrentUserIdToken: vi.fn(async () => null),
+      });
+
+      const { useChatMessages: composable } = await import('./useChatMessages.js');
+      const chat = composable('char-001');
+
+      await chat.sendMessage('Test');
+      await nextTick();
+
+      // 新行為：消息應該被刪除
+      expect(chat.messages.value.length).toBe(0);
     });
   });
 

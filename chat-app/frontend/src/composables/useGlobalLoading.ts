@@ -20,8 +20,10 @@ export interface WithGlobalLoadingOptions {
  */
 export interface UseGlobalLoadingReturn {
   isGlobalLoading: ComputedRef<boolean>;
+  activeRequestCount: ComputedRef<number>;
   startLoading: () => void;
   stopLoading: () => void;
+  resetLoading: () => void;
   withGlobalLoading: <T>(fn: () => T | Promise<T>, options?: WithGlobalLoadingOptions) => Promise<T>;
   temporarilyDisable: <T>(fn?: () => T | Promise<T>) => Promise<T | void>;
 }
@@ -31,17 +33,28 @@ export interface UseGlobalLoadingReturn {
 const activeRequests: Ref<number> = ref(0);
 const isForcedHidden: Ref<boolean> = ref(false);
 
+// ✅ 修復：添加最大請求數限制，防止計數器失控
+const MAX_ACTIVE_REQUESTS = 100;
+
 const isGlobalLoading: ComputedRef<boolean> = computed(
   () => !isForcedHidden.value && activeRequests.value > 0
 );
+
+// ✅ 修復：暴露活動請求計數以便調試
+const activeRequestCount: ComputedRef<number> = computed(() => activeRequests.value);
 
 // ==================== 工具函數 ====================
 
 /**
  * 開始加載
+ * ✅ 修復：添加最大請求數限制，防止計數器失控
  */
 const startLoading = (): void => {
-  activeRequests.value += 1;
+  if (activeRequests.value < MAX_ACTIVE_REQUESTS) {
+    activeRequests.value += 1;
+  } else {
+    console.warn('[useGlobalLoading] 達到最大活動請求數限制，可能存在計數器洩漏');
+  }
 };
 
 /**
@@ -51,6 +64,18 @@ const stopLoading = (): void => {
   if (activeRequests.value > 0) {
     activeRequests.value -= 1;
   }
+};
+
+/**
+ * 重置加載狀態
+ * ✅ 修復：提供強制重置功能，用於計數器卡住時的恢復
+ */
+const resetLoading = (): void => {
+  if (activeRequests.value !== 0) {
+    console.warn(`[useGlobalLoading] 重置計數器，之前的值: ${activeRequests.value}`);
+  }
+  activeRequests.value = 0;
+  isForcedHidden.value = false;
 };
 
 /**
@@ -100,12 +125,14 @@ const temporarilyDisable = async <T>(
  */
 export const useGlobalLoading = (): UseGlobalLoadingReturn => ({
   isGlobalLoading,
+  activeRequestCount,
   startLoading,
   stopLoading,
+  resetLoading,
   withGlobalLoading,
   temporarilyDisable,
 });
 
 // ==================== 命名導出（向後兼容） ====================
 
-export { isGlobalLoading, withGlobalLoading, temporarilyDisable };
+export { isGlobalLoading, activeRequestCount, withGlobalLoading, temporarilyDisable, resetLoading };

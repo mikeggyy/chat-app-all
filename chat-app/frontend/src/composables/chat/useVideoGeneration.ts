@@ -296,15 +296,6 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         skipGlobalLoading: true, // ✅ 允許用戶繼續聊天
       });
 
-      // 🔍 詳細調試日誌 - 檢查回應格式
-      console.log('[DEBUG] ===== 影片 API 原始回應 =====');
-      console.log('[DEBUG] 回應類型:', typeof videoResult);
-      console.log('[DEBUG] 完整回應:', JSON.stringify(videoResult, null, 2));
-      console.log('[DEBUG] 是否有 videoUrl:', videoResult && 'videoUrl' in videoResult);
-      console.log('[DEBUG] videoUrl 值:', videoResult?.videoUrl);
-      console.log('[DEBUG] 是否有 data.videoUrl:', videoResult?.data?.videoUrl);
-      console.log('[DEBUG] ============================');
-
       const normalizedResult =
         videoResult && typeof videoResult === 'object' && 'videoUrl' in videoResult
           ? videoResult
@@ -318,14 +309,6 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
       });
 
       if (!normalizedResult || !normalizedResult.videoUrl) {
-        // 🔍 詳細錯誤日誌
-        console.error('[DEBUG] ===== 影片生成失敗檢查 =====');
-        console.error('[DEBUG] hasNormalizedResult:', Boolean(normalizedResult));
-        console.error('[DEBUG] normalizedResult:', normalizedResult);
-        console.error('[DEBUG] hasVideoUrl:', Boolean(normalizedResult?.videoUrl));
-        console.error('[DEBUG] videoUrl:', normalizedResult?.videoUrl);
-        console.error('[DEBUG] ================================');
-
         // 移除臨時消息
         const tempIndex = messages.value.findIndex((m) => m.id === tempVideoMessageId);
         if (tempIndex !== -1) {
@@ -386,7 +369,7 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         messageListRef.value?.scrollToBottom();
 
         // ✅ 觸發影片完成通知（不使用 toast）
-        if (deps.onVideoCompleted) {
+        if (deps.onVideoCompleted && aiVideoMessage.id) {
           deps.onVideoCompleted(aiVideoMessage.id);
         }
 

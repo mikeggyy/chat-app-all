@@ -353,7 +353,7 @@ onBeforeUnmount(() => {
     <!-- 背景輪播 -->
     <MatchBackground
       :carousel-matches="carousel.carouselMatches.value"
-      :background-track-style="carousel.backgroundTrackStyle.value"
+      :background-track-style="(carousel.backgroundTrackStyle.value as any)"
       :is-image-loaded="carousel.isImageLoaded"
     />
 

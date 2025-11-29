@@ -7,6 +7,8 @@
  * - 影片限制處理
  */
 
+import { onBeforeUnmount } from 'vue';
+
 /**
  * 照片選擇器模態框數據
  */
@@ -105,6 +107,9 @@ export function usePhotoVideoHandler(deps: UsePhotoVideoHandlerDeps): UsePhotoVi
     getGiftById,
   } = deps;
 
+  // ✅ 修復：追蹤禮物動畫定時器以便清理
+  let giftAnimationTimer: ReturnType<typeof setTimeout> | null = null;
+
   // ==========================================
   // 核心方法
   // ==========================================
@@ -138,8 +143,14 @@ export function usePhotoVideoHandler(deps: UsePhotoVideoHandlerDeps): UsePhotoVi
           // 立即顯示禮物動畫
           showGiftAnimation(gift.emoji, gift.name);
 
+          // ✅ 修復：清理之前的定時器（如果存在）
+          if (giftAnimationTimer) {
+            clearTimeout(giftAnimationTimer);
+          }
           // 2秒後自動隱藏動畫
-          setTimeout(() => {
+          // ✅ 修復：追蹤定時器
+          giftAnimationTimer = setTimeout(() => {
+            giftAnimationTimer = null;
             closeGiftAnimation();
           }, 2000);
         }
@@ -206,6 +217,14 @@ export function usePhotoVideoHandler(deps: UsePhotoVideoHandlerDeps): UsePhotoVi
     closeVideoLimit();
     navigateToMembership();
   };
+
+  // ✅ 修復：組件卸載時清理定時器
+  onBeforeUnmount(() => {
+    if (giftAnimationTimer) {
+      clearTimeout(giftAnimationTimer);
+      giftAnimationTimer = null;
+    }
+  });
 
   // ==========================================
   // 返回 API

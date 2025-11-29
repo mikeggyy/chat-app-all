@@ -1,21 +1,26 @@
 <script setup lang="ts">
 // Types
+interface GenderOption {
+  id: string;
+  label: string;
+}
 
-const props = defineProps({
-  selectedGender: {
-    type: String,
-    default: "all",
-  },
-  genderOptions: {
-    type: Array,
-    required: true,
-  },
+interface Props {
+  selectedGender?: string;
+  genderOptions: GenderOption[];
+}
+
+withDefaults(defineProps<Props>(), {
+  selectedGender: "all",
 });
 
-const emit = defineEmits(["update:selectedGender"]);
+const emit = defineEmits<{
+  "update:selectedGender": [value: string];
+}>();
 
-const updateGender = (event) => {
-  emit("update:selectedGender", event.target.value);
+const updateGender = (event: Event) => {
+  const target = event.target as HTMLSelectElement;
+  emit("update:selectedGender", target.value);
 };
 </script>
 

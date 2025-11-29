@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-type PotionType = 'memoryBoost' | 'brainBoost';
+type PotionType = 'memoryBoost' | 'brainBoost' | '';
 
 interface Props {
   isOpen: boolean;
-  potionType: PotionType;
+  potionType?: PotionType;
   characterName?: string;
   remainingCount?: number;
 }
@@ -18,6 +18,7 @@ interface PotionInfo {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  potionType: 'memoryBoost',
   characterName: "",
   remainingCount: 0,
 });

@@ -35,7 +35,7 @@ interface Feature {
   title: string;
   detail: string;
   icon: any; // Component type
-  badge?: string;
+  badge?: string | null;
   [key: string]: any;
 }
 

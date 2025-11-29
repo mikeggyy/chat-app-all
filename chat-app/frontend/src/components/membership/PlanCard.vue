@@ -37,32 +37,20 @@
 <script setup lang="ts">
 import { ArrowRightIcon } from '@heroicons/vue/24/solid';
 import LoadingSpinner from '../LoadingSpinner.vue';
+import type { MembershipTier } from '../../config/membership';
 
 /**
  * PlanCard - 會員方案卡片組件
  * 職責：顯示單一會員方案的詳細信息和升級按鈕
  */
 
-// Types
-interface Tier {
-  id: string;
-  label: string;
-  highlight: string;
-  highlightColor: string;
-  headline: string;
-  description: string;
-  priceTag: string;
-  pricePeriod: string;
-  [key: string]: any;
-}
-
 interface Props {
-  tier: Tier;
+  tier: MembershipTier;
   isUpgrading?: boolean;
 }
 
 interface Emits {
-  (e: 'upgrade', tier: Tier): void;
+  (e: 'upgrade', tier: MembershipTier): void;
 }
 
 withDefaults(defineProps<Props>(), {

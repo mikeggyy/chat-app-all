@@ -1,32 +1,39 @@
 <script setup lang="ts">
-// Types
-
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
 import LazyImage from "../common/LazyImage.vue";
 
-defineProps({
-  entry: {
-    type: Object,
-    required: true,
-  },
-  formatScore: {
-    type: Function,
-    required: true,
-  },
-});
+interface RankingEntry {
+  id: string;
+  name: string;
+  avatar: string;
+  score: number;
+  rank: number;
+  subtitle?: string;
+  handle?: string;
+  title?: string;
+}
 
-const emit = defineEmits(["navigate"]);
+interface Props {
+  entry: RankingEntry;
+  formatScore: (score: number) => string;
+}
+
+defineProps<Props>();
+
+const emit = defineEmits<{
+  navigate: [];
+}>();
 
 const handleNavigate = () => {
   emit("navigate");
 };
 
-const handleActionClick = (event) => {
+const handleActionClick = (event: MouseEvent) => {
   event.stopPropagation();
   emit("navigate");
 };
 
-const handleKeydown = (event) => {
+const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
     emit("navigate");

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import AIMagicianButton from "./AIMagicianButton.vue";
 import { useCharacterCreationStore } from "@/stores/characterCreation";
 
@@ -34,7 +33,7 @@ interface Emits {
   (e: "update:prompt", value: string): void;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   selectedResultImage: "",
   selectedResultAlt: "生成角色預覽",
 });

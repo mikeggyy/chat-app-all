@@ -40,6 +40,8 @@ export function useChatMessages(partnerId: string | Ref<string>) {
         const token = await firebaseAuth.getCurrentUserIdToken();
         if (token) return token;
       } catch (error) {
+        console.warn('[useChatMessages] 獲取 token 失敗:', error);
+        // 繼續執行，下面會拋出 Error
       }
     }
 
@@ -193,7 +195,7 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     charId: string,
     text: string,
     userMessageId: string,
-    retryCount: number = 0
+    _retryCount: number = 0
   ): Promise<void> => {
     try {
       isReplying.value = true;

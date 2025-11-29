@@ -10,15 +10,6 @@ interface Conversation {
 }
 
 /**
- * 分頁載入對話列表 API 響應接口
- */
-interface PaginatedConversationsResponse {
-  conversations: Conversation[];
-  nextCursor: string | null;
-  hasMore: boolean;
-}
-
-/**
  * 載入更多返回值接口
  */
 interface LoadMoreResult {

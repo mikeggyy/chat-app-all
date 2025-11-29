@@ -116,8 +116,9 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
         // ✅ 檢查圖片大小（防止超大圖片）
         const contentLength = response.headers.get('content-length');
         const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-        if (contentLength && parseInt(contentLength) > MAX_IMAGE_SIZE) {
-          throw new Error(`角色圖片過大 (${Math.round(parseInt(contentLength) / 1024 / 1024)} MB)，請使用小於 5MB 的圖片`);
+        const contentSize = contentLength ? parseInt(contentLength, 10) : 0;
+        if (!isNaN(contentSize) && contentSize > MAX_IMAGE_SIZE) {
+          throw new Error(`角色圖片過大 (${Math.round(contentSize / 1024 / 1024)} MB)，請使用小於 5MB 的圖片`);
         }
 
         // ✅ P0 優化：arrayBuffer() 也在 AbortController 保護下（同一個 signal）

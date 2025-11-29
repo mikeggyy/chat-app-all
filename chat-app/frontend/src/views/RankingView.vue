@@ -9,7 +9,6 @@ import {
   watch,
   type Ref,
   type ShallowRef,
-  type ComputedRef,
 } from "vue";
 import { useRouter } from "vue-router";
 import {
@@ -61,12 +60,13 @@ interface Metadata {
 }
 
 interface DecoratedEntry {
-  chatId: string;
+  id: string;
+  chatId: string | null;
   avatar: string;
   name: string;
   subtitle: string;
   score: number;
-  rank?: number;
+  rank: number;
   stats: Metadata;
   [key: string]: any;
 }
@@ -232,6 +232,10 @@ const decorateEntry = (entry: RankingEntry | null): DecoratedEntry | null => {
     return null;
   }
 
+  // 確保 id 和 rank 欄位存在
+  const entryId = normalizeIdentifier(entry.id) || `entry-${entry.rank ?? Date.now()}`;
+  const entryRank = typeof entry.rank === 'number' ? entry.rank : 0;
+
   const metadata = getEntryMetadata(entry);
   const chatId = resolveEntryChatId(entry);
 
@@ -267,6 +271,8 @@ const decorateEntry = (entry: RankingEntry | null): DecoratedEntry | null => {
 
   return {
     ...entry,
+    id: entryId,
+    rank: entryRank,
     chatId,
     avatar,
     name: displayName || "熱門角色",
@@ -281,7 +287,7 @@ const decorateEntry = (entry: RankingEntry | null): DecoratedEntry | null => {
 };
 
 const handleEntryNavigate = (entry: DecoratedEntry | RankingEntry): void => {
-  const chatId = resolveEntryChatId(entry);
+  const chatId = resolveEntryChatId(entry as RankingEntry);
   if (chatId) {
     router.push({ name: "chat", params: { id: chatId } });
     return;
@@ -326,7 +332,9 @@ const decoratedPodiumEntries = computed(() =>
       }
       return decorated;
     })
-    .filter((entry) => entry && [1, 2, 3].includes(entry.rank))
+    .filter((entry): entry is DecoratedEntry =>
+      entry !== null && entry !== undefined && [1, 2, 3].includes(entry.rank)
+    )
 );
 
 const decoratedEntries = computed(() =>
@@ -340,7 +348,7 @@ const decoratedEntries = computed(() =>
       decorationCache.set(cacheKey, decorated);
     }
     return decorated;
-  }).filter(Boolean)
+  }).filter((entry): entry is DecoratedEntry => entry !== null && entry !== undefined)
 );
 
 const themeName = computed(() =>
@@ -366,18 +374,14 @@ const updateLine = computed(() =>
 );
 
 const podiumByRank = computed(() => {
-  const map = {
-    first: null,
-    second: null,
-    third: null,
-  };
+  const map: { first?: DecoratedEntry; second?: DecoratedEntry; third?: DecoratedEntry } = {};
 
   for (const entry of decoratedPodiumEntries.value) {
-    if (entry.rank === 1) {
+    if (entry && entry.rank === 1) {
       map.first = entry;
-    } else if (entry.rank === 2) {
+    } else if (entry && entry.rank === 2) {
       map.second = entry;
-    } else if (entry.rank === 3) {
+    } else if (entry && entry.rank === 3) {
       map.third = entry;
     }
   }
@@ -483,7 +487,7 @@ const loadRankings = async ({ reset = false }: { reset?: boolean } = {}): Promis
       ? incomingEntries
       : [...entries.value, ...incomingEntries];
 
-    updatedAt.value = data?.updatedAt ?? updatedAt.value;
+    updatedAt.value = typeof data?.updatedAt === 'string' ? data.updatedAt : updatedAt.value;
 
     if (typeof data?.nextOffset === "number") {
       offset.value = data.nextOffset;
@@ -498,11 +502,11 @@ const loadRankings = async ({ reset = false }: { reset?: boolean } = {}): Promis
     } else {
       hasMore.value = incomingEntries.length === RANKING_PAGE_SIZE;
     }
-  } catch (error) {
+  } catch (error: unknown) {
     if (requestToken !== currentToken) {
       return;
     }
-    errorMessage.value = error?.message ?? "排行榜資料載入失敗，請稍後再試。";
+    errorMessage.value = (error as Error)?.message ?? "排行榜資料載入失敗，請稍後再試。";
   } finally {
     if (requestToken === currentToken) {
       loading.value = false;
@@ -624,13 +628,13 @@ watch(
     />
 
     <RankingPeriodSelector
-      :periods="PERIOD_OPTIONS"
+      :periods="(PERIOD_OPTIONS as PeriodOption[])"
       :active-period="activePeriod"
       @change="handlePeriodChange"
     />
 
     <RankingPodium
-      :podium-by-rank="podiumByRank"
+      :podium-by-rank="(podiumByRank as any)"
       :format-score="formatScore"
       :is-ready="podiumReady"
       @navigate="handleEntryNavigate"
@@ -638,7 +642,7 @@ watch(
 
     <RankingList
       ref="rankingListRef"
-      :entries="decoratedEntries"
+      :entries="(decoratedEntries as any)"
       :format-score="formatScore"
       :is-loading="isInitialLoading"
       :is-loading-more="isLoadingMore"

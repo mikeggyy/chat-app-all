@@ -4,7 +4,7 @@
  * 管理用戶會員等級、升級、取消等功能
  */
 
-import { ref, computed, type Ref, type ComputedRef } from 'vue';
+import { ref, computed, onBeforeUnmount, type Ref, type ComputedRef } from 'vue';
 import { apiJson } from '../utils/api.js';
 import { logger } from '../utils/logger';
 import type { MembershipTier, MembershipInfo, MembershipPricing, UpgradeProgress } from '../types';
@@ -89,6 +89,9 @@ const upgradeProgress: Ref<UpgradeProgress> = ref({
  * 會員系統 composable
  */
 export function useMembership(): UseMembershipReturn {
+  // ✅ 修復：追蹤定時器以便清理
+  let progressTimer: ReturnType<typeof setTimeout> | null = null;
+
   /**
    * 載入會員信息
    * @param userId - 用戶 ID（必須提供）
@@ -218,7 +221,12 @@ export function useMembership(): UseMembershipReturn {
     } finally {
       isLoading.value = false;
       // 清除進度（延遲 2 秒）
-      setTimeout(() => {
+      // ✅ 修復：追蹤定時器以便清理
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+      }
+      progressTimer = setTimeout(() => {
+        progressTimer = null;
         upgradeProgress.value = {
           step: '',
           message: '',
@@ -319,6 +327,14 @@ export function useMembership(): UseMembershipReturn {
   const getFeatureValue = (feature: keyof MembershipFeatures): number | boolean | undefined => {
     return membershipInfo.value.features[feature];
   };
+
+  // ✅ 修復：組件卸載時清理定時器
+  onBeforeUnmount(() => {
+    if (progressTimer) {
+      clearTimeout(progressTimer);
+      progressTimer = null;
+    }
+  });
 
   return {
     // State

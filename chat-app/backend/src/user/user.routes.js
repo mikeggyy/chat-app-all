@@ -76,7 +76,7 @@ userRouter.get("/", requireFirebaseAuth, requireAdmin, relaxedRateLimiter, async
     const { limit, startAfter } = req.query;
 
     const result = await getAllUsers({
-      limit: limit ? parseInt(limit) : 100,
+      limit: limit ? parseInt(limit, 10) : 100,
       startAfter: startAfter || null,
     });
 

@@ -296,7 +296,7 @@ onBeforeUnmount(() => {
     <VoiceFilters
       :selected-gender="selectedGender"
       :gender-options="genderOptions"
-      @update:selected-gender="selectedGender = $event"
+      @update:selected-gender="selectedGender = ($event as 'all' | 'FEMALE' | 'MALE')"
     />
 
     <section class="voice__list" aria-label="可選聲線">
@@ -324,7 +324,7 @@ onBeforeUnmount(() => {
     <!-- 角色創建成功彈窗 -->
     <CharacterCreatedModal
       v-if="createdCharacter"
-      :character="createdCharacter"
+      :character="(createdCharacter as any)"
       :is-visible="isCharacterCreatedModalVisible"
       @close="handleCloseModal"
       @view-character="handleViewCharacter"

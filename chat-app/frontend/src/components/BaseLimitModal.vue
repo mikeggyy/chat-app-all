@@ -215,7 +215,7 @@ watch(
                     variant="ad"
                     :icon="FilmIcon"
                     title="觀看廣告解鎖"
-                    :description="config.adDescription"
+                    :description="config.adDescription ?? '觀看廣告以繼續使用'"
                     :info="`今日剩餘次數：<strong>${remainingAds}</strong> / ${dailyAdLimit}`"
                     :button-text="isWatchingAd ? '載入中...' : '觀看廣告'"
                     :disabled="isWatchingAd"
@@ -248,7 +248,7 @@ watch(
                         : '使用解鎖卡'
                       : '前往購買'
                   "
-                  :button-icon="hasUnlockCards ? null : ShoppingCartIcon"
+                  :button-icon="hasUnlockCards ? undefined : ShoppingCartIcon"
                   @click="hasUnlockCards ? handleUseUnlockCard() : handleBuyUnlockCard()"
                 />
 
@@ -257,15 +257,15 @@ watch(
                   v-if="type !== 'photo' || photoVipConfig"
                   variant="vip"
                   :icon="BoltIcon"
-                  :title="type === 'photo' ? photoVipConfig.title : config.vipTitle"
+                  :title="type === 'photo' && photoVipConfig ? photoVipConfig.title : (config.vipTitle ?? '升級會員')"
                   :description="
-                    type === 'photo' ? photoVipConfig.description : config.vipDescription
+                    type === 'photo' && photoVipConfig ? photoVipConfig.description : (config.vipDescription ?? '享受更多功能')
                   "
                   :benefits="
-                    type === 'photo' ? photoVipConfig.benefits : config.vipBenefits
+                    type === 'photo' && photoVipConfig ? photoVipConfig.benefits : (config.vipBenefits ?? [])
                   "
                   :button-text="
-                    type === 'photo' ? photoVipConfig.buttonText : '立即升級'
+                    type === 'photo' && photoVipConfig ? photoVipConfig.buttonText : '立即升級'
                   "
                   @click="handleUpgrade"
                 />

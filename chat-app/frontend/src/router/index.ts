@@ -423,9 +423,9 @@ routingScope.run(() => {
   };
 
   startTokenMonitor();
-  checkTokenAndRedirect().catch((_error) => {
+  checkTokenAndRedirect().catch((error) => {
     if (import.meta.env.DEV) {
-
+      console.warn('[Router] Token check failed:', error);
     }
   });
 
@@ -441,7 +441,7 @@ routingScope.run(() => {
         await router.isReady();
       } catch (error) {
         if (import.meta.env.DEV) {
-
+          console.warn('[Router] Router not ready:', error);
         }
       }
 
@@ -459,9 +459,9 @@ routingScope.run(() => {
 
           try {
             await router.replace({ name: targetRoute });
-          } catch (_error) {
+          } catch (routeError) {
             if (import.meta.env.DEV) {
-
+              console.warn('[Router] Navigation to', targetRoute, 'failed:', routeError);
             }
           }
         }
@@ -471,7 +471,7 @@ routingScope.run(() => {
           await router.replace({ name: "login" });
         } catch (error) {
           if (import.meta.env.DEV) {
-
+            console.warn('[Router] Navigation to login failed:', error);
           }
         }
       }

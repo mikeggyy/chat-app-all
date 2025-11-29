@@ -65,14 +65,6 @@ export interface ConversationThread {
 export type TabType = 'all' | 'favorite';
 
 /**
- * API 收藏響應
- */
-interface FavoritesResponse {
-  matches?: Match[];
-  [key: string]: any;
-}
-
-/**
  * useChatListState 選項
  */
 export interface UseChatListStateOptions {

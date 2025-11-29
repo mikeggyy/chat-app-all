@@ -37,9 +37,9 @@ const {
   loadPackages,
   purchasePackage,
   resetCoins,
-  isLoading: isCoinsLoading,
+  isLoading: _isCoinsLoading,
 } = useCoins();
-const { membership, loadMembership } = useMembership();
+const { membershipInfo, loadMembership } = useMembership();
 const { error: showError } = useToast();
 const { dialogState, handleConfirm, handleCancel } = usePurchaseConfirm();
 
@@ -59,10 +59,10 @@ const {
 } = useShopCategories();
 
 // 使用商品管理 Composable
-const { filteredItems, COIN_ICON_PATH } = useShopItems(
-  packages,
-  assetPackages,
-  potionPackages,
+const { filteredItems, COIN_ICON_PATH: _COIN_ICON_PATH } = useShopItems(
+  packages as any,
+  assetPackages as any,
+  potionPackages as any,
   activeCategory
 );
 
@@ -70,7 +70,7 @@ const { filteredItems, COIN_ICON_PATH } = useShopItems(
 const { isPurchasing, isPurchasingItem, handlePurchase } = useShopPurchase({
   user,
   balance,
-  membership,
+  membership: membershipInfo,
   activeCategory,
   loadBalance,
   purchasePackage,
@@ -118,7 +118,7 @@ const loadPotionPackages = async () => {
 watch(
   () => route.query.category,
   (newCategory) => {
-    updateCategoryFromRoute(newCategory);
+    updateCategoryFromRoute(newCategory as string | undefined);
   }
 );
 
@@ -126,7 +126,7 @@ watch(
 onMounted(async () => {
   // 檢查 URL query 參數並設置初始分類
   if (route.query.category) {
-    initializeCategoryFromQuery(route.query.category);
+    initializeCategoryFromQuery(route.query.category as string);
   }
 
   // 加載所有商品數據（公開 API，不需要認證）
@@ -159,8 +159,8 @@ onMounted(async () => {
         loadPackages({ skipGlobalLoading: true }),
         loadMembership(userId, { skipGlobalLoading: true }),
       ]);
-    } catch (err) {
-      const message = err?.message || "載入資料失敗";
+    } catch (err: unknown) {
+      const message = (err as Error)?.message || "載入資料失敗";
       showError(message);
     }
   }
@@ -190,10 +190,10 @@ onMounted(async () => {
       :is-purchasing="isPurchasing"
       :is-purchasing-item="isPurchasingItem"
       :balance="balance"
-      :membership-tier="membership?.membershipTier || 'free'"
+      :membership-tier="membershipInfo?.tier || 'free'"
       :is-coin-icon-available="isCoinIconAvailable"
       :category-description="activeCategoryInfo?.description"
-      @purchase="handlePurchase"
+      @purchase="(handlePurchase as any)"
       @coin-icon-error="handleCoinIconError"
     />
 

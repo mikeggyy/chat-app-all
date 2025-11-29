@@ -1,31 +1,33 @@
 <script setup lang="ts">
-// Types
-
 import LazyImage from "../common/LazyImage.vue";
 
-defineProps({
-  rank: {
-    type: Number,
-    required: true,
-    validator: (value) => [1, 2, 3].includes(value),
-  },
-  entry: {
-    type: Object,
-    required: true,
-  },
-  formatScore: {
-    type: Function,
-    required: true,
-  },
-});
+interface RankingEntry {
+  id: string;
+  name: string;
+  avatar: string;
+  score: number;
+  subtitle?: string;
+  handle?: string;
+  title?: string;
+}
 
-const emit = defineEmits(["navigate"]);
+interface Props {
+  rank: 1 | 2 | 3;
+  entry: RankingEntry;
+  formatScore: (score: number) => string;
+}
+
+defineProps<Props>();
+
+const emit = defineEmits<{
+  navigate: [];
+}>();
 
 const handleClick = () => {
   emit("navigate");
 };
 
-const handleKeydown = (event) => {
+const handleKeydown = (event: KeyboardEvent) => {
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
     emit("navigate");

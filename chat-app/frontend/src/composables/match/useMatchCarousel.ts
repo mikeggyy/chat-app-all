@@ -285,6 +285,9 @@ export function useMatchCarousel(
     swipeOffset.value = direction === 'next' ? -width : width;
 
     resetTimerId = window.setTimeout(() => {
+      // ✅ 修復：清理定時器引用，確保狀態一致
+      resetTimerId = undefined;
+
       if (direction === 'next') {
         showMatchByIndex(currentIndex.value + 1);
       } else {

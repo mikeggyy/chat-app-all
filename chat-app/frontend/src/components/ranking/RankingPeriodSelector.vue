@@ -1,20 +1,21 @@
 <script setup lang="ts">
-// Types
+interface Period {
+  id: string;
+  label: string;
+}
 
-defineProps({
-  periods: {
-    type: Array,
-    required: true,
-  },
-  activePeriod: {
-    type: String,
-    required: true,
-  },
-});
+interface Props {
+  periods: Period[];
+  activePeriod: string;
+}
 
-const emit = defineEmits(["change"]);
+defineProps<Props>();
 
-const handlePeriodChange = (periodId) => {
+const emit = defineEmits<{
+  change: [periodId: string];
+}>();
+
+const handlePeriodChange = (periodId: string) => {
   emit("change", periodId);
 };
 </script>

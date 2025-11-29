@@ -181,11 +181,9 @@ const onSwipeStart = (event: PointerEvent): void => {
   swipeStartX.value = event.clientX;
   pointerId.value = event.pointerId;
 
-  if (
-    event.currentTarget &&
-    typeof event.currentTarget.setPointerCapture === "function"
-  ) {
-    event.currentTarget.setPointerCapture(pointerId.value);
+  const target = event.currentTarget as Element | null;
+  if (target && typeof target.setPointerCapture === "function") {
+    target.setPointerCapture(pointerId.value);
   }
 
   emit("swipe-start", props.thread.id);

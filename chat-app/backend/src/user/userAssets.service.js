@@ -364,7 +364,7 @@ export const batchSetAssets = async (userId, assets) => {
 
   for (const [key, assetType] of Object.entries(cardMapping)) {
     if (assets[key] !== undefined && assets[key] !== null) {
-      const quantity = parseInt(assets[key]) || 0;
+      const quantity = parseInt(assets[key], 10) || 0;
       const assetRef = getAssetRef(userId, assetType);
 
       batch.set(

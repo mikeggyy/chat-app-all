@@ -6,7 +6,7 @@ import { useMembership } from '../composables/useMembership';
 import { useToast } from '../composables/useToast';
 import { useGuestGuard } from '../composables/useGuestGuard';
 import { logger } from '../utils/logger.js';
-import { membershipTiers, comparisonFeatures, type Tier } from '../config/membership.js';
+import { membershipTiers, comparisonFeatures, type Tier } from '../config/membership';
 import MembershipHero from '../components/membership/MembershipHero.vue';
 import MembershipTabs from '../components/membership/MembershipTabs.vue';
 import PlanCard from '../components/membership/PlanCard.vue';
@@ -25,7 +25,7 @@ import ComparisonTable from '../components/membership/ComparisonTable.vue';
 const router = useRouter();
 const { user } = useUserProfile();
 const {
-  membershipTier: currentTier,
+  currentTier,
   loadMembership,
   upgradeMembership,
 } = useMembership();

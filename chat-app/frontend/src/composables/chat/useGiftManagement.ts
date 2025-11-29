@@ -4,7 +4,6 @@
  * 管理禮物選擇和發送功能
  */
 
-import { getGiftById } from '../../config/gifts.js';
 
 // ==================== 類型定義 ====================
 
@@ -49,10 +48,7 @@ export function useGiftManagement(deps: UseGiftManagementDeps): UseGiftManagemen
   const {
     getCurrentUserId,
     openGiftSelector,
-    sendGift,
     loadBalance,
-    showGiftAnimation,
-    closeGiftAnimation,
     showPhotoSelector, // ✅ 新增
     closeGiftSelector, // ✅ 新增
   } = deps;

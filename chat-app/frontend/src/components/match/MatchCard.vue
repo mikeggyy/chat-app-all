@@ -115,7 +115,7 @@ defineEmits(['toggle-favorite', 'open-background', 'enter-chat']);
 /**
  * 格式化背景文字（截斷長文本）
  */
-const formatBackground = (text) => {
+const formatBackground = (text: string | undefined | null): string => {
   if (typeof text !== 'string') return '';
   const normalized = text.trim();
   if (normalized.length <= BIO_MAX_LENGTH) {

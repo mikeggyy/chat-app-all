@@ -7,7 +7,6 @@ import {
   reactive,
   ref,
   watch,
-  type Ref,
 } from "vue";
 
 interface Props {
@@ -206,7 +205,7 @@ const updateSliderBounds = (): void => {
   clampCropPosition();
 };
 
-const onImageLoad = (event: Event): void => {
+const onImageLoad = (event: Event | { target: HTMLImageElement | null }): void => {
   const image = event?.target as HTMLImageElement | null;
   const container = cropContainerRef.value;
   if (!image || !container) return;

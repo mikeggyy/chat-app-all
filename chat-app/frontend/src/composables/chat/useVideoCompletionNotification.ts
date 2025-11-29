@@ -43,7 +43,7 @@ export function useVideoCompletionNotification(): UseVideoCompletionNotification
   /**
    * 滾動到影片位置
    */
-  const scrollToVideo = (messageListRef: any, videoMessageId: string): void => {
+  const scrollToVideo = (messageListRef: any, _videoMessageId: string): void => {
     if (!messageListRef?.value) {
       console.warn('[VideoNotification] messageListRef 不可用');
       return;
@@ -72,18 +72,19 @@ export function useVideoCompletionNotification(): UseVideoCompletionNotification
     });
 
     if (targetElement) {
+      const element = targetElement as HTMLElement;
       // 滾動到影片位置
-      targetElement.scrollIntoView({
+      element.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       });
 
       // 添加高亮效果
-      targetElement.style.transition = 'box-shadow 0.3s ease';
-      targetElement.style.boxShadow = '0 0 20px rgba(255, 107, 157, 0.6)';
+      element.style.transition = 'box-shadow 0.3s ease';
+      element.style.boxShadow = '0 0 20px rgba(255, 107, 157, 0.6)';
 
       setTimeout(() => {
-        targetElement!.style.boxShadow = '';
+        element.style.boxShadow = '';
       }, 2000);
     } else {
       console.warn('[VideoNotification] 找不到影片元素');

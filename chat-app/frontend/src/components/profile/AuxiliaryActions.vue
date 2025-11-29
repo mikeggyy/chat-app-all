@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PencilSquareIcon, Cog6ToothIcon } from "@heroicons/vue/24/outline";
-import type { Component, Ref } from "vue";
+import type { Component, ComponentPublicInstance } from "vue";
 import SettingsMenu from "./SettingsMenu.vue";
 
 interface AuxiliaryAction {
@@ -9,18 +9,19 @@ interface AuxiliaryAction {
   icon: Component;
 }
 
+// Compatible function type for ref binding
+type RefBindFn = (el: HTMLElement | null) => void;
+
 interface Props {
   isSettingsMenuOpen?: boolean;
   settingsError?: string;
-  settingsMenuButtonRef?: unknown;
-  settingsMenuRef?: unknown;
+  settingsMenuButtonRef?: RefBindFn;
+  settingsMenuRef?: RefBindFn;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   isSettingsMenuOpen: false,
   settingsError: "",
-  settingsMenuButtonRef: null,
-  settingsMenuRef: null,
 });
 
 const emit = defineEmits<{
@@ -49,6 +50,13 @@ const handleActionClick = (key: string, event: Event) => {
     emit("settings-toggle", event);
   }
 };
+
+// Wrapper for ref binding to match Vue's expected signature
+const handleSettingsButtonRef = (el: Element | ComponentPublicInstance | null) => {
+  if (el instanceof HTMLElement || el === null) {
+    props.settingsMenuButtonRef?.(el);
+  }
+};
 </script>
 
 <template>
@@ -74,7 +82,7 @@ const handleActionClick = (key: string, event: Event) => {
           :aria-controls="
             action.key === 'settings' ? 'profile-settings-menu' : undefined
           "
-          :ref="action.key === 'settings' ? settingsMenuButtonRef : null"
+          :ref="action.key === 'settings' ? handleSettingsButtonRef : undefined"
           @click="handleActionClick(action.key, $event)"
         >
           <component :is="action.icon" class="icon" aria-hidden="true" />

@@ -1,50 +1,48 @@
 <script setup lang="ts">
-// Types
-
 import { ref } from "vue";
 import { ArrowPathIcon } from "@heroicons/vue/24/solid";
 import RankingItem from "./RankingItem.vue";
 
-const sentinel = ref(null);
+interface RankingEntry {
+  id: string;
+  name: string;
+  avatar: string;
+  score: number;
+  rank: number;
+  subtitle?: string;
+  handle?: string;
+  title?: string;
+}
 
-defineProps({
-  entries: {
-    type: Array,
-    default: () => [],
-  },
-  formatScore: {
-    type: Function,
-    required: true,
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
-  isLoadingMore: {
-    type: Boolean,
-    default: false,
-  },
-  isError: {
-    type: Boolean,
-    default: false,
-  },
-  isEmpty: {
-    type: Boolean,
-    default: false,
-  },
-  errorMessage: {
-    type: String,
-    default: "",
-  },
-  hasMore: {
-    type: Boolean,
-    default: false,
-  },
+interface Props {
+  entries?: RankingEntry[];
+  formatScore: (score: number) => string;
+  isLoading?: boolean;
+  isLoadingMore?: boolean;
+  isError?: boolean;
+  isEmpty?: boolean;
+  errorMessage?: string;
+  hasMore?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  entries: () => [],
+  isLoading: false,
+  isLoadingMore: false,
+  isError: false,
+  isEmpty: false,
+  errorMessage: "",
+  hasMore: false,
 });
 
-const emit = defineEmits(["navigate", "retry"]);
+const sentinel = ref<HTMLElement | null>(null);
 
-const handleNavigate = (entry) => {
+const emit = defineEmits<{
+  navigate: [entry: RankingEntry];
+  retry: [];
+}>();
+
+const handleNavigate = (entry: RankingEntry) => {
   emit("navigate", entry);
 };
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Ref } from "vue";
+import type { ComponentPublicInstance } from "vue";
 
 interface SettingsOption {
   key: string;
@@ -7,16 +7,18 @@ interface SettingsOption {
   variant?: "danger";
 }
 
+// Compatible function type for ref binding
+type RefBindFn = (el: HTMLElement | null) => void;
+
 interface Props {
   isOpen?: boolean;
   error?: string;
-  menuRef?: unknown;
+  menuRef?: RefBindFn;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   isOpen: false,
   error: "",
-  menuRef: null,
 });
 
 const emit = defineEmits<{
@@ -24,6 +26,13 @@ const emit = defineEmits<{
 }>();
 
 const settingsOptions: SettingsOption[] = [{ key: "logout", label: "登出", variant: "danger" }];
+
+// Wrapper for ref binding
+const handleMenuRef = (el: Element | ComponentPublicInstance | null) => {
+  if (el instanceof HTMLElement || el === null) {
+    props.menuRef?.(el);
+  }
+};
 </script>
 
 <template>
@@ -33,7 +42,7 @@ const settingsOptions: SettingsOption[] = [{ key: "logout", label: "登出", var
       id="profile-settings-menu"
       class="settings-menu"
       role="menu"
-      :ref="menuRef"
+      :ref="handleMenuRef"
       @click.stop
     >
       <button

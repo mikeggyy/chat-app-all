@@ -107,22 +107,27 @@ const logsDir = getLogsDirectory();
 const transports = [
   // 控制台輸出
   new winston.transports.Console(),
-
-  // 錯誤日誌檔案
-  new winston.transports.File({
-    filename: path.join(logsDir, "error.log"),
-    level: "error",
-    maxsize: 5242880, // 5MB
-    maxFiles: 5,
-  }),
-
-  // 組合日誌檔案
-  new winston.transports.File({
-    filename: path.join(logsDir, "combined.log"),
-    maxsize: 5242880, // 5MB
-    maxFiles: 5,
-  }),
 ];
+
+// 測試環境不使用文件傳輸（避免 "write after end" 錯誤）
+if (process.env.NODE_ENV !== "test") {
+  transports.push(
+    // 錯誤日誌檔案
+    new winston.transports.File({
+      filename: path.join(logsDir, "error.log"),
+      level: "error",
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    }),
+
+    // 組合日誌檔案
+    new winston.transports.File({
+      filename: path.join(logsDir, "combined.log"),
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
+    })
+  );
+}
 
 // 創建 logger 實例
 const logger = winston.createLogger({
@@ -130,18 +135,20 @@ const logger = winston.createLogger({
   levels,
   format,
   transports,
-  // 處理未捕獲的異常
-  exceptionHandlers: [
+  // 處理未捕獲的異常（測試環境不使用文件）
+  exceptionHandlers: process.env.NODE_ENV !== "test" ? [
     new winston.transports.File({
       filename: path.join(logsDir, "exceptions.log"),
     }),
-  ],
-  // 處理未處理的 Promise rejection
-  rejectionHandlers: [
+  ] : [],
+  // 處理未處理的 Promise rejection（測試環境不使用文件）
+  rejectionHandlers: process.env.NODE_ENV !== "test" ? [
     new winston.transports.File({
       filename: path.join(logsDir, "rejections.log"),
     }),
-  ],
+  ] : [],
+  // 測試環境不自動退出
+  exitOnError: process.env.NODE_ENV !== "test",
 });
 
 /**

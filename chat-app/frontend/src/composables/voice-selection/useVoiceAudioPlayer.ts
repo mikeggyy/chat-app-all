@@ -19,6 +19,8 @@ interface VoiceAudioPlayerReturn {
 export function useVoiceAudioPlayer(): VoiceAudioPlayerReturn {
   const isPlayingId = ref<string>('');
   const audioPlayers = new Map<string, HTMLAudioElement>();
+  // ✅ 修復：存儲事件處理器引用，以便在清理時正確移除
+  const eventHandlers = new Map<string, () => void>();
 
   /**
    * 切換語音預覽播放
@@ -46,9 +48,15 @@ export function useVoiceAudioPlayer(): VoiceAudioPlayerReturn {
     }
 
     // 停止所有正在播放的音頻
-    audioPlayers.forEach((player) => {
+    audioPlayers.forEach((player, id) => {
       try {
         player.pause();
+        // ✅ 修復：移除事件監聽器
+        const handler = eventHandlers.get(id);
+        if (handler) {
+          player.removeEventListener('ended', handler);
+          eventHandlers.delete(id);
+        }
       } catch {}
     });
     audioPlayers.clear();
@@ -65,8 +73,11 @@ export function useVoiceAudioPlayer(): VoiceAudioPlayerReturn {
       // 清理時移除事件監聽器
       audio.removeEventListener('ended', handleEnded);
       audioPlayers.delete(voiceId);
+      eventHandlers.delete(voiceId);
     };
 
+    // ✅ 修復：存儲事件處理器引用
+    eventHandlers.set(voiceId, handleEnded);
     audio.addEventListener('ended', handleEnded);
 
     audio
@@ -84,18 +95,24 @@ export function useVoiceAudioPlayer(): VoiceAudioPlayerReturn {
 
   /**
    * 停止所有音頻播放並清理
-   * ✅ 修復：現在也會移除所有事件監聽器
+   * ✅ 修復：現在也會正確移除所有 addEventListener 添加的事件監聽器
    */
   const cleanupAudio = (): void => {
-    audioPlayers.forEach((player) => {
+    audioPlayers.forEach((player, id) => {
       try {
         player.pause();
-        // ✅ 清除所有事件監聽器（設為 null）
+        // ✅ 修復：移除 addEventListener 添加的監聽器
+        const handler = eventHandlers.get(id);
+        if (handler) {
+          player.removeEventListener('ended', handler);
+        }
+        // 清除內聯屬性
         player.onended = null;
         player.onerror = null;
       } catch {}
     });
     audioPlayers.clear();
+    eventHandlers.clear();
     isPlayingId.value = '';
   };
 

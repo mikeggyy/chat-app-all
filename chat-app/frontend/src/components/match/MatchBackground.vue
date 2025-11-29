@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, type CSSProperties } from 'vue';
 import LazyImage from '../common/LazyImage.vue';
 
 /**
@@ -40,20 +40,26 @@ import LazyImage from '../common/LazyImage.vue';
  * ✅ P3 優化：追蹤圖片載入狀態，快速滑動時顯示佔位效果而非前一張圖片
  */
 
+// 類型定義
+interface CarouselMatchData {
+  portraitUrl?: string;
+  [key: string]: any;
+}
+
+interface CarouselMatchItem {
+  slot: string;
+  data?: CarouselMatchData;
+}
+
+interface Props {
+  carouselMatches: CarouselMatchItem[];
+  backgroundTrackStyle: CSSProperties;
+  isImageLoaded?: ((url: string) => boolean) | null;
+}
+
 // Props
-const props = defineProps({
-  carouselMatches: {
-    type: Array,
-    required: true,
-  },
-  backgroundTrackStyle: {
-    type: Object,
-    required: true,
-  },
-  isImageLoaded: {
-    type: Function,
-    default: null,
-  },
+const props = withDefaults(defineProps<Props>(), {
+  isImageLoaded: null,
 });
 
 // 本地追蹤已載入的圖片 URL

@@ -1,23 +1,32 @@
 <script setup lang="ts">
-// Types
-
 import { HeartIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/solid";
 import LazyImage from '@/components/common/LazyImage.vue';
 
-const props = defineProps({
-  profile: {
-    type: Object,
-    required: true,
-  },
-});
+interface CharacterProfile {
+  id: string;
+  name: string;
+  image: string;
+  favoritesCountFormatted?: string;
+  messageCountFormatted?: string;
+  author?: string;
+  description?: string;
+}
 
-const emit = defineEmits(["click"]);
+interface Props {
+  profile: CharacterProfile;
+}
+
+const props = defineProps<Props>();
+
+const emit = defineEmits<{
+  click: [profile: CharacterProfile];
+}>();
 
 const handleClick = () => {
   emit("click", props.profile);
 };
 
-const handleKeyup = (event) => {
+const handleKeyup = (event: KeyboardEvent) => {
   if (event.key === "Enter") {
     handleClick();
   }

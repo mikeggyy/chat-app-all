@@ -1,31 +1,37 @@
 <script setup lang="ts">
-// Types
-
 import { ArrowRightIcon, HeartIcon } from "@heroicons/vue/24/solid";
 import CharacterCard from "./CharacterCard.vue";
 
-const props = defineProps({
-  conversations: {
-    type: Array,
-    default: () => [],
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
-  showEmpty: {
-    type: Boolean,
-    default: false,
-  },
+interface CharacterProfile {
+  id: string;
+  name: string;
+  image: string;
+  favoritesCountFormatted?: string;
+  messageCountFormatted?: string;
+}
+
+interface Props {
+  conversations?: CharacterProfile[];
+  isLoading?: boolean;
+  showEmpty?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  conversations: () => [],
+  isLoading: false,
+  showEmpty: false,
 });
 
-const emit = defineEmits(["open-panel", "character-click"]);
+const emit = defineEmits<{
+  "open-panel": [panel: string];
+  "character-click": [profile: CharacterProfile];
+}>();
 
 const handleViewRecords = () => {
   emit("open-panel", "reconnect");
 };
 
-const handleCharacterClick = (profile) => {
+const handleCharacterClick = (profile: CharacterProfile) => {
   emit("character-click", profile);
 };
 </script>

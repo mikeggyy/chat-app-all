@@ -7,7 +7,7 @@ const props = defineProps({
   variant: {
     type: String,
     required: true,
-    validator: (value) => ['ad', 'unlock', 'vip', 'disabled'].includes(value),
+    validator: (value: string) => ['ad', 'unlock', 'vip', 'disabled'].includes(value),
   },
   icon: {
     type: [Object, Function],

@@ -53,8 +53,8 @@ interface LimitModalProps {
   [key: string]: any;
   total: number;
   standardTotal?: number | null;
-  tier: 'free' | 'vip' | 'vvip';
-  resetPeriod?: 'monthly' | 'daily';
+  tier: string; // 允許 string 類型以兼容組件傳入的值
+  resetPeriod?: string;
   cards: number;
   used?: number;
   characterName?: string;
@@ -137,7 +137,7 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
  * 返回值類型定義
  */
 interface UseLimitModalConfigReturn {
-  config: ComputedRef<TypeConfig | undefined>;
+  config: ComputedRef<TypeConfig>;
   remainingAds: ComputedRef<number>;
   canWatchAd: ComputedRef<boolean>;
   unlockCards: ComputedRef<number>;
@@ -152,11 +152,23 @@ interface UseLimitModalConfigReturn {
  * @param props - 組件 props
  * @returns 配置相關的計算屬性和方法
  */
+// 默認配置（用於未知類型的情況，實際上不應該發生）
+const DEFAULT_CONFIG: TypeConfig = {
+  title: '已達上限',
+  icon: ExclamationTriangleIcon,
+  iconColor: '#fbbf24',
+  highlightColor: '#60a5fa',
+  shopCategory: 'general',
+  unlockCardsKey: 'characterUnlockCards',
+  unlockUseDescription: '使用解鎖卡繼續使用',
+  unlockBuyDescription: '購買解鎖卡解除限制',
+};
+
 export function useLimitModalConfig(
   props: LimitModalProps
 ): UseLimitModalConfigReturn {
-  // 當前配置
-  const config = computed<TypeConfig | undefined>(() => TYPE_CONFIG[props.type]);
+  // 當前配置（確保不會返回 undefined）
+  const config = computed<TypeConfig>(() => TYPE_CONFIG[props.type] || DEFAULT_CONFIG);
 
   // 計算剩餘的廣告次數
   const remainingAds = computed<number>(() => {

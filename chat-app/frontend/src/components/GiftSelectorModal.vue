@@ -3,12 +3,15 @@ import { computed } from 'vue';
 import { XMarkIcon, CurrencyDollarIcon } from '@heroicons/vue/24/outline';
 import { getGiftList, getGiftPrice, RARITY_CONFIG } from '../config/gifts';
 
+// 會員等級類型
+type MembershipTier = 'free' | 'vip' | 'vvip';
+
 interface Props {
   isOpen?: boolean;
   characterName?: string;
   balance?: number;
   userBalance?: number;
-  membershipTier?: string;
+  membershipTier?: MembershipTier;
 }
 
 interface Gift {
@@ -44,10 +47,12 @@ const emit = defineEmits<{
   select: [data: SelectEventData];
 }>();
 
-const gifts = getGiftList();
+const gifts = getGiftList() as Gift[];
 
 const getGiftPriceInfo = (giftId: string): PriceInfo => {
-  return getGiftPrice(giftId, props.membershipTier);
+  const result = getGiftPrice(giftId, props.membershipTier);
+  // 如果禮物不存在，返回默認值
+  return result ?? { basePrice: 0, finalPrice: 0, saved: 0 };
 };
 
 const canAfford = (giftId: string): boolean => {
@@ -57,7 +62,8 @@ const canAfford = (giftId: string): boolean => {
 };
 
 const getRarityColor = (rarity: string): string => {
-  return RARITY_CONFIG[rarity]?.color || '#9CA3AF';
+  const config = RARITY_CONFIG as Record<string, { color: string }>;
+  return config[rarity]?.color || '#9CA3AF';
 };
 
 const handleSelect = (gift: Gift): void => {

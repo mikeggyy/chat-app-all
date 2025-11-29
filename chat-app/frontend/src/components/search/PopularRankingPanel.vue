@@ -1,27 +1,35 @@
 <script setup lang="ts">
-// Types
-
 import { ArrowRightIcon, FireIcon } from "@heroicons/vue/24/solid";
 import CharacterCard from "./CharacterCard.vue";
 
-const props = defineProps({
-  characters: {
-    type: Array,
-    default: () => [],
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
+interface CharacterProfile {
+  id: string;
+  name: string;
+  image: string;
+  favoritesCountFormatted?: string;
+  messageCountFormatted?: string;
+}
+
+interface Props {
+  characters?: CharacterProfile[];
+  isLoading?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  characters: () => [],
+  isLoading: false,
 });
 
-const emit = defineEmits(["open-panel", "character-click"]);
+const emit = defineEmits<{
+  "open-panel": [panel: string];
+  "character-click": [profile: CharacterProfile];
+}>();
 
 const handleViewRanking = () => {
   emit("open-panel", "ranking");
 };
 
-const handleCharacterClick = (profile) => {
+const handleCharacterClick = (profile: CharacterProfile) => {
   emit("character-click", profile);
 };
 </script>

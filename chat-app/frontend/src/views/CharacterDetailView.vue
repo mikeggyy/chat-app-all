@@ -114,7 +114,7 @@ const voiceLabel = computed<string>(() => {
     typeof character.value.voice === "object" &&
     character.value.voice.label
   ) {
-    return character.value.voice.label;
+    return String(character.value.voice.label);
   }
 
   // 如果是字串，使用映射表
@@ -130,7 +130,8 @@ const voiceLabel = computed<string>(() => {
     sage: "賢者",
     verse: "詩篇",
   };
-  return voiceMap[character.value.voice as string] || character.value.voice;
+  const voiceStr = typeof character.value.voice === 'string' ? character.value.voice : '';
+  return voiceMap[voiceStr] || voiceStr || "未設定";
 });
 
 const voiceDescription = computed<string>(() => {

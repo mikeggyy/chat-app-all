@@ -60,13 +60,13 @@ const {
   recentRecordEntries,
   hasMoreRecords,
   isLoadingMoreRecords,
-  recordsListRef,
+  recordsListRef: _recordsListRef,
   openRecentRecords,
   closeRecentRecords,
   handleRecordsScroll,
   openChatForEntry,
 } = useRecordDetail(
-  recentConversations,
+  recentConversations as any,
   popularCharacters,
   popularHasMore,
   fetchPopularCharacters,
@@ -102,8 +102,8 @@ const openChat = (profile: CharacterProfile | null): void => {
         <RecentConversationsPanel
           :conversations="recentlyViewed"
           :is-loading="isLoadingRecent"
-          :show-empty="user?.id && recentConversations.length === 0"
-          @open-panel="openRecentRecords"
+          :show-empty="Boolean(user?.id && recentConversations.length === 0)"
+          @open-panel="(openRecentRecords as any)"
           @character-click="openChat"
         />
 
@@ -111,7 +111,7 @@ const openChat = (profile: CharacterProfile | null): void => {
         <PopularRankingPanel
           :characters="popularRanking"
           :is-loading="isLoadingPopular"
-          @open-panel="openRecentRecords"
+          @open-panel="(openRecentRecords as any)"
           @character-click="openChat"
         />
 
@@ -127,7 +127,7 @@ const openChat = (profile: CharacterProfile | null): void => {
       <!-- 搜尋結果 -->
       <template v-else>
         <SearchResults
-          :results="displayedResults"
+          :results="(displayedResults as any)"
           :query="searchQuery"
           :is-fallback="isFallbackResult"
           @reset="resetSearch"

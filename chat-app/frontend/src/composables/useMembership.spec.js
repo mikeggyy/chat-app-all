@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useMembership } from './useMembership.ts';
+import { useMembership } from './useMembership';
 
 // Mock API
 vi.mock('../utils/api.js', () => ({
@@ -124,15 +124,17 @@ describe('useMembership - 會員系統測試', () => {
   describe('會員升級', () => {
     it('應該成功升級會員', async () => {
       const mockUpgradeResponse = {
-        tier: 'vvip',
-        features: {
-          conversationLimit: -1, // 無限制
-          voiceLimit: -1,
-          photoLimit: 20,
-          unlimitedConversation: true,
-          unlimitedVoice: true,
+        membership: {
+          tier: 'vvip',
+          features: {
+            conversationLimit: -1, // 無限制
+            voiceLimit: -1,
+            photoLimit: 20,
+            unlimitedConversation: true,
+            unlimitedVoice: true,
+          },
+          isActive: true,
         },
-        isActive: true,
       };
 
       apiJson.mockResolvedValue(mockUpgradeResponse);
@@ -142,11 +144,10 @@ describe('useMembership - 會員系統測試', () => {
       await upgradeMembership('user-123', 'vvip');
 
       expect(apiJson).toHaveBeenCalledWith(
-        '/api/membership/upgrade',
+        '/api/membership/user-123/upgrade',
         expect.objectContaining({
           method: 'POST',
           body: expect.objectContaining({
-            userId: 'user-123',
             targetTier: 'vvip',
           }),
         })
@@ -165,20 +166,22 @@ describe('useMembership - 會員系統測試', () => {
     it('應該在缺少 targetTier 時拋出錯誤', async () => {
       const { upgradeMembership } = useMembership();
 
-      await expect(upgradeMembership('user-123', undefined as any)).rejects.toThrow('缺少目標會員等級');
+      await expect(upgradeMembership('user-123', undefined)).rejects.toThrow('無效的目標會員等級');
     });
   });
 
   describe('會員取消', () => {
     it('應該成功取消會員', async () => {
       const mockCancelResponse = {
-        tier: 'free',
-        features: {
-          conversationLimit: 10,
-          voiceLimit: 5,
-          photoLimit: 2,
+        membership: {
+          tier: 'free',
+          features: {
+            conversationLimit: 10,
+            voiceLimit: 5,
+            photoLimit: 2,
+          },
+          isActive: false,
         },
-        isActive: false,
       };
 
       apiJson.mockResolvedValue(mockCancelResponse);
@@ -188,10 +191,9 @@ describe('useMembership - 會員系統測試', () => {
       await cancelMembership('user-123');
 
       expect(apiJson).toHaveBeenCalledWith(
-        '/api/membership/cancel',
+        '/api/membership/user-123/cancel',
         expect.objectContaining({
           method: 'POST',
-          body: { userId: 'user-123' },
         })
       );
 

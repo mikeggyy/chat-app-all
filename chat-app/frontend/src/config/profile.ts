@@ -97,7 +97,7 @@ export const BUILTIN_AVATAR_OPTIONS: AvatarOption[] = [
 /**
  * 快捷操作項目
  */
-interface QuickAction {
+export interface QuickAction {
   key: string;
   label: string;
   icon: FunctionalComponent;

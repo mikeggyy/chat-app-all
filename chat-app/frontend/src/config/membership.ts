@@ -23,17 +23,17 @@ import type { FunctionalComponent } from "vue";
 /**
  * 會員功能特性
  */
-interface Feature {
+export interface Feature {
   icon: FunctionalComponent;
   title: string;
   detail: string;
-  badge: string | null;
+  badge?: string | null;
 }
 
 /**
  * 會員方案配置
  */
-interface MembershipTier {
+export interface MembershipTier {
   id: string;
   label: string;
   headline: string;
@@ -45,6 +45,9 @@ interface MembershipTier {
   cardGradient: string;
   features: Feature[];
 }
+
+/** Alias for MembershipTier */
+export type Tier = MembershipTier;
 
 /**
  * 功能對比項目

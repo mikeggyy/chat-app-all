@@ -24,6 +24,9 @@ import LevelUpAnimation from '../LevelUpAnimation.vue';
 import CharacterRanking from '../CharacterRanking.vue';
 
 // Types
+type PotionType = 'memoryBoost' | 'brainBoost' | '';
+type MembershipTier = 'free' | 'vip' | 'vvip';
+
 interface UserPotions {
   memoryBoost: number;
   brainBoost: number;
@@ -37,8 +40,8 @@ interface ModalState {
 interface Modals {
   resetConfirm: ModalState & { loading?: boolean };
   characterInfo: ModalState;
-  potionConfirm: ModalState & { type?: string };
-  potionLimit: ModalState & { type?: string };
+  potionConfirm: ModalState & { type?: PotionType };
+  potionLimit: ModalState & { type?: PotionType };
   unlockConfirm: ModalState & { loading?: boolean };
   unlockLimit: ModalState;
   buffDetails: ModalState & { type?: string };
@@ -72,7 +75,7 @@ interface Props {
   videoCards?: number;
   showGiftSelector?: boolean;
   balance?: number;
-  membershipTier?: string;
+  membershipTier?: MembershipTier;
 }
 
 interface Emits {

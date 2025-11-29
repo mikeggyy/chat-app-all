@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PROFILE_LIMITS, GENDER_OPTIONS, generateAgeOptions } from "../../config/profile";
-import { computed, type Ref } from "vue";
+import { computed } from "vue";
+import type { VNodeRef } from "vue";
 
 interface ProfileForm {
   displayName: string;
@@ -24,7 +25,7 @@ interface Props {
   displayNameLength?: number;
   promptLength?: number;
   isFormDirty?: boolean;
-  inputRef?: unknown;
+  inputRef?: VNodeRef;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,7 +35,6 @@ const props = withDefaults(defineProps<Props>(), {
   displayNameLength: 0,
   promptLength: 0,
   isFormDirty: false,
-  inputRef: null,
 });
 
 const emit = defineEmits<{

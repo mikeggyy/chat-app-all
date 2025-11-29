@@ -1,4 +1,4 @@
-import { ref, Ref } from 'vue';
+import { ref, Ref, onBeforeUnmount } from 'vue';
 
 // ============================================================================
 // Type Definitions
@@ -80,6 +80,9 @@ const dialogState: Ref<DialogState> = ref({
  * ```
  */
 export function usePurchaseConfirm(): UsePurchaseConfirmReturn {
+  // ✅ 修復：追蹤定時器以便清理
+  let processingTimer: ReturnType<typeof setTimeout> | null = null;
+
   /**
    * 顯示購買確認對話框
    *
@@ -129,7 +132,12 @@ export function usePurchaseConfirm(): UsePurchaseConfirmReturn {
 
     // ✅ 延遲重置處理狀態，防止快速重複打開對話框
     // 給予足夠時間讓購買請求發送
-    setTimeout((): void => {
+    // ✅ 修復：清理之前的定時器並追蹤新定時器
+    if (processingTimer) {
+      clearTimeout(processingTimer);
+    }
+    processingTimer = setTimeout((): void => {
+      processingTimer = null;
       dialogState.value.isProcessing = false;
     }, 1000); // 1 秒冷卻時間
   };
@@ -151,6 +159,14 @@ export function usePurchaseConfirm(): UsePurchaseConfirmReturn {
     }
     dialogState.value.isOpen = false;
   };
+
+  // ✅ 修復：組件卸載時清理定時器
+  onBeforeUnmount(() => {
+    if (processingTimer) {
+      clearTimeout(processingTimer);
+      processingTimer = null;
+    }
+  });
 
   return {
     dialogState,

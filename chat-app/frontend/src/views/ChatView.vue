@@ -144,14 +144,14 @@ const {
 
   // Video Completion Notification
   videoNotification,
-  showVideoNotification,
+  showVideoNotification: _showVideoNotification,
   hideVideoNotification,
   scrollToVideo,
 
   // Generation Failure Notification
   generationFailures,
   clearGenerationFailure,
-  clearAllGenerationFailures,
+  clearAllGenerationFailures: _clearAllGenerationFailures,
   checkForGenerationFailures,
 } = useChatSetup({
   router,
@@ -163,7 +163,7 @@ const {
 // ====================
 // Level System
 // ====================
-const { fetchCharacterLevel, getCharacterLevel, updateLocalLevel } = useLevel();
+const { fetchCharacterLevel, getCharacterLevel: _getCharacterLevel, updateLocalLevel: _updateLocalLevel } = useLevel();
 
 // 當前角色的等級數據
 const currentLevel = ref(1);
@@ -368,7 +368,7 @@ onBeforeUnmount(() => {
       :video-cards="videoCards"
       :show-gift-selector="showGiftSelector"
       :balance="balance"
-      :membership-tier="user?.membershipTier || 'free'"
+      :membership-tier="(user?.membershipTier as 'free' | 'vip' | 'vvip') || 'free'"
       @cancel-reset="cancelResetConversation"
       @confirm-reset="confirmResetConversation"
       @close-character-info="closeCharacterInfo"

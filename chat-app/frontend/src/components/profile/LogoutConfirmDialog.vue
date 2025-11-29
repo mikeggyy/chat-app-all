@@ -1,24 +1,33 @@
 <script setup lang="ts">
-import type { Ref } from "vue";
+import type { ComponentPublicInstance } from "vue";
+
+// Compatible function type for ref binding
+type RefBindFn = (el: HTMLElement | null) => void;
 
 interface Props {
   isVisible?: boolean;
   isLoggingOut?: boolean;
   error?: string;
-  cancelButtonRef?: unknown;
+  cancelButtonRef?: RefBindFn;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   isVisible: false,
   isLoggingOut: false,
   error: "",
-  cancelButtonRef: null,
 });
 
 const emit = defineEmits<{
   cancel: [];
   confirm: [];
 }>();
+
+// Wrapper for ref binding
+const handleCancelButtonRef = (el: Element | ComponentPublicInstance | null) => {
+  if (el instanceof HTMLElement || el === null) {
+    props.cancelButtonRef?.(el);
+  }
+};
 </script>
 
 <template>
@@ -50,7 +59,7 @@ const emit = defineEmits<{
           <button
             type="button"
             class="btn-unified btn-cancel"
-            :ref="cancelButtonRef"
+            :ref="handleCancelButtonRef"
             @click="emit('cancel')"
             :disabled="isLoggingOut"
           >

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, type Ref, type ComputedRef } from "vue";
+import { computed, ref, onMounted, type Ref } from "vue";
 import { useRouter } from "vue-router";
 import { logger } from "@/utils/logger";
 import {
@@ -43,6 +43,7 @@ interface DecoratedCharacter {
   portrait: string;
   tagline: string;
   description: string;
+  [key: string]: any;
 }
 
 const router = useRouter();
@@ -161,7 +162,7 @@ let charactersRequestToken: number = 0;
 const characters = computed(() => {
   return userCharactersRaw.value
     .map((character, index) => decorateCharacter(character, index))
-    .filter(Boolean);
+    .filter((char): char is DecoratedCharacter => char !== null);
 });
 
 // ✅ P1 優化（2025-01）：虛擬滾動，提升 5-8 倍性能
@@ -223,7 +224,7 @@ const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boo
     }
     console.error('[MyCharacters] ❌ 載入角色失敗：', error);
     userCharactersRaw.value = [];
-    charactersError.value = error?.message ?? "載入角色列表失敗，請稍後再試。";
+    charactersError.value = (error as Error)?.message ?? "載入角色列表失敗，請稍後再試。";
     if (import.meta.env.DEV) {
     }
   } finally {

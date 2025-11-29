@@ -67,7 +67,13 @@ import { useMembership } from '../composables/useMembership';
 
 type ProgressStep = 'validating' | 'processing' | 'finalizing' | 'completed';
 
-const { isUpgrading, upgradeProgress } = useMembership();
+const { isLoading: _isLoading, upgradeProgress } = useMembership();
+
+// 是否正在升級（從 upgradeProgress 狀態推導）
+const isUpgrading = computed(() => {
+  const step = upgradeProgress.value.step;
+  return step && step !== 'completed';
+});
 
 // 進度標題
 const progressTitle = computed(() => {

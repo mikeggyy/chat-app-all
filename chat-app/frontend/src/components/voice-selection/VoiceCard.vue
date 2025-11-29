@@ -32,7 +32,7 @@ const handleCardClick = () => {
   emit("select", props.preset.id);
 };
 
-const handlePreviewClick = (event) => {
+const handlePreviewClick = (event: MouseEvent) => {
   event.stopPropagation();
   emit("toggle-preview", props.preset.id);
 };

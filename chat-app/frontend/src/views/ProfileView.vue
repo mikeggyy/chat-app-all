@@ -31,7 +31,7 @@ const firebaseAuth = useFirebaseAuth();
 
 // 使用整合的 useProfileData composable
 const {
-  user, // ✅ 添加：用於調試的原始用戶資料
+  user: _user, // ✅ 添加：用於調試的原始用戶資料（保留供未來使用）
   profile,
   targetUserId,
   displayedId,
@@ -49,7 +49,7 @@ const {
   isExpiringSoon,
   balance,
   formattedBalance,
-  loadBalance, // ✅ 添加：金幣餘額加載函數
+  loadBalance: _loadBalance, // ✅ 添加：金幣餘額加載函數（保留供未來使用）
   resetCoins, // ✅ 添加：登出時重置金幣狀態
   hasUnreadNotifications,
   requireLogin,
@@ -368,7 +368,7 @@ watch(
 
       <header class="profile-hero__top">
         <ProfileVIPCard
-          :tier="tier"
+          :tier="(tier as 'free' | 'vip' | 'vvip')"
           :tier-name="tierName"
           :is-v-i-p="isVIP"
           :is-v-v-i-p="isVVIP"

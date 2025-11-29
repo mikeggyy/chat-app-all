@@ -235,26 +235,17 @@ describe('useCoins - 金幣系統測試', () => {
       await purchasePackage('user-123', 'pkg-2');
 
       expect(apiJson).toHaveBeenCalledWith(
-        '/api/coins/purchase',
+        '/api/coins/purchase/package',
         expect.objectContaining({
           method: 'POST',
           body: expect.objectContaining({
-            userId: 'user-123',
             packageId: 'pkg-2',
-          }),
-          headers: expect.objectContaining({
-            'Idempotency-Key': 'test-key-123',
+            idempotencyKey: 'test-key-123',
           }),
         })
       );
 
       expect(balance.value).toBe(1500);
-    });
-
-    it('應該在缺少 userId 時拋出錯誤', async () => {
-      const { purchasePackage } = useCoins();
-
-      await expect(purchasePackage(undefined, 'pkg-1')).rejects.toThrow('缺少用戶 ID');
     });
 
     it('應該在缺少 packageId 時拋出錯誤', async () => {

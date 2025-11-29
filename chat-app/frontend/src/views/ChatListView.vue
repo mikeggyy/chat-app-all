@@ -27,7 +27,7 @@ interface HiddenThreadMeta {
 
 interface ActionMessage {
   text: string;
-  tone: string;
+  tone: 'success' | 'error' | 'info' | '';
 }
 
 interface DeleteConfirmState {
@@ -338,7 +338,7 @@ const actionMessage: ActionMessage = reactive({
 });
 let actionMessageTimer: number = 0;
 
-const showActionMessage = (text: string, tone: string = 'info'): void => {
+const showActionMessage = (text: string, tone: 'success' | 'error' | 'info' = 'info'): void => {
   const content = typeof text === 'string' ? text.trim() : '';
   if (!content) {
     actionMessage.text = '';

@@ -37,6 +37,15 @@ interface ConversationEntry {
   [key: string]: any;
 }
 
+interface CharacterCard {
+  id: string;
+  displayName: string;
+  portrait: string;
+  totalFavoritesLabel: string;
+  totalChatUsersLabel: string;
+  isMissing: boolean;
+}
+
 const router = useRouter();
 const { user } = useUserProfile();
 
@@ -151,7 +160,7 @@ const favoriteCards = computed(() => {
         isMissing: false,
       };
     })
-    .filter(Boolean);
+    .filter((card): card is CharacterCard => card !== null);
 });
 
 const hasFavorites = computed(() => favoriteCards.value.length > 0);
@@ -251,7 +260,7 @@ const conversationCards = computed(() => {
       }
       return null;
     })
-    .filter(Boolean);
+    .filter((card): card is CharacterCard => card !== null);
 
   return normalized;
 });

@@ -62,6 +62,8 @@ export function useChatVirtualScroll(
   // 節流控制變數
   let lastScrollTime = 0;
   let scrollThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+  // ✅ 修復：追蹤 loadMore 中的 setTimeout
+  let loadMoreTimer: ReturnType<typeof setTimeout> | null = null;
 
   // 當前顯示的消息數量（從最新往舊計算）
   const displayedCount: Ref<number> = ref(initialCount);
@@ -133,7 +135,12 @@ export function useChatVirtualScroll(
     displayedCount.value = newCount;
 
     // 下一個 tick 恢復滾動位置
-    setTimeout(() => {
+    // ✅ 修復：追蹤定時器以便清理
+    if (loadMoreTimer) {
+      clearTimeout(loadMoreTimer);
+    }
+    loadMoreTimer = setTimeout(() => {
+      loadMoreTimer = null;
       if (containerRef.value) {
         const newScrollHeight = containerRef.value.scrollHeight;
         const scrollDiff = newScrollHeight - lastScrollHeight.value;
@@ -202,6 +209,11 @@ export function useChatVirtualScroll(
     if (scrollThrottleTimer) {
       clearTimeout(scrollThrottleTimer);
       scrollThrottleTimer = null;
+    }
+    // ✅ 修復：清理 loadMore 定時器
+    if (loadMoreTimer) {
+      clearTimeout(loadMoreTimer);
+      loadMoreTimer = null;
     }
   });
 

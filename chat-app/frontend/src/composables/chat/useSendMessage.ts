@@ -5,7 +5,7 @@
  * 從 ChatView.vue 提取為獨立 composable
  */
 
-import { nextTick, type Ref, type ComputedRef } from 'vue';
+import type { Ref, ComputedRef } from 'vue';
 import type { LimitCheckResult } from '../../types';
 
 // ==================== 類型定義 ====================
@@ -82,7 +82,7 @@ export const useSendMessage = (params: UseSendMessageParams): UseSendMessageRetu
     getPartnerDisplayName,
     // getDraft, // 未使用，保留用於未來擴展
     setDraft,
-    getMessageInputRef,
+    // getMessageInputRef, // 未使用，已移除自動聚焦功能
     getCharacterTickets,
 
     // Guest checks
@@ -110,8 +110,25 @@ export const useSendMessage = (params: UseSendMessageParams): UseSendMessageRetu
   const handleSendMessage = async (text: string): Promise<void> => {
     const userId = getCurrentUserId();
     const matchId = getPartnerId();
+    const trimmedText = text?.trim() || '';
 
-    if (!userId || !matchId || !text) return;
+    // ✅ 修復：分別處理不同的空值情況，提供適當的反饋
+    // 空文本是正常情況，靜默返回
+    if (!trimmedText) {
+      return;
+    }
+
+    // userId 或 matchId 缺失是異常情況，記錄警告
+    if (!userId) {
+      console.warn('[useSendMessage] 無法發送消息：用戶未登入');
+      showError('請先登入');
+      return;
+    }
+
+    if (!matchId) {
+      console.warn('[useSendMessage] 無法發送消息：未選擇對話對象');
+      return;
+    }
 
     // Guest message limit check
     const isGuestValue = (isGuest as any).value ?? isGuest;
@@ -141,7 +158,8 @@ export const useSendMessage = (params: UseSendMessageParams): UseSendMessageRetu
 
     try {
       // Send message (sendMessage only takes text parameter)
-      await sendMessageToApi(text);
+      // ✅ 修復：使用已去除空白的文本
+      await sendMessageToApi(trimmedText);
 
       // Invalidate suggestions
       invalidateSuggestions();

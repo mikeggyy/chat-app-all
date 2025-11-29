@@ -179,7 +179,7 @@ onMounted(async () => {
     // 有草稿，嘗試載入 flow 並顯示恢復對話框
     try {
       const flow = await fetchCharacterCreationFlow(draft.flowId);
-      if (flow && flow.generation?.result?.images?.length > 0) {
+      if (flow && (flow.generation?.result?.images?.length ?? 0) > 0) {
         // 確認 flow 確實有生成的圖片
         pendingFlow.value = flow;
         showResumeFlowModal.value = true;

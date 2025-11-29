@@ -60,6 +60,8 @@ const getPhotoUnlockCards = async (userId) => {
     // ✅ 統一從 assets 讀取
     return user?.assets?.photoUnlockCards || 0;
   } catch (error) {
+    // 記錄錯誤但返回 0，避免阻斷流程
+    console.warn(`[photoLimit] 獲取用戶 ${userId} 照片卡數量失敗:`, error.message);
     return 0;
   }
 };

@@ -1,26 +1,37 @@
 <script setup lang="ts">
-// Types
-
 import PodiumCard from "./PodiumCard.vue";
 
-defineProps({
-  podiumByRank: {
-    type: Object,
-    required: true,
-  },
-  formatScore: {
-    type: Function,
-    required: true,
-  },
-  isReady: {
-    type: Boolean,
-    default: false,
-  },
+interface RankingEntry {
+  id: string;
+  name: string;
+  avatar: string;
+  score: number;
+  subtitle?: string;
+  handle?: string;
+  title?: string;
+}
+
+interface PodiumByRank {
+  first?: RankingEntry;
+  second?: RankingEntry;
+  third?: RankingEntry;
+}
+
+interface Props {
+  podiumByRank: PodiumByRank;
+  formatScore: (score: number) => string;
+  isReady?: boolean;
+}
+
+withDefaults(defineProps<Props>(), {
+  isReady: false,
 });
 
-const emit = defineEmits(["navigate"]);
+const emit = defineEmits<{
+  navigate: [entry: RankingEntry];
+}>();
 
-const handleNavigate = (entry) => {
+const handleNavigate = (entry: RankingEntry) => {
   emit("navigate", entry);
 };
 </script>

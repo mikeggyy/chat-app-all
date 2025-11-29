@@ -3,11 +3,11 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ShoppingCartIcon, XMarkIcon } from '@heroicons/vue/24/outline';
 
-type PotionType = 'memoryBoost' | 'brainBoost';
+type PotionType = 'memoryBoost' | 'brainBoost' | '';
 
 interface Props {
   isOpen: boolean;
-  potionType: PotionType;
+  potionType?: PotionType;
   characterName?: string;
 }
 
@@ -19,6 +19,7 @@ interface PotionInfo {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  potionType: 'memoryBoost',
   characterName: '',
 });
 

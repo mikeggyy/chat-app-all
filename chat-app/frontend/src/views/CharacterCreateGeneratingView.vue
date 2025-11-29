@@ -38,7 +38,7 @@ import { usePersonaEditing } from "../composables/character-creation/usePersonaE
 
 const {
   progress,
-  isAnimating,
+  isAnimating: _isAnimating,
   isComplete,
   progressText,
   startProgressAnimation,
@@ -138,11 +138,6 @@ const generatingEmblem = "/character-create/generating-emblem.png";
 const isGeneratingImages = computed(() => store.isLoading);
 const imageGenerationError = computed(() => store.error);
 
-// AI 魔法師狀態（直接使用 store）
-const aiMagicianError = computed(() => store.error);
-const aiMagicianUsageCount = computed(() => store.aiMagicianUsageCount);
-const AI_MAGICIAN_LIMIT = 3;
-
 // Gender Preference Composable
 const {
   genderPreference,
@@ -153,12 +148,12 @@ const {
 
 // 草稿流程管理
 const {
-  hasDraft,
-  draftFlow,
+  hasDraft: _hasDraft,
+  draftFlow: _draftFlow,
   checkDraft,
   saveDraft,
   clearDraft,
-  updateDraftStep,
+  updateDraftStep: _updateDraftStep,
 } = useDraftFlow();
 
 // ==================== Computed 屬性 ====================
@@ -185,10 +180,6 @@ const headerTitle: ComputedRef<string> = computed(() => {
 const selectedResultLabel: ComputedRef<string> = computed(
   () => selectedResult.value?.label ?? ""
 );
-
-const aiMagicianRemainingUsage: ComputedRef<number> = computed(() => {
-  return Math.max(0, AI_MAGICIAN_LIMIT - aiMagicianUsageCount.value);
-});
 
 const confirmButtonLabel: ComputedRef<string> = computed(() => {
   if (currentStep.value === Step.SELECTION || currentStep.value === Step.SETTINGS) {
@@ -325,7 +316,7 @@ const triggerImageGeneration = async (): Promise<void> => {
       });
 
       store.setGeneratedImages(
-        imageResults.map((img) => ({
+        imageResults.map((img: { id: string; image: string; label: string; alt: string }) => ({
           id: img.id,
           url: img.image,
           label: img.label,
@@ -807,7 +798,7 @@ onMounted(() => {
 
       // 設置圖片到 store（會自動選中第一張）
       store.setGeneratedImages(
-        imageResults.map((img) => ({
+        imageResults.map((img: { id: string; image: string; label: string; alt: string }) => ({
           id: img.id,
           url: img.image,
           label: img.label,

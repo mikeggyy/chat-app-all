@@ -3,13 +3,7 @@ import { useRouter } from 'vue-router';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 import { useNotifications } from '../composables/useNotifications';
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: string;
-  isRead: boolean;
-}
+// Note: Notification interface removed - using flexible type in handler instead
 
 const router = useRouter();
 const { notifications } = useNotifications();
@@ -39,7 +33,7 @@ const formatTimestamp = (dateString: string): string => {
   }
 };
 
-const handleNotificationClick = (notification: Notification): void => {
+const handleNotificationClick = (notification: { id: string | number; [key: string]: any }): void => {
   if (!notification || !notification.id) {
     return;
   }
@@ -47,7 +41,7 @@ const handleNotificationClick = (notification: Notification): void => {
   // 導航到通知詳細頁面
   router.push({
     name: 'notification-detail',
-    params: { id: notification.id }
+    params: { id: String(notification.id) }
   });
 };
 </script>

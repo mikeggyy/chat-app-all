@@ -101,48 +101,28 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
 
   /**
    * 當前角色的記憶增強藥水效果
+   * ✅ 2025-11-28 修復：移除 computed 中的副作用（console.log）
    */
   const activeMemoryBoost = computed(() => {
     const partnerId = getPartnerId();
-    console.log('[activeMemoryBoost] partnerId:', partnerId);
-    console.log('[activeMemoryBoost] activePotionEffects:', activePotionEffects.value);
-
-    const result = activePotionEffects.value.find(
+    return activePotionEffects.value.find(
       (effect) =>
         effect.potionType === 'memory_boost' &&
         effect.characterId === partnerId
     );
-
-    console.log('[activeMemoryBoost] 找到的效果:', result);
-    return result;
   });
 
   /**
    * 當前角色的腦力激盪藥水效果
+   * ✅ 2025-11-28 修復：移除 computed 中的副作用（console.log）
    */
   const activeBrainBoost = computed(() => {
     const partnerId = getPartnerId();
-    console.log('[activeBrainBoost] partnerId:', partnerId);
-    console.log('[activeBrainBoost] activePotionEffects:', activePotionEffects.value);
-
-    // ✅ 2025-11-25 調試：詳細記錄每個效果的字段
-    activePotionEffects.value.forEach((effect, index) => {
-      console.log(`[activeBrainBoost] Effect ${index}:`, {
-        potionType: effect.potionType,
-        characterId: effect.characterId,
-        id: effect.id,
-        matches: effect.potionType === 'brain_boost' && effect.characterId === partnerId
-      });
-    });
-
-    const result = activePotionEffects.value.find(
+    return activePotionEffects.value.find(
       (effect) =>
         effect.potionType === 'brain_boost' &&
         effect.characterId === partnerId
     );
-
-    console.log('[activeBrainBoost] 找到的效果:', result);
-    return result;
   });
 
   // ====================
@@ -196,7 +176,9 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
       console.log('[loadActivePotions] API 返回數據:', data);
 
       // ✅ 修復：後端使用 sendSuccess 包裝響應，數據在 data.data 中
-      const potions = data?.data?.potions || data?.potions || [];
+      // ✅ 加強類型檢查：確保 potions 是陣列
+      const rawPotions = data?.data?.potions ?? data?.potions;
+      const potions = Array.isArray(rawPotions) ? rawPotions : [];
       activePotionEffects.value = potions;
       console.log('[loadActivePotions] 設置 activePotionEffects:', activePotionEffects.value);
     } catch (error) {

@@ -67,7 +67,8 @@ export const calculateLevelFromPoints = (totalPoints) => {
 
   const pointsInCurrentLevel = totalPoints - accumulated;
   const pointsToNextLevel = level < MAX_LEVEL ? getPointsForLevel(level + 1) : 0;
-  const progress = level < MAX_LEVEL
+  // 防止除以零：確保 pointsToNextLevel > 0
+  const progress = level < MAX_LEVEL && pointsToNextLevel > 0
     ? Math.floor((pointsInCurrentLevel / pointsToNextLevel) * 100)
     : 100;
 
@@ -317,7 +318,8 @@ export const calculateLevelFast = (totalPoints) => {
   const pointsAtCurrentLevel = LEVEL_POINTS_TABLE[left];
   const pointsInCurrentLevel = totalPoints - pointsAtCurrentLevel;
   const pointsToNextLevel = level < MAX_LEVEL ? getPointsForLevel(level + 1) : 0;
-  const progress = level < MAX_LEVEL
+  // 防止除以零：確保 pointsToNextLevel > 0
+  const progress = level < MAX_LEVEL && pointsToNextLevel > 0
     ? Math.floor((pointsInCurrentLevel / pointsToNextLevel) * 100)
     : 100;
 

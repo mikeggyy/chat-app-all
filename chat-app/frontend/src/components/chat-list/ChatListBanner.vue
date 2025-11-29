@@ -19,7 +19,7 @@
 // Types
 interface Message {
   text: string;
-  tone?: 'info' | 'error' | 'success';
+  tone?: 'info' | 'error' | 'success' | '';
 }
 
 interface Props {

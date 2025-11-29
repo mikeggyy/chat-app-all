@@ -4,7 +4,7 @@
  */
 
 import logger from "../utils/logger.js";
-import { getGiftById } from "../config/gifts.js";
+import { getGiftById, getResponseLevelByRarity } from "../config/gifts.js";
 import { getOpenAIClient } from "../ai/ai.service.js";
 import { generateGeminiImage } from "../ai/gemini.service.js";
 import { getConversationHistory, appendConversationMessage, deleteConversationMessages } from "../conversation/conversation.service.js";
@@ -399,15 +399,25 @@ Focus on showing both the character and the gift (${gift.name} ${gift.emoji}) na
  * - 如果照片生成失敗，回滾已保存的訊息並返回失敗狀態
  * - 前端根據 success 狀態決定是否需要退款
  *
- * ✅ 支援選擇現有照片：如果 options.selectedPhotoUrl 有值，使用該照片而非生成新照片
+ * ✅ 2025-11-30 更新：所有禮物都生成感謝照片（用戶花錢了，應該給照片）
+ * - common: 預設文字 + AI 照片（成本 ~1.5 TWD）
+ * - uncommon/rare/epic/legendary: AI 文字 + AI 照片（成本 ~1.56 TWD）
+ * - 用戶可選擇參考照片，沒選則使用角色預設照片（肖像）
  */
 export const processGiftResponse = async (characterData, giftId, userId, options = {}) => {
-  const generatePhoto = options.generatePhoto !== false; // 預設生成照片
-  const selectedPhotoUrl = options.selectedPhotoUrl; // 用戶選擇的現有照片 URL
+  const gift = getGiftById(giftId);
+
+  // 根據禮物稀有度獲取回覆等級配置
+  const responseLevel = getResponseLevelByRarity(gift?.rarity);
+  logger.info(`[禮物回應] 🎁 禮物回覆分級: giftId=${giftId}, rarity=${gift?.rarity}, level=${responseLevel.level}`);
+
+  // ✅ 2025-11-30 更新：所有禮物都生成感謝照片（用戶花錢了，應該給照片）
+  // 用戶可選擇參考照片，沒選則使用角色預設照片（肖像）
+  const selectedPhotoUrl = options.selectedPhotoUrl; // 用戶選擇的參考照片
+  const shouldGeneratePhoto = responseLevel.generatePhoto && options.generatePhoto !== false;
 
   let thankYouMessageObj = null;
   let photoMessage = null;
-  const gift = getGiftById(giftId);
 
   // 追蹤已保存的訊息 ID（用於失敗時回滾）
   const savedMessageIds = [];
@@ -415,17 +425,26 @@ export const processGiftResponse = async (characterData, giftId, userId, options
   let photoGenerationError = null;
 
   try {
-    // ✅ 步驟 1: 生成感謝訊息（不保存）
+    // ✅ 步驟 1: 根據分級決定感謝訊息生成方式
     let thankYouMessage;
-    try {
-      thankYouMessage = await generateGiftThankYouMessage(
-        characterData,
-        giftId,
-        userId
-      );
-    } catch (msgError) {
-      logger.warn(`[禮物回應] 生成感謝訊息失敗，使用預設訊息: ${msgError.message}`);
+
+    if (responseLevel.generateAiText) {
+      // uncommon 及以上：使用 AI 生成個性化感謝訊息
+      try {
+        thankYouMessage = await generateGiftThankYouMessage(
+          characterData,
+          giftId,
+          userId
+        );
+        logger.info(`[禮物回應] ✨ 使用 AI 生成感謝訊息: rarity=${gift?.rarity}`);
+      } catch (msgError) {
+        logger.warn(`[禮物回應] AI 生成感謝訊息失敗，降級使用預設訊息: ${msgError.message}`);
+        thankYouMessage = gift?.thankYouMessage || `謝謝你的${gift?.name || '禮物'}！我好開心！${gift?.emoji || ''}`;
+      }
+    } else {
+      // common：使用預設文字回覆（成本 0）
       thankYouMessage = gift?.thankYouMessage || `謝謝你的${gift?.name || '禮物'}！我好開心！${gift?.emoji || ''}`;
+      logger.info(`[禮物回應] 📝 使用預設感謝訊息: rarity=${gift?.rarity}`);
     }
 
     // 創建感謝訊息對象（但還不保存）
@@ -436,19 +455,25 @@ export const processGiftResponse = async (characterData, giftId, userId, options
       createdAt: new Date().toISOString(),
     };
 
-    // ✅ 步驟 2: 如果需要生成照片，先生成照片
+    // ✅ 步驟 2: 生成感謝照片
+    // 所有禮物都生成照片（用戶花錢了，應該給照片）
+    // 用戶可選擇參考照片，沒選則使用角色預設照片（肖像）
     let finalImageUrl = null;
-    if (generatePhoto || selectedPhotoUrl) {
+
+    if (shouldGeneratePhoto) {
       try {
         if (selectedPhotoUrl) {
-          logger.info(`[禮物回應] 使用選中照片作為參考生成新的禮物照片: userId=${userId}, characterId=${characterData.id}, referenceUrl=${selectedPhotoUrl.substring(0, 100)}...`);
+          // 使用用戶選擇的照片作為參考
+          logger.info(`[禮物回應] 📸 使用用戶選擇的照片生成禮物照片: userId=${userId}, characterId=${characterData.id}, rarity=${gift?.rarity}`);
           const photoResult = await generateGiftSelfie(characterData, giftId, userId, selectedPhotoUrl);
           finalImageUrl = photoResult?.imageUrl;
-          logger.info(`[禮物回應] 基於參考照片生成成功: userId=${userId}, characterId=${characterData.id}, hasImageUrl=${!!finalImageUrl}`);
-        } else if (generatePhoto) {
+          logger.info(`[禮物回應] ✅ 基於用戶選擇的照片生成成功: userId=${userId}, characterId=${characterData.id}`);
+        } else {
+          // 使用角色預設照片（肖像）作為參考
+          logger.info(`[禮物回應] 🎨 使用角色預設照片生成禮物照片: userId=${userId}, characterId=${characterData.id}, rarity=${gift?.rarity}`);
           const photoResult = await generateGiftSelfie(characterData, giftId, userId);
           finalImageUrl = photoResult?.imageUrl;
-          logger.info(`[禮物回應] 禮物照片生成成功: userId=${userId}, characterId=${characterData.id}, hasImageUrl=${!!finalImageUrl}`);
+          logger.info(`[禮物回應] ✅ 禮物照片生成成功: userId=${userId}, characterId=${characterData.id}`);
         }
       } catch (photoError) {
         // ✅ 照片生成失敗 - 記錄錯誤，稍後決定是否回滾
@@ -456,10 +481,12 @@ export const processGiftResponse = async (characterData, giftId, userId, options
         photoGenerationError = photoError;
         logger.error(`[禮物回應] ❌ 照片生成失敗: userId=${userId}, characterId=${characterData.id}`, photoError);
       }
+    } else {
+      logger.info(`[禮物回應] ⏭️ 不生成照片: rarity=${gift?.rarity}, level=${responseLevel.level}, generatePhoto=${options.generatePhoto}`);
     }
 
     // ✅ 步驟 3: 根據生成結果決定是否保存
-    if (photoGenerationFailed && (generatePhoto || selectedPhotoUrl)) {
+    if (photoGenerationFailed && shouldGeneratePhoto) {
       // 照片生成失敗且用戶期望有照片 - 不保存任何訊息，返回失敗
       logger.error(`[禮物回應] ❌ 照片生成失敗，不保存任何訊息，需要退款: userId=${userId}, characterId=${characterData.id}, errorType=${photoGenerationError?.errorType}`);
 
@@ -565,9 +592,16 @@ export const processGiftResponse = async (characterData, giftId, userId, options
       thankYouMessage: thankYouMessageObj,
       photoMessage: photoMessage,
       gift: gift,
+      responseLevel: {
+        level: responseLevel.level,
+        rarity: gift?.rarity,
+        usedAiText: responseLevel.generateAiText,
+        generatedPhoto: !!finalImageUrl, // 是否生成了照片
+        usedCustomReference: !!selectedPhotoUrl && !!finalImageUrl, // 是否使用了用戶選擇的參考照片
+      },
     };
 
-    logger.info(`[禮物回應] ✅ 禮物回應處理成功: userId=${userId}, characterId=${characterData.id}, hasPhotoMessage=${!!photoMessage}`);
+    logger.info(`[禮物回應] ✅ 禮物回應處理成功: userId=${userId}, characterId=${characterData.id}, rarity=${gift?.rarity}, level=${responseLevel.level}, generatedPhoto=${!!finalImageUrl}, usedCustomReference=${!!selectedPhotoUrl}`);
     return response;
 
   } catch (criticalError) {

@@ -77,7 +77,19 @@ class ApiCacheService {
     // 自動清理定時器
     this.cleanupInterval = null;
     this.startAutoCleanup();
+
+    // ✅ 修復：註冊頁面卸載事件，確保 setInterval 被清理
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', this.handleBeforeUnload);
+    }
   }
+
+  /**
+   * 頁面卸載前清理
+   */
+  private handleBeforeUnload = (): void => {
+    this.stopAutoCleanup();
+  };
 
   /**
    * 獲取緩存數據
@@ -306,6 +318,18 @@ class ApiCacheService {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
     }
+  }
+
+  /**
+   * ✅ 新增：完整銷毀實例（用於測試或 HMR）
+   * 停止定時器並移除事件監聽器
+   */
+  destroy(): void {
+    this.stopAutoCleanup();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', this.handleBeforeUnload);
+    }
+    this.clear(); // 清除所有緩存
   }
 
   /**

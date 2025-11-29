@@ -2,6 +2,56 @@
  * 禮物系統配置（共享）
  */
 
+/**
+ * 禮物回覆等級配置
+ * 根據稀有度決定回覆方式
+ *
+ * ✅ 2025-11-30 更新：所有禮物都生成感謝照片（用戶花錢了，應該給照片）
+ *
+ * 回覆等級說明：
+ * - preset_photo: 預設文字 + AI 照片（成本 ~1.5 TWD）
+ * - ai_text_photo: AI 文字 + AI 照片（成本 ~1.56 TWD）
+ */
+export const GIFT_RESPONSE_LEVELS = {
+  common: {
+    level: "preset_photo",
+    generateAiText: false, // 預設文字（節省 ~0.06 TWD）
+    generatePhoto: true,   // 生成照片
+    description: "預設文字 + AI 照片",
+  },
+  uncommon: {
+    level: "ai_text_photo",
+    generateAiText: true,
+    generatePhoto: true,
+    description: "AI 文字 + AI 照片",
+  },
+  rare: {
+    level: "ai_text_photo",
+    generateAiText: true,
+    generatePhoto: true,
+    description: "AI 文字 + AI 照片",
+  },
+  epic: {
+    level: "ai_text_photo",
+    generateAiText: true,
+    generatePhoto: true,
+    description: "AI 文字 + AI 照片",
+  },
+  legendary: {
+    level: "ai_text_photo",
+    generateAiText: true,
+    generatePhoto: true,
+    description: "AI 文字 + AI 照片",
+  },
+};
+
+/**
+ * 根據稀有度獲取回覆等級配置
+ */
+export const getResponseLevelByRarity = (rarity) => {
+  return GIFT_RESPONSE_LEVELS[rarity] || GIFT_RESPONSE_LEVELS.common;
+};
+
 export const GIFTS = {
   rose: {
     id: "rose",
@@ -240,7 +290,9 @@ export const isValidGift = (giftId) => {
 export default {
   GIFTS,
   RARITY_CONFIG,
+  GIFT_RESPONSE_LEVELS,
   getGiftList,
   getGiftById,
   isValidGift,
+  getResponseLevelByRarity,
 };

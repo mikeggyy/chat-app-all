@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { useRouter } from "vue-router";
 import { logger } from "@/utils/logger";
 import { XMarkIcon } from "@heroicons/vue/24/outline";
 import { useGuestGuard } from "../composables/useGuestGuard";
 import { useUserProfile } from "../composables/useUserProfile";
+import { useIsMounted } from "../composables/useIsMounted";
 import { useUnlockTickets } from "../composables/useUnlockTickets";
 import { useDraftFlow } from "../composables/character-creation/useDraftFlow";
 import { apiJson } from "../utils/api";
@@ -65,6 +66,10 @@ const { requireLogin } = useGuestGuard();
 const { user } = useUserProfile();
 const { loadBalance: loadTicketsBalance, createCards } = useUnlockTickets();
 const { checkDraft, clearDraft } = useDraftFlow();
+
+// ✅ 修復：追蹤組件掛載狀態和導航計時器
+const isMounted = useIsMounted();
+let navigationTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 const genderOptions: GenderOption[] = [
   {
@@ -211,6 +216,11 @@ onMounted(async () => {
         skipGlobalLoading: true,
       });
 
+      // ✅ 修復：API 調用後檢查組件是否仍掛載
+      if (!isMounted.value) {
+        return;
+      }
+
       // 調試日誌：查看完整的 API 返回數據
       console.log('[角色創建限制] API 返回數據:', response);
       console.log('[角色創建限制] response.limit:', response?.limit);
@@ -249,6 +259,11 @@ onMounted(async () => {
       }
     } catch {
       // Silent fail
+    }
+
+    // ✅ 修復：載入前再次檢查組件是否仍掛載
+    if (!isMounted.value) {
+      return;
     }
 
     // 載入用戶資產（解鎖卡數量）- 統一使用 useUnlockTickets
@@ -341,7 +356,9 @@ const handleClose = (): void => {
   if (window.history.length > 1) {
     clearCreationState();
     router.back();
-    window.setTimeout(() => {
+    // ✅ 修復：追蹤計時器以便在組件卸載時清理
+    navigationTimeoutId = setTimeout(() => {
+      navigationTimeoutId = null;
       if (router.currentRoute.value?.name === "character-create-gender") {
         navigateBackToProfile();
       }
@@ -351,6 +368,14 @@ const handleClose = (): void => {
 
   navigateBackToProfile();
 };
+
+// ✅ 修復：組件卸載時清理計時器
+onBeforeUnmount(() => {
+  if (navigationTimeoutId !== null) {
+    clearTimeout(navigationTimeoutId);
+    navigationTimeoutId = null;
+  }
+});
 </script>
 
 <template>

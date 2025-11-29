@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
   ChevronLeftIcon,
@@ -29,6 +29,9 @@ const { getNotificationById, markAsRead } = useNotifications();
 
 const notification = ref<NotificationDetail | null>(null);
 const isLoading = ref<boolean>(true);
+
+// ✅ 修復：追蹤定時器以便清理
+let loadTimerId: ReturnType<typeof setTimeout> | null = null;
 
 const notificationId = computed(() => route.params.id as string);
 
@@ -72,8 +75,14 @@ const handleAction = (action: NotificationAction): void => {
 const loadNotification = (): void => {
   isLoading.value = true;
 
+  // ✅ 修復：清理之前的定時器（如果有）
+  if (loadTimerId !== null) {
+    clearTimeout(loadTimerId);
+  }
+
   // 模擬 API 請求
-  setTimeout(() => {
+  loadTimerId = setTimeout(() => {
+    loadTimerId = null;
     const id = notificationId.value;
     notification.value = getNotificationById(id) as unknown as NotificationDetail | null;
     isLoading.value = false;
@@ -87,6 +96,14 @@ const loadNotification = (): void => {
 
 onMounted(() => {
   loadNotification();
+});
+
+// ✅ 修復：組件卸載時清理定時器，避免記憶體洩漏
+onBeforeUnmount(() => {
+  if (loadTimerId !== null) {
+    clearTimeout(loadTimerId);
+    loadTimerId = null;
+  }
 });
 </script>
 

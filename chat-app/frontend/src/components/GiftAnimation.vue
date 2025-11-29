@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, onBeforeUnmount } from "vue";
 
 interface Props {
   show?: boolean;
@@ -26,6 +26,9 @@ const props = withDefaults(defineProps<Props>(), {
 
 const particles = ref<Particle[]>([]);
 const showAnimation = ref<boolean>(false);
+
+// ✅ 修復：追蹤定時器以便清理
+let animationTimerId: ReturnType<typeof setTimeout> | null = null;
 
 // 生成隨機粒子
 const generateParticles = (): void => {
@@ -78,11 +81,25 @@ watch(() => props.show, (newValue: boolean) => {
     showAnimation.value = true;
     generateParticles();
 
+    // ✅ 修復：清理之前的定時器（如果有）
+    if (animationTimerId !== null) {
+      clearTimeout(animationTimerId);
+    }
+
     // 動畫結束後自動隱藏
-    setTimeout(() => {
+    animationTimerId = setTimeout(() => {
       showAnimation.value = false;
       particles.value = [];
+      animationTimerId = null;
     }, 2000);
+  }
+});
+
+// ✅ 修復：組件卸載時清理定時器
+onBeforeUnmount(() => {
+  if (animationTimerId !== null) {
+    clearTimeout(animationTimerId);
+    animationTimerId = null;
   }
 });
 </script>

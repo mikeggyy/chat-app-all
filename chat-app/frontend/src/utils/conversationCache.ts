@@ -53,8 +53,22 @@ const readFromStore = (store: StoreType, key: string): Message[] | null => {
   const raw = store.getItem(key);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as Message[];
-  } catch {
+    const parsed = JSON.parse(raw);
+    // ✅ 修復：驗證解析結果是陣列
+    if (!Array.isArray(parsed)) {
+      console.warn(`[conversationCache] 緩存數據格式無效 (非陣列): ${key}`);
+      store.removeItem(key); // 清理損壞的數據
+      return null;
+    }
+    return parsed as Message[];
+  } catch (error) {
+    // ✅ 修復：記錄 JSON 解析錯誤，便於調試數據損壞問題
+    console.warn(`[conversationCache] JSON 解析失敗，清理損壞的緩存: ${key}`, error);
+    try {
+      store.removeItem(key); // 主動清理損壞的數據
+    } catch {
+      // 忽略清理錯誤
+    }
     return null;
   }
 };

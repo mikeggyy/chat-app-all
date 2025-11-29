@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive, watchEffect } from "vue";
+import { ref, computed, reactive, watchEffect, onBeforeUnmount } from "vue";
 import type { Ref, ComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
@@ -54,6 +54,9 @@ interface StoredAppearance {
 }
 
 const router = useRouter();
+
+// ✅ 修復：追蹤導航超時計時器以便清理
+let navigationTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 // 保存的性別資料
 const savedGender: Ref<string> = ref("");
@@ -266,7 +269,9 @@ const handleClose = (): void => {
   if (window.history.length > 1) {
     clearCreationState();
     router.back();
-    window.setTimeout(() => {
+    // ✅ 修復：追蹤計時器以便在組件卸載時清理
+    navigationTimeoutId = setTimeout(() => {
+      navigationTimeoutId = null;
       if (router.currentRoute.value?.name === "character-create-appearance") {
         fallbackToProfile();
       }
@@ -291,6 +296,14 @@ const handleReferenceFocusUpdate = (value: string): void => {
   referenceFocus.value = value;
   saveAppearanceState({ referenceFocus: value });
 };
+
+// ✅ 修復：組件卸載時清理計時器
+onBeforeUnmount(() => {
+  if (navigationTimeoutId !== null) {
+    clearTimeout(navigationTimeoutId);
+    navigationTimeoutId = null;
+  }
+});
 </script>
 
 <template>

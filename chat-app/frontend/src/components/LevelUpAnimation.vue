@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onBeforeUnmount } from "vue";
 
 interface Props {
   show?: boolean;
@@ -22,6 +22,9 @@ const emit = defineEmits<{
 }>();
 
 const showAnimation = ref(false);
+
+// ✅ 修復：追蹤定時器以便清理
+let animationTimerId: ReturnType<typeof setTimeout> | null = null;
 
 // 等級顏色
 const levelColor = computed(() => {
@@ -49,21 +52,35 @@ const stars = computed(() => {
   });
 });
 
-// 監聽 show 屬性
+// 監聯 show 屬性
 watch(
   () => props.show,
   (newValue) => {
     if (newValue) {
       showAnimation.value = true;
 
+      // ✅ 修復：清理之前的定時器
+      if (animationTimerId !== null) {
+        clearTimeout(animationTimerId);
+      }
+
       // 動畫結束後隱藏
-      setTimeout(() => {
+      animationTimerId = setTimeout(() => {
         showAnimation.value = false;
         emit("complete");
+        animationTimerId = null;
       }, 2500);
     }
   }
 );
+
+// ✅ 修復：組件卸載時清理定時器
+onBeforeUnmount(() => {
+  if (animationTimerId !== null) {
+    clearTimeout(animationTimerId);
+    animationTimerId = null;
+  }
+});
 </script>
 
 <template>

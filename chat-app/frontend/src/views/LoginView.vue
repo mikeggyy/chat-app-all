@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { apiJson } from "../utils/api";
 import { useUserProfile } from "../composables/useUserProfile";
@@ -331,6 +331,14 @@ onMounted(async () => {
     // 注意：不在這裡設置 isLoading = false，讓它保持 loading 狀態
     // 直到 authBootstrap 完成並導航到目標頁面
     console.log('[LoginView] 🔵 onMounted 完成');
+  }
+});
+
+// ✅ 修復：組件卸載時清理超時計時器，避免記憶體洩漏
+onBeforeUnmount(() => {
+  if (navigationTimeoutId) {
+    clearTimeout(navigationTimeoutId);
+    navigationTimeoutId = null;
   }
 });
 

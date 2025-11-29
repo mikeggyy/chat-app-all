@@ -297,7 +297,10 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     }
 
     pendingRetryTimerId = setTimeout(() => {
-      syncPendingMessages();
+      // ✅ 修復：添加 catch 處理異步錯誤，防止 unhandled rejection
+      syncPendingMessages().catch(error => {
+        console.error('[useChatMessages] 同步待處理消息失敗:', error);
+      });
     }, 2000); // 2 秒後嘗試同步
   };
 

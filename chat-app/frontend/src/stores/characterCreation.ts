@@ -313,15 +313,24 @@ export const useCharacterCreationStore = defineStore("characterCreation", () => 
       const stored = sessionStorage.getItem("character-creation-state");
       if (stored) {
         const state = JSON.parse(stored);
+
+        // ✅ 修復：驗證解析後的數據是有效對象
+        if (!state || typeof state !== 'object') {
+          console.warn("[CharacterCreationStore] sessionStorage 數據格式無效，已跳過");
+          return;
+        }
+
         flowId.value = state.flowId || "";
         status.value = state.status || "draft";
         gender.value = state.gender || "";
         appearance.value = state.appearance || null;
-        generatedImages.value = state.generatedImages || [];
+        generatedImages.value = Array.isArray(state.generatedImages) ? state.generatedImages : [];
         selectedImageId.value = state.selectedImageId || "";
         persona.value = state.persona || null;
         voiceId.value = state.voiceId || "";
-        aiMagicianUsageCount.value = state.aiMagicianUsageCount || 0;
+        // ✅ 修復：驗證 aiMagicianUsageCount 是有效數字
+        const usageCount = Number(state.aiMagicianUsageCount);
+        aiMagicianUsageCount.value = Number.isFinite(usageCount) && usageCount >= 0 ? usageCount : 0;
       }
     } catch (error) {
       console.error("[CharacterCreationStore] 從 sessionStorage 加載失敗:", error);
@@ -354,7 +363,12 @@ export const useCharacterCreationStore = defineStore("characterCreation", () => 
    * 清除 sessionStorage
    */
   const clearSession = (): void => {
-    sessionStorage.removeItem("character-creation-state");
+    // ✅ 修復：添加 try-catch 處理隱私模式或配額不足
+    try {
+      sessionStorage.removeItem("character-creation-state");
+    } catch (error) {
+      console.warn("[CharacterCreationStore] 清除 sessionStorage 失敗:", error);
+    }
   };
 
   // ==================== 返回 ====================

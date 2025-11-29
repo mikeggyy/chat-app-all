@@ -10,7 +10,7 @@ import { generateGeminiImage, buildGeminiPrompt } from "./gemini.service.js";
 import { getMatchById } from "../match/match.service.js";
 import { getConversationHistory, appendConversationMessage } from "../conversation/conversation.service.js";
 import { canGeneratePhoto, recordPhotoGeneration } from "./photoLimit.service.js";
-import { isDevUser } from "../../shared/config/testAccounts.js";
+import { isDevUser } from "../../../../shared/config/testAccounts.js";
 import { savePhotoToAlbum } from "../photoAlbum/photoAlbum.service.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 

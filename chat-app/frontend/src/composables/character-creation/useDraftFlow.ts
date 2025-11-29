@@ -37,8 +37,23 @@ export function useDraftFlow() {
 
       const draft = JSON.parse(stored) as DraftFlow;
 
+      // ✅ 修復：驗證草稿數據完整性
+      if (!draft || !draft.flowId || !draft.createdAt || !draft.step) {
+        console.warn('[useDraftFlow] 草稿數據不完整，清除');
+        clearDraft();
+        return null;
+      }
+
       // 檢查草稿是否過期（24小時）
       const createdTime = new Date(draft.createdAt).getTime();
+
+      // ✅ 修復：驗證日期解析結果，防止 NaN 導致過期檢查失敗
+      if (isNaN(createdTime)) {
+        console.warn('[useDraftFlow] 草稿日期格式無效，清除', draft.createdAt);
+        clearDraft();
+        return null;
+      }
+
       const now = Date.now();
       const EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24小時
 

@@ -105,19 +105,23 @@ const writeToStore = (store: StoreType, key: string, value: Message[] | null): v
 
       // ✅ 更激進的清理策略：清理所有類型的緩存
       try {
-        const keysToRemove: string[] = [];
+        // ✅ 修復：先快照所有 keys，避免遍歷時動態修改導致的不穩定行為
+        const allKeys: string[] = [];
         for (let i = 0; i < store.length; i++) {
-          const storageKey = store.key(i);
-          if (storageKey) {
-            // 清理所有對話相關緩存（history、pending、hidden-threads）
-            const shouldRemove =
-              storageKey.startsWith('history::') ||
-              storageKey.startsWith('pending::') ||
-              storageKey.startsWith('chat-list-hidden-threads:');
+          const k = store.key(i);
+          if (k !== null) allKeys.push(k);
+        }
 
-            if (shouldRemove) {
-              keysToRemove.push(storageKey);
-            }
+        const keysToRemove: string[] = [];
+        for (const storageKey of allKeys) {
+          // 清理所有對話相關緩存（history、pending、hidden-threads）
+          const shouldRemove =
+            storageKey.startsWith('history::') ||
+            storageKey.startsWith('pending::') ||
+            storageKey.startsWith('chat-list-hidden-threads:');
+
+          if (shouldRemove) {
+            keysToRemove.push(storageKey);
           }
         }
 
@@ -265,20 +269,24 @@ export const clearAllConversationCaches = (): number => {
 
   try {
     let removedCount = 0;
-    const keysToRemove: string[] = [];
 
+    // ✅ 修復：先快照所有 keys，避免遍歷時索引偏移
+    const allKeys: string[] = [];
     for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
-      if (key) {
-        // 清理所有對話相關緩存
-        const shouldRemove =
-          key.startsWith('history::') ||
-          key.startsWith('pending::') ||
-          key.startsWith('chat-list-hidden-threads:');
+      const k = storage.key(i);
+      if (k !== null) allKeys.push(k);
+    }
 
-        if (shouldRemove) {
-          keysToRemove.push(key);
-        }
+    const keysToRemove: string[] = [];
+    for (const key of allKeys) {
+      // 清理所有對話相關緩存
+      const shouldRemove =
+        key.startsWith('history::') ||
+        key.startsWith('pending::') ||
+        key.startsWith('chat-list-hidden-threads:');
+
+      if (shouldRemove) {
+        keysToRemove.push(key);
       }
     }
 
@@ -317,23 +325,27 @@ export const estimateLocalStorageUsage = (): StorageUsage => {
   let conversationBytes = 0;
 
   try {
+    // ✅ 修復：先快照所有 keys，確保遍歷穩定
+    const allKeys: string[] = [];
     for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
-      if (key) {
-        const value = storage.getItem(key);
-        const bytes = (key.length + (value?.length || 0)) * 2; // UTF-16 每字符 2 bytes
+      const k = storage.key(i);
+      if (k !== null) allKeys.push(k);
+    }
 
-        totalBytes += bytes;
+    for (const key of allKeys) {
+      const value = storage.getItem(key);
+      const bytes = (key.length + (value?.length || 0)) * 2; // UTF-16 每字符 2 bytes
 
-        // 統計對話相關緩存
-        const isConversation =
-          key.startsWith('history::') ||
-          key.startsWith('pending::') ||
-          key.startsWith('chat-list-hidden-threads:');
+      totalBytes += bytes;
 
-        if (isConversation) {
-          conversationBytes += bytes;
-        }
+      // 統計對話相關緩存
+      const isConversation =
+        key.startsWith('history::') ||
+        key.startsWith('pending::') ||
+        key.startsWith('chat-list-hidden-threads:');
+
+      if (isConversation) {
+        conversationBytes += bytes;
       }
     }
 

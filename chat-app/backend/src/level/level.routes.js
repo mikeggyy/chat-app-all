@@ -4,7 +4,7 @@
 
 import express from "express";
 import { asyncHandler } from "../utils/routeHelpers.js";
-import { sendSuccess, sendError } from "../../shared/utils/errorFormatter.js";
+import { sendSuccess, sendError } from "../../../../shared/utils/errorFormatter.js";
 import { requireFirebaseAuth } from "../auth/index.js";
 import { relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
 import {

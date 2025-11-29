@@ -11,4 +11,4 @@ export {
   auth,
   FieldValue,
   FieldPath
-} from '../../shared/backend-utils/firebase.js';
+} from '../../../../shared/backend-utils/firebase.js';

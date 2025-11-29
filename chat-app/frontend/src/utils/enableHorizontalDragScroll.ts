@@ -348,3 +348,33 @@ export const enableHorizontalDragScroll = (): void => {
     target.addEventListener("dragstart", onDragStart as EventListener, true);
   }
 };
+
+/**
+ * ✅ 修復：添加清理函數，移除所有事件監聽器
+ * 用於組件卸載或頁面切換時防止記憶體洩漏
+ */
+export const disableHorizontalDragScroll = (): void => {
+  if (!isEnabled || typeof window === "undefined") {
+    return;
+  }
+
+  isEnabled = false;
+
+  // 取消動量動畫
+  cancelMomentum();
+
+  // 重置指標狀態（這也會移除 pointermove/up/cancel 監聽器）
+  resetPointerState();
+
+  // 移除全局事件監聽器
+  const pointerDownTargets: (Window | Document)[] = [window, document];
+  for (const target of pointerDownTargets) {
+    target.removeEventListener("pointerdown", onPointerDown as EventListener, { capture: true });
+    target.removeEventListener("click", onClickCapture as EventListener, true);
+    target.removeEventListener("dragstart", onDragStart as EventListener, true);
+  }
+
+  // 清理最後拖曳狀態
+  lastDrag.element = null;
+  lastDrag.timestamp = 0;
+};

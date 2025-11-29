@@ -9,7 +9,7 @@ import {
   getGiftList,
   getGiftById,
   isValidGift,
-} from "../../shared/config/gifts.js";
+} from "../../../../shared/config/gifts.js";
 
 // 重新導出共享配置
 export { GIFTS, RARITY_CONFIG, getGiftList, getGiftById, isValidGift };

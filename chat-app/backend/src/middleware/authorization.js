@@ -3,7 +3,7 @@
  * 用於檢查用戶權限
  */
 
-import { sendError } from "../../shared/utils/errorFormatter.js";
+import { sendError } from "../../../../shared/utils/errorFormatter.js";
 
 /**
  * 要求請求者是資源擁有者

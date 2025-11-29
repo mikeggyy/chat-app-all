@@ -4,7 +4,7 @@
  */
 
 import { MEMBERSHIP_TIERS } from "../../membership/membership.config.js";
-import { isDevUser } from "../../../shared/config/testAccounts.js";
+import { isDevUser } from "../../../../../shared/config/testAccounts.js";
 import { TEST_ACCOUNT_LIMITS } from "../../config/limits.js";
 import { getUserTier } from "../../utils/membershipUtils.js";
 import { getFirestoreDb } from "../../firebase/index.js";

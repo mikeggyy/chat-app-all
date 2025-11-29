@@ -118,7 +118,11 @@ export function useNotifications(): UseNotificationsReturn {
    * @returns {Notification | undefined} 找到的通知對象或 undefined
    */
   const getNotificationById = (id: string | number): Notification | undefined => {
-    const numId = parseInt(String(id));
+    // ✅ 修復：驗證 parseInt 結果，防止 NaN
+    const numId = typeof id === 'number' ? id : parseInt(String(id), 10);
+    if (!Number.isFinite(numId)) {
+      return undefined;
+    }
     return notificationsStore.value.find(notification => notification.id === numId);
   };
 
@@ -128,7 +132,11 @@ export function useNotifications(): UseNotificationsReturn {
    * @param {string | number} id - 通知 ID
    */
   const markAsRead = (id: string | number): void => {
-    const numId = parseInt(String(id));
+    // ✅ 修復：驗證 parseInt 結果，防止 NaN
+    const numId = typeof id === 'number' ? id : parseInt(String(id), 10);
+    if (!Number.isFinite(numId)) {
+      return;
+    }
     const notification = notificationsStore.value.find(n => n.id === numId);
     if (notification && !notification.isRead) {
       notification.isRead = true;

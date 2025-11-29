@@ -10,7 +10,7 @@ import {
   sendSuccess,
   sendError,
   ApiError,
-} from "../../shared/utils/errorFormatter.js";
+} from "../../../../shared/utils/errorFormatter.js";
 import { sendGift, getUserGiftHistory, getCharacterGiftStats, getGiftPricing } from "./gift.service.js";
 import { refundCoins } from "../payment/coins.service.js";
 import { processGiftResponse } from "./giftResponse.service.js";

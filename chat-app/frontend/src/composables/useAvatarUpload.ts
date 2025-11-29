@@ -93,6 +93,8 @@ export function useAvatarUpload({
 
     // 如果是 data URL，直接顯示預覽並關閉編輯器
     if (isDataUrl) {
+      // ✅ 修復：data URL 不需要網路載入，直接設置為載入完成
+      isImageLoading.value = false;
       closeEditor();
       return;
     }

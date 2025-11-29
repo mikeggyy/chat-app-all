@@ -4,7 +4,7 @@
  * 當影片生成完成時，顯示頂部提示並提供滾動到影片位置的按鈕
  */
 
-import { ref, type Ref } from 'vue';
+import { ref, onBeforeUnmount, type Ref } from 'vue';
 
 export interface VideoCompletionNotification {
   show: boolean;
@@ -21,6 +21,17 @@ export interface UseVideoCompletionNotificationReturn {
 
 export function useVideoCompletionNotification(): UseVideoCompletionNotificationReturn {
   const notification: Ref<VideoCompletionNotification | null> = ref(null);
+
+  // ✅ 修復：追蹤高亮效果的定時器，防止記憶體洩漏
+  let highlightTimerId: ReturnType<typeof setTimeout> | null = null;
+
+  // ✅ 修復：組件卸載時清理定時器
+  onBeforeUnmount(() => {
+    if (highlightTimerId !== null) {
+      clearTimeout(highlightTimerId);
+      highlightTimerId = null;
+    }
+  });
 
   /**
    * 顯示影片完成提示
@@ -83,8 +94,13 @@ export function useVideoCompletionNotification(): UseVideoCompletionNotification
       element.style.transition = 'box-shadow 0.3s ease';
       element.style.boxShadow = '0 0 20px rgba(255, 107, 157, 0.6)';
 
-      setTimeout(() => {
+      // ✅ 修復：清理先前的定時器，使用追蹤變數
+      if (highlightTimerId !== null) {
+        clearTimeout(highlightTimerId);
+      }
+      highlightTimerId = setTimeout(() => {
         element.style.boxShadow = '';
+        highlightTimerId = null;
       }, 2000);
     } else {
       console.warn('[VideoNotification] 找不到影片元素');

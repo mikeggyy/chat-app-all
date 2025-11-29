@@ -77,10 +77,17 @@ export function useAIMagician(savedGender: Ref<string | null>): UseAIMagicianRet
 
     if (savedGender.value) {
       const sessionKey = `ai-magician-usage-${savedGender.value}`;
-      const storedUsage = window.sessionStorage.getItem(sessionKey);
-      if (storedUsage) {
-        aiMagicianUsageCount.value = parseInt(storedUsage, 10);
-      } else {
+      // ✅ 修復：添加 try-catch 處理隱私模式等情況
+      try {
+        const storedUsage = window.sessionStorage.getItem(sessionKey);
+        if (storedUsage) {
+          const parsed = parseInt(storedUsage, 10);
+          aiMagicianUsageCount.value = isNaN(parsed) ? 0 : parsed;
+        } else {
+          aiMagicianUsageCount.value = 0;
+        }
+      } catch {
+        // sessionStorage 不可用（隱私模式等）
         aiMagicianUsageCount.value = 0;
       }
     }
@@ -101,10 +108,18 @@ export function useAIMagician(savedGender: Ref<string | null>): UseAIMagicianRet
 
       // 使用 sessionStorage 追蹤 AI 魔法師使用次數
       const sessionKey = `ai-magician-usage-${savedGender.value}`;
-      const currentUsage = parseInt(
-        sessionStorage.getItem(sessionKey) || "0",
-        10
-      );
+      // ✅ 修復：添加 try-catch 處理 sessionStorage 錯誤
+      let currentUsage = 0;
+      try {
+        const stored = sessionStorage.getItem(sessionKey);
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          currentUsage = isNaN(parsed) ? 0 : parsed;
+        }
+      } catch {
+        // sessionStorage 不可用，使用記憶體中的計數
+        currentUsage = aiMagicianUsageCount.value;
+      }
 
       // 檢查是否超過使用限制
       if (currentUsage >= AI_MAGICIAN_LIMIT) {
@@ -136,7 +151,13 @@ export function useAIMagician(savedGender: Ref<string | null>): UseAIMagicianRet
 
       // 更新使用次數（保存到 sessionStorage）
       const newUsageCount = currentUsage + 1;
-      sessionStorage.setItem(sessionKey, newUsageCount.toString());
+      // ✅ 修復：添加 try-catch 處理 sessionStorage 錯誤
+      try {
+        sessionStorage.setItem(sessionKey, newUsageCount.toString());
+      } catch {
+        // sessionStorage 不可用，僅更新記憶體
+        console.warn('[useAIMagician] 無法保存使用次數到 sessionStorage');
+      }
       aiMagicianUsageCount.value = newUsageCount;
 
       // 檢測拒絕訊息（同時包含 "抱歉" 和 "無法" 關鍵詞）

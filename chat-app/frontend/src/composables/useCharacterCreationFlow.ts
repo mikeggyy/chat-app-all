@@ -251,7 +251,8 @@ export function useCharacterCreationFlow(
         JSON.stringify(sanitizedSummary)
       );
     } catch (error) {
-      // Silent fail
+      // ✅ 修復：記錄 sessionStorage 錯誤，便於調試
+      console.warn('[useCharacterCreationFlow] 保存摘要到 sessionStorage 失敗:', error);
     }
   };
 
@@ -269,6 +270,12 @@ export function useCharacterCreationFlow(
       }
       const parsed: Partial<SummaryPayload> = JSON.parse(raw);
 
+      // ✅ 修復：驗證解析後的數據結構
+      if (!parsed || typeof parsed !== 'object') {
+        console.warn('[useCharacterCreationFlow] sessionStorage 數據格式無效');
+        return null;
+      }
+
       const storedGender = readStoredGenderPreference!();
       const genderToUse = storedGender || parsed?.gender;
 
@@ -284,6 +291,8 @@ export function useCharacterCreationFlow(
       suppressSync = false;
       return parsed as SummaryPayload;
     } catch (error) {
+      // ✅ 修復：記錄解析錯誤，便於調試
+      console.warn('[useCharacterCreationFlow] 從 sessionStorage 恢復摘要失敗:', error);
       suppressSync = false;
       return null;
     }

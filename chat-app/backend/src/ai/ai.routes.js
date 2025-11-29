@@ -32,7 +32,7 @@ import {
   sendSuccess,
   sendError,
   ApiError,
-} from "../../shared/utils/errorFormatter.js";
+} from "../../../../shared/utils/errorFormatter.js";
 import {
   withIdempotency,
   handleVoicePlayment,

@@ -17,10 +17,10 @@ import {
   ORDER_TYPES,
   ORDER_STATUS,
 } from "./order.service.js";
-import { isGuestUser } from "../../shared/config/testAccounts.js";
+import { isGuestUser } from "../../../../shared/config/testAccounts.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { validateRequest, orderSchemas } from "../middleware/validation.middleware.js";
-import { sendSuccess, sendError } from "../../shared/utils/errorFormatter.js";
+import { sendSuccess, sendError } from "../../../../shared/utils/errorFormatter.js";
 import {
   purchaseRateLimiter,
   standardRateLimiter,

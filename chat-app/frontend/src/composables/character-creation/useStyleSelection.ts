@@ -105,7 +105,8 @@ export function useStyleSelection(): UseStyleSelectionReturn {
           STYLE_VERSION
         );
       } catch (error) {
-        // Ignore storage errors
+        // ✅ 修復：記錄 sessionStorage 錯誤，便於調試
+        console.warn('[useStyleSelection] 保存風格版本到 sessionStorage 失敗:', error);
       }
       return false; // Version mismatch, need to clear
     }

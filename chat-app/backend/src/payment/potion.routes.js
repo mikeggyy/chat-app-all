@@ -8,7 +8,7 @@ import {
   sendSuccess,
   sendError,
   ApiError,
-} from "../../shared/utils/errorFormatter.js";
+} from "../../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import { handleIdempotentRequest } from "../utils/idempotency.js";

@@ -18,12 +18,12 @@ import {
   rechargeCoins,
   setCoinsBalance,
 } from "./coins.service.js";
-import { isTestAccount } from "../../shared/config/testAccounts.js";
+import { isTestAccount } from "../../../../shared/config/testAccounts.js";
 import {
   sendSuccess,
   sendError,
   ApiError,
-} from "../../shared/utils/errorFormatter.js";
+} from "../../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 import { validateRequest, coinSchemas } from "../middleware/validation.middleware.js";
 import { purchaseRateLimiter, relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";

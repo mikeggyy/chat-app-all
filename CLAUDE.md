@@ -617,7 +617,7 @@ console.log(user.customClaims);
 
 ## 已知問題與修復記錄
 
-歷史修復文檔已歸檔至 `docs/archived/fixes-2025/`，包含：
+本專案持續追蹤和修復問題，主要修復包含：
 - 商品價格不一致修復
 - 角色創建資料保存修復
 - CSRF 安全修復

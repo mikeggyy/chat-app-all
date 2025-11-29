@@ -114,7 +114,12 @@ class RequestQueue {
       // 處理下一個請求
       if (this.queue.length > 0) {
         // 使用 setTimeout 確保不會阻塞主線程
-        setTimeout(() => this.process(), 0);
+        // ✅ 修復：添加 catch 防止 unhandled rejection
+        setTimeout(() => {
+          this.process().catch(err => {
+            logger.error(`[請求隊列-${this.name}] 處理循環錯誤:`, err);
+          });
+        }, 0);
       }
     }
   }
@@ -138,9 +143,14 @@ class RequestQueue {
     const count = this.queue.length;
 
     // 拒絕所有待處理的請求
-    this.queue.forEach(({ reject }) => {
-      reject(new Error('隊列已清空'));
-    });
+    // ✅ 修復：每個 reject 單獨 try-catch，確保所有項目都被處理
+    for (const item of this.queue) {
+      try {
+        item.reject(new Error('隊列已清空'));
+      } catch (err) {
+        logger.error(`[請求隊列-${this.name}] reject 調用失敗:`, err);
+      }
+    }
 
     this.queue = [];
     this.stats.queued = 0;

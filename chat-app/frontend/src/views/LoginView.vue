@@ -443,6 +443,12 @@ onBeforeUnmount(() => {
     inset: 0;
     z-index: 0;
     overflow: hidden;
+    // 漸層背景填充空白區域
+    background: linear-gradient(
+      160deg,
+      #0f0f14 0%,
+      rgba(148, 33, 146, 0.4) 100%
+    );
 
     img {
       width: 100%;
@@ -450,6 +456,13 @@ onBeforeUnmount(() => {
       object-fit: cover;
       filter: brightness(0.45);
       transform: scale(1.05);
+
+      // 桌面版：完整顯示圖片
+      @media (min-width: 1024px) {
+        object-fit: contain;
+        object-position: center center;
+        transform: none;
+      }
     }
 
     .overlay {

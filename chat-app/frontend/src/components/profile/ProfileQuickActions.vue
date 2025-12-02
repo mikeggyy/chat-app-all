@@ -143,4 +143,135 @@ const handleActionClick = (action: QuickAction) => {
     gap: 0.5rem;
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px) - Dashboard 卡片風格
+// ========================================
+
+@media (min-width: 1024px) {
+  .quick-actions {
+    margin-top: 0;
+    flex: 1;
+
+    ul {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      border: none;
+      width: 100%;
+    }
+  }
+
+  .quick-action {
+    &__button {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 16px;
+      padding: 20px 24px;
+      border-radius: 16px;
+      background: linear-gradient(165deg, rgba(30, 33, 48, 0.95) 0%, rgba(22, 25, 43, 0.9) 100%);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      text-align: left;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: linear-gradient(165deg, rgba(40, 44, 62, 0.98) 0%, rgba(30, 34, 52, 0.95) 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        border-color: rgba(102, 126, 234, 0.3);
+      }
+    }
+
+    &__icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.15));
+      border: 1px solid rgba(102, 126, 234, 0.2);
+      flex-shrink: 0;
+
+      .icon {
+        width: 22px;
+        height: 22px;
+        color: rgba(255, 255, 255, 0.9);
+      }
+    }
+
+    &__label {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: #f1f5f9;
+    }
+
+    &__badge {
+      top: 4px;
+      right: 4px;
+      width: 10px;
+      height: 10px;
+    }
+  }
+}
+
+// 寬螢幕優化
+@media (min-width: 1440px) {
+  .quick-actions ul {
+    gap: 24px;
+  }
+
+  .quick-action {
+    &__button {
+      padding: 24px 28px;
+      gap: 20px;
+      border-radius: 18px;
+    }
+
+    &__icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+
+      .icon {
+        width: 24px;
+        height: 24px;
+      }
+    }
+
+    &__label {
+      font-size: 1rem;
+    }
+  }
+}
+
+// 超寬螢幕
+@media (min-width: 1920px) {
+  .quick-actions ul {
+    gap: 28px;
+  }
+
+  .quick-action {
+    &__button {
+      padding: 28px 32px;
+    }
+
+    &__icon {
+      width: 56px;
+      height: 56px;
+
+      .icon {
+        width: 26px;
+        height: 26px;
+      }
+    }
+
+    &__label {
+      font-size: 1.0625rem;
+    }
+  }
+}
 </style>

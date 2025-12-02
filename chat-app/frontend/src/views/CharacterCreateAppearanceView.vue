@@ -602,4 +602,54 @@ onBeforeUnmount(() => {
     padding: 32px 40px 40px;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+
+@media (min-width: 1024px) {
+  .appearance {
+    max-width: 700px;
+    margin: 0 auto;
+    min-height: auto;
+    background: transparent;
+    padding: 32px 24px 48px;
+  }
+
+  .appearance__header {
+    justify-content: center;
+  }
+
+  .appearance__icon-button {
+    display: none;
+  }
+
+  .appearance__header-spacer {
+    display: none;
+  }
+
+  .appearance__title h1 {
+    font-size: 28px;
+  }
+
+  .appearance__body {
+    padding: 2rem;
+    background: linear-gradient(150deg, rgba(30, 31, 38, 0.95), rgba(20, 21, 28, 0.98));
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    max-height: none;
+    gap: 1.5rem;
+  }
+
+  .appearance__footer {
+    margin-top: 2rem;
+  }
+
+  .appearance__generate {
+    max-width: 400px;
+    margin: 0 auto;
+    display: block;
+  }
+}
 </style>

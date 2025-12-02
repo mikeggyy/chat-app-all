@@ -509,4 +509,107 @@ const handleClose = (): void => {
     gap: 1.25rem;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .photo-selector-container {
+    max-width: 800px;
+    max-height: 85vh;
+    border-radius: 24px;
+  }
+
+  .photo-selector-header {
+    padding: 1.75rem;
+  }
+
+  .header-title {
+    font-size: 1.4rem;
+  }
+
+  .close-button {
+    width: 2.75rem;
+    height: 2.75rem;
+    transition: all 0.2s ease;
+
+    .icon {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
+    max-height: calc(85vh - 140px);
+  }
+
+  .photo-card {
+    border-radius: 16px;
+    transition: all 0.25s ease;
+
+    &:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 32px rgba(255, 107, 157, 0.4);
+    }
+  }
+
+  .photo-image {
+    border-radius: 16px;
+  }
+
+  .default-badge {
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    border-radius: 14px;
+  }
+
+  .select-icon {
+    width: 3.5rem;
+    height: 3.5rem;
+
+    .icon {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+  }
+
+  .select-text {
+    font-size: 1rem;
+  }
+
+  .selected-checkmark {
+    width: 3rem;
+    height: 3rem;
+    top: 10px;
+    left: 10px;
+
+    .icon {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+  }
+
+  .action-buttons {
+    padding: 1.25rem 1.75rem;
+    gap: 1.25rem;
+  }
+}
+
+/* 超寬桌面版 (≥ 1440px) */
+@media (min-width: 1440px) {
+  .photo-selector-container {
+    max-width: 1000px;
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
 </style>

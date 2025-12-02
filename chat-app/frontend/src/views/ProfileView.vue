@@ -745,4 +745,125 @@ watch(
     transform: rotate(360deg);
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px) - Dashboard 風格
+// ========================================
+
+@media (min-width: 1024px) {
+  .profile-view {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 48px 48px;
+    min-height: calc(100vh - var(--desktop-header-height, 64px));
+    background: transparent;
+    gap: 32px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .profile-hero {
+    border-radius: 20px;
+    background: linear-gradient(165deg, rgba(30, 33, 48, 0.95) 0%, rgba(22, 25, 43, 0.9) 100%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    padding: 24px 32px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+
+    &__overlay {
+      display: none;
+    }
+
+    &::before {
+      display: none;
+    }
+
+    &__top {
+      order: 2;
+      margin-left: auto;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    &__content {
+      order: 1;
+      flex-direction: row;
+      align-items: center;
+      margin-top: 0;
+      gap: 20px;
+      flex: 1;
+    }
+  }
+
+  .avatar {
+    flex-shrink: 0;
+
+    &-ring {
+      width: 4.5rem;
+      height: 4.5rem;
+    }
+
+    &__edit-button {
+      width: 26px;
+      height: 26px;
+      border-width: 2px;
+
+      .icon {
+        width: 12px;
+        height: 12px;
+      }
+    }
+  }
+
+  .identity {
+    text-align: left;
+    flex-shrink: 0;
+
+    h1 {
+      font-size: 1.375rem;
+      letter-spacing: 0.02em;
+      margin-bottom: 2px;
+    }
+
+    p {
+      font-size: 0.8125rem;
+      margin-top: 0;
+      color: rgba(148, 163, 184, 0.7);
+    }
+  }
+}
+
+// 寬螢幕優化
+@media (min-width: 1440px) {
+  .profile-view {
+    max-width: 1600px;
+    padding: 40px 64px 64px;
+    gap: 40px;
+  }
+
+  .profile-hero {
+    padding: 28px 40px;
+    gap: 32px;
+    border-radius: 24px;
+  }
+
+  .avatar-ring {
+    width: 5rem;
+    height: 5rem;
+  }
+
+  .identity h1 {
+    font-size: 1.5rem;
+  }
+}
+
+// 超寬螢幕
+@media (min-width: 1920px) {
+  .profile-view {
+    max-width: 1800px;
+  }
+}
 </style>

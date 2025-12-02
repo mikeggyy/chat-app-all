@@ -1567,4 +1567,155 @@ router.put("/:userId/resource-limits/global/:type/reset", requireMinRole("admin"
   }
 });
 
+// ========================================
+// 禮包購買狀態管理
+// ========================================
+
+/**
+ * GET /api/users/:userId/bundle-purchases
+ * 獲取用戶的禮包購買記錄
+ * 🔒 權限：moderator 以上
+ * 🛡️ 速率限制：200 次/15 分鐘
+ */
+router.get("/:userId/bundle-purchases", requireMinRole("moderator"), relaxedAdminRateLimiter, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // 驗證用戶是否存在
+    await auth.getUser(userId);
+
+    // 獲取購買記錄
+    const purchasesRef = db.collection("users").doc(userId).collection("bundle_purchases");
+    const snapshot = await purchasesRef.get();
+
+    const purchases = [];
+    snapshot.forEach(doc => {
+      purchases.push({
+        bundleId: doc.id,
+        ...doc.data(),
+      });
+    });
+
+    // 獲取所有禮包配置（用於顯示禮包名稱）
+    const bundlesRef = db.collection("bundle_packages").where("status", "==", "active");
+    const bundlesSnapshot = await bundlesRef.get();
+    const bundleMap = {};
+    bundlesSnapshot.forEach(doc => {
+      bundleMap[doc.id] = doc.data();
+    });
+
+    // 合併禮包資訊
+    const purchasesWithInfo = purchases.map(p => ({
+      ...p,
+      bundleName: bundleMap[p.bundleId]?.name || p.bundleName || p.bundleId,
+      purchaseLimit: bundleMap[p.bundleId]?.purchaseLimit || "unknown",
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        userId,
+        purchases: purchasesWithInfo,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: "獲取禮包購買記錄失敗", message: error.message });
+  }
+});
+
+/**
+ * PUT /api/users/:userId/bundle-purchases/:bundleId
+ * 更新用戶的禮包購買狀態（可用於設置已購買或重置）
+ * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
+ * Body: { count?, lastPurchaseAt?, reset? }
+ */
+router.put("/:userId/bundle-purchases/:bundleId", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
+  try {
+    const { userId, bundleId } = req.params;
+    const { count, lastPurchaseAt, reset } = req.body;
+
+    // 驗證用戶是否存在
+    await auth.getUser(userId);
+
+    const purchaseRef = db.collection("users").doc(userId).collection("bundle_purchases").doc(bundleId);
+
+    if (reset === true) {
+      // 重置：刪除購買記錄
+      await purchaseRef.delete();
+      return res.json({
+        success: true,
+        message: "禮包購買狀態已重置",
+        data: { bundleId, reset: true },
+      });
+    }
+
+    // 獲取禮包名稱
+    const bundleDoc = await db.collection("bundle_packages").doc(bundleId).get();
+    const bundleName = bundleDoc.exists ? bundleDoc.data().name : bundleId;
+
+    // 更新或創建購買記錄
+    const purchaseData = {
+      bundleId,
+      bundleName,
+      count: typeof count === "number" ? Math.max(0, count) : 1,
+      lastPurchaseAt: lastPurchaseAt ? new Date(lastPurchaseAt) : FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: "admin",
+    };
+
+    // 檢查是否已有記錄
+    const existingDoc = await purchaseRef.get();
+    if (!existingDoc.exists) {
+      purchaseData.firstPurchaseAt = FieldValue.serverTimestamp();
+    }
+
+    await purchaseRef.set(purchaseData, { merge: true });
+
+    res.json({
+      success: true,
+      message: "禮包購買狀態更新成功",
+      data: {
+        bundleId,
+        bundleName,
+        ...purchaseData,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: "更新禮包購買狀態失敗", message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/users/:userId/bundle-purchases/:bundleId
+ * 刪除用戶的禮包購買記錄（重置限購狀態）
+ * 🔒 權限：admin 以上
+ * 🛡️ 速率限制：100 次/15 分鐘
+ */
+router.delete("/:userId/bundle-purchases/:bundleId", requireMinRole("admin"), standardAdminRateLimiter, async (req, res) => {
+  try {
+    const { userId, bundleId } = req.params;
+
+    // 驗證用戶是否存在
+    await auth.getUser(userId);
+
+    const purchaseRef = db.collection("users").doc(userId).collection("bundle_purchases").doc(bundleId);
+    const doc = await purchaseRef.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: "找不到該禮包的購買記錄" });
+    }
+
+    await purchaseRef.delete();
+
+    res.json({
+      success: true,
+      message: "禮包購買記錄已刪除，用戶可以再次購買",
+      data: { bundleId },
+    });
+  } catch (error) {
+    res.status(500).json({ error: "刪除禮包購買記錄失敗", message: error.message });
+  }
+});
+
 export default router;

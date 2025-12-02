@@ -138,5 +138,57 @@ const handleKeyup = (event: KeyboardEvent) => {
       }
     }
   }
+
+  /* ========================================
+     桌面版樣式 (≥ 1024px)
+     ======================================== */
+  @media (min-width: 1024px) {
+    flex: 0 0 160px;
+    padding: 0.875rem;
+    border-radius: 16px;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 28px rgba(59, 130, 246, 0.25);
+    }
+
+    :deep(.lazy-image) {
+      border-radius: 12px;
+    }
+
+    .character-card-image {
+      border-radius: 12px;
+    }
+
+    .recent-body {
+      gap: 0.35rem;
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      .recent-stats {
+        gap: 0.85rem;
+
+        .stat-item {
+          font-size: 0.85rem;
+
+          .stat-icon {
+            width: 14px;
+            height: 14px;
+          }
+        }
+      }
+    }
+  }
+
+  @media (min-width: 1440px) {
+    flex: 0 0 180px;
+    padding: 1rem;
+
+    .recent-body h3 {
+      font-size: 1.05rem;
+    }
+  }
 }
 </style>

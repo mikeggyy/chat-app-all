@@ -478,4 +478,113 @@ const hasDiscount = computed(() => {
     font-size: 0.65rem;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .gift-modal__content {
+    padding: 2rem;
+    border-radius: 1.5rem;
+  }
+
+  .gift-modal__header {
+    margin-bottom: 1.25rem;
+  }
+
+  .gift-modal__title {
+    font-size: 1.4rem;
+  }
+
+  .gift-modal__close {
+    border-radius: 0.75rem;
+    padding: 0.625rem;
+    transition: all 0.2s ease;
+  }
+
+  .gift-modal__close:hover {
+    transform: scale(1.1);
+  }
+
+  .gift-modal__close .icon {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .gift-modal__balance {
+    padding: 1rem 1.25rem;
+    border-radius: 1rem;
+  }
+
+  .balance-amount {
+    font-size: 1.4rem;
+  }
+
+  .gift-modal__list {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .gift-item {
+    padding: 1.25rem;
+    min-height: 180px;
+    border-radius: 1rem;
+    transition: all 0.25s ease;
+  }
+
+  .gift-item::before {
+    height: 4px;
+    transition: opacity 0.2s ease;
+  }
+
+  .gift-item.is-affordable:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .gift-item.is-affordable:hover::before {
+    opacity: 1;
+  }
+
+  .gift-item__emoji {
+    font-size: 3rem;
+    transition: transform 0.2s ease;
+  }
+
+  .gift-item.is-affordable:hover .gift-item__emoji {
+    transform: scale(1.1);
+  }
+
+  .gift-item__name {
+    font-size: 0.95rem;
+  }
+
+  .gift-item__description {
+    font-size: 0.75rem;
+  }
+
+  .price-final {
+    font-size: 1.25rem;
+  }
+
+  .gift-modal__footer {
+    padding: 1rem 1.25rem;
+    border-radius: 0.75rem;
+  }
+
+  .footer-text {
+    font-size: 0.95rem;
+  }
+}
+
+/* 超寬桌面版 (≥ 1440px) */
+@media (min-width: 1440px) {
+  .gift-modal__content {
+    max-width: 1000px;
+  }
+
+  .gift-modal__list {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
 </style>

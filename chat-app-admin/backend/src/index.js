@@ -107,6 +107,7 @@ import voicesRoutes from "./routes/voices.routes.js";
 import rewardsRoutes from "./routes/rewards.routes.js";
 import flashSalesRoutes from "./routes/flashSales.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
+import bundlesRoutes from "./routes/bundles.routes.js";
 
 // 註冊路由（所有路由都需要管理員權限）
 app.use("/api/dashboard", authMiddleware, adminMiddleware, dashboardRoutes);
@@ -132,6 +133,7 @@ app.use("/api/voices", authMiddleware, adminMiddleware, voicesRoutes);
 app.use("/api/rewards", authMiddleware, adminMiddleware, rewardsRoutes);
 app.use("/api/flash-sales", authMiddleware, adminMiddleware, flashSalesRoutes);
 app.use("/api/notifications", authMiddleware, adminMiddleware, notificationsRoutes);
+app.use("/api/bundles", authMiddleware, adminMiddleware, bundlesRoutes);
 
 // 404 處理
 app.use((req, res) => {

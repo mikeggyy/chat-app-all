@@ -13,6 +13,7 @@ import { useIsMounted } from '../composables/useIsMounted';
 import MatchBackground from '../components/match/MatchBackground.vue';
 import MatchCard from '../components/match/MatchCard.vue';
 import BackgroundDialog from '../components/match/BackgroundDialog.vue';
+import BundleCountdownFloat from '../components/match/BundleCountdownFloat.vue';
 import { logger } from '../utils/logger';
 
 /**
@@ -385,6 +386,9 @@ onBeforeUnmount(() => {
       :text="backgroundDialog.text"
       @close="closeBackgroundDialog"
     />
+
+    <!-- 禮包倒數提示 -->
+    <BundleCountdownFloat />
   </main>
 </template>
 
@@ -423,6 +427,62 @@ onBeforeUnmount(() => {
       width: 100%;
       // ✅ 效能優化：提示 GPU 加速 transform
       will-change: transform;
+    }
+  }
+}
+
+/* 桌面版佈局：輪播圖樣式 */
+@media (min-width: 1024px) {
+  .match-page {
+    min-height: 100%;
+    padding: 24px;
+    align-items: flex-end;
+    justify-content: center;
+
+    .content-wrapper {
+      position: fixed;
+      bottom: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 420px;
+      z-index: 3;
+      overflow: visible;
+
+      .carousel-track {
+        display: block;
+        position: relative;
+        // 禁用滑動 transform
+        transform: none !important;
+        transition: none !important;
+
+        // 每個內容卡片：堆疊顯示
+        :deep(.content) {
+          width: 100%;
+          padding: 1.5rem;
+          transition: opacity 0.3s ease, visibility 0.3s ease;
+
+          // 非活動卡片：隱藏
+          &:not(.is-active) {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 寬螢幕調整
+@media (min-width: 1440px) {
+  .match-page {
+    .content-wrapper {
+      max-width: 500px;
+      bottom: 56px;
     }
   }
 }

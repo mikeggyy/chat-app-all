@@ -366,10 +366,50 @@ onMounted(() => {
   }
 }
 
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
 @media (min-width: 1024px) {
+  .photo-gallery-screen {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+    padding-bottom: 48px;
+    min-height: auto;
+    background: transparent;
+  }
+
+  .photo-gallery-content {
+    padding: 0;
+    max-height: none;
+  }
+
   .photo-grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 1.5rem;
+  }
+
+  .edit-actions {
+    position: relative;
+    background: transparent;
+    border-top: none;
+    padding: 1.5rem 0;
+  }
+
+  .delete-btn {
+    max-width: 400px;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 1440px) {
+  .photo-gallery-screen {
+    max-width: 1400px;
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
 }
 </style>

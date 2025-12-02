@@ -459,4 +459,58 @@ onBeforeUnmount(() => {
     font-size: 0.9375rem;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .modal-container {
+    max-width: 600px;
+  }
+
+  .modal-content {
+    border-radius: 28px;
+  }
+
+  .modal-header {
+    padding: 1.75rem 1.75rem 1.25rem;
+  }
+
+  .warning-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .modal-title {
+    font-size: 1.35rem;
+  }
+
+  .close-button {
+    width: 40px;
+    height: 40px;
+    transition: all 0.2s ease;
+  }
+
+  .close-button:hover:not(:disabled) {
+    transform: scale(1.1);
+  }
+
+  .close-button .icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .modal-body {
+    padding: 1.75rem;
+  }
+
+  .message {
+    font-size: 1.05rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .options-section {
+    gap: 1.25rem;
+  }
+}
 </style>

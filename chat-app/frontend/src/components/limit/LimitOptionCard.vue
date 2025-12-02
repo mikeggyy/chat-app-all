@@ -258,4 +258,69 @@ const handleClick = () => {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .option-card {
+    padding: 1.75rem;
+    border-radius: 20px;
+  }
+
+  .option-card:hover:not(.option-card--disabled) {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .option-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .option-title {
+    font-size: 1.2rem;
+  }
+
+  .option-description {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .option-info {
+    padding: 0.875rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9375rem;
+  }
+
+  .vip-benefits li {
+    padding: 0.625rem 0;
+    font-size: 1rem;
+  }
+
+  .option-button {
+    padding: 1rem 1.5rem;
+    font-size: 1.05rem;
+    border-radius: 14px;
+  }
+
+  .option-button--ad:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(245, 158, 11, 0.45);
+  }
+
+  .option-button--unlock:hover:not(:disabled) {
+    transform: translateY(-3px);
+  }
+
+  .option-button--vip:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(251, 191, 36, 0.45);
+  }
+
+  .button-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
 </style>

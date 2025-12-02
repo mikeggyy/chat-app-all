@@ -178,12 +178,25 @@ export function useMatchCarousel(
   /**
    * 計算 translateX 值
    * 考慮基礎偏移和手勢滑動偏移
+   * 桌面版：flexbox 已置中，只需滑動偏移
+   * 手機版：需要 -100% 基礎偏移
    */
   const translateValue = computed<string>(() => {
     const hasLoop = carouselMatches.value.length > 1;
-    const base = hasLoop ? '-100%' : '0px';
+    const isDesktop = window.innerWidth >= 1024;
     const offset = `${swipeOffset.value}px`;
-    return hasLoop ? `calc(${base} + ${offset})` : offset;
+
+    if (!hasLoop) {
+      return offset;
+    }
+
+    if (isDesktop) {
+      // 桌面版：flexbox 已經將軌道置中，只需要滑動偏移
+      return offset;
+    }
+
+    // 手機版：使用百分比基礎偏移
+    return `calc(-100% + ${offset})`;
   });
 
   /**
@@ -204,9 +217,18 @@ export function useMatchCarousel(
 
   /**
    * 測量卡片寬度
+   * 桌面版使用固定卡片寬度+間距，手機版使用容器寬度
    */
   const measureCardWidth = (): void => {
-    cardWidth.value = carouselContainer.value?.offsetWidth ?? 0;
+    const isDesktop = window.innerWidth >= 1024;
+    const isWideScreen = window.innerWidth >= 1440;
+
+    if (isDesktop) {
+      // 桌面版：卡片寬度 + gap
+      cardWidth.value = isWideScreen ? (500 + 40) : (420 + 32);
+    } else {
+      cardWidth.value = carouselContainer.value?.offsetWidth ?? 0;
+    }
   };
 
   /**

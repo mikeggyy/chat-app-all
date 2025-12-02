@@ -298,4 +298,65 @@ const handleNotificationClick = async (notification: { id: string; isRead?: bool
     font-size: 0.85rem;
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .notifications-view {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 24px;
+    padding-bottom: 48px;
+    min-height: auto;
+    background: transparent;
+  }
+
+  .notifications-header {
+    position: relative;
+    background: transparent;
+    backdrop-filter: none;
+    border-bottom: none;
+    padding: 0 0 1.5rem;
+
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .back-button {
+    display: none; // 桌面版不需要返回按鈕
+  }
+
+  .header-spacer {
+    display: none;
+  }
+
+  .notifications-content {
+    padding: 0;
+  }
+
+  .notifications-list {
+    gap: 1.25rem;
+  }
+
+  .notification-item {
+    padding: 1.5rem 2rem;
+    border-radius: 24px;
+
+    &:hover {
+      transform: translateY(-3px);
+    }
+  }
+
+  .notification-title {
+    font-size: 1.1rem;
+  }
+
+  .notification-message {
+    font-size: 0.95rem;
+    -webkit-line-clamp: 2;
+  }
+}
 </style>

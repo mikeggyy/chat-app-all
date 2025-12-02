@@ -648,4 +648,62 @@ onBeforeUnmount(() => {
     aspect-ratio: 4 / 5;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+
+@media (min-width: 1024px) {
+  .create-gender {
+    max-width: 600px;
+    margin: 0 auto;
+    min-height: auto;
+    background: transparent;
+    padding: 32px 24px 48px;
+  }
+
+  .create-gender__header {
+    justify-content: center;
+  }
+
+  .create-gender__close {
+    display: none;
+  }
+
+  .create-gender__spacer {
+    display: none;
+  }
+
+  .create-gender__content {
+    margin-top: 0;
+    padding: 2rem;
+    background: linear-gradient(150deg, rgba(30, 31, 38, 0.95), rgba(20, 21, 28, 0.98));
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .create-gender__title {
+    font-size: 28px;
+  }
+
+  .gender-options {
+    max-width: 520px;
+  }
+
+  .gender-option__button:hover {
+    transform: translateY(-4px);
+  }
+
+  .create-gender__footer {
+    margin-top: 2rem;
+  }
+
+  .create-gender__confirm {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    display: block;
+  }
+}
 </style>

@@ -711,4 +711,53 @@ const handleThreadSelect = (thread: Thread): void => {
     transform: rotate(360deg);
   }
 }
+
+/* 桌面版佈局：全寬大膽設計 */
+@media (min-width: 1024px) {
+  .chat-list-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 48px;
+    height: auto;
+    min-height: calc(100vh - var(--desktop-header-height, 64px));
+  }
+
+  .chat-list-backdrop {
+    position: fixed;
+    inset: 0;
+  }
+
+  /* 桌機版隱藏標題（導航已有） */
+  .chat-list-title-wrapper {
+    display: none;
+  }
+
+  .chat-thread-scroll {
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .chat-thread-list {
+    padding-bottom: 0;
+  }
+}
+
+/* 寬螢幕優化 */
+@media (min-width: 1440px) {
+  .chat-list-page {
+    max-width: 1400px;
+    padding: 40px 64px;
+  }
+}
+
+/* 超寬螢幕 */
+@media (min-width: 1920px) {
+  .chat-list-page {
+    max-width: 1600px;
+  }
+}
 </style>

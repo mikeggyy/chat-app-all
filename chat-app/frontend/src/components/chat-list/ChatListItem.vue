@@ -416,4 +416,169 @@ defineExpose({
   width: 1.5rem;
   height: 1.5rem;
 }
+
+/* 桌面版樣式優化 - 大膽設計 */
+@media (min-width: 1024px) {
+  .chat-thread {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.06);
+    border-radius: 0;
+    transition: all 0.25s ease;
+  }
+
+  .chat-thread:first-child {
+    border-radius: 20px 20px 0 0;
+  }
+
+  .chat-thread:last-child {
+    border-radius: 0 0 20px 20px;
+    border-bottom: none;
+  }
+
+  .chat-thread:only-child {
+    border-radius: 20px;
+  }
+
+  .chat-thread:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.08));
+  }
+
+  .chat-thread__content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    gap: 1.25rem;
+    transform: none !important;
+  }
+
+  .chat-thread__avatar {
+    flex-shrink: 0;
+    width: 4rem;
+    height: 4rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-thread__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chat-thread__header {
+    margin-bottom: 0.25rem;
+  }
+
+  .chat-thread__header h2 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  .chat-thread__header time {
+    font-size: 0.8125rem;
+    color: rgba(148, 163, 184, 0.8);
+  }
+
+  .chat-thread__preview {
+    font-size: 0.9375rem;
+    color: rgba(226, 232, 240, 0.65);
+    line-height: 1.4;
+  }
+
+  /* 桌面版：直接顯示操作按鈕，與內容對齊 */
+  .chat-thread__actions {
+    position: static;
+    flex-shrink: 0;
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem 0 0.5rem;
+    transform: none !important;
+  }
+
+  .chat-thread__actions-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .chat-thread__action {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 10px;
+    background: rgba(51, 65, 85, 0.4);
+    transition: all 0.2s ease;
+  }
+
+  .chat-thread__action:hover:not(:disabled) {
+    transform: scale(1.05);
+    background: rgba(71, 85, 105, 0.6);
+  }
+
+  .chat-thread__action--favorite {
+    color: rgba(226, 232, 240, 0.6);
+  }
+
+  .chat-thread__action--favorite:hover:not(:disabled) {
+    background: rgba(236, 72, 153, 0.2);
+    color: #f472b6;
+  }
+
+  .chat-thread__action--favorite.is-active {
+    background: rgba(236, 72, 153, 0.25);
+    color: #f472b6;
+  }
+
+  .chat-thread__action--delete {
+    color: rgba(226, 232, 240, 0.6);
+  }
+
+  .chat-thread__action--delete:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+  }
+
+  .chat-thread__icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+}
+
+/* 寬螢幕進一步放大 */
+@media (min-width: 1440px) {
+  .chat-thread__content {
+    padding: 1.5rem 2rem;
+    gap: 1.5rem;
+  }
+
+  .chat-thread__avatar {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+
+  .chat-thread__header h2 {
+    font-size: 1.125rem;
+  }
+
+  .chat-thread__preview {
+    font-size: 1rem;
+  }
+
+  .chat-thread__actions {
+    padding: 0 2rem 0 1rem;
+    gap: 0.75rem;
+  }
+
+  .chat-thread__action {
+    width: 44px;
+    height: 44px;
+  }
+}
 </style>

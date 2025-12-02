@@ -92,4 +92,51 @@ const handleCategoryChange = (categoryId: string): void => {
     font-size: 0.76rem;
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .shop-categories {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0;
+    overflow-x: visible;
+  }
+
+  .category-tab {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
+    border-radius: 12px;
+    background: linear-gradient(165deg, rgba(30, 33, 48, 0.95) 0%, rgba(22, 25, 43, 0.9) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    &:hover {
+      background: linear-gradient(165deg, rgba(40, 44, 62, 0.98) 0%, rgba(30, 34, 52, 0.95) 100%);
+      border-color: rgba(148, 163, 184, 0.2);
+      transform: translateY(-1px);
+    }
+
+    &--active {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.5), rgba(118, 75, 162, 0.4));
+      border-color: rgba(102, 126, 234, 0.4);
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    }
+  }
+}
+
+// 寬螢幕優化
+@media (min-width: 1440px) {
+  .shop-categories {
+    gap: 1rem;
+  }
+
+  .category-tab {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9375rem;
+  }
+}
 </style>

@@ -274,4 +274,92 @@ const handleCoinIconError = (): void => {
     font-size: clamp(1.2rem, 4vw, 1.4rem);
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .shop-hero {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 32px;
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    background: linear-gradient(165deg, rgba(30, 33, 48, 0.95) 0%, rgba(22, 25, 43, 0.9) 100%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .shop-header {
+    margin-bottom: 0;
+    justify-content: flex-start;
+    gap: 1rem;
+    order: 1;
+    flex: 1;
+
+    &__button {
+      display: none; // 桌面版隱藏返回按鈕
+    }
+
+    &__title {
+      font-size: 1.5rem;
+      text-align: left;
+    }
+  }
+
+  .shop-badge {
+    order: 2;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    &__icon {
+      width: 3.5rem;
+      height: 3.5rem;
+
+      &::before {
+        display: none;
+      }
+    }
+
+    &__icon-image {
+      width: 65%;
+      height: 65%;
+    }
+  }
+
+  .shop-balance {
+    order: 3;
+    font-size: 1.75rem;
+    margin: 0;
+    color: #fbbf24;
+
+    &__label {
+      display: none;
+    }
+  }
+}
+
+// 寬螢幕優化
+@media (min-width: 1440px) {
+  .shop-hero {
+    padding: 28px 40px;
+    border-radius: 24px;
+  }
+
+  .shop-header__title {
+    font-size: 1.75rem;
+  }
+
+  .shop-badge__icon {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .shop-balance {
+    font-size: 2rem;
+  }
+}
 </style>

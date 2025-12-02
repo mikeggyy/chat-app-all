@@ -701,4 +701,25 @@ watch(
     padding: 1.6rem 1.1rem 3rem;
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .ranking-screen {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+    padding-bottom: 48px;
+    min-height: auto;
+    gap: 2rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  .ranking-screen {
+    max-width: 1100px;
+  }
+}
 </style>

@@ -173,4 +173,31 @@ onMounted(() => {
     }
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .stats-button {
+    min-width: auto;
+    padding: 0.625rem 1rem;
+    border-radius: 12px;
+    gap: 0.5rem;
+
+    &__icon {
+      width: 26px;
+      height: 26px;
+    }
+
+    &__value {
+      font-size: 1rem;
+    }
+
+    &__arrow {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
 </style>

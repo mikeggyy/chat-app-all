@@ -1,0 +1,87 @@
+// ========================================
+// 響應式斷點系統
+// ========================================
+
+// 斷點定義
+$breakpoint-mobile-max: 767px;
+$breakpoint-tablet: 768px;
+$breakpoint-desktop: 1024px;
+$breakpoint-wide: 1440px;
+
+// ========================================
+// Mixins
+// ========================================
+
+/// 手機版樣式 (< 768px)
+/// @example
+///   @include mobile {
+///     .element { display: none; }
+///   }
+@mixin mobile {
+  @media (max-width: $breakpoint-mobile-max) {
+    @content;
+  }
+}
+
+/// 平板及以上 (≥ 768px)
+/// @example
+///   @include tablet-up {
+///     .element { display: flex; }
+///   }
+@mixin tablet-up {
+  @media (min-width: $breakpoint-tablet) {
+    @content;
+  }
+}
+
+/// 僅平板 (768px - 1023px)
+@mixin tablet-only {
+  @media (min-width: $breakpoint-tablet) and (max-width: #{$breakpoint-desktop - 1}) {
+    @content;
+  }
+}
+
+/// 桌面版及以上 (≥ 1024px)
+/// @example
+///   @include desktop {
+///     .element { max-width: 1200px; }
+///   }
+@mixin desktop {
+  @media (min-width: $breakpoint-desktop) {
+    @content;
+  }
+}
+
+/// 寬螢幕 (≥ 1440px)
+@mixin wide {
+  @media (min-width: $breakpoint-wide) {
+    @content;
+  }
+}
+
+/// 非手機版 (≥ 768px) - tablet-up 的別名
+@mixin not-mobile {
+  @include tablet-up {
+    @content;
+  }
+}
+
+// ========================================
+// CSS 變數 - 桌面版擴展
+// ========================================
+
+:root {
+  // 桌面版佈局變數
+  --desktop-header-height: 64px;
+  --desktop-sidebar-width: 280px;
+  --desktop-chat-sidebar-width: 320px;
+  --desktop-max-content-width: 1200px;
+  --desktop-content-padding: 24px;
+  --desktop-card-max-width: 600px;
+  --desktop-list-max-width: 800px;
+
+  // 桌面版間距
+  --desktop-gap-sm: 16px;
+  --desktop-gap-md: 24px;
+  --desktop-gap-lg: 32px;
+}

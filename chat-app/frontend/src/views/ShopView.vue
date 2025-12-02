@@ -110,7 +110,8 @@ const loadAssetPackages = async () => {
   try {
     const response = await apiJson("/api/assets/packages");
     if (response.success) {
-      assetPackages.value = response.packages || [];
+      // ✅ 修復：API 響應數據在 data 屬性中
+      assetPackages.value = response.data?.packages || response.packages || [];
     }
   } catch (error) {
     logger.error("加載解鎖卡套餐失敗:", error);
@@ -122,7 +123,8 @@ const loadPotionPackages = async () => {
   try {
     const response = await apiJson("/api/potions/packages");
     if (response.success) {
-      potionPackages.value = response.potions || [];
+      // ✅ 修復：API 響應數據在 data 屬性中
+      potionPackages.value = response.data?.potions || response.potions || [];
     }
   } catch (error) {
     logger.error("加載藥水商品失敗:", error);
@@ -140,13 +142,15 @@ const loadBundlePackages = async () => {
       // 已登入用戶：獲取含購買狀態的禮包列表
       const response = await apiJson("/api/bundles/me");
       if (response.success) {
-        bundlePackages.value = response.packages || [];
+        // ✅ 修復：API 響應數據在 data 屬性中
+        bundlePackages.value = response.data?.packages || response.packages || [];
       }
     } else {
       // 訪客用戶：獲取公開禮包列表
       const response = await apiJson("/api/bundles");
       if (response.success) {
-        bundlePackages.value = response.packages || [];
+        // ✅ 修復：API 響應數據在 data 屬性中
+        bundlePackages.value = response.data?.packages || response.packages || [];
       }
     }
   } catch (error) {
@@ -267,5 +271,36 @@ onMounted(async () => {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+}
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .shop-view {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px 48px 48px;
+    min-height: calc(100vh - var(--desktop-header-height, 64px));
+    background: transparent;
+    gap: 24px;
+  }
+}
+
+// 寬螢幕優化
+@media (min-width: 1440px) {
+  .shop-view {
+    max-width: 1600px;
+    padding: 40px 64px 64px;
+    gap: 32px;
+  }
+}
+
+// 超寬螢幕
+@media (min-width: 1920px) {
+  .shop-view {
+    max-width: 1800px;
+  }
 }
 </style>

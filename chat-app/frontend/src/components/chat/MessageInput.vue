@@ -182,4 +182,19 @@ defineExpose({ focus });
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04), 0 -1px 4px rgba(0, 0, 0, 0.02);
   }
 }
+
+/* 桌面版樣式 (≥ 1024px) */
+@media (min-width: 1024px) {
+  .chat-input {
+    /* 桌面版改為相對定位，由父容器控制位置 */
+    position: relative;
+    border-radius: 0;
+    padding: 1rem 1.5rem;
+    max-width: 100%;
+  }
+
+  .chat-input__field {
+    max-width: 800px;
+  }
+}
 </style>

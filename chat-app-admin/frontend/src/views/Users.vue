@@ -117,9 +117,10 @@
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="200">
+        <el-table-column label="操作" fixed="right" width="280">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">編輯</el-button>
+            <el-button size="small" type="warning" @click="handleBundlePurchases(row)">禮包</el-button>
             <el-button size="small" type="danger" @click="handleDelete(row)"
               >刪除</el-button
             >
@@ -229,6 +230,122 @@
         <el-button type="primary" :loading="saveLoading" @click="handleSave"
           >保存</el-button
         >
+      </template>
+    </el-dialog>
+
+    <!-- 禮包購買管理對話框 -->
+    <el-dialog
+      v-model="bundleDialogVisible"
+      title="禮包購買狀態管理"
+      width="700px"
+    >
+      <div v-if="bundleDialogUser">
+        <el-alert
+          :title="`用戶: ${bundleDialogUser.displayName || bundleDialogUser.email}`"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 16px"
+        />
+
+        <!-- 已購買禮包列表 -->
+        <el-card shadow="never" style="margin-bottom: 16px">
+          <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center">
+              <span>已購買禮包記錄</span>
+              <el-button size="small" @click="loadBundlePurchases">
+                刷新
+              </el-button>
+            </div>
+          </template>
+          <el-table
+            :data="bundlePurchases"
+            v-loading="bundlePurchasesLoading"
+            empty-text="此用戶尚未購買任何限購禮包"
+            style="width: 100%"
+          >
+            <el-table-column prop="bundleName" label="禮包名稱" width="150" />
+            <el-table-column prop="purchaseLimit" label="限購類型" width="100">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.purchaseLimit === 'once' ? 'danger' : row.purchaseLimit === 'monthly' ? 'warning' : 'success'"
+                  size="small"
+                >
+                  {{ row.purchaseLimit === 'once' ? '終身' : row.purchaseLimit === 'monthly' ? '每月' : row.purchaseLimit === 'weekly' ? '每週' : row.purchaseLimit }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="count" label="購買次數" width="80" />
+            <el-table-column label="最後購買" width="160">
+              <template #default="{ row }">
+                {{ formatDate(row.lastPurchaseAt?._seconds ? new Date(row.lastPurchaseAt._seconds * 1000) : row.lastPurchaseAt) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120">
+              <template #default="{ row }">
+                <el-popconfirm
+                  title="確定要重置此禮包的購買記錄嗎？用戶將可以再次購買"
+                  @confirm="handleResetBundlePurchase(row.bundleId)"
+                >
+                  <template #reference>
+                    <el-button size="small" type="danger">重置</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
+        <!-- 手動設置購買狀態 -->
+        <el-card shadow="never">
+          <template #header>
+            <span>手動設置購買狀態</span>
+          </template>
+          <el-form :inline="true" :model="addBundlePurchaseForm">
+            <el-form-item label="禮包">
+              <el-select
+                v-model="addBundlePurchaseForm.bundleId"
+                placeholder="選擇禮包"
+                style="width: 200px"
+              >
+                <el-option
+                  v-for="bundle in availableBundles"
+                  :key="bundle.id"
+                  :label="bundle.name"
+                  :value="bundle.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="購買次數">
+              <el-input-number
+                v-model="addBundlePurchaseForm.count"
+                :min="1"
+                :max="999"
+                style="width: 120px"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button
+                type="primary"
+                :loading="addBundlePurchaseLoading"
+                @click="handleAddBundlePurchase"
+              >
+                設置為已購買
+              </el-button>
+            </el-form-item>
+          </el-form>
+          <el-alert
+            title="說明：手動設置已購買狀態後，用戶將受到該禮包的限購限制"
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-top: 12px"
+          />
+        </el-card>
+      </div>
+
+      <template #footer>
+        <el-button @click="bundleDialogVisible = false">關閉</el-button>
       </template>
     </el-dialog>
   </div>
@@ -383,6 +500,18 @@ function handleSearch() {
 
 // 保存原始藥水數量用於比對
 const originalPotions = ref({ memoryBoost: 0, brainBoost: 0 });
+
+// 禮包購買管理
+const bundleDialogVisible = ref(false);
+const bundleDialogUser = ref(null);
+const bundlePurchases = ref([]);
+const bundlePurchasesLoading = ref(false);
+const availableBundles = ref([]);
+const addBundlePurchaseLoading = ref(false);
+const addBundlePurchaseForm = reactive({
+  bundleId: "",
+  count: 1,
+});
 
 function handleEdit(user) {
   editForm.uid = user.uid;
@@ -705,6 +834,94 @@ async function handleDelete(user) {
     // 用戶取消刪除
     if (error !== "cancel") {
     }
+  }
+}
+
+// ========================================
+// 禮包購買狀態管理功能
+// ========================================
+
+async function handleBundlePurchases(user) {
+  bundleDialogUser.value = user;
+  bundleDialogVisible.value = true;
+  addBundlePurchaseForm.bundleId = "";
+  addBundlePurchaseForm.count = 1;
+
+  // 載入禮包列表和購買記錄
+  await Promise.all([loadAvailableBundles(), loadBundlePurchases()]);
+}
+
+async function loadAvailableBundles() {
+  try {
+    // 從主應用 API 獲取禮包列表（需要跨域或代理）
+    // 這裡假設管理後台有一個代理端點
+    const response = await api.get("/api/bundles");
+    availableBundles.value = response.packages || [];
+  } catch (error) {
+    console.error("載入禮包列表失敗:", error);
+    // 使用靜態列表作為備選
+    availableBundles.value = [
+      { id: "starter-pack", name: "新手禮包" },
+      { id: "weekly-pack", name: "週特惠禮包" },
+      { id: "monthly-pack", name: "月度超值禮包" },
+      { id: "vip-pack", name: "VIP 專屬禮包" },
+    ];
+  }
+}
+
+async function loadBundlePurchases() {
+  if (!bundleDialogUser.value) return;
+
+  bundlePurchasesLoading.value = true;
+  try {
+    const response = await api.get(
+      `/api/users/${bundleDialogUser.value.uid}/bundle-purchases`
+    );
+    bundlePurchases.value = response.data?.purchases || [];
+  } catch (error) {
+    ElMessage.error("載入禮包購買記錄失敗");
+    bundlePurchases.value = [];
+  } finally {
+    bundlePurchasesLoading.value = false;
+  }
+}
+
+async function handleResetBundlePurchase(bundleId) {
+  if (!bundleDialogUser.value) return;
+
+  try {
+    await api.delete(
+      `/api/users/${bundleDialogUser.value.uid}/bundle-purchases/${bundleId}`
+    );
+    ElMessage.success("已重置禮包購買記錄，用戶可再次購買");
+    await loadBundlePurchases();
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || "重置失敗");
+  }
+}
+
+async function handleAddBundlePurchase() {
+  if (!bundleDialogUser.value || !addBundlePurchaseForm.bundleId) {
+    ElMessage.warning("請選擇禮包");
+    return;
+  }
+
+  addBundlePurchaseLoading.value = true;
+  try {
+    await api.put(
+      `/api/users/${bundleDialogUser.value.uid}/bundle-purchases/${addBundlePurchaseForm.bundleId}`,
+      {
+        count: addBundlePurchaseForm.count,
+      }
+    );
+    ElMessage.success("已設置購買狀態");
+    addBundlePurchaseForm.bundleId = "";
+    addBundlePurchaseForm.count = 1;
+    await loadBundlePurchases();
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || "設置失敗");
+  } finally {
+    addBundlePurchaseLoading.value = false;
   }
 }
 

@@ -141,7 +141,8 @@ const handleSelect = (item: NavItem): void => {
   justify-content: center;
 }
 
-@media (min-width: 768px) {
+/* 平板版：居中顯示 */
+@media (min-width: 768px) and (max-width: 1023px) {
   .bottom-nav {
     inset-inline: auto;
     left: 50%;
@@ -153,6 +154,14 @@ const handleSelect = (item: NavItem): void => {
 
   .bottom-nav-list {
     width: 100%;
+  }
+}
+
+/* 桌面版：隱藏底部導航 */
+@media (min-width: 1024px) {
+  .bottom-nav,
+  .bottom-nav-guard {
+    display: none !important;
   }
 }
 

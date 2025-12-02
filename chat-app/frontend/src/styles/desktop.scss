@@ -1,0 +1,247 @@
+// ========================================
+// 桌面版專用樣式
+// ========================================
+
+@import './breakpoints.scss';
+
+// ========================================
+// 桌面版佈局容器
+// ========================================
+
+.desktop-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg-dark, #1e2130);
+}
+
+.desktop-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-top: var(--desktop-header-height);
+}
+
+// ========================================
+// 桌面版內容容器
+// ========================================
+
+// 居中卡片容器 (用於配對、個人資料等)
+.desktop-card-container {
+  width: 100%;
+  max-width: var(--desktop-card-max-width);
+  margin: 0 auto;
+  padding: var(--desktop-content-padding);
+}
+
+// 居中列表容器 (用於對話列表、通知等)
+.desktop-list-container {
+  width: 100%;
+  max-width: var(--desktop-list-max-width);
+  margin: 0 auto;
+  padding: var(--desktop-content-padding);
+}
+
+// 全寬容器 (用於搜尋結果網格等)
+.desktop-full-container {
+  width: 100%;
+  max-width: var(--desktop-max-content-width);
+  margin: 0 auto;
+  padding: var(--desktop-content-padding);
+}
+
+// ========================================
+// 桌面版網格佈局
+// ========================================
+
+.desktop-grid {
+  display: grid;
+  gap: var(--desktop-gap-md);
+
+  // 2 欄網格
+  &--2col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  // 3 欄網格
+  &--3col {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  // 4 欄網格
+  &--4col {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  // 自適應網格 (最小 280px)
+  &--auto {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+// ========================================
+// 桌面版聊天佈局
+// ========================================
+
+.desktop-chat-layout {
+  display: flex;
+  height: calc(100vh - var(--desktop-header-height));
+  height: calc(100dvh - var(--desktop-header-height));
+  overflow: hidden;
+}
+
+.desktop-chat-sidebar {
+  width: var(--desktop-chat-sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 17, 24, 0.95);
+  overflow-y: auto;
+}
+
+.desktop-chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; // 防止 flex 子項溢出
+  overflow: hidden;
+}
+
+// ========================================
+// 桌面版頂部導航
+// ========================================
+
+.desktop-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--desktop-header-height);
+  background: rgba(15, 17, 24, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--desktop-content-padding);
+}
+
+.desktop-header__logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-right: 2rem;
+
+  // Logo 漸變效果
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.desktop-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.desktop-header__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    color: #e2e8f0;
+    background: rgba(148, 163, 184, 0.1);
+  }
+
+  &.active {
+    color: #fff;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+
+    .desktop-header__nav-icon {
+      color: #a78bfa;
+    }
+  }
+
+  .desktop-header__nav-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+}
+
+.desktop-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.desktop-header__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: #94a3b8;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: #e2e8f0;
+    background: rgba(148, 163, 184, 0.1);
+  }
+
+  .icon {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+// ========================================
+// 桌面版工具類
+// ========================================
+
+// 僅手機版顯示
+.mobile-only {
+  @include desktop {
+    display: none !important;
+  }
+}
+
+// 僅桌面版顯示
+.desktop-only {
+  display: none !important;
+
+  @include desktop {
+    display: block !important;
+  }
+}
+
+// 桌面版 flex 顯示
+.desktop-only-flex {
+  display: none !important;
+
+  @include desktop {
+    display: flex !important;
+  }
+}
+
+// 桌面版 grid 顯示
+.desktop-only-grid {
+  display: none !important;
+
+  @include desktop {
+    display: grid !important;
+  }
+}

@@ -148,4 +148,21 @@ const handleSettingsButtonRef = (el: Element | ComponentPublicInstance | null) =
     height: 20px;
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .aux-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+
+    .icon {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
 </style>

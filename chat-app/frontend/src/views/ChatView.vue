@@ -1,28 +1,42 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue';
-import { useRouter } from 'vue-router';
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  type Ref,
+} from "vue";
+import { useRouter } from "vue-router";
+
+// 響應式斷點
+import { useBreakpoint } from "../composables/useBreakpoint";
 
 // Chat 組件
-import ChatHeader from '../components/chat/ChatHeader.vue';
+import ChatHeader from "../components/chat/ChatHeader.vue";
+import ChatListSidebar from "../components/chat/ChatListSidebar.vue";
 
 // Level System
-import { useLevel } from '../composables/useLevel';
-import ChatContent from '../components/chat/ChatContent.vue';
-import ChatModals from '../components/chat/ChatModals.vue';
-import VideoCompletionNotification from '../components/chat/VideoCompletionNotification.vue';
-import GenerationFailureNotification from '../components/chat/GenerationFailureNotification.vue';
+import { useLevel } from "../composables/useLevel";
+import ChatContent from "../components/chat/ChatContent.vue";
+import ChatModals from "../components/chat/ChatModals.vue";
+import VideoCompletionNotification from "../components/chat/VideoCompletionNotification.vue";
+import GenerationFailureNotification from "../components/chat/GenerationFailureNotification.vue";
 
 // 統一 Setup Composable
-import { useChatSetup } from '../composables/chat/useChatSetup';
+import { useChatSetup } from "../composables/chat/useChatSetup";
 
 // Watchers & Initialization
-import { useChatWatchers } from '../composables/chat/useChatWatchers';
-import { useChatInitialization } from '../composables/chat/useChatInitialization';
+import { useChatWatchers } from "../composables/chat/useChatWatchers";
+import { useChatInitialization } from "../composables/chat/useChatInitialization";
 
 const router = useRouter();
 
+// 響應式斷點檢測
+const { isDesktop } = useBreakpoint();
+
 // Local Refs
-const draft: Ref<string> = ref('');
+const draft: Ref<string> = ref("");
 const chatContentRef: Ref<{ messageListRef?: any } | null> = ref(null);
 const chatPageRef: Ref<HTMLElement | null> = ref(null);
 
@@ -163,7 +177,11 @@ const {
 // ====================
 // Level System
 // ====================
-const { fetchCharacterLevel, getCharacterLevel: _getCharacterLevel, updateLocalLevel: _updateLocalLevel } = useLevel();
+const {
+  fetchCharacterLevel,
+  getCharacterLevel: _getCharacterLevel,
+  updateLocalLevel: _updateLocalLevel,
+} = useLevel();
 
 // 當前角色的等級數據
 const currentLevel = ref(1);
@@ -180,11 +198,15 @@ const loadCharacterLevel = async () => {
 };
 
 // 監聽 partnerId 變化來加載等級
-watch(partnerId, (newId) => {
-  if (newId) {
-    loadCharacterLevel();
-  }
-}, { immediate: true });
+watch(
+  partnerId,
+  (newId) => {
+    if (newId) {
+      loadCharacterLevel();
+    }
+  },
+  { immediate: true }
+);
 
 // ====================
 // Watchers
@@ -203,7 +225,7 @@ useChatWatchers({
 // Initialization
 // ====================
 const { initializeChat } = useChatInitialization({
-  getCurrentUserId: () => user.value?.id || '',
+  getCurrentUserId: () => user.value?.id || "",
   getPartnerId: () => partnerId.value,
   getPartner: () => partner.value,
   getMessages: () => messages.value,
@@ -224,7 +246,7 @@ const { initializeChat } = useChatInitialization({
 // Generation Failure Notification State
 // ====================
 const currentFailureNotification: Ref<{
-  type: 'photo' | 'video';
+  type: "photo" | "video";
   characterName: string;
   reason?: string;
 } | null> = ref(null);
@@ -258,8 +280,9 @@ const handleCloseFailureNotification = () => {
     if (failures && failures.length > 0) {
       // 找到第一個匹配的失敗記錄索引
       const index = generationFailures.value.findIndex(
-        f => f.characterId === partnerId.value &&
-            f.type === currentFailureNotification.value!.type
+        (f) =>
+          f.characterId === partnerId.value &&
+          f.type === currentFailureNotification.value!.type
       );
       if (index !== -1) {
         clearGenerationFailure(index);
@@ -275,7 +298,10 @@ const handleCloseGiftSelector = () => {
 // 處理查看影片通知
 const handleViewVideo = () => {
   if (videoNotification.value && chatContentRef.value?.messageListRef) {
-    scrollToVideo(chatContentRef.value.messageListRef, videoNotification.value.videoMessageId);
+    scrollToVideo(
+      chatContentRef.value.messageListRef,
+      videoNotification.value.videoMessageId
+    );
     hideVideoNotification();
   }
 };
@@ -283,8 +309,12 @@ const handleViewVideo = () => {
 // ====================
 // Type conversions for template (null -> undefined)
 // ====================
-const playingVoiceMessageIdComputed = computed(() => playingVoiceMessageId.value ?? undefined);
-const suggestionErrorComputed = computed(() => suggestionError.value ?? undefined);
+const playingVoiceMessageIdComputed = computed(
+  () => playingVoiceMessageId.value ?? undefined
+);
+const suggestionErrorComputed = computed(
+  () => suggestionError.value ?? undefined
+);
 const partnerComputed = computed(() => partner.value ?? undefined);
 
 // ====================
@@ -293,132 +323,167 @@ const partnerComputed = computed(() => partner.value ?? undefined);
 onBeforeUnmount(() => {
   cleanupMessages();
 });
+
+// ====================
+// Desktop Sidebar
+// ====================
+const handleSidebarSelect = (threadId: string) => {
+  if (threadId && threadId !== partnerId.value) {
+    router.push({ name: "chat", params: { id: threadId } });
+  }
+};
 </script>
 
 <template>
-  <div ref="chatPageRef" class="chat-page" :style="backgroundStyle">
-    <!-- Chat Header -->
-    <ChatHeader
-      :partner-name="partnerDisplayName"
-      :is-resetting-conversation="modals.resetConfirm.loading"
-      :is-favorited="isFavorited"
-      :is-favorite-mutating="isFavoriteMutating"
-      :memory-boost-count="userPotions.memoryBoost"
-      :brain-boost-count="userPotions.brainBoost"
-      :active-memory-boost="activeMemoryBoost"
-      :active-brain-boost="activeBrainBoost"
-      :active-character-unlock="activeCharacterUnlock"
-      :character-unlock-cards="characterTickets"
-      :is-character-unlocked="isCharacterUnlocked"
-      :level="currentLevel"
-      :level-progress="currentLevelProgress"
-      @back="handleBack"
-      @menu-action="handleMenuAction"
-      @toggle-favorite="toggleFavorite"
-      @view-buff-details="handleViewBuffDetails"
+  <div class="chat-layout" :class="{ 'chat-layout--desktop': isDesktop }">
+    <!-- 桌面版側邊欄 -->
+    <ChatListSidebar
+      v-if="isDesktop"
+      :current-partner-id="partnerId"
+      @select="handleSidebarSelect"
     />
 
-    <!-- Chat Content (MessageList + MessageInput + UnlockFab) -->
-    <ChatContent
-      ref="chatContentRef"
-      :messages="messages"
-      :partner-name="partnerDisplayName"
-      :partner-background="partnerBackground"
-      :is-replying="isReplying"
-      :playing-voice-message-id="playingVoiceMessageIdComputed"
-      :draft="draft"
-      :disabled="isLoadingHistory || isReplying"
-      :suggestions="suggestionOptions"
-      :is-loading-suggestions="isLoadingSuggestions"
-      :suggestion-error="suggestionErrorComputed"
-      :is-sending-gift="isSendingGift"
-      :is-requesting-selfie="isRequestingSelfie"
-      :is-requesting-video="isRequestingVideo"
-      :photo-remaining="photoRemaining"
-      :is-character-unlocked="isCharacterUnlocked"
-      :has-character-tickets="hasCharacterTickets"
-      :character-tickets="characterTickets"
-      @play-voice="handlePlayVoice"
-      @image-click="handleImageClick"
-      @update:draft="draft = $event"
-      @send="handleSendMessage"
-      @suggestion-click="handleSuggestionClick"
-      @request-suggestions="handleRequestSuggestions"
-      @gift-click="handleOpenGiftSelector"
-      @selfie-click="handleRequestSelfie"
-      @video-click="handleRequestVideo"
-      @unlock-action="handleMenuAction('unlock-character')"
-    />
+    <!-- 聊天主區域 -->
+    <div ref="chatPageRef" class="chat-page" :style="backgroundStyle">
+      <!-- Chat Header -->
+      <ChatHeader
+        :partner-name="partnerDisplayName"
+        :is-resetting-conversation="modals.resetConfirm.loading"
+        :is-favorited="isFavorited"
+        :is-favorite-mutating="isFavoriteMutating"
+        :memory-boost-count="userPotions.memoryBoost"
+        :brain-boost-count="userPotions.brainBoost"
+        :active-memory-boost="activeMemoryBoost"
+        :active-brain-boost="activeBrainBoost"
+        :active-character-unlock="activeCharacterUnlock"
+        :character-unlock-cards="characterTickets"
+        :is-character-unlocked="isCharacterUnlocked"
+        :level="currentLevel"
+        :level-progress="currentLevelProgress"
+        @back="handleBack"
+        @menu-action="handleMenuAction"
+        @toggle-favorite="toggleFavorite"
+        @view-buff-details="handleViewBuffDetails"
+      />
 
-    <!-- All Modals -->
-    <ChatModals
-      :modals="modals"
-      :partner-display-name="partnerDisplayName"
-      :partner-background="partnerBackground"
-      :partner-id="partnerId"
-      :partner="partnerComputed"
-      :user-potions="userPotions"
-      :active-memory-boost="activeMemoryBoost"
-      :active-brain-boost="activeBrainBoost"
-      :active-character-unlock="activeCharacterUnlock"
-      :character-tickets="characterTickets"
-      :voice-cards="voiceCards"
-      :photo-cards="photoCards"
-      :video-cards="videoCards"
-      :show-gift-selector="showGiftSelector"
-      :balance="balance"
-      :membership-tier="(user?.membershipTier as 'free' | 'lite' | 'vip' | 'vvip') || 'free'"
-      @cancel-reset="cancelResetConversation"
-      @confirm-reset="confirmResetConversation"
-      @close-character-info="closeCharacterInfo"
-      @close-potion-confirm="closePotionConfirm"
-      @confirm-use-potion="handleConfirmUsePotion"
-      @close-potion-limit="closePotionLimit"
-      @close-unlock-confirm="closeUnlockConfirm"
-      @confirm-unlock-character="handleConfirmUnlockCharacter"
-      @close-unlock-limit="closeUnlockLimit"
-      @close-buff-details="closeBuffDetails"
-      @close-conversation-limit="closeConversationLimit"
-      @watch-ad="handleWatchAd"
-      @use-unlock-card="handleUseUnlockCard"
-      @close-voice-limit="closeVoiceLimit"
-      @watch-voice-ad="handleWatchVoiceAd"
-      @use-voice-unlock-card="handleUseVoiceUnlockCard"
-      @close-photo-limit="closePhotoLimit"
-      @use-photo-unlock-card="handleUsePhotoUnlockCard"
-      @close-video-limit="closeVideoLimit"
-      @use-video-unlock-card="handleUseVideoUnlockCard"
-      @upgrade-membership="handleUpgradeFromVideoModal"
-      @close-photo-selector="closePhotoSelector"
-      @photo-select="handlePhotoSelect"
-      @close-image-viewer="closeImageViewer"
-      @close-gift-selector="handleCloseGiftSelector"
-      @select-gift="handleSelectGift"
-      @close-character-ranking="closeCharacterRanking"
-    />
+      <!-- Chat Content (MessageList + MessageInput + UnlockFab) -->
+      <ChatContent
+        ref="chatContentRef"
+        :messages="messages"
+        :partner-name="partnerDisplayName"
+        :partner-background="partnerBackground"
+        :is-replying="isReplying"
+        :playing-voice-message-id="playingVoiceMessageIdComputed"
+        :draft="draft"
+        :disabled="isLoadingHistory || isReplying"
+        :suggestions="suggestionOptions"
+        :is-loading-suggestions="isLoadingSuggestions"
+        :suggestion-error="suggestionErrorComputed"
+        :is-sending-gift="isSendingGift"
+        :is-requesting-selfie="isRequestingSelfie"
+        :is-requesting-video="isRequestingVideo"
+        :photo-remaining="photoRemaining"
+        :is-character-unlocked="isCharacterUnlocked"
+        :has-character-tickets="hasCharacterTickets"
+        :character-tickets="characterTickets"
+        @play-voice="handlePlayVoice"
+        @image-click="handleImageClick"
+        @update:draft="draft = $event"
+        @send="handleSendMessage"
+        @suggestion-click="handleSuggestionClick"
+        @request-suggestions="handleRequestSuggestions"
+        @gift-click="handleOpenGiftSelector"
+        @selfie-click="handleRequestSelfie"
+        @video-click="handleRequestVideo"
+        @unlock-action="handleMenuAction('unlock-character')"
+      />
 
-    <!-- Video Completion Notification -->
-    <VideoCompletionNotification
-      v-if="videoNotification"
-      :is-visible="videoNotification.show"
-      :character-name="videoNotification.characterName"
-      @view-video="handleViewVideo"
-      @close="hideVideoNotification"
-    />
+      <!-- All Modals -->
+      <ChatModals
+        :modals="modals"
+        :partner-display-name="partnerDisplayName"
+        :partner-background="partnerBackground"
+        :partner-id="partnerId"
+        :partner="partnerComputed"
+        :user-potions="userPotions"
+        :active-memory-boost="activeMemoryBoost"
+        :active-brain-boost="activeBrainBoost"
+        :active-character-unlock="activeCharacterUnlock"
+        :character-tickets="characterTickets"
+        :voice-cards="voiceCards"
+        :photo-cards="photoCards"
+        :video-cards="videoCards"
+        :show-gift-selector="showGiftSelector"
+        :balance="balance"
+        :membership-tier="(user?.membershipTier as 'free' | 'lite' | 'vip' | 'vvip') || 'free'"
+        @cancel-reset="cancelResetConversation"
+        @confirm-reset="confirmResetConversation"
+        @close-character-info="closeCharacterInfo"
+        @close-potion-confirm="closePotionConfirm"
+        @confirm-use-potion="handleConfirmUsePotion"
+        @close-potion-limit="closePotionLimit"
+        @close-unlock-confirm="closeUnlockConfirm"
+        @confirm-unlock-character="handleConfirmUnlockCharacter"
+        @close-unlock-limit="closeUnlockLimit"
+        @close-buff-details="closeBuffDetails"
+        @close-conversation-limit="closeConversationLimit"
+        @watch-ad="handleWatchAd"
+        @use-unlock-card="handleUseUnlockCard"
+        @close-voice-limit="closeVoiceLimit"
+        @watch-voice-ad="handleWatchVoiceAd"
+        @use-voice-unlock-card="handleUseVoiceUnlockCard"
+        @close-photo-limit="closePhotoLimit"
+        @use-photo-unlock-card="handleUsePhotoUnlockCard"
+        @close-video-limit="closeVideoLimit"
+        @use-video-unlock-card="handleUseVideoUnlockCard"
+        @upgrade-membership="handleUpgradeFromVideoModal"
+        @close-photo-selector="closePhotoSelector"
+        @photo-select="handlePhotoSelect"
+        @close-image-viewer="closeImageViewer"
+        @close-gift-selector="handleCloseGiftSelector"
+        @select-gift="handleSelectGift"
+        @close-character-ranking="closeCharacterRanking"
+      />
 
-    <!-- Generation Failure Notification -->
-    <GenerationFailureNotification
-      v-if="currentFailureNotification"
-      :is-visible="!!currentFailureNotification"
-      :type="currentFailureNotification.type"
-      :character-name="currentFailureNotification.characterName"
-      :reason="currentFailureNotification.reason"
-      @close="handleCloseFailureNotification"
-    />
+      <!-- Video Completion Notification -->
+      <VideoCompletionNotification
+        v-if="videoNotification"
+        :is-visible="videoNotification.show"
+        :character-name="videoNotification.characterName"
+        @view-video="handleViewVideo"
+        @close="hideVideoNotification"
+      />
+
+      <!-- Generation Failure Notification -->
+      <GenerationFailureNotification
+        v-if="currentFailureNotification"
+        :is-visible="!!currentFailureNotification"
+        :type="currentFailureNotification.type"
+        :character-name="currentFailureNotification.characterName"
+        :reason="currentFailureNotification.reason"
+        @close="handleCloseFailureNotification"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
+/* ===================
+   Desktop Layout Container
+   =================== */
+.chat-layout {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+
+  // 桌面版：左右分欄佈局
+  &--desktop {
+    display: flex;
+    height: calc(100vh - var(--desktop-header-height, 64px));
+    height: calc(100dvh - var(--desktop-header-height, 64px));
+  }
+}
+
 /* ===================
    Main Container
    =================== */
@@ -432,5 +497,15 @@ onBeforeUnmount(() => {
   background-position: center;
   background-attachment: fixed;
   position: relative;
+
+  // 桌面版：聊天主區域填滿剩餘空間
+  .chat-layout--desktop & {
+    flex: 1;
+    min-width: 0; // 防止 flex 子項溢出
+    height: 100%;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-attachment: unset;
+  }
 }
 </style>

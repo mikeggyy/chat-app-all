@@ -241,4 +241,72 @@ const openChat = (profile: CharacterProfile | null): void => {
 .scroll-container::-webkit-scrollbar-track {
   background: transparent;
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .search-page {
+    height: calc(100vh - var(--desktop-header-height, 64px));
+    height: calc(100dvh - var(--desktop-header-height, 64px));
+    padding: 0 24px;
+  }
+
+  .page-header {
+    width: min(800px, 100%);
+    padding: 2.5rem 0 1.5rem;
+    gap: 1rem;
+
+    h1 {
+      font-size: 2.25rem;
+    }
+
+    .page-kicker {
+      font-size: 0.9rem;
+    }
+
+    .page-subtitle {
+      font-size: 1rem;
+      max-width: 600px;
+    }
+  }
+
+  .scroll-container {
+    width: min(1000px, 100%);
+    padding: 1.5rem 0 3rem;
+    gap: 2rem;
+
+    // 推薦面板網格佈局
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    align-content: start;
+
+    // 搜尋結果時回復單列
+    &:has(.search-results) {
+      grid-template-columns: 1fr;
+      max-width: 800px;
+    }
+  }
+}
+
+// ========================================
+// 寬螢幕樣式 (≥ 1440px)
+// ========================================
+
+@media (min-width: 1440px) {
+  .page-header {
+    width: min(900px, 100%);
+
+    h1 {
+      font-size: 2.5rem;
+    }
+  }
+
+  .scroll-container {
+    width: min(1200px, 100%);
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.5rem;
+  }
+}
 </style>

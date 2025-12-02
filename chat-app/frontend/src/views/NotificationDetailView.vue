@@ -471,4 +471,73 @@ onBeforeUnmount(() => {
     text-align: center;
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .notification-detail-view {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 24px;
+    padding-bottom: 48px;
+    min-height: auto;
+    background: transparent;
+  }
+
+  .notification-detail-header {
+    position: relative;
+    background: transparent;
+    backdrop-filter: none;
+    border-bottom: none;
+    padding: 0 0 1.5rem;
+
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .back-button {
+    display: none; // 桌面版不需要返回按鈕
+  }
+
+  .header-spacer {
+    display: none;
+  }
+
+  .notification-detail-content {
+    padding: 2rem;
+    background: linear-gradient(150deg, rgba(30, 31, 38, 0.95), rgba(20, 21, 28, 0.98));
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    max-height: none;
+  }
+
+  .notification-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+
+    .icon {
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  .notification-detail-title {
+    font-size: 2rem;
+  }
+
+  .notification-detail-body .paragraph {
+    font-size: 1.05rem;
+    line-height: 1.8;
+  }
+
+  .action-button {
+    padding: 1rem 2rem;
+    font-size: 1rem;
+  }
+}
 </style>

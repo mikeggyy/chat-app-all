@@ -313,4 +313,26 @@ const potionsList = computed(() => {
     gap: 0.75rem;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .modal-container {
+    max-width: 700px;
+  }
+
+  .modal-content {
+    border-radius: 28px;
+  }
+
+  .modal-body {
+    padding: 2rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
 </style>

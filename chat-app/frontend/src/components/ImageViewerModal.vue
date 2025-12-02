@@ -244,4 +244,48 @@ const handleDownload = async (): Promise<void> => {
     max-height: 95vh;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .image-viewer-modal {
+    padding: 2rem;
+  }
+
+  .image-viewer-actions {
+    top: 1.5rem;
+    right: 1.5rem;
+    gap: 0.75rem;
+  }
+
+  .image-viewer-action-btn {
+    width: 56px;
+    height: 56px;
+
+    .icon {
+      width: 28px;
+      height: 28px;
+    }
+
+    &:hover {
+      transform: scale(1.15);
+    }
+  }
+
+  .image-viewer-content {
+    max-width: 85vw;
+    max-height: 85vh;
+  }
+
+  .image-viewer-image {
+    max-height: 85vh;
+    border-radius: 12px;
+    transition: transform 0.3s ease;
+  }
+
+  .image-viewer-image:hover {
+    transform: scale(1.02);
+  }
+}
 </style>

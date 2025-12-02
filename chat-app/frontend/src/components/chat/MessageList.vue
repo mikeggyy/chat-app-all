@@ -365,4 +365,43 @@ defineExpose({
     }
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .chat-body {
+    flex: 1;
+    min-height: 0;
+    padding: 0 2rem 2rem;
+    margin-top: 16rem;
+    gap: 1.5rem;
+  }
+
+  .chat-profile {
+    max-width: 600px;
+    padding: 1.5rem 2rem;
+
+    h2 {
+      font-size: 1.15rem;
+    }
+
+    p {
+      font-size: 1rem;
+    }
+  }
+
+  .chat-profile__label {
+    font-size: 0.75rem;
+  }
+
+  .chat-thread {
+    gap: 1rem;
+  }
+
+  .chat-bubble--typing {
+    max-width: 65%;
+  }
+}
 </style>

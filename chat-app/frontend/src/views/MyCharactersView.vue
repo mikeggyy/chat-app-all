@@ -809,4 +809,91 @@ onMounted(() => {
     }
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .my-characters-view {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+    padding-bottom: 48px;
+    min-height: auto;
+    background: transparent;
+  }
+
+  .my-characters-header {
+    position: relative;
+    background: transparent;
+    backdrop-filter: none;
+    border-bottom: none;
+    padding: 0 0 1.5rem;
+  }
+
+  .my-characters-header__button {
+    display: none; // 桌面版不需要返回按鈕
+  }
+
+  .my-characters-header__title h1 {
+    text-align: left;
+    font-size: 1.75rem;
+  }
+
+  .my-characters-content {
+    padding: 0;
+    max-height: none;
+  }
+
+  .character-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .character-card {
+    flex-direction: column;
+    padding: 0;
+    border-radius: 24px;
+
+    &__media {
+      flex: none;
+      width: 100%;
+    }
+
+    &__media-frame {
+      width: 100%;
+      border-radius: 24px 24px 0 0;
+    }
+
+    &__portrait,
+    &__portrait-placeholder {
+      border-radius: 24px 24px 0 0;
+      aspect-ratio: 3 / 4;
+    }
+
+    &__body {
+      padding: 1.25rem 1.5rem 1.5rem;
+    }
+
+    &__name {
+      font-size: 1.2rem;
+    }
+
+    &:hover {
+      transform: translateY(-6px);
+    }
+  }
+}
+
+@media (min-width: 1440px) {
+  .my-characters-view {
+    max-width: 1200px;
+  }
+
+  .character-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 </style>

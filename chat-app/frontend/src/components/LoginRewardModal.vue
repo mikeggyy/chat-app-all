@@ -755,4 +755,146 @@ const handleClaim = () => {
     transform: scale(0.9) translateY(20px);
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+@media (min-width: 1024px) {
+  .modal-container {
+    max-width: 520px;
+    border-radius: 24px;
+  }
+
+  .modal-header {
+    padding: 1.5rem;
+  }
+
+  .header-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+
+    .icon {
+      width: 30px;
+      height: 30px;
+    }
+  }
+
+  .header-title {
+    font-size: 1.35rem;
+  }
+
+  .close-btn {
+    padding: 0.5rem;
+    transition: all 0.2s ease;
+
+    &:hover {
+      transform: scale(1.1);
+    }
+
+    .close-icon {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .streak-section {
+    padding: 1rem;
+  }
+
+  .streak-badge {
+    padding: 0.5rem 1.25rem;
+  }
+
+  .streak-count {
+    font-size: 1.6rem;
+  }
+
+  .milestones-section {
+    padding: 1rem 1.25rem;
+  }
+
+  .milestones-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+  }
+
+  .milestone-card {
+    border-radius: 12px;
+    padding: 0.75rem 0.5rem;
+    transition: all 0.2s ease;
+
+    &:hover:not(.milestone-card--claimed) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  .milestone-badge-icon {
+    font-size: 1.4rem;
+  }
+
+  .month-rewards {
+    padding: 0.75rem 1rem;
+  }
+
+  .week-days {
+    gap: 0.4rem;
+  }
+
+  .day-reward {
+    padding: 0.5rem 0.25rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+
+    &:hover:not(.day-reward--claimed) {
+      transform: translateY(-2px);
+    }
+
+    &--today {
+      transform: scale(1.08);
+
+      &:hover {
+        transform: scale(1.1);
+      }
+    }
+  }
+
+  .day-number {
+    font-size: 0.7rem;
+  }
+
+  .day-coins {
+    font-size: 0.8rem;
+  }
+
+  .claim-result {
+    padding: 1rem;
+    margin: 0.75rem 1rem;
+  }
+
+  .result-title {
+    font-size: 1.1rem;
+  }
+
+  .coins-amount {
+    font-size: 2rem;
+  }
+
+  .modal-actions {
+    padding: 1rem;
+  }
+
+  .claim-btn,
+  .confirm-btn {
+    padding: 1rem;
+    font-size: 1.05rem;
+    border-radius: 14px;
+  }
+
+  .claim-btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(236, 72, 153, 0.5);
+  }
+}
 </style>

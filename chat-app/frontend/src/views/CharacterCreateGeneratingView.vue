@@ -1000,4 +1000,27 @@ onBeforeUnmount(() => {
     padding: 32px 24px 40px;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+
+@media (min-width: 1024px) {
+  .generating {
+    max-width: 800px;
+    margin: 0 auto;
+    min-height: auto;
+    background: transparent;
+    padding: 32px 24px 48px;
+  }
+
+  .generating--complete {
+    background: transparent;
+  }
+
+  .generating--settings {
+    max-width: 700px;
+    background: transparent;
+  }
+}
 </style>

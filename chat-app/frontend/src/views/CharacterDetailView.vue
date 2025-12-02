@@ -667,4 +667,81 @@ onMounted(() => {
     padding: 0.875rem;
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .character-detail-view {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 24px;
+    min-height: auto;
+    background: transparent;
+  }
+
+  .detail-header {
+    position: relative;
+    background: transparent;
+    backdrop-filter: none;
+    border-bottom: none;
+    padding: 0 0 1.5rem;
+
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .detail-header__button {
+    display: none; // 桌面版不需要返回按鈕
+  }
+
+  .detail-header__spacer {
+    display: none;
+  }
+
+  .detail-content {
+    background: transparent;
+  }
+
+  .character-detail {
+    padding: 0;
+    max-height: none;
+    background: linear-gradient(150deg, rgba(30, 31, 38, 0.95), rgba(20, 21, 28, 0.98));
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 2rem;
+  }
+
+  .detail-portrait__image {
+    max-width: 350px;
+    border-radius: 20px;
+  }
+
+  .detail-portrait__placeholder {
+    max-width: 350px;
+    border-radius: 20px;
+  }
+
+  .detail-section {
+    padding: 1.25rem;
+    border-radius: 16px;
+
+    &__title {
+      font-size: 0.8rem;
+    }
+
+    &__content {
+      font-size: 1rem;
+    }
+  }
+
+  .action-button {
+    padding: 1rem 2.5rem;
+    font-size: 1rem;
+    border-radius: 14px;
+  }
+}
 </style>

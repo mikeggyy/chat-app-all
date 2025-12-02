@@ -183,6 +183,11 @@ const formatBackground = (text: string | undefined | null): string => {
     &.single {
       grid-template-columns: 1fr;
       max-width: 360px;
+
+      // 桌面版：置中按鈕
+      @media (min-width: 1024px) {
+        margin: 0 auto;
+      }
     }
   }
 

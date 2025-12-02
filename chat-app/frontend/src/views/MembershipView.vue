@@ -215,7 +215,7 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .membership-screen {
   min-height: 100vh;
   min-height: 100dvh;
@@ -244,5 +244,26 @@ onMounted(async () => {
   flex: 1;
   /* 或使用動態視口單位，減去 hero section 的高度 */
   max-height: calc(100dvh - 280px);
+}
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .membership-screen {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 24px;
+    padding-bottom: 48px;
+    min-height: auto;
+    background: transparent;
+  }
+
+  .membership-panel {
+    max-height: none;
+    gap: 2rem;
+    padding: 0;
+  }
 }
 </style>

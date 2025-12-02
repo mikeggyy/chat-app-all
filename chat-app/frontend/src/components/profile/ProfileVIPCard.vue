@@ -360,4 +360,49 @@ const handleUpgradeClick = () => {
     }
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .vip-card {
+    width: auto;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    gap: 0.75rem;
+
+    &__header {
+      gap: 0.625rem;
+    }
+
+    &__icon-wrapper {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+    }
+
+    &__icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    &__tier {
+      font-size: 0.875rem;
+    }
+
+    &__expiry {
+      font-size: 0.6875rem;
+    }
+
+    &__button-text {
+      font-size: 0.8125rem;
+    }
+
+    &__arrow {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
 </style>

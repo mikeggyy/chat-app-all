@@ -3,14 +3,30 @@ import { computed, watch, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import GlobalLoadingOverlay from "./components/GlobalLoadingOverlay.vue";
 import BottomNavBar from "./components/BottomNavBar.vue";
+import DesktopHeader from "./components/layout/DesktopHeader.vue";
 import ToastContainer from "./components/ToastContainer.vue";
 import LoginRewardModal from "./components/LoginRewardModal.vue";
 import { useUserProfile } from "./composables/useUserProfile";
 import { useLoginReward } from "./composables/useLoginReward";
+import { useBreakpoint } from "./composables/useBreakpoint";
 import { isGuestUser } from "../../../shared/config/testAccounts.js";
 
 const route = useRoute();
-const showBottomNav = computed(() => Boolean(route.meta?.showBottomNav));
+
+// 響應式斷點檢測
+const { isDesktop } = useBreakpoint();
+
+// 是否顯示底部導航（手機版 + 路由允許）
+const showBottomNav = computed(() => {
+  return !isDesktop.value && Boolean(route.meta?.showBottomNav);
+});
+
+// 是否顯示桌面版頂部導航
+const showDesktopHeader = computed(() => {
+  // 登入頁和 onboarding 頁面不顯示桌面版導航
+  const excludedRoutes = ['login', 'onboarding', 'guest-upgrade'];
+  return isDesktop.value && !excludedRoutes.includes(String(route.name || ''));
+});
 
 // 用戶狀態
 const { user } = useUserProfile();
@@ -56,10 +72,19 @@ const handleClaim = async () => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'is-desktop': isDesktop }">
     <GlobalLoadingOverlay />
     <ToastContainer />
-    <router-view />
+
+    <!-- 桌面版頂部導航 -->
+    <DesktopHeader v-if="showDesktopHeader" />
+
+    <!-- 主要內容區 -->
+    <main class="app-main" :class="{ 'has-desktop-header': showDesktopHeader }">
+      <router-view />
+    </main>
+
+    <!-- 手機版底部導航 -->
     <BottomNavBar v-if="showBottomNav" />
 
     <!-- 每日登入獎勵彈窗 -->
@@ -80,10 +105,28 @@ const handleClaim = async () => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .app-shell {
   min-height: 100%;
   height: 100%;
   position: relative;
+
+  // 桌面版佈局
+  &.is-desktop {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; // 防止 flex 溢出
+
+  // 桌面版有頂部導航時的內邊距
+  &.has-desktop-header {
+    padding-top: var(--desktop-header-height, 64px);
+  }
 }
 </style>

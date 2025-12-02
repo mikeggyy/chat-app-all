@@ -379,4 +379,72 @@ const handleViewCharacter = (): void => {
 .modal-leave-to .modal-content {
   transform: scale(0.9);
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .modal-content {
+    max-width: 540px;
+    padding: 40px 32px;
+  }
+
+  .modal-close {
+    width: 36px;
+    height: 36px;
+    top: 20px;
+    right: 20px;
+  }
+
+  .modal-close:hover {
+    transform: scale(1.1);
+  }
+
+  .success-icon {
+    width: 72px;
+    height: 72px;
+  }
+
+  .modal-title {
+    font-size: 28px;
+  }
+
+  .character-card {
+    padding: 24px;
+  }
+
+  .character-portrait {
+    width: 240px;
+    height: 240px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .character-portrait:hover {
+    transform: scale(1.02);
+    box-shadow: 0 12px 32px rgba(255, 120, 186, 0.4);
+  }
+
+  .character-name {
+    font-size: 24px;
+  }
+
+  .character-section {
+    padding: 16px;
+    transition: background 0.2s ease;
+  }
+
+  .character-section:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .action-button {
+    padding: 14px 40px;
+    font-size: 16px;
+  }
+
+  .action-button--primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(255, 77, 143, 0.5);
+  }
+}
 </style>

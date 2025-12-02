@@ -102,4 +102,65 @@ defineEmits<Emits>();
   outline: 2px solid var(--primary-color, #3b82f6);
   outline-offset: -2px;
 }
+
+/* 桌面版樣式優化 - 大膽設計 */
+@media (min-width: 1024px) {
+  .chat-list-header {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    background: transparent;
+    backdrop-filter: none;
+    border-bottom: none;
+    margin-bottom: 1.5rem;
+  }
+
+  .chat-list-tabs {
+    display: inline-flex;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 14px;
+    padding: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .chat-list-tab {
+    flex: none;
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 10px;
+    border-bottom: none;
+    color: rgba(226, 232, 240, 0.7);
+    transition: all 0.2s ease;
+  }
+
+  .chat-list-tab:hover {
+    background: rgba(226, 232, 240, 0.08);
+    color: #fff;
+  }
+
+  .chat-list-tab--active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.4), rgba(118, 75, 162, 0.4));
+    color: #fff;
+    border-bottom: none;
+    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.3);
+  }
+
+  .chat-list-tab--active::before {
+    display: none;
+  }
+}
+
+/* 寬螢幕進一步優化 */
+@media (min-width: 1440px) {
+  .chat-list-header {
+    margin-bottom: 2rem;
+  }
+
+  .chat-list-tab {
+    padding: 0.875rem 2.5rem;
+    font-size: 1.0625rem;
+  }
+}
 </style>

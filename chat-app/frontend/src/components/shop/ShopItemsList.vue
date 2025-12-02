@@ -159,4 +159,71 @@ const isPurchasingItem = (item: ShopItemType): boolean => {
     }
   }
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .shop-content {
+    padding: 0;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .category-description {
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+    padding: 1rem 1.5rem;
+    border-radius: 14px;
+    background: linear-gradient(165deg, rgba(30, 33, 48, 0.95) 0%, rgba(22, 25, 43, 0.9) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+
+    p {
+      font-size: 0.9rem;
+    }
+  }
+
+  .shop-items {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+  }
+
+  .shop-empty {
+    padding: 6rem 3rem;
+  }
+
+  .empty-icon {
+    width: 80px;
+    height: 80px;
+  }
+
+  .empty-text {
+    font-size: 1.125rem;
+  }
+}
+
+// 寬螢幕優化
+@media (min-width: 1440px) {
+  .category-description {
+    margin-bottom: 2rem;
+    padding: 1.25rem 2rem;
+
+    p {
+      font-size: 0.9375rem;
+    }
+  }
+
+  .shop-items {
+    gap: 1.5rem;
+  }
+}
+
+// 超寬螢幕
+@media (min-width: 1920px) {
+  .shop-items {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
 </style>

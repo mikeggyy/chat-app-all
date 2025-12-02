@@ -124,5 +124,14 @@ defineExpose({
 <style scoped lang="scss">
 .chat-content {
   display: contents;
+
+  // 桌面版：改用 flex 佈局確保輸入框在底部
+  @media (min-width: 1024px) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 </style>

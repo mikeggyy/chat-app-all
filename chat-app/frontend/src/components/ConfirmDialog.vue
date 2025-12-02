@@ -205,4 +205,51 @@ const handleCancel = (): void => {
     font-size: 0.95rem;
   }
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .dialog-container {
+    max-width: 440px;
+  }
+
+  .dialog-content {
+    border-radius: 24px;
+  }
+
+  .dialog-header {
+    padding: 1.75rem 1.75rem 1.25rem;
+  }
+
+  .dialog-title {
+    font-size: 1.35rem;
+  }
+
+  .dialog-body {
+    padding: 1.75rem;
+  }
+
+  .dialog-message {
+    font-size: 1.05rem;
+    line-height: 1.7;
+  }
+
+  .dialog-footer {
+    padding: 1.25rem 1.75rem 1.75rem;
+    gap: 1.25rem;
+  }
+
+  .btn-unified {
+    transition: all 0.2s ease;
+  }
+
+  .btn-unified:hover {
+    transform: translateY(-2px);
+  }
+
+  .btn-confirm:hover {
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  }
+}
 </style>

@@ -19,12 +19,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Firestore 資料庫（兩個應用共享）
 - Firebase Authentication（主應用用戶 + 管理員權限）
 
-## 📌 最近重要更新
+## 快速命令參考
 
-- **2025-01**: 價格不一致問題修復、角色創建資料保存修復
-- **2025-01**: 後端 API 測試 100% 完成 - 31 APIs, 688 tests
-- **2025-01**: 安全性增強 - 日誌脫敏、速率限制配置、統一錯誤碼
-- **2024**: Cloudflare Pages 部署支援（[docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md)）
+| 任務 | 命令 |
+|-----|------|
+| 啟動所有服務 | `npm run dev` |
+| 主應用開發 | `cd chat-app && npm run dev` |
+| 管理後台開發 | `cd chat-app-admin && npm run dev` |
+| 使用 Emulator | `cd chat-app && npm run dev:with-emulator` |
+| 運行測試 | `cd chat-app/backend && npm test` |
+| 清理端口 | `npm run cleanup-ports` |
+| 安裝所有依賴 | `npm run install:all` |
+| 驗證配置 | `npm run verify-config` |
+
+**端口配置**: 主應用 `5173/4000`，管理後台 `5174/4001`（詳見 [PORTS.md](PORTS.md)）
+
+**最近更新**: 後端 API 測試 100% 完成 (688 tests)、安全性增強（日誌脫敏、速率限制、統一錯誤碼）— 詳見 [CHANGELOG.md](CHANGELOG.md)
 
 ## 首次設置檢查清單
 
@@ -160,67 +170,24 @@ chat-app-all/            # 根目錄
 
 ## 常用命令
 
-### 根目錄命令
+詳細命令請參考上方「快速命令參考」表格。
 
-```bash
-# 開發
-npm run dev                 # 啟動所有服務 (主應用 + 管理後臺，共4個服務)
-npm run install:all         # 安裝所有子項目的依賴
-
-# 測試
-cd chat-app/backend && npm test  # 運行主應用後端測試（688 tests）
-
-# 服務管理
-npm run cleanup-ports       # 清理特定端口
-npm run kill-all-node       # 關閉所有 Node.js 進程（測試時很有用）
-```
-
-### 主應用 (chat-app) 命令
+### 數據管理（Emulator 模式）
 
 ```bash
 cd chat-app
-
-# 開發
-npm run dev                 # 啟動前後端（生產環境 Firebase）
-npm run dev:with-emulator   # 使用 Firebase Emulator 啟動
-npm run dev:backend         # 僅啟動後端 (port 4000)
-npm run dev:frontend        # 僅啟動前端 (port 5173)
-
-# 構建
-npm run build:frontend      # 構建前端生產版本
-npm run build:backend       # 構建後端（如需要）
-
-# 數據管理（Emulator 模式）
 npm run import:all          # 導入所有 Firestore 數據
 npm run import:characters   # 僅導入 AI 角色
 npm run import:configs      # 僅導入系統配置
 npm run import:membership   # 僅導入會員方案
 npm run import:test-data    # 導入測試數據
-
-# 開發工具
-npm run test:env            # 驗證環境變數配置（推薦首次啟動前執行）
-npm run cleanup-ports       # 清理被佔用的端口（Windows）
-npm run kill-all-node       # 關閉所有 Node.js 進程（測試時很有用）
-npm run verify-config       # 驗證端口配置同步
-npm run dev:guide           # 互動式開發指南
 ```
 
-### 管理後臺 (chat-app-admin) 命令
+### 構建生產版本
 
 ```bash
-cd chat-app-admin
-
-# 開發
-npm run dev                 # 啟動前後端
-npm run dev:backend         # 僅啟動後端 (port 4001)
-npm run dev:frontend        # 僅啟動前端 (port 5174)
-
-# 構建
-npm run build:frontend      # 構建前端生產版本
-npm run build:backend       # 構建後端（如需要）
-
-# 開發工具
-npm run test:env            # 驗證環境變數配置（推薦首次啟動前執行）
+cd chat-app && npm run build:frontend      # 主應用
+cd chat-app-admin && npm run build:frontend # 管理後台
 ```
 
 ## 技術棧
@@ -623,101 +590,6 @@ console.log(user.customClaims);
 - CSRF 安全修復
 - 錢包同步修復
 
-## 常見任務
-
-### 一鍵啟動/停止所有服務
-
-```bash
-# 根目錄 - 啟動所有服務（推薦）
-npm run dev
-
-# 停止：按 Ctrl+C
-```
-
-### 安裝依賴
-
-```bash
-# 根目錄 - 安裝所有項目依賴
-npm install           # 安裝根目錄依賴
-npm run install:all   # 安裝所有子項目依賴
-
-# 單獨安裝主應用依賴
-cd chat-app
-npm run install:all
-
-# 單獨安裝管理後臺依賴
-cd chat-app-admin
-npm run install:all
-```
-
-### 端口管理
-
-```bash
-# 查看端口配置
-cat PORTS.md
-
-# 清理被占用的端口（Windows）
-cd chat-app
-npm run cleanup-ports
-
-# 手動清理特定端口
-netstat -ano | findstr :4000    # 查找占用 port 4000 的進程
-taskkill //F //PID <PID>        # 終止進程
-```
-
-### 構建生產版本
-
-```bash
-# 主應用
-cd chat-app
-npm run build:frontend
-
-# 管理後臺
-cd chat-app-admin
-npm run build:frontend
-```
-
-### 添加新的 AI 角色
-
-**方法 1: 直接在 Firestore 中創建**
-1. 訪問 [Firebase Console](https://console.firebase.google.com)
-2. 進入專案 `chat-app-3-8a7ee`
-3. 在 `characters` 集合中添加新文檔
-
-**方法 2: 使用管理後臺**
-1. 訪問管理後臺前端：http://localhost:5174
-2. 登入管理員帳號
-3. 進入「AI 角色管理」頁面
-4. 點擊「新增角色」
-
-**方法 3: 使用導入腳本（Emulator 模式）**
-```bash
-cd chat-app
-npm run import:characters
-```
-
-### 驗證配置
-
-```bash
-# 驗證端口和環境配置
-cd chat-app
-npm run verify-config
-```
-
-### 重置開發環境
-
-```bash
-# 1. 清理端口
-cd chat-app
-npm run cleanup-ports
-
-# 2. 重新安裝依賴（如果需要）
-npm run install:all
-
-# 3. 重啟服務
-npm run dev
-```
-
 ## 故障排除
 
 ### 端口被占用
@@ -783,401 +655,85 @@ npm run install:all
 
 ## 調試技巧
 
-### 後端調試
+### 常用調試命令
 
-**查看詳細日誌**:
 ```bash
-cd chat-app/backend
-npm run dev  # 開發環境會顯示詳細日誌
-
-# 日誌會自動脫敏，敏感信息已被過濾
-# 實現：backend/src/utils/sanitizer.js
-```
-
-**查看 Firestore 數據**:
-```bash
-# Firebase Emulator 模式
-npm run dev:with-emulator
-# 訪問 Emulator UI: http://localhost:4001
-
-# 生產環境
-# 訪問 Firebase Console: https://console.firebase.google.com
-```
-
-**監控端點**:
-```bash
-# 健康檢查
+# 監控端點
 curl http://localhost:4000/api/monitoring/health
-
-# 系統統計
 curl http://localhost:4000/api/monitoring/stats
 
-# 緩存統計
-# 後端啟動時會自動輸出緩存命中率
-```
-
-**調試速率限制**:
-```bash
-# 查看速率限制配置
-cat chat-app/backend/src/middleware/rateLimiterConfig.js
-
-# 測試速率限制
-# 快速發送多個請求，觀察 429 錯誤
-```
-
-### 前端調試
-
-**Vue DevTools**:
-- 安裝瀏覽器擴展：[Vue.js devtools](https://devtools.vuejs.org/)
-- 查看組件狀態、Pinia store、路由等
-
-**API 請求調試**:
-```javascript
-// API 調用已集成錯誤處理
-// 位置：frontend/src/utils/api.js
-
-// 查看網絡請求
-// 瀏覽器開發者工具 -> Network 標籤
-```
-
-**Composable 狀態調試**:
-```javascript
-// 在組件中添加 watchEffect 觀察狀態
-import { watchEffect } from 'vue';
-import { useUserProfile } from '@/composables/useUserProfile';
-
-const { profile, coins } = useUserProfile();
-
-watchEffect(() => {
-  console.log('Profile:', profile.value);
-  console.log('Coins:', coins.value);
-});
-```
-
-**LocalStorage 調試**:
-```javascript
-// 查看存儲的數據
-console.log('Auth:', localStorage.getItem('auth'));
-console.log('User:', localStorage.getItem('user'));
-
-// 清除所有數據（重新登入）
-localStorage.clear();
-```
-
-### 常見問題排查
-
-**Firebase 權限錯誤**:
-```bash
-# 1. 檢查 .env 配置
-cat chat-app/backend/.env | grep FIREBASE
-
-# 2. 檢查 Firestore Rules
-cat chat-app/firestore.rules
-
-# 3. 驗證環境變數
+# 驗證環境變數
 cd chat-app && npm run test:env
 ```
 
-**API 429 錯誤（速率限制）**:
-```bash
-# 查看觸發的限制器
-# 日誌會顯示：Rate limit exceeded for [endpoint]
+### 調試工具
 
-# 臨時解決：等待 1 分鐘後重試
+- **後端**: VSCode Debugger, Postman, Firebase Emulator UI
+- **前端**: Vue DevTools, 瀏覽器 DevTools (Network/Console)
+- **數據庫**: Firebase Console, Firestore Emulator
 
-# 永久解決：調整速率限制配置
-# 編輯：backend/src/middleware/rateLimiterConfig.js
-```
+### 常見問題快速排查
 
-**金幣餘額不正確**:
-```bash
-# 1. 檢查 Firestore Transaction 日誌
-# Firebase Console -> Firestore -> users/{userId}
-
-# 2. 查看冪等性記錄
-# Collection: idempotency_keys
-
-# 3. 檢查交易記錄
-# Collection: user_transactions/{userId}/transactions
-
-# 4. 驗證商業邏輯
-node chat-app/backend/scripts/test-user-assets.js
-```
-
-**緩存未更新**:
-```javascript
-// 後端手動清除用戶緩存
-import { invalidateUserCache } from './user/userProfileCache.service.js';
-invalidateUserCache(userId);
-
-// 後端重新加載角色緩存
-import { reloadAllCharacters } from './services/character/characterCache.service.js';
-await reloadAllCharacters();
-
-// 或重啟服務
-npm run dev
-```
-
-**前端狀態不同步**:
-```javascript
-// 強制刷新用戶資料
-import { useUserProfile } from '@/composables/useUserProfile';
-const { fetchProfile } = useUserProfile();
-await fetchProfile();
-
-// 或刷新頁面
-window.location.reload();
-```
-
-### 調試工具推薦
-
-**後端**:
-- **VSCode Debugger** - 設置斷點調試 Node.js
-- **Postman/Thunder Client** - 測試 API 端點
-- **Firebase Emulator UI** - 查看本地 Firestore 數據
-
-**前端**:
-- **Vue DevTools** - Vue 組件和狀態調試
-- **React DevTools** (如適用)
-- **瀏覽器 DevTools** - Network, Console, Application 標籤
-
-**數據庫**:
-- **Firebase Console** - 生產環境數據管理
-- **Firestore Emulator** - 本地數據測試
-- **NoSQL Booster** (可選) - 更強大的查詢工具
-
-### 性能調試
-
-**前端性能**:
-```javascript
-// 使用 Vue DevTools Performance 標籤
-// 查看組件渲染時間
-
-// 使用瀏覽器 Performance 工具
-// DevTools -> Performance -> 錄製
-
-// 檢查虛擬滾動是否生效
-// composables/useChatVirtualScroll.js
-```
-
-**後端性能**:
-```bash
-# 查看緩存命中率
-# 啟動時自動輸出：
-# Character cache hit rate: 98.5%
-# User profile cache hit rate: 87.2%
-
-# 查看 API 響應時間
-# 日誌中會記錄每個請求的執行時間
-```
-
-**Firestore 優化**:
-```bash
-# 查看讀取次數
-# Firebase Console -> Usage
-
-# 檢查索引
-cat chat-app/firestore.indexes.json
-
-# 優化查詢
-# 確保使用緩存而非重複查詢
-```
+| 問題 | 解決方案 |
+|-----|---------|
+| Firebase 權限錯誤 | 檢查 `.env` 配置，運行 `npm run test:env` |
+| API 429 錯誤 | 等待 1 分鐘或調整 `rateLimiterConfig.js` |
+| 緩存未更新 | 調用 `invalidateUserCache(userId)` 或重啟服務 |
+| 前端狀態不同步 | 調用 `fetchProfile()` 或刷新頁面 |
 
 ## 測試
 
-### 🎉 後端 API 測試完成（2025-01-15）
-
-**測試成果**:
-- ✅ **31 個 API** 全部測試完成
-- ✅ **688 個後端測試** 100% 通過
-- ✅ **10 大系統** 完整覆蓋（核心業務、虛擬商品、AI 服務、交易、限制服務、角色創建、資產管理、輔助功能、系統維護與監控、認證系統）
-- ⚡ **執行時間**: ~1.4 秒
-- 🐛 **Bug 修復**: 2 個參數驗證 bug
-
-**測試框架**: Vitest 4.0.8 + Supertest 7.1.4
-
-**從根目錄運行所有測試**:
-```bash
-# 主應用後端測試
-cd chat-app/backend && npm test
-
-# 預期結果
-# ✓ Test Files: 31 passed (31)
-# ✓ Tests: 688 passed (688)
-# ✓ Duration: ~1.4s
-```
-
-**從 chat-app/backend 目錄運行**:
-```bash
-cd chat-app/backend
-npm test
-
-# 預期結果
-# ✓ Test Files: 31 passed (31)
-# ✓ Tests: 688 passed (688)
-# ✓ Duration: ~1.4s
-```
-
-**測試文檔**:
-- 📄 [TEST_SUMMARY_2025-01-15_FINAL_COMPLETE.md](chat-app/TEST_SUMMARY_2025-01-15_FINAL_COMPLETE.md) - 完整總結
-- 🏆 [TESTING_ACHIEVEMENT.md](chat-app/TESTING_ACHIEVEMENT.md) - 成就展示
-- 📚 [TESTING_DOCS_INDEX.md](chat-app/TESTING_DOCS_INDEX.md) - 文檔索引
-
-### 現有測試
-
-代碼庫包含以下測試類型：
-
-**API 單元測試** (31 個測試套件, 688 tests):
-- 所有後端 API 路由測試位於 `chat-app/backend/src/**/*.routes.spec.js`
-- 覆蓋成功路徑、錯誤處理、邊界條件、權限檢查、參數驗證
-
-**其他單元測試**:
-- `chat-app/backend/src/utils/CacheManager.test.js` - 緩存管理器測試
-- `chat-app/backend/src/utils/security.test.js` - 安全功能測試
-- `chat-app-admin/frontend/src/composables/useVariableEditor.test.js` - 前端 composable 測試
-
-**功能測試腳本** (位於 `chat-app/backend/scripts/test-*.js`):
-- `test-business-logic-fixes.js` - 商業邏輯修復驗證
-- `test-membership-upgrade.js` - 會員升級流程測試
-- `test-potion-system.js` - 藥水系統測試
-- `test-user-assets.js` - 用戶資產管理測試
-- `test-character-unlock.js` - 角色解鎖測試
-- `test-api-optimization.js` - API 優化測試
-- `test-response-optimizer.js` - 響應優化器測試
-- 更多測試腳本...
-
-**系統驗證**:
-- `test-env-validation.js` - 環境變數驗證
-- `test-all-business-logic.js` - 完整商業邏輯測試
-- `test-2025-01-13-fixes.js`, `test-2025-01-14-fixes.js` - 特定修復驗證
-
 ### 運行測試
 
-**運行單元測試**:
 ```bash
-# 後端單元測試
-cd chat-app/backend/src/utils
-node CacheManager.test.js
-node security.test.js
+# 運行所有後端測試（688 tests, ~1.4s）
+cd chat-app/backend && npm test
 
-# 前端單元測試
-cd chat-app-admin/frontend/src/composables
-node useVariableEditor.test.js
-```
-
-**運行功能測試**:
-```bash
-# 進入後端目錄
+# 運行功能測試腳本
 cd chat-app/backend
-
-# 運行特定測試
 node scripts/test-membership-upgrade.js
-node scripts/test-potion-system.js
 node scripts/test-user-assets.js
-
-# 運行完整商業邏輯測試
-node scripts/test-all-business-logic.js
-
-# 驗證環境配置
-node scripts/test-env-validation.js
 ```
 
-**使用 Firebase Emulator 測試**:
-```bash
-# 啟動 Emulator 模式（自動導入測試數據）
-cd chat-app
-npm run dev:with-emulator
+**測試框架**: Vitest + Supertest
 
-# 或手動運行測試數據導入
-npm run import:test-data
+**測試位置**:
+- API 路由測試: `chat-app/backend/src/**/*.routes.spec.js`
+- 功能測試腳本: `chat-app/backend/scripts/test-*.js`
+
+### 測試帳號
+
+```javascript
+import { TEST_ACCOUNTS } from '../../../../shared/config/testAccounts.js';
+
+TEST_ACCOUNTS.GUEST_USER_ID  // "test-user"
+TEST_ACCOUNTS.DEV_USER_ID    // 開發者測試帳號
 ```
 
 ### 測試策略
 
-**環境選擇**:
-- ✅ **新功能測試**: 使用 Firebase Emulator (`npm run dev:with-emulator`)
-- ✅ **Bug 修復驗證**: 可以使用生產環境測試帳號
-- ✅ **商業邏輯測試**: 使用測試腳本 + Emulator
-- ⚠️ **生產環境測試**: 僅使用 `shared/config/testAccounts.js` 中定義的測試帳號
-
-**測試帳號**:
-```javascript
-// 從共享配置獲取測試帳號
-import { TEST_ACCOUNTS, isGuestUser, isDevUser } from '../../../../shared/config/testAccounts.js';
-
-// 可用測試帳號
-TEST_ACCOUNTS.GUEST_USER_ID  // "test-user" - 訪客測試帳號
-TEST_ACCOUNTS.DEV_USER_ID    // "6FXftJp96WeXYqAO4vRYs52EFXN2" - 開發者測試帳號
-```
-
-**監控和調試**:
-```bash
-# 訪問監控端點
-curl http://localhost:4000/api/monitoring/health
-curl http://localhost:4000/api/monitoring/stats
-
-# 查看監控路由
-# 後端：backend/src/routes/monitoring.routes.js
-```
-
-### 測試最佳實踐
-
-1. **使用 Emulator 進行破壞性測試** - 避免影響生產數據
-2. **測試前備份重要數據** - Firestore Console 導出功能
-3. **使用測試帳號** - 不要使用真實用戶帳號測試
-4. **驗證修復** - 每次修復後運行相關測試腳本
-5. **測試邊界情況** - 包括空值、極限值、錯誤輸入
+- ✅ **新功能**: 使用 `npm run dev:with-emulator`
+- ✅ **Bug 修復**: 使用生產環境測試帳號
+- ⚠️ **生產環境**: 僅使用 `shared/config/testAccounts.js` 中的帳號
 
 ## 部署
 
-詳細的部署指南請參閱：
-- **[chat-app/docs/DEPLOYMENT.md](chat-app/docs/DEPLOYMENT.md)** - 完整部署指南
+詳細部署指南：[chat-app/docs/DEPLOYMENT.md](chat-app/docs/DEPLOYMENT.md)
 
-**推薦架構（方案 A - Firebase）**：
-- **前端**: Firebase Hosting
-- **後端**: Google Cloud Run
-- **資料庫**: Firestore + Firebase Auth + Storage
+| 架構方案 | 前端 | 後端 | 快速指南 |
+|---------|------|------|---------|
+| Firebase | Firebase Hosting | Cloud Run | [DEPLOYMENT.md](chat-app/docs/DEPLOYMENT.md) |
+| Cloudflare | Cloudflare Pages | Cloud Run | [cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md) |
 
-**替代架構（方案 B - Cloudflare）**：
-- **前端**: Cloudflare Pages（更快、更便宜）
-- **後端**: Google Cloud Run（或 Cloudflare Workers）
-- **資料庫**: Firestore + Firebase Auth + Storage
-- **快速指南**: [docs/cloudflare-pages-quickstart.md](docs/cloudflare-pages-quickstart.md) ⚡
-
-**快速部署流程（Firebase）**：
-
+**快速部署**：
 ```bash
-# 1. 後端部署到 Cloud Run
-cd chat-app/backend
-./deploy-cloudrun.sh  # Linux/Mac
-# 或
-deploy-cloudrun.bat   # Windows
+# 後端 → Cloud Run
+cd chat-app/backend && ./deploy-cloudrun.sh
 
-# 2. 前端部署到 Firebase Hosting
-cd chat-app
-npm run build:frontend
-firebase deploy --only hosting
+# 前端 → Firebase Hosting
+cd chat-app && npm run build:frontend && firebase deploy --only hosting
 
-# 3. 部署 Firestore Rules
-firebase deploy --only firestore:rules
-
-# 4. 導入初始數據（首次部署）
-cd backend
-npm run import:all
-```
-
-**快速部署流程（Cloudflare Pages）**：
-
-```bash
-# 1. 後端部署到 Cloud Run（同上）
-cd chat-app/backend
-./deploy-cloudrun.sh
-
-# 2. 前端部署到 Cloudflare Pages
-cd chat-app
-npm run deploy:pages  # 或 npm run deploy:pages:preview
-
-# 3. 部署 Firestore Rules（同上）
+# Firestore Rules
 firebase deploy --only firestore:rules
 ```
 
@@ -1415,34 +971,12 @@ invalidateUserCache(userId);
 
 ### 資料庫操作
 
-**Firestore 集合命名規範**：
-- 使用小寫 + 下劃線：`user_conversations`, `user_favorites`
-- 配置類集合：單數形式 `membership_tiers`, `gift_rarities`
-- 用戶數據：使用子集合 `users/{userId}/conversations/{characterId}`
-
 **新增 Firestore 集合的步驟**：
 1. 在 `docs/firestore-collections.md` 記錄數據結構
 2. 創建導入腳本（`backend/scripts/import-*.js`）
 3. 在 `firestore.indexes.json` 添加必要的索引
 4. 更新 `firestore.rules` 添加安全規則
 5. 使用 Emulator 測試：`npm run dev:with-emulator`
-
-**Firestore 操作示例**：
-```javascript
-import { getFirestoreDb } from './firebase/index.js';
-
-const db = getFirestoreDb();
-
-// 讀取
-const doc = await db.collection('characters').doc(characterId).get();
-const character = doc.data();
-
-// 寫入（使用事務確保原子性）
-await db.runTransaction(async (transaction) => {
-  const userRef = db.collection('users').doc(userId);
-  transaction.update(userRef, { coins: newBalance });
-});
-```
 
 ### 前端開發
 
@@ -1544,37 +1078,14 @@ cat chat-app/backend/src/utils/sanitizer.js
 
 ### 常見開發任務
 
-**添加新的 AI 角色**：
-1. Firestore Console 添加文檔到 `characters` 集合
-2. 或使用管理後臺：http://localhost:5174
-3. 或修改 `backend/scripts/characters.data.js` + `npm run import:characters`
-
-**添加新的限制類型**：
-1. `backend/src/config/limits.js` 定義限制值
-2. `backend/src/services/limitService/` 創建服務（參考 `baseLimitService.js`）
-3. `frontend/src/composables/` 創建對應的 composable（參考 `useConversationLimit.js`）
-4. 在主應用的 CLAUDE.md 文檔中記錄新的限制系統
-
-**添加新的虛擬商品**：
-1. Firestore `gifts` / `coin_packages` 集合添加文檔
-2. 或使用管理後臺添加
-3. 前端會自動顯示（動態讀取）
-
-**修改會員限制**：
-1. Firestore Console → `membership_tiers` 集合
-2. 修改對應等級的 `features` 欄位
-3. 無需重啟服務（動態讀取）
-
-**添加速率限制到新路由**：
-1. 選擇適當的限制器（參考 `backend/src/middleware/rateLimiterConfig.js`）
-2. 在路由中應用中間件：`router.post('/endpoint', giftRateLimiter, handler)`
-3. 測試限制是否生效
-4. 在 `RATE_LIMITING_GUIDE.md` 中記錄
-
-**添加新的錯誤碼**：
-1. 在 `backend/src/utils/errorCodes.js` 中添加錯誤碼定義
-2. 使用 `createErrorResponse()` 返回標準化錯誤
-3. 前端根據錯誤碼進行相應處理
+| 任務 | 方法 |
+|-----|------|
+| 添加 AI 角色 | 管理後臺 (localhost:5174) 或 `npm run import:characters` |
+| 添加虛擬商品 | 管理後臺或直接修改 Firestore `gifts` 集合 |
+| 修改會員限制 | Firestore `membership_tiers` → `features` 欄位 |
+| 添加限制類型 | 參考 `backend/src/services/limitService/` 模式 |
+| 添加速率限制 | 使用 `rateLimiterConfig.js` 中的限制器 |
+| 添加錯誤碼 | 在 `errorCodes.js` 中定義，使用 `createErrorResponse()` |
 
 ### 重要提醒
 

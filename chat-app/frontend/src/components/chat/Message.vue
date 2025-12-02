@@ -427,4 +427,46 @@ defineEmits<Emits>();
   backdrop-filter: blur(4px);
   letter-spacing: 0.02em;
 }
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .chat-bubble {
+    max-width: 65%; // 桌面版縮小氣泡最大寬度
+    padding: 1rem 1.25rem;
+    font-size: 1rem;
+    border-radius: 24px;
+
+    &--has-image {
+      max-width: 70%;
+    }
+  }
+
+  // 為包含影片的消息設置桌面版寬度
+  .chat-bubble:has(.chat-bubble__video-container) {
+    max-width: 70%;
+  }
+
+  .chat-bubble__image-container {
+    max-width: 320px;
+  }
+
+  .chat-bubble__video-container {
+    max-width: 360px;
+  }
+
+  .chat-bubble__play {
+    width: 28px;
+    height: 28px;
+    top: -10px;
+    left: -4px;
+
+    .icon {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
 </style>

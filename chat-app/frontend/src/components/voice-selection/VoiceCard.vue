@@ -159,4 +159,63 @@ const handlePreviewClick = (event: MouseEvent) => {
 .voice__preview:disabled {
   opacity: 0.45;
 }
+
+/* ========================================
+   桌面版樣式 (≥ 1024px)
+   ======================================== */
+@media (min-width: 1024px) {
+  .voice__card {
+    padding: 20px;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+
+  .voice__card:hover:not(.voice__card--selected) {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(0, 0, 0, 0.35);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  .voice__card--selected {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 99, 168, 0.3);
+  }
+
+  .voice__card-header h2 {
+    font-size: 17px;
+  }
+
+  .voice__badge {
+    padding: 3px 10px;
+    font-size: 12px;
+  }
+
+  .voice__tags span {
+    padding: 3px 10px;
+    font-size: 12px;
+  }
+
+  .voice__card-desc {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .voice__preview {
+    padding: 10px 18px;
+    border-radius: 18px;
+    transition: all 0.2s ease;
+  }
+
+  .voice__preview:hover:not(:disabled) {
+    background: rgba(255, 99, 168, 0.2);
+    border-color: rgba(255, 99, 168, 0.5);
+    transform: scale(1.05);
+  }
+
+  .voice__preview svg {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+}
 </style>

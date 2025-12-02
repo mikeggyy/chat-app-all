@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, type ComputedRef } from "vue";
+import { computed, ref, onMounted, onUnmounted, type ComputedRef, type Ref } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
+import { ClockIcon } from "@heroicons/vue/24/outline";
 import LoadingSpinner from "../LoadingSpinner.vue";
 import { COIN_ICON_PATH } from "../../config/assets";
 
@@ -116,6 +117,79 @@ const disabledTitle: ComputedRef<string> = computed(() => {
   return "";
 });
 
+// 倒數計時相關
+const countdownText: Ref<string> = ref("");
+let countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+// 計算倒數時間
+const calculateCountdown = (): void => {
+  const status = props.item.purchaseStatus;
+  if (!status || status.canPurchase || !status.nextAvailableAt) {
+    countdownText.value = "";
+    return;
+  }
+
+  const nextAvailable = new Date(status.nextAvailableAt);
+  const now = new Date();
+  const diff = nextAvailable.getTime() - now.getTime();
+
+  if (diff <= 0) {
+    countdownText.value = "即將可購買";
+    return;
+  }
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  if (days > 0) {
+    countdownText.value = `${days}天 ${hours}小時後`;
+  } else if (hours > 0) {
+    countdownText.value = `${hours}小時 ${minutes}分後`;
+  } else if (minutes > 0) {
+    countdownText.value = `${minutes}分 ${seconds}秒後`;
+  } else {
+    countdownText.value = `${seconds}秒後`;
+  }
+};
+
+// 是否顯示倒數計時
+const showCountdown: ComputedRef<boolean> = computed(() => {
+  const status = props.item.purchaseStatus;
+  return !!(status && !status.canPurchase && status.nextAvailableAt);
+});
+
+// 啟動/停止倒數計時
+const startCountdown = (): void => {
+  if (showCountdown.value) {
+    calculateCountdown();
+    // 根據剩餘時間調整更新頻率
+    const status = props.item.purchaseStatus;
+    if (status?.nextAvailableAt) {
+      const diff = new Date(status.nextAvailableAt).getTime() - Date.now();
+      // 小於 1 小時用秒更新，否則用分鐘更新
+      const interval = diff < 3600000 ? 1000 : 60000;
+      countdownInterval = setInterval(calculateCountdown, interval);
+    }
+  }
+};
+
+const stopCountdown = (): void => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+};
+
+onMounted(() => {
+  startCountdown();
+});
+
+onUnmounted(() => {
+  stopCountdown();
+});
+
 const handlePurchase = (): void => {
   emit("purchase", props.item);
 };
@@ -166,12 +240,46 @@ const handleCoinIconError = (): void => {
       <p v-if="item.bonusText" class="shop-item__bonus">
         {{ item.bonusText }}
       </p>
-      <p v-if="item.description" class="shop-item__description">
+      <!-- 禮包內容列表 -->
+      <ul v-if="item.contents" class="shop-item__contents">
+        <li v-if="item.contents.coins">
+          <img :src="COIN_ICON_PATH" class="contents-icon contents-icon--coin" alt="" />
+          <span>{{ item.contents.coins.toLocaleString() }} 金幣</span>
+        </li>
+        <li v-if="item.contents.characterUnlockCards">
+          <span class="contents-icon">🎫</span>
+          <span>{{ item.contents.characterUnlockCards }} 張角色解鎖券</span>
+        </li>
+        <li v-if="item.contents.photoUnlockCards">
+          <span class="contents-icon">📷</span>
+          <span>{{ item.contents.photoUnlockCards }} 張照片卡</span>
+        </li>
+        <li v-if="item.contents.videoUnlockCards">
+          <span class="contents-icon">🎬</span>
+          <span>{{ item.contents.videoUnlockCards }} 張影片卡</span>
+        </li>
+        <li v-if="item.contents.voiceUnlockCards">
+          <span class="contents-icon">🎵</span>
+          <span>{{ item.contents.voiceUnlockCards }} 張語音卡</span>
+        </li>
+        <li v-if="item.contents.characterCreationCards">
+          <span class="contents-icon">✨</span>
+          <span>{{ item.contents.characterCreationCards }} 張創建角色卡</span>
+        </li>
+      </ul>
+      <!-- 非禮包的描述 -->
+      <p v-else-if="item.description" class="shop-item__description">
         {{ item.description }}
       </p>
       <p v-if="item.effect" class="shop-item__effect">
         {{ item.effect }}
       </p>
+
+      <!-- 限購倒數計時 -->
+      <div v-if="showCountdown && countdownText" class="shop-item__countdown">
+        <ClockIcon class="countdown-icon" aria-hidden="true" />
+        <span class="countdown-text">{{ countdownText }}可購買</span>
+      </div>
 
       <button
         type="button"
@@ -487,6 +595,39 @@ const handleCoinIconError = (): void => {
     line-height: 1.4;
   }
 
+  &__contents {
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: rgba(226, 232, 240, 0.85);
+      padding: 0.35rem 0.5rem;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .contents-icon {
+      font-size: 0.85rem;
+      flex-shrink: 0;
+
+      &--coin {
+        width: 16px;
+        height: 16px;
+        object-fit: contain;
+      }
+    }
+  }
+
   &__effect {
     margin: 0.25rem 0 0;
     font-size: 0.68rem;
@@ -494,6 +635,33 @@ const handleCoinIconError = (): void => {
     text-align: center;
     line-height: 1.3;
     font-weight: 500;
+  }
+
+  &__countdown {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    border-radius: 8px;
+    width: 100%;
+
+    .countdown-icon {
+      width: 14px;
+      height: 14px;
+      color: #fbbf24;
+      flex-shrink: 0;
+    }
+
+    .countdown-text {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #fbbf24;
+      letter-spacing: 0.01em;
+    }
   }
 
   &__buy-button {
@@ -648,6 +816,170 @@ const handleCoinIconError = (): void => {
 
     .button-label {
       font-size: 0.75rem;
+    }
+  }
+}
+
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
+@media (min-width: 1024px) {
+  .shop-item {
+    padding: 1.25rem;
+    gap: 0.75rem;
+    border-radius: 18px;
+    background: linear-gradient(165deg, rgba(30, 33, 48, 0.95) 0%, rgba(22, 25, 43, 0.9) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+
+    &:hover {
+      transform: translateY(-3px);
+      border-color: rgba(102, 126, 234, 0.3);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    &__badge {
+      top: 0.75rem;
+      right: 0.75rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.7rem;
+    }
+
+    &__icon-wrapper {
+      width: 60px;
+      height: 60px;
+      border-radius: 16px;
+    }
+
+    &__icon {
+      width: 32px;
+      height: 32px;
+    }
+
+    &__emoji {
+      font-size: 2.25rem;
+    }
+
+    &__name {
+      font-size: 1.125rem;
+    }
+
+    &__bonus {
+      font-size: 0.8rem;
+    }
+
+    &__description {
+      font-size: 0.8rem;
+    }
+
+    &__contents {
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+
+      li {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.6rem;
+      }
+
+      .contents-icon {
+        font-size: 0.95rem;
+
+        &--coin {
+          width: 18px;
+          height: 18px;
+        }
+      }
+    }
+
+    &__countdown {
+      padding: 0.5rem 0.85rem;
+      border-radius: 10px;
+      margin-top: 0.625rem;
+
+      .countdown-icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .countdown-text {
+        font-size: 0.75rem;
+      }
+    }
+
+    &__buy-button {
+      padding: 1rem 1.5rem;
+      border-radius: 14px;
+      margin-top: 0.75rem;
+
+      .button-price {
+        font-size: 1.25rem;
+      }
+
+      .button-label {
+        font-size: 0.875rem;
+      }
+    }
+  }
+}
+
+// 寬螢幕優化
+@media (min-width: 1440px) {
+  .shop-item {
+    padding: 1.5rem;
+    gap: 0.875rem;
+    border-radius: 20px;
+
+    &__icon-wrapper {
+      width: 68px;
+      height: 68px;
+    }
+
+    &__icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    &__emoji {
+      font-size: 2.5rem;
+    }
+
+    &__name {
+      font-size: 1.1875rem;
+    }
+
+    &__contents {
+      li {
+        font-size: 0.85rem;
+        padding: 0.45rem 0.7rem;
+      }
+
+      .contents-icon--coin {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    &__countdown {
+      padding: 0.55rem 1rem;
+      border-radius: 12px;
+
+      .countdown-icon {
+        width: 17px;
+        height: 17px;
+      }
+
+      .countdown-text {
+        font-size: 0.8rem;
+      }
+    }
+
+    &__buy-button {
+      padding: 1.125rem 1.75rem;
+
+      .button-price {
+        font-size: 1.375rem;
+      }
     }
   }
 }

@@ -812,27 +812,81 @@ const handleCardClick = (characterId: string): void => {
   color: rgba(255, 214, 214, 0.85);
 }
 
+// ========================================
+// 桌面版樣式 (≥ 1024px)
+// ========================================
+
 @media (min-width: 1024px) {
+  .favorites-screen {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+    padding-bottom: 48px;
+    min-height: auto;
+    background: transparent;
+  }
+
   .favorites-header {
-    padding-top: 1.5rem;
+    padding: 0 0 1rem;
+  }
+
+  .favorites-header__button {
+    display: none; // 桌面版不需要返回按鈕
+  }
+
+  .favorites-header__spacer {
+    display: none;
+  }
+
+  .favorites-header__title h1 {
+    text-align: left;
+    font-size: 1.75rem;
   }
 
   .favorites-tabs {
-    padding: 0 2.5rem;
+    justify-content: flex-start;
+    padding: 0;
+    margin-bottom: 1rem;
   }
 
   .favorites-content {
-    padding-left: 2.5rem;
-    padding-right: 2.5rem;
+    padding: 0;
+    max-height: none;
   }
 
   .favorites-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
   }
 
+  .favorite-card {
+    border-radius: 24px;
+
+    &:hover {
+      transform: translateY(-8px);
+    }
+  }
+
   .favorite-card__info {
-    padding: 1rem 1.2rem 1.3rem;
+    padding: 1.1rem 1.3rem 1.4rem;
+  }
+
+  .favorite-card__name {
+    font-size: 1.1rem;
+  }
+
+  .favorite-card__metric dd {
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  .favorites-screen {
+    max-width: 1100px;
+  }
+
+  .favorites-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 </style>

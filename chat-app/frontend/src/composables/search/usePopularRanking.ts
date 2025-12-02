@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, computed, onMounted, type Ref, type ComputedRef } from "vue";
 import { apiJson } from "../../utils/api.js";
 import { fallbackMatches } from "../../utils/matchFallback.js";

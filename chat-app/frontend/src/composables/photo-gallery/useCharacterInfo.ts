@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, computed } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { fallbackMatches } from '../../utils/matchFallback.js';
@@ -15,13 +14,6 @@ interface Character extends Partial<Partner> {
   portraitUrl?: string;
   portrait?: string;
   image?: string;
-}
-
-/**
- * useCharacterInfo 的依賴注入介面
- */
-interface UseCharacterInfoDependencies {
-  characterId: Ref<string>;
 }
 
 /**

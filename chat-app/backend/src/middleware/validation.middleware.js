@@ -623,10 +623,11 @@ export const giftSchemas = {
 
 /**
  * 會員相關的驗證 schemas
+ * ✅ 2025-11-30 更新：新增 lite 等級支援
  */
 export const membershipSchemas = {
   // 會員等級枚舉
-  tier: z.enum(["free", "vip", "vvip"], {
+  tier: z.enum(["free", "lite", "vip", "vvip"], {
     required_error: "需提供會員等級",
     invalid_type_error: "無效的會員等級",
   }),
@@ -639,9 +640,9 @@ export const membershipSchemas = {
   // 升級會員
   upgradeMembership: {
     body: z.object({
-      tier: z.enum(["vip", "vvip"], {
+      tier: z.enum(["lite", "vip", "vvip"], {
         required_error: "需提供目標會員等級",
-        invalid_type_error: "只能升級到 VIP 或 VVIP",
+        invalid_type_error: "只能升級到 Lite, VIP 或 VVIP",
       }),
       paymentInfo: z.record(z.any()).optional(),
       idempotencyKey: z.string().min(1, "請提供冪等性鍵以防止重複購買").trim(),

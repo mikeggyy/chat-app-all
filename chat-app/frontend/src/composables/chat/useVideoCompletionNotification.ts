@@ -5,6 +5,7 @@
  */
 
 import { ref, onBeforeUnmount, type Ref } from 'vue';
+import { logger } from '../../utils/logger.js';
 
 export interface VideoCompletionNotification {
   show: boolean;
@@ -56,14 +57,14 @@ export function useVideoCompletionNotification(): UseVideoCompletionNotification
    */
   const scrollToVideo = (messageListRef: any, _videoMessageId: string): void => {
     if (!messageListRef?.value) {
-      console.warn('[VideoNotification] messageListRef 不可用');
+      logger.warn('[VideoNotification] messageListRef 不可用');
       return;
     }
 
     // 尋找影片消息元素
     const messageElements = messageListRef.value.$el?.querySelectorAll('.chat-bubble');
     if (!messageElements) {
-      console.warn('[VideoNotification] 找不到消息元素');
+      logger.warn('[VideoNotification] 找不到消息元素');
       return;
     }
 
@@ -103,7 +104,7 @@ export function useVideoCompletionNotification(): UseVideoCompletionNotification
         highlightTimerId = null;
       }, 2000);
     } else {
-      console.warn('[VideoNotification] 找不到影片元素');
+      logger.warn('[VideoNotification] 找不到影片元素');
       // Fallback: 滾動到底部
       if (messageListRef.value.scrollToBottom) {
         messageListRef.value.scrollToBottom();

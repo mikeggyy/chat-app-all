@@ -17,7 +17,7 @@ import { TEST_ACCOUNT_LIMITS } from "../config/limits.js";
  * @param {string} userId - 用戶 ID
  * @param {Object} options - 選項
  * @param {boolean} options.useCache - 是否使用緩存（默認 true）
- * @returns {Promise<string>} 會員等級 ("guest" | "free" | "vip" | "vvip")
+ * @returns {Promise<string>} 會員等級 ("guest" | "free" | "lite" | "vip" | "vvip")
  */
 export const getUserTier = async (userId, options = {}) => {
   const { useCache = true } = options;
@@ -69,14 +69,15 @@ export const getUserTier = async (userId, options = {}) => {
 };
 
 /**
- * 檢查用戶是否為付費會員（VIP 或 VVIP）
+ * 檢查用戶是否為付費會員（Lite, VIP 或 VVIP）
+ * ✅ 2025-11-30 更新：新增 Lite 等級支援
  *
  * @param {string} userId - 用戶 ID
  * @returns {Promise<boolean>}
  */
 export const isPaidMember = async (userId) => {
   const tier = await getUserTier(userId);
-  return tier === "vip" || tier === "vvip";
+  return tier === "lite" || tier === "vip" || tier === "vvip";
 };
 
 /**

@@ -1,10 +1,11 @@
 import "dotenv/config";
-import { getFirestoreDb } from "../src/firebase/index.js";
-import { FieldValue } from "firebase-admin/firestore";
+// ✅ 2025-11-30 修復：從同一個模組導入 FieldValue 避免序列化錯誤
+import { getFirestoreDb, FieldValue } from "../src/firebase/index.js";
 import {
   MEMBERSHIP_TIERS,
   AI_FEATURE_PRICES,
   COIN_PACKAGES,
+  BUNDLE_PACKAGES,                      // ✅ 新增：組合禮包
   AD_CONFIG
 } from "../src/membership/membership.config.js";
 
@@ -66,7 +67,24 @@ async function importMembershipConfigs() {
     totalCount += Object.keys(COIN_PACKAGES).length;
     console.log(`✅ 已導入 ${Object.keys(COIN_PACKAGES).length} 個金幣方案\n`);
 
-    // 4. 導入廣告配置
+    // 4. 導入組合禮包
+    console.log("🎁 導入組合禮包...");
+    const bundleBatch = db.batch();
+    Object.values(BUNDLE_PACKAGES).forEach((bundle) => {
+      const ref = db.collection("bundle_packages").doc(bundle.id);
+      bundleBatch.set(ref, {
+        ...bundle,
+        status: "active",
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      console.log(`   ✓ ${bundle.name} - NT$${bundle.price}`);
+    });
+    await bundleBatch.commit();
+    totalCount += Object.keys(BUNDLE_PACKAGES).length;
+    console.log(`✅ 已導入 ${Object.keys(BUNDLE_PACKAGES).length} 個組合禮包\n`);
+
+    // 5. 導入廣告配置
     console.log("📺 導入廣告配置...");
     const adConfigRef = db.collection("system_configs").doc("ad_config");
     await adConfigRef.set({
@@ -82,10 +100,12 @@ async function importMembershipConfigs() {
     const tiersSnapshot = await db.collection("membership_tiers").get();
     const featuresSnapshot = await db.collection("ai_feature_prices").get();
     const coinsSnapshot = await db.collection("coin_packages").get();
+    const bundlesSnapshot = await db.collection("bundle_packages").get();
 
     console.log(`   📁 membership_tiers: ${tiersSnapshot.size} 個文檔`);
     console.log(`   📁 ai_feature_prices: ${featuresSnapshot.size} 個文檔`);
     console.log(`   📁 coin_packages: ${coinsSnapshot.size} 個文檔`);
+    console.log(`   📁 bundle_packages: ${bundlesSnapshot.size} 個文檔`);
     console.log(`   📁 system_configs/ad_config: 1 個文檔`);
 
     console.log("\n🎉 會員配置導入成功！");
@@ -97,6 +117,7 @@ async function importMembershipConfigs() {
     console.log("   📁 membership_tiers (會員等級配置)");
     console.log("   📁 ai_feature_prices (AI 功能價格)");
     console.log("   📁 coin_packages (金幣充值方案)");
+    console.log("   📁 bundle_packages (組合禮包)");
     console.log("   📁 system_configs (系統配置)");
 
     process.exit(0);

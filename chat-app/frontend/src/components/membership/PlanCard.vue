@@ -90,6 +90,26 @@ defineEmits<Emits>();
   pointer-events: none;
 }
 
+/* ✅ 2025-11-30 新增：Lite 方案樣式 */
+.plan-card--lite::before {
+  background: radial-gradient(
+    circle at 20% 20%,
+    rgba(16, 185, 129, 0.12),
+    transparent 50%
+  );
+}
+
+.plan-card--lite {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.plan-card--lite .plan-card__price {
+  background: linear-gradient(135deg, #10b981, #14b8a6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .plan-card--vvip::before {
   background: radial-gradient(
     circle at 20% 20%,

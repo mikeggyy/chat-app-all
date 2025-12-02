@@ -9,8 +9,10 @@ import {
   PhotoIcon,
   ShoppingBagIcon,
   UsersIcon,
+  GiftIcon,
 } from "@heroicons/vue/24/outline";
 import type { FunctionalComponent } from "vue";
+import type { UserProfile } from "../types";
 
 // ==================== 常量配置 ====================
 
@@ -27,31 +29,11 @@ export const PROFILE_LIMITS = {
 // ==================== 預設用戶資料 ====================
 
 /**
- * 用戶資料結構
- */
-interface UserProfile {
-  id: string;
-  uid: string;
-  displayName: string;
-  locale: string;
-  createdAt: string;
-  defaultPrompt: string;
-  email: string;
-  photoURL: string;
-  lastLoginAt: string;
-  phoneNumber: string | null;
-  gender: string;
-  notificationOptIn: boolean;
-  signInProvider: string;
-  updatedAt: string;
-  conversations: unknown[];
-  favorites: unknown[];
-}
-
-/**
  * 備用用戶資料（當無法載入用戶資料時使用）
+ * 使用 UserProfile 類型並提供完整預設值
+ * 確保 id 和 photoURL 為必填以滿足類型安全
  */
-export const FALLBACK_USER: UserProfile = {
+export const FALLBACK_USER: UserProfile & { id: string; photoURL: string } = {
   id: "demo-user",
   uid: "LoveDemo晨霧星語",
   displayName: "小高0556",
@@ -108,6 +90,11 @@ export interface QuickAction {
  * 每個操作包含 key、label 和對應的圖標組件
  */
 export const QUICK_ACTIONS: QuickAction[] = [
+  {
+    key: "daily-reward",
+    label: "每日獎勵",
+    icon: GiftIcon,
+  },
   {
     key: "notifications",
     label: "通知",

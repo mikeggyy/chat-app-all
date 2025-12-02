@@ -72,7 +72,7 @@ describe('useSendMessage - 消息發送測試', () => {
       // Guest checks
       isGuest: ref(false),
       canGuestSendMessage: ref(true),
-      requireLogin: vi.fn(),
+      requireLogin: vi.fn(() => false),
       incrementGuestMessageCount: vi.fn(),
 
       // Limit checks
@@ -411,8 +411,8 @@ describe('useSendMessage - 消息發送測試', () => {
 
       await handleSendMessage('   ');
 
-      // 空白字符視為有效消息（由上層處理 trim）
-      expect(mockDependencies.sendMessageToApi).toHaveBeenCalledWith('   ');
+      // 空白字符會被 trim 後變成空字串，不會發送
+      expect(mockDependencies.sendMessageToApi).not.toHaveBeenCalled();
     });
 
     it('應該處理長消息', async () => {

@@ -34,6 +34,25 @@ export interface UpgradeOptions extends UseMembershipOptions {
   paymentMethod?: string;
 }
 
+/**
+ * ✅ 2025-11-30 新增：升級價格預覽（補差價計算）
+ */
+export interface UpgradePriceInfo {
+  currentTier: MembershipTier;
+  targetTier: MembershipTier;
+  currentTierName: string;
+  targetTierName: string;
+  currentDailyRate: number;
+  daysRemaining: number;
+  remainingValue: number;
+  targetMonthlyPrice: number;
+  upgradePrice: number;
+  savings: number;
+  newExpiryDays: number;
+  description: string;
+  message: string;
+}
+
 export interface UseMembershipReturn {
   // State
   membershipInfo: Ref<MembershipInfo>;
@@ -46,11 +65,13 @@ export interface UseMembershipReturn {
   loadMembership: (userId?: string, options?: UseMembershipOptions) => Promise<any>; // 別名
   upgradeMembership: (userId: string | undefined, targetTier: MembershipTier, options?: UpgradeOptions) => Promise<any>;
   cancelMembership: (userId?: string, options?: UseMembershipOptions) => Promise<any>;
+  getUpgradePricePreview: (userId: string, targetTier: MembershipTier, options?: UseMembershipOptions) => Promise<UpgradePriceInfo>; // ✅ 2025-11-30 新增
 
   // Computed
   currentTier: ComputedRef<MembershipTier>;
   isActive: ComputedRef<boolean>;
   isFree: ComputedRef<boolean>;
+  isLite: ComputedRef<boolean>; // ✅ 2025-11-30 新增
   isVIP: ComputedRef<boolean>;
   isVVIP: ComputedRef<boolean>;
   features: ComputedRef<MembershipFeatures>;
@@ -138,7 +159,7 @@ export function useMembership(): UseMembershipReturn {
   /**
    * 升級會員
    * @param userId - 用戶 ID（必須提供）
-   * @param targetTier - 目標會員等級 (vip 或 vvip)
+   * @param targetTier - 目標會員等級 (lite, vip 或 vvip)
    * @param options - 選項
    */
   const upgradeMembership = async (
@@ -151,7 +172,8 @@ export function useMembership(): UseMembershipReturn {
       throw new Error('缺少用戶 ID');
     }
 
-    if (!targetTier || (targetTier !== 'vip' && targetTier !== 'vvip')) {
+    // ✅ 2025-11-30 更新：新增 lite 等級驗證
+    if (!targetTier || (targetTier !== 'lite' && targetTier !== 'vip' && targetTier !== 'vvip')) {
       error.value = '無效的目標會員等級';
       throw new Error('無效的目標會員等級');
     }
@@ -281,20 +303,78 @@ export function useMembership(): UseMembershipReturn {
     }
   };
 
+  /**
+   * ✅ 2025-11-30 新增：獲取升級價格預覽（補差價計算）
+   * @param userId - 用戶 ID（必須提供）
+   * @param targetTier - 目標會員等級 (lite, vip 或 vvip)
+   * @param options - 選項
+   * @returns 升級價格詳情
+   */
+  const getUpgradePricePreview = async (
+    userId: string,
+    targetTier: MembershipTier,
+    options: UseMembershipOptions = {}
+  ): Promise<UpgradePriceInfo> => {
+    if (!userId) {
+      error.value = '缺少用戶 ID';
+      throw new Error('缺少用戶 ID');
+    }
+
+    if (!targetTier || (targetTier !== 'lite' && targetTier !== 'vip' && targetTier !== 'vvip')) {
+      error.value = '無效的目標會員等級';
+      throw new Error('無效的目標會員等級');
+    }
+
+    try {
+      const data = await apiJson(
+        `/api/membership/${encodeURIComponent(userId)}/upgrade-price/${encodeURIComponent(targetTier)}`,
+        {
+          skipGlobalLoading: options.skipGlobalLoading ?? true, // 預覽不需要全局 loading
+        }
+      );
+
+      logger.log('[會員] 升級價格預覽:', data);
+
+      return {
+        currentTier: data.currentTier,
+        targetTier: data.targetTier,
+        currentTierName: data.currentTierName,
+        targetTierName: data.targetTierName,
+        currentDailyRate: data.currentDailyRate,
+        daysRemaining: data.daysRemaining,
+        remainingValue: data.remainingValue,
+        targetMonthlyPrice: data.targetMonthlyPrice,
+        upgradePrice: data.upgradePrice,
+        savings: data.savings,
+        newExpiryDays: data.newExpiryDays,
+        description: data.description,
+        message: data.message,
+      };
+    } catch (err: any) {
+      error.value = err?.message || '獲取升級價格失敗';
+      throw err;
+    }
+  };
+
   // Computed properties
   const currentTier = computed(() => membershipInfo.value.tier);
   const isActive = computed(() => membershipInfo.value.isActive);
   const isFree = computed(() => membershipInfo.value.tier === 'free');
+  // ✅ 2025-11-30 新增：Lite 等級判斷
+  const isLite = computed(() => membershipInfo.value.tier === 'lite' && membershipInfo.value.isActive);
   const isVIP = computed(() => membershipInfo.value.tier === 'vip' && membershipInfo.value.isActive);
   const isVVIP = computed(() => membershipInfo.value.tier === 'vvip' && membershipInfo.value.isActive);
   const features = computed(() => membershipInfo.value.features);
   const expiresAt = computed(() => membershipInfo.value.expiresAt);
 
   // 是否可以升級
+  // ✅ 2025-11-30 更新：支援 Lite 等級
   const canUpgrade = computed(() => {
     const tier = membershipInfo.value.tier;
-    // Free 用戶可以升級到 VIP 或 VVIP
+    // Free 用戶可以升級到 Lite, VIP 或 VVIP
     if (tier === 'free') return true;
+    // Lite 用戶可以升級到 VIP 或 VVIP
+    if (tier === 'lite') return true;
     // VIP 用戶可以升級到 VVIP
     if (tier === 'vip') return true;
     // VVIP 用戶無法再升級
@@ -302,11 +382,12 @@ export function useMembership(): UseMembershipReturn {
   });
 
   // 是否可以取消
+  // ✅ 2025-11-30 更新：支援 Lite 等級
   const canCancel = computed(() => {
-    // 只有活躍的 VIP 或 VVIP 用戶可以取消
+    // 只有活躍的 Lite, VIP 或 VVIP 用戶可以取消
     return (
       membershipInfo.value.isActive &&
-      (membershipInfo.value.tier === 'vip' || membershipInfo.value.tier === 'vvip')
+      (membershipInfo.value.tier === 'lite' || membershipInfo.value.tier === 'vip' || membershipInfo.value.tier === 'vvip')
     );
   });
 
@@ -348,11 +429,13 @@ export function useMembership(): UseMembershipReturn {
     loadMembership: loadMembershipInfo, // 別名，用於向後兼容
     upgradeMembership,
     cancelMembership,
+    getUpgradePricePreview, // ✅ 2025-11-30 新增
 
     // Computed
     currentTier,
     isActive,
     isFree,
+    isLite, // ✅ 2025-11-30 新增
     isVIP,
     isVVIP,
     features,

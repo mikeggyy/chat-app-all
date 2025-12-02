@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * useChatFeatures.ts
  * Chat 功能模塊（TypeScript 版本）
@@ -7,15 +6,16 @@
 
 import { type Ref, computed } from 'vue';
 import { useChatActions, type UseChatActionsReturn } from '../useChatActions.js';
+import type { ModalsState, PhotoVideoLimitData, PotionType as ModalPotionType } from '../useModalManager.js';
 import { usePotionManagement, type UsePotionManagementReturn, type PotionType } from '../usePotionManagement.js';
-import { useSelfieGeneration, type UseSelfieGenerationReturn } from '../useSelfieGeneration.js';
-import { useVideoGeneration, type UseVideoGenerationReturn } from '../useVideoGeneration.js';
+import { useSelfieGeneration, type UseSelfieGenerationReturn, type UseSelfieGenerationDeps } from '../useSelfieGeneration.js';
+import { useVideoGeneration, type UseVideoGenerationReturn, type UseVideoGenerationDeps } from '../useVideoGeneration.js';
 import { useVideoCompletionNotification, type UseVideoCompletionNotificationReturn, type VideoCompletionNotification } from '../useVideoCompletionNotification.js';
 import { useGenerationFailureNotification, type UseGenerationFailureNotificationReturn, type GenerationFailure } from '../useGenerationFailureNotification.js';
-import { useGiftManagement, type UseGiftManagementReturn } from '../useGiftManagement.js';
+import { useGiftManagement, type UseGiftManagementReturn, type UseGiftManagementDeps } from '../useGiftManagement.js';
 import { useCharacterUnlock, type UseCharacterUnlockReturn } from '../useCharacterUnlock.js';
 import { useFavoriteManagement, type UseFavoriteManagementReturn } from '../useFavoriteManagement.js';
-import { useVoiceManagement, type UseVoiceManagementReturn } from '../useVoiceManagement.js';
+import { useVoiceManagement, type UseVoiceManagementReturn, type UseVoiceManagementDeps } from '../useVoiceManagement.js';
 import type { Message, Partner, FirebaseAuthService, User, PhotoLimitInfo } from '../../../types';
 
 // ==================== 類型定義 ====================
@@ -53,7 +53,7 @@ export interface UseChatFeaturesDeps {
   chatContentRef: Ref<any>;
 
   // 模態框狀態（✅ 新增）
-  modals: any; // ModalsState from useModalManager
+  modals: ModalsState;
 
   // 功能函數
   requireLogin: () => boolean;
@@ -71,19 +71,18 @@ export interface UseChatFeaturesDeps {
   closePotionLimit: () => void;
   closeUnlockConfirm: () => void;
   closePotionConfirm: () => void;
-  showPotionConfirm: () => void;
-  showPotionLimit: () => void;
+  showPotionConfirm: (type: ModalPotionType) => void;
+  showPotionLimit: (type: ModalPotionType) => void;
   showUnlockConfirm: () => void;
   showUnlockLimit: () => void;
-  showPhotoLimit: () => void;
-  showVoiceLimit: () => void;
-  showVideoLimit: () => void;
-  showPhotoSelector: () => void;
-  showGiftSelector: () => void;
-  closeGiftSelector: () => void;
+  showPhotoLimit: (data: Partial<PhotoVideoLimitData> | any) => void;
+  showVoiceLimit: (limitInfo: any, pendingMessage?: Message | null) => void;
+  showVideoLimit: (data: Partial<PhotoVideoLimitData> | any) => void;
+  showPhotoSelector: (useCardOrForGift?: boolean, pendingGift?: any) => void;
+  // showGiftSelector 和 closeGiftSelector 從 useChatActions 內部獲取，不需要作為參數
   closePhotoSelector: () => void;
   closeVideoLimit: () => void;
-  showGiftAnimation: (gift: any) => void;
+  showGiftAnimation: (emoji: string, name: string) => void;
   closeGiftAnimation: () => void;
 
   // 狀態管理
@@ -92,7 +91,7 @@ export interface UseChatFeaturesDeps {
   showError: (message: string) => void;
   success: (message: string) => void;
   rollbackUserMessage: (messageId: string) => void;
-  createLimitModalData: (type: string, data?: any) => LimitModalData;
+  createLimitModalData: (limitCheck: any, type?: string) => LimitModalData;
   setUserProfile: (profile: User) => void;
 
   // 配置
@@ -283,7 +282,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
     getFirebaseAuth: () => firebaseAuth,
-    getPartnerDisplayName: () => partner.value?.display_name,
+    getPartnerDisplayName: () => partner.value?.display_name || '',
     closeUnlockConfirm,
     loadTicketsBalance,
     setLoading,
@@ -294,16 +293,18 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
   // ==========================================
   // Voice Management - 語音管理
   // ==========================================
+  // 注意：playVoice 和 checkVoiceLimit 的類型在不同 composable 間有差異
+  // 使用類型斷言來橋接這些差異（架構級問題，未來應統一類型定義）
   const {
     handlePlayVoice,
     handleWatchVoiceAd,
     handleUseVoiceUnlockCard,
   } = useVoiceManagement({
     getCurrentUserId: () => currentUserId.value,
-    playVoice,
+    playVoice: playVoice as unknown as UseVoiceManagementDeps['playVoice'],
     loadVoiceStats,
-    checkVoiceLimit,
-    unlockVoiceByAd: () => {}, // TODO: 從 useChatLimits 獲取
+    checkVoiceLimit: checkVoiceLimit as unknown as UseVoiceManagementDeps['checkVoiceLimit'],
+    unlockVoiceByAd: (async () => {}) as UseVoiceManagementDeps['unlockVoiceByAd'], // TODO: 從 useChatLimits 獲取
     loadTicketsBalance,
     showVoiceLimit,
     closeVoiceLimit,
@@ -315,6 +316,26 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
   // ==========================================
   // Selfie Generation - 自拍照片生成
   // ==========================================
+  // 適配器函數：將 rollbackUserMessage 包裝為 useSelfieGeneration 期望的類型
+  const rollbackUserMessageAdapter: UseSelfieGenerationDeps['rollbackUserMessage'] = async (_userId, _characterId, messageId) => {
+    rollbackUserMessage(messageId);
+  };
+
+  // 適配器函數：fetchPhotoStats 返回 void
+  const fetchPhotoStatsAdapter: UseSelfieGenerationDeps['fetchPhotoStats'] = async () => {
+    await fetchPhotoStats();
+  };
+
+  // 適配器函數：createLimitModalData
+  const createLimitModalDataForSelfie: UseSelfieGenerationDeps['createLimitModalData'] = (limitCheck, type) => {
+    return createLimitModalData(limitCheck, type);
+  };
+
+  // 適配器：config 轉換為 SelfieGenerationConfig
+  const selfieConfig: UseSelfieGenerationDeps['config'] = {
+    MESSAGE_ID_PREFIXES: config.MESSAGE_ID_PREFIXES || { selfie: 'selfie-' },
+  };
+
   const {
     handleRequestSelfie,
     handleUsePhotoUnlockCard,
@@ -324,18 +345,18 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     getFirebaseAuth: () => firebaseAuth,
     messages,
     messageListRef: computed(() => chatContentRef.value?.messageListRef),
-    rollbackUserMessage,
+    rollbackUserMessage: rollbackUserMessageAdapter,
     requireLogin,
     canGeneratePhoto,
-    fetchPhotoStats,
+    fetchPhotoStats: fetchPhotoStatsAdapter,
     showPhotoLimit,
-    createLimitModalData,
+    createLimitModalData: createLimitModalDataForSelfie,
     requestSelfie,
     closePhotoLimit,
     loadTicketsBalance,
     showError,
     showSuccess: success,
-    config,
+    config: selfieConfig,
     // ✅ 照片生成失敗回調
     onPhotoFailed: (characterId: string, characterName: string, reason?: string) => {
       addGenerationFailure({
@@ -346,7 +367,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
         reason,
       });
     },
-    getPartnerName: () => partner.value?.displayName || partner.value?.display_name || '角色',
+    getPartnerName: () => partner.value?.display_name || '角色',
   });
 
   // ==========================================
@@ -373,6 +394,25 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
   // ==========================================
   // Video Generation - 視頻生成
   // ==========================================
+  // 適配器函數：將 rollbackUserMessage 包裝為 useVideoGeneration 期望的類型
+  const rollbackUserMessageForVideo: UseVideoGenerationDeps['rollbackUserMessage'] = async (_userId, _characterId, messageId) => {
+    rollbackUserMessage(messageId);
+  };
+
+  // 適配器函數：createLimitModalData
+  const createLimitModalDataForVideo: UseVideoGenerationDeps['createLimitModalData'] = (limitCheck, type) => {
+    return createLimitModalData(limitCheck, type);
+  };
+
+  // 適配器：config 轉換為 VideoGenerationConfig
+  // 注意：config 類型在不同 composable 間有差異，使用類型斷言來橋接
+  const videoConfig = {
+    MESSAGE_ID_PREFIXES: config.MESSAGE_ID_PREFIXES || { video: 'video-' },
+    VIDEO_CONFIG: config.VIDEO_CONFIG || {},
+    AI_VIDEO_RESPONSE_TEXT: config.AI_VIDEO_RESPONSE_TEXT || '',
+    VIDEO_REQUEST_MESSAGES: config.VIDEO_REQUEST_MESSAGES || [],
+  } as UseVideoGenerationDeps['config'];
+
   const {
     isRequestingVideo,
     handleRequestVideo,
@@ -383,17 +423,17 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
     getFirebaseAuth: () => firebaseAuth,
     messages,
     messageListRef: computed(() => chatContentRef.value?.messageListRef),
-    rollbackUserMessage,
+    rollbackUserMessage: rollbackUserMessageForVideo,
     requireLogin,
     showVideoLimit,
     showPhotoSelector,
-    createLimitModalData,
+    createLimitModalData: createLimitModalDataForVideo,
     showError,
     showSuccess: success,
-    config,
+    config: videoConfig,
     // ✅ 影片完成回調
     onVideoCompleted: (videoMessageId: string) => {
-      const characterName = partner.value?.displayName || partner.value?.display_name || '角色';
+      const characterName = partner.value?.display_name || '角色';
       showVideoNotification(videoMessageId, characterName);
     },
     // ✅ 影片生成失敗回調
@@ -406,19 +446,24 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
         reason,
       });
     },
-    getPartnerName: () => partner.value?.displayName || partner.value?.display_name || '角色',
+    getPartnerName: () => partner.value?.display_name || '角色',
   });
 
   // ==========================================
   // Gift Management - 禮物管理
   // ==========================================
+  // 適配器函數：將 sendGift 包裝為 useGiftManagement 期望的類型
+  const sendGiftAdapter: UseGiftManagementDeps['sendGift'] = async (giftData, onSuccess, selectedPhotoUrl) => {
+    await sendGift(giftData, onSuccess ? () => onSuccess() : undefined, selectedPhotoUrl);
+  };
+
   const {
     handleOpenGiftSelector,
     handleSelectGift,
   } = useGiftManagement({
     getCurrentUserId: () => currentUserId.value,
     openGiftSelector,
-    sendGift,
+    sendGift: sendGiftAdapter,
     loadBalance,
     showGiftAnimation,
     closeGiftAnimation,
@@ -435,7 +480,7 @@ export function useChatFeatures(options: UseChatFeaturesDeps): UseChatFeaturesRe
   } = useFavoriteManagement({
     getCurrentUserId: () => currentUserId.value,
     getPartnerId: () => partnerId.value,
-    getPartnerName: () => partner.value?.displayName || partner.value?.display_name || '',
+    getPartnerName: () => partner.value?.display_name || '',
     getUser: () => user.value,
     getFirebaseAuth: () => firebaseAuth,
     setUserProfile,

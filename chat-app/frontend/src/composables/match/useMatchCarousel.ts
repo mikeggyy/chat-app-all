@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Match 輪播控制 Composable
  *
@@ -319,7 +318,7 @@ export function useMatchCarousel(
     const offsets = [-2, -1, 1, 2];
     offsets.forEach((offset) => {
       const idx = (newIndex + offset + len) % len;
-      const url = matches.value?.[idx]?.portraitUrl;
+      const url = matches?.value?.[idx]?.portraitUrl;
       if (url) {
         preloadImage(url);
       }

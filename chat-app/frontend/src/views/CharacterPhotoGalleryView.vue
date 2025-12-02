@@ -36,9 +36,7 @@
             :is-selected="editMode.selectedIds.value.has(photo.id)"
             :is-edit-mode="editMode.isEditMode.value"
             :alt="characterName"
-            @click="
-              editMode.handlePhotoClick(photo as any, gallery.openPhotoViewer as any)
-            "
+            @click="editMode.handlePhotoClick(photo, gallery.openPhotoViewer)"
             @toggle-selection="editMode.toggleSelection"
           />
         </div>
@@ -113,18 +111,10 @@ import DeleteConfirmDialog from "../components/photo-gallery/DeleteConfirmDialog
 import VideoViewer from "../components/photo-gallery/VideoViewer.vue";
 
 // Composables
-import { usePhotoGallery } from "../composables/photo-gallery/usePhotoGallery";
+import { usePhotoGallery, type Photo } from "../composables/photo-gallery/usePhotoGallery";
 import { usePhotoEditMode } from "../composables/photo-gallery/usePhotoEditMode";
 import { useCharacterInfo } from "../composables/photo-gallery/useCharacterInfo";
 import { useVirtualScroll } from "../composables/useVirtualScroll";
-
-// Types
-interface Photo {
-  id: string;
-  imageUrl: string;
-  mediaType?: 'image' | 'video';
-  [key: string]: any;
-}
 
 const route = useRoute();
 const router = useRouter();

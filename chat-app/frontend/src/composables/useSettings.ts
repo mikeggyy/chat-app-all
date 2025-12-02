@@ -219,26 +219,28 @@ export function useSettings({ onLogout }: UseSettingsOptions): UseSettingsReturn
     const doc = window.document;
     doc.addEventListener('click', handleDocumentClick);
 
+    // ✅ 2025-12-01 修復：移除空 catch 塊，nextTick 在 Vue 3 中不會拋出錯誤
     nextTick(() => {
       const firstMenuItem = menuRef.value?.querySelector(
         'button.settings-menu__item'
       ) as HTMLButtonElement | null | undefined;
       firstMenuItem?.focus();
-    }).catch(() => {});
+    });
 
     onCleanup(() => {
       doc.removeEventListener('click', handleDocumentClick);
     });
   });
 
-  // 監聽登出確認框打開狀態，設置焦點
+  // 監聯登出確認框打開狀態，設置焦點
+  // ✅ 2025-12-01 修復：移除空 catch 塊
   watchEffect(() => {
     if (!isLogoutConfirmVisible.value) {
       return;
     }
     nextTick(() => {
       logoutCancelButtonRef.value?.focus();
-    }).catch(() => {});
+    });
   });
 
   // ==================== 返回 ====================

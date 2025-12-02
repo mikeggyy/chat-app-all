@@ -200,6 +200,7 @@ export function useLimitModalConfig(
   });
 
   // 會員升級選項配置（照片專用）
+  // ✅ 2025-11-30 更新：新增 Lite 等級支援
   const photoVipConfig = computed<PhotoVipConfig | null>(() => {
     if (props.type !== 'photo') return null;
 
@@ -207,26 +208,62 @@ export function useLimitModalConfig(
       return null; // VVIP 用戶不顯示升級選項
     }
 
-    return {
-      title: props.tier === 'free' ? '升級會員' : '升級到 VVIP',
-      description:
-        props.tier === 'free'
-          ? 'VIP 每月 10 次 / VVIP 每月 50 次' +
-            (props.resetPeriod === 'monthly' ? '，下個月自動重置' : '')
-          : '升級到 VVIP 享受每月 50 次拍照額度' +
-            (props.resetPeriod === 'monthly' ? '，下個月自動重置' : ''),
-      benefits: [
-        props.tier === 'free'
-          ? '✓ VIP 每月 10 次 / VVIP 每月 50 次拍照'
-          : '✓ VVIP 每月 50 次拍照',
+    // 根據等級顯示不同的升級選項
+    const getTitle = () => {
+      if (props.tier === 'free') return '升級會員';
+      if (props.tier === 'lite') return '升級至 VIP';
+      return '升級到 VVIP';
+    };
+
+    const getDescription = () => {
+      const resetNote = props.resetPeriod === 'monthly' ? '，下個月自動重置' : '';
+      if (props.tier === 'free') {
+        return `Lite 可購買 / VIP 每月 10 次 / VVIP 每月 50 次${resetNote}`;
+      }
+      if (props.tier === 'lite') {
+        return `升級到 VIP 享受每月 10 次拍照額度${resetNote}`;
+      }
+      return `升級到 VVIP 享受每月 50 次拍照額度${resetNote}`;
+    };
+
+    const getBenefits = () => {
+      if (props.tier === 'free') {
+        return [
+          '✓ Lite 可用金幣購買 / VIP 每月 10 次 / VVIP 每月 50 次拍照',
+          '✓ 無限對話和語音播放',
+          '✓ 獲得解鎖券和金幣獎勵',
+        ];
+      }
+      if (props.tier === 'lite') {
+        return [
+          '✓ VIP 每月 10 次 / VVIP 每月 50 次拍照',
+          '✓ 無限對話和語音播放',
+          '✓ 獲得解鎖券和金幣獎勵',
+        ];
+      }
+      return [
+        '✓ VVIP 每月 50 次拍照',
         '✓ 無限對話和語音播放',
         '✓ 獲得解鎖券和金幣獎勵',
-      ],
-      buttonText: props.tier === 'free' ? '查看方案' : '升級 VVIP',
+      ];
+    };
+
+    const getButtonText = () => {
+      if (props.tier === 'free') return '查看方案';
+      if (props.tier === 'lite') return '升級 VIP';
+      return '升級 VVIP';
+    };
+
+    return {
+      title: getTitle(),
+      description: getDescription(),
+      benefits: getBenefits(),
+      buttonText: getButtonText(),
     };
   });
 
   // 提示訊息
+  // ✅ 2025-11-30 更新：新增 Lite 等級支援
   const message = computed<string>(() => {
     if (props.type === 'conversation') {
       return `您與「${props.characterName}」的對話次數已達到免費用戶上限。`;
@@ -236,6 +273,8 @@ export function useLimitModalConfig(
       let msg = `您已達到 AI 自拍額度上限`;
       if (props.tier === 'free') {
         msg += '（免費用戶終生限制）';
+      } else if (props.tier === 'lite') {
+        msg += '（Lite 會員可用金幣購買）';
       } else if (props.tier === 'vip') {
         msg += '（VIP 月度限制）';
       } else if (props.tier === 'vvip') {
@@ -250,6 +289,10 @@ export function useLimitModalConfig(
         return props.cards > 0
           ? `您目前有 ${props.cards} 張影片卡可用。`
           : '免費用戶需要升級會員才能獲得影片卡。升級 VIP 可獲得 1 張影片卡，升級 VVIP 可獲得 5 張影片卡。';
+      } else if (props.tier === 'lite') {
+        return props.cards > 0
+          ? `您目前有 ${props.cards} 張影片卡可用。`
+          : 'Lite 會員可用金幣購買影片卡，或升級至 VIP/VVIP 獲得贈送的影片卡。';
       } else {
         const tierName = props.tier === 'vip' ? 'VIP' : 'VVIP';
         if (props.cards > 0) {

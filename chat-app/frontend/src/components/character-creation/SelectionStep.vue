@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { logger } from '../../utils/logger.js';
+
 // Types
 interface GeneratedResult {
   id: string;
@@ -32,7 +34,7 @@ const emit = defineEmits<Emits>();
 
 const isResultSelected = (resultId: string): boolean => {
   const selected = resultId === props.selectedResultId;
-  console.log('[SelectionStep] isResultSelected:', {
+  logger.log('[SelectionStep] isResultSelected:', {
     resultId,
     selectedResultId: props.selectedResultId,
     selected

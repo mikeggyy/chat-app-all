@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArrowLeftIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { logger } from '../../utils/logger.js';
 
 // Types
 interface Props {
@@ -19,7 +20,7 @@ withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const handleBack = (): void => {
-  console.log('[GeneratingHeader] X 按鈕被點擊');
+  logger.log('[GeneratingHeader] X 按鈕被點擊');
   emit("back");
 };
 </script>

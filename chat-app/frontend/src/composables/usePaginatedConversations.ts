@@ -17,6 +17,21 @@ interface LoadMoreResult {
 }
 
 /**
+ * 分頁對話列表 API 響應
+ */
+interface PaginatedConversationsResponse {
+  conversations?: Conversation[];
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  // API 可能將數據包裝在 data 字段中
+  data?: {
+    conversations?: Conversation[];
+    nextCursor?: string | null;
+    hasMore?: boolean;
+  };
+}
+
+/**
  * 分頁載入對話列表 Composable 返回值接口
  */
 interface UsePaginatedConversationsReturn {
@@ -66,10 +81,10 @@ export function usePaginatedConversations(
           skipGlobalLoading: true,
           skipDeduplication: true, // ✅ Always fetch fresh data to show latest lastMessage
         }
-      ) as any;
+      ) as PaginatedConversationsResponse;
 
       // ✅ 修復：處理包裝在 data 字段中的響應
-      const data = response?.data || response;
+      const data = response?.data ?? response;
       conversations.value = data.conversations || [];
       nextCursor.value = data.nextCursor || null;
       hasMore.value = data.hasMore || false;
@@ -101,10 +116,10 @@ export function usePaginatedConversations(
           skipGlobalLoading: true,
           skipDeduplication: true, // ✅ Always fetch fresh data for pagination
         }
-      ) as any;
+      ) as PaginatedConversationsResponse;
 
       // ✅ 修復：處理包裝在 data 字段中的響應
-      const data = response?.data || response;
+      const data = response?.data ?? response;
       const newConversations = data.conversations || [];
 
       // 將新對話添加到列表末尾

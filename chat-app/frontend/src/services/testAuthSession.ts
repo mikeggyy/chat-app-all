@@ -1,8 +1,7 @@
-export const TEST_SESSION_STORAGE_KEY = "love-story.test-session";
+import { logger } from '../utils/logger.js';
+import type { UserProfile } from '../types';
 
-interface UserProfile {
-  [key: string]: any;
-}
+export const TEST_SESSION_STORAGE_KEY = "love-story.test-session";
 
 interface TestSession {
   token: string;
@@ -88,6 +87,8 @@ export const saveTestSession = (session: SessionInput = {}): void => {
   try {
     storage.setItem(TEST_SESSION_STORAGE_KEY, JSON.stringify(payload));
   } catch (error) {
+    // ✅ 修復：記錄錯誤而非靜默忽略（可能是隱私模式或儲存空間已滿）
+    logger.warn('[TestAuthSession] saveTestSession 失敗（可能是隱私模式）:', error);
   }
 };
 
@@ -126,6 +127,8 @@ export const loadTestSession = (): TestSession | null => {
       storedAt,
     };
   } catch (error) {
+    // ✅ 修復：記錄錯誤而非靜默忽略（可能是 JSON 解析失敗或隱私模式）
+    logger.warn('[TestAuthSession] loadTestSession 失敗:', error);
     return null;
   }
 };
@@ -139,6 +142,8 @@ export const clearTestSession = (): void => {
   try {
     storage.removeItem(TEST_SESSION_STORAGE_KEY);
   } catch (error) {
+    // ✅ 修復：記錄錯誤而非靜默忽略（可能是隱私模式）
+    logger.warn('[TestAuthSession] clearTestSession 失敗（可能是隱私模式）:', error);
   }
 };
 

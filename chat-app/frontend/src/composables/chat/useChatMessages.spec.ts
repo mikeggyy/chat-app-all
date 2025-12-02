@@ -489,6 +489,9 @@ describe('useChatMessages - 聊天消息管理測試', () => {
       global.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
+          headers: {
+            get: (name: string) => name === 'content-type' ? 'application/json' : null,
+          },
           json: async () => ({ success: true }),
         } as any)
       ) as any;
@@ -514,6 +517,9 @@ describe('useChatMessages - 聊天消息管理測試', () => {
       global.fetch = vi.fn(() =>
         Promise.resolve({
           ok: true,
+          headers: {
+            get: (name: string) => name === 'content-type' ? 'application/json' : null,
+          },
           json: async () => ({ success: true }),
         } as any)
       ) as any;

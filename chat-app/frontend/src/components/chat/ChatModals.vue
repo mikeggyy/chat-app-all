@@ -25,7 +25,8 @@ import CharacterRanking from '../CharacterRanking.vue';
 
 // Types
 type PotionType = 'memoryBoost' | 'brainBoost' | '';
-type MembershipTier = 'free' | 'vip' | 'vvip';
+// ✅ 2025-11-30 更新：新增 Lite 等級
+type MembershipTier = 'free' | 'lite' | 'vip' | 'vvip';
 
 interface UserPotions {
   memoryBoost: number;

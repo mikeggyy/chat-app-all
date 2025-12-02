@@ -43,12 +43,14 @@ describe('useMembership - 會員系統測試', () => {
       expect(isActive.value).toBe(false);
     });
 
+    // ✅ 2025-11-30 更新：新增 isLite 測試
     it('應該正確判斷會員等級', () => {
-      const { currentTier, isFree, isVIP, isVVIP } = useMembership();
+      const { currentTier, isFree, isLite, isVIP, isVVIP } = useMembership();
 
       // Free 會員
       expect(currentTier.value).toBe('free');
       expect(isFree.value).toBe(true);
+      expect(isLite.value).toBe(false);
       expect(isVIP.value).toBe(false);
       expect(isVVIP.value).toBe(false);
     });

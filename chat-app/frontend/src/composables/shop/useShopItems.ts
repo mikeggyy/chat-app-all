@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { computed, ref, type Ref, type ComputedRef } from "vue";
+import { computed, type Ref, type ComputedRef } from "vue";
 import { COIN_ICON_PATH } from "../../config/assets";
 
 // ==================== 類型定義 ====================
@@ -14,21 +13,25 @@ interface IconMapping {
 /**
  * 金幣套餐原始數據
  */
-interface CoinPackageData {
+export interface CoinPackageData {
   id: string;
+  name?: string;                    // ✅ 新增：套餐名稱
+  description?: string;             // ✅ 新增：套餐描述
   coins: number;
-  totalCoins: number;
+  totalCoins?: number;              // 總金幣數（可選，可計算為 coins + bonus）
   price?: number;
   unitPrice?: number;
-  bonus: number;
+  bonus?: number;                   // 改為可選，與 CoinPackage 兼容
   popular?: boolean;
   bestValue?: boolean;
+  limitedPurchase?: boolean;        // ✅ 新增：首購限定
+  order?: number;                   // ✅ 新增：排序
 }
 
 /**
  * 資產套餐原始數據
  */
-interface AssetPackageData {
+export interface AssetPackageData {
   id?: string;
   sku?: string;
   category: string;
@@ -43,12 +46,13 @@ interface AssetPackageData {
   popular?: boolean;
   badge?: string | null;
   originalPrice?: number | null;
+  order?: number; // 排序順序
 }
 
 /**
  * 藥水套餐原始數據
  */
-interface PotionPackageData {
+export interface PotionPackageData {
   id: string;
   baseId?: string;
   displayName?: string;
@@ -62,6 +66,43 @@ interface PotionPackageData {
   popular?: boolean;
   badge?: string | null;
   originalPrice?: number | null;
+  order?: number; // 排序順序
+}
+
+/**
+ * 禮包購買狀態
+ */
+interface BundlePurchaseStatus {
+  canPurchase: boolean;
+  reason?: string | null;
+  nextAvailableAt?: Date | string | null;
+  purchaseCount: number;
+  lastPurchaseAt?: Date | string | null;
+}
+
+/**
+ * 組合禮包原始數據
+ */
+export interface BundlePackageData {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency?: string;
+  order?: number;
+  contents: {
+    coins?: number;
+    photoUnlockCards?: number;
+    videoUnlockCards?: number;
+    characterUnlockCards?: number;
+    characterCreationCards?: number;
+    voiceUnlockCards?: number;
+  };
+  badge?: string | null;
+  popular?: boolean;
+  bestValue?: boolean;
+  purchaseLimit?: "once" | "monthly" | "weekly" | "none";
+  purchaseStatus?: BundlePurchaseStatus | null;
 }
 
 /**
@@ -84,10 +125,19 @@ export interface ShopItem {
   coinData?: CoinPackageData;
   bonusText?: string | null;
   useCoinImage?: boolean;
+  limitedPurchase?: boolean;        // ✅ 新增：首購限定
   // 藥水專用
   description?: string;
   effect?: string;
   requiresCharacter?: boolean;
+  // 組合禮包專用
+  isBundlePackage?: boolean;
+  bundleData?: BundlePackageData;
+  currency?: string;
+  contents?: BundlePackageData["contents"];
+  purchaseStatus?: BundlePurchaseStatus | null;
+  // 排序
+  order?: number;
 }
 
 /**
@@ -97,6 +147,7 @@ export interface UseShopItemsDeps {
   packages: Ref<CoinPackageData[]>;
   assetPackages: Ref<AssetPackageData[]>;
   potionPackages: Ref<PotionPackageData[]>;
+  bundlePackages: Ref<BundlePackageData[]>;
   activeCategory: Ref<string>;
 }
 
@@ -108,6 +159,7 @@ export interface UseShopItemsReturn {
   coinItems: ComputedRef<ShopItem[]>;
   assetCardItems: ComputedRef<ShopItem[]>;
   potionItems: ComputedRef<ShopItem[]>;
+  bundleItems: ComputedRef<ShopItem[]>;
   allItems: ComputedRef<ShopItem[]>;
   filteredItems: ComputedRef<ShopItem[]>;
   // Constants
@@ -124,6 +176,7 @@ export function useShopItems(
   packages: Ref<CoinPackageData[]>,
   assetPackages: Ref<AssetPackageData[]>,
   potionPackages: Ref<PotionPackageData[]>,
+  bundlePackages: Ref<BundlePackageData[]>,
   activeCategory: Ref<string>
 ): UseShopItemsReturn {
   // Icon 映射表（根據 category 轉換為正確的 iconColor）
@@ -179,12 +232,14 @@ export function useShopItems(
           ];
 
     // ✅ 修復：按照 order 欄位排序（雙重保險）
-    const sortedPkgs = [...pkgs].sort((a, b) => ((a as any).order || 0) - ((b as any).order || 0));
+    const sortedPkgs = [...pkgs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
     return sortedPkgs.map((pkg) => ({
       id: `coin-${pkg.id}`,
       category: "coins",
-      name: `${pkg.totalCoins || pkg.coins} 金幣`,
+      // ✅ 修復：優先使用套餐名稱，若無則顯示金幣數量
+      name: pkg.name || `${pkg.totalCoins || pkg.coins} 金幣`,
+      description: pkg.description || "",
       icon: null, // 金幣使用圖片而非 icon 組件
       iconColor: "coins",
       price: pkg.unitPrice || pkg.price || 0, // 支援統一欄位 unitPrice 和舊欄位 price
@@ -192,8 +247,9 @@ export function useShopItems(
       coinData: pkg,
       popular: pkg.popular || false,
       badge: pkg.bestValue ? "超值" : pkg.popular ? "熱門" : null,
-      bonusText: pkg.bonus > 0 ? `+${pkg.bonus} 贈送` : null,
+      bonusText: (pkg.bonus ?? 0) > 0 ? `+${pkg.bonus} 贈送` : null,
       useCoinImage: true, // 使用金幣圖片
+      limitedPurchase: pkg.limitedPurchase || false, // ✅ 新增：首購限定標記
     }));
   });
 
@@ -221,7 +277,7 @@ export function useShopItems(
         popular: pkg.popular || false,
         badge: pkg.badge || null,
         originalPrice: pkg.originalPrice || null,
-        order: (pkg as any).order || 0, // 保留 order 用於排序
+        order: pkg.order ?? 0, // 排序順序
       };
     });
 
@@ -259,7 +315,7 @@ export function useShopItems(
         badge: potion.badge || null,
         requiresCharacter: false,
         originalPrice: potion.originalPrice || null,
-        order: (potion as any).order || 0, // 保留 order 用於排序
+        order: potion.order ?? 0, // 排序順序
       };
     });
 
@@ -268,10 +324,60 @@ export function useShopItems(
   });
 
   /**
+   * 組合禮包商品（從 API 加載）
+   */
+  const bundleItems = computed<ShopItem[]>(() => {
+    const items = bundlePackages.value.map((bundle) => {
+      // 生成禮包內容描述
+      const contentParts: string[] = [];
+      if (bundle.contents.coins) {
+        contentParts.push(`${bundle.contents.coins} 金幣`);
+      }
+      if (bundle.contents.photoUnlockCards) {
+        contentParts.push(`${bundle.contents.photoUnlockCards} 張照片卡`);
+      }
+      if (bundle.contents.videoUnlockCards) {
+        contentParts.push(`${bundle.contents.videoUnlockCards} 張影片卡`);
+      }
+      if (bundle.contents.characterUnlockCards) {
+        contentParts.push(`${bundle.contents.characterUnlockCards} 張角色解鎖券`);
+      }
+      if (bundle.contents.characterCreationCards) {
+        contentParts.push(`${bundle.contents.characterCreationCards} 張創建角色卡`);
+      }
+      if (bundle.contents.voiceUnlockCards) {
+        contentParts.push(`${bundle.contents.voiceUnlockCards} 張語音卡`);
+      }
+
+      return {
+        id: `bundle-${bundle.id}`,
+        category: "bundles",
+        name: bundle.name,
+        description: bundle.description || contentParts.join(" + "),
+        icon: null,
+        emoji: "🎁",
+        iconColor: "bundle",
+        price: bundle.price,
+        currency: bundle.currency || "TWD",
+        popular: bundle.popular || false,
+        badge: bundle.badge || (bundle.bestValue ? "💎 最超值" : null),
+        isBundlePackage: true,
+        bundleData: bundle,
+        contents: bundle.contents,
+        order: bundle.order || 0,
+        purchaseStatus: bundle.purchaseStatus || null,
+      };
+    });
+
+    // 按照 order 欄位排序
+    return items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  });
+
+  /**
    * 合併所有商品
    */
   const allItems = computed<ShopItem[]>(() => {
-    return [...coinItems.value, ...assetCardItems.value, ...potionItems.value];
+    return [...coinItems.value, ...bundleItems.value, ...assetCardItems.value, ...potionItems.value];
   });
 
   /**
@@ -288,6 +394,7 @@ export function useShopItems(
     coinItems,
     assetCardItems,
     potionItems,
+    bundleItems,
     allItems,
     filteredItems,
 

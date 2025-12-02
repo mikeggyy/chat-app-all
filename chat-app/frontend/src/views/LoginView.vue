@@ -9,6 +9,7 @@ import {
   saveTestSession,
   clearTestSession,
 } from "../services/testAuthSession";
+import { logger } from "../utils/logger";
 
 // Types
 type StatusType = "idle" | "loading" | "success" | "error" | "info";
@@ -126,18 +127,18 @@ const handleGoogleLogin = async (): Promise<void> => {
     const outcome = await signInWithGoogle();
 
     if (outcome.redirected) {
-      console.log('[LoginView] 🟡 使用 redirect 登入方式');
+      logger.log('[LoginView] 🟡 使用 redirect 登入方式');
       redirecting = true;
       setStatus("loading", "即將重新導向至 Google 登入頁面，請稍候...");
       return;
     }
 
     if (!outcome.result) {
-      console.log('[LoginView] ❌ 登入未取得有效結果');
+      logger.log('[LoginView] ❌ 登入未取得有效結果');
       throw new Error("Google 登入未取得有效結果，請重新操作。");
     }
 
-    console.log('[LoginView] 🟢 Popup 登入成功！準備處理後續流程');
+    logger.log('[LoginView] 🟢 Popup 登入成功！準備處理後續流程');
     // ✅ 登入成功！authBootstrap 會自動處理：
     // 1. onAuthStateChanged 偵測到登入
     // 2. GET /api/users/:id (或 POST 創建新用戶)
@@ -145,27 +146,27 @@ const handleGoogleLogin = async (): Promise<void> => {
     // 4. watch(user) 監聽到變化後自動導航
     clearTestSession();
     resetGuestMessageCount();
-    console.log('[LoginView] 🟢 設置狀態訊息：登入成功！正在載入您的資料...');
+    logger.log('[LoginView] 🟢 設置狀態訊息：登入成功！正在載入您的資料...');
     setStatus("success", "登入成功！正在載入您的資料...");
 
     // ✅ 2025-11-25 修復：設置等待導航標記，讓 watch(user) 在資料載入完成後自動導航
     // 移除固定時間的 setTimeout，避免 authBootstrap 尚未完成時就嘗試導航
-    console.log('[LoginView] 🔵 設置 waitingForNavigation = true，等待 authBootstrap 完成');
+    logger.log('[LoginView] 🔵 設置 waitingForNavigation = true，等待 authBootstrap 完成');
     waitingForNavigation.value = true;
 
     // ✅ 2025-11-26 修復：添加 3 秒超時自動刷新機制
     // 如果 3 秒內沒有自動導航（watch 沒有被觸發），就刷新頁面
     navigationTimeoutId = setTimeout(() => {
-      console.warn('[LoginView] ⚠️ 3秒內未自動導航，刷新頁面');
+      logger.warn('[LoginView] ⚠️ 3秒內未自動導航，刷新頁面');
       window.location.reload();
     }, 3000);
   } catch (err) {
-    console.error('[LoginView] ❌ handleGoogleLogin 錯誤:', err);
+    logger.error('[LoginView] ❌ handleGoogleLogin 錯誤:', err);
     handleFirebaseAuthError(err);
     isLoading.value = false; // ❌ 只在錯誤時才清除 loading
   } finally {
     if (redirecting) {
-      console.log('[LoginView] 🔵 保持 loading 狀態 (redirect 模式)');
+      logger.log('[LoginView] 🔵 保持 loading 狀態 (redirect 模式)');
       // redirect 時保持 loading 狀態
       // 不設置 isLoading = false
     }
@@ -239,7 +240,7 @@ watch(
       return;
     }
 
-    console.log('[LoginView] 🟢 用戶資料已載入，準備導航', {
+    logger.log('[LoginView] 🟢 用戶資料已載入，準備導航', {
       userId: newUser.id,
       displayName: newUser.displayName,
     });
@@ -251,7 +252,7 @@ watch(
     if (navigationTimeoutId) {
       clearTimeout(navigationTimeoutId);
       navigationTimeoutId = null;
-      console.log('[LoginView] 🟢 清除超時計時器');
+      logger.log('[LoginView] 🟢 清除超時計時器');
     }
 
     try {
@@ -259,24 +260,24 @@ watch(
       const isGuest = isGuestUser(newUser.id || '');
       const hasCompletedOnboarding = newUser.hasCompletedOnboarding !== false;
 
-      console.log('[LoginView] 🟡 導航決策:', {
+      logger.log('[LoginView] 🟡 導航決策:', {
         isGuest,
         hasCompletedOnboarding,
         userId: newUser.id
       });
 
       if (isGuest) {
-        console.log('[LoginView] 🟢 導航至 match (遊客)');
+        logger.log('[LoginView] 🟢 導航至 match (遊客)');
         await router.push({ name: "match" });
       } else if (hasCompletedOnboarding) {
-        console.log('[LoginView] 🟢 導航至 match (已完成 onboarding)');
+        logger.log('[LoginView] 🟢 導航至 match (已完成 onboarding)');
         await router.push({ name: "match" });
       } else {
-        console.log('[LoginView] 🟢 導航至 onboarding (新用戶)');
+        logger.log('[LoginView] 🟢 導航至 onboarding (新用戶)');
         await router.push({ name: "onboarding" });
       }
     } catch (error) {
-      console.error('[LoginView] ❌ 導航錯誤:', error);
+      logger.error('[LoginView] ❌ 導航錯誤:', error);
 
       // ✅ 2025-11-26 修復：導航錯誤時也清除超時計時器
       if (navigationTimeoutId) {
@@ -293,14 +294,14 @@ watch(
 
 // ✅ 處理 Google 登入重定向結果
 onMounted(async () => {
-  console.log('[LoginView] 🔵 onMounted 執行');
+  logger.log('[LoginView] 🔵 onMounted 執行');
   try {
-    console.log('[LoginView] 🔵 檢查 redirect 登入結果');
+    logger.log('[LoginView] 🔵 檢查 redirect 登入結果');
     const redirectOutcome = await resolveRedirectResult();
-    console.log('[LoginView] 🟢 resolveRedirectResult 完成', redirectOutcome);
+    logger.log('[LoginView] 🟢 resolveRedirectResult 完成', redirectOutcome);
 
     if (redirectOutcome?.result) {
-      console.log('[LoginView] 🟢 Redirect 登入成功！處理後續流程');
+      logger.log('[LoginView] 🟢 Redirect 登入成功！處理後續流程');
       // ✅ Google 登入重定向成功！
       // authBootstrap 會自動處理後續流程：
       // 1. onAuthStateChanged 偵測到登入
@@ -313,24 +314,24 @@ onMounted(async () => {
       resetGuestMessageCount();
 
       // ✅ 2025-11-25 修復：設置等待導航標記，讓 watch(user) 在資料載入完成後自動導航
-      console.log('[LoginView] 🔵 設置 waitingForNavigation = true (redirect 模式)');
+      logger.log('[LoginView] 🔵 設置 waitingForNavigation = true (redirect 模式)');
       waitingForNavigation.value = true;
 
       // ✅ 2025-11-26 修復：添加 3 秒超時自動刷新機制
       navigationTimeoutId = setTimeout(() => {
-        console.warn('[LoginView] ⚠️ 3秒內未自動導航，刷新頁面');
+        logger.warn('[LoginView] ⚠️ 3秒內未自動導航，刷新頁面');
         window.location.reload();
       }, 3000);
     } else {
-      console.log('[LoginView] 🟡 沒有 redirect 登入結果（正常頁面載入）');
+      logger.log('[LoginView] 🟡 沒有 redirect 登入結果（正常頁面載入）');
     }
   } catch (error) {
-    console.error('[LoginView] ❌ onMounted 錯誤:', error);
+    logger.error('[LoginView] ❌ onMounted 錯誤:', error);
     handleFirebaseAuthError(error);
   } finally {
     // 注意：不在這裡設置 isLoading = false，讓它保持 loading 狀態
     // 直到 authBootstrap 完成並導航到目標頁面
-    console.log('[LoginView] 🔵 onMounted 完成');
+    logger.log('[LoginView] 🔵 onMounted 完成');
   }
 });
 

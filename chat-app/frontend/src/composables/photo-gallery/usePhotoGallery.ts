@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, type Ref } from 'vue';
 import { apiJsonCached } from '../../utils/api.js';
 import { logger } from '../../utils/logger.js';
@@ -15,6 +14,7 @@ export interface Photo {
   createdAt: string;
   role: 'user' | 'partner' | 'ai';
   isDefault?: boolean;
+  mediaType?: 'image' | 'video';
 }
 
 /**
@@ -106,9 +106,10 @@ export function usePhotoGallery(): UsePhotoGalleryReturn {
       }
 
       // ✅ 修復：優先使用 API 返回的角色立繪，確保顯示正確的角色圖片
-      const portraitUrl = response?.character?.portraitUrl ||
-                          response?.character?.portrait ||
-                          response?.character?.image ||
+      const character = response?.character as Record<string, unknown> | undefined;
+      const portraitUrl = (character?.portraitUrl as string) ||
+                          (character?.portrait as string) ||
+                          (character?.image as string) ||
                           fallbackPortrait;
 
       // 在開頭插入預設照片（角色立繪）

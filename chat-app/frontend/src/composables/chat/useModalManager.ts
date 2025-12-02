@@ -11,6 +11,22 @@ import type { Message } from '../../types';
 // ==================== 類型定義 ====================
 
 /**
+ * 待發送禮物資料 - 與 GiftData 兼容
+ */
+export interface PendingGiftData {
+  giftId: string;
+  gift?: {
+    id: string;
+    name: string;
+    emoji: string;
+    price: number;
+    rarity?: string;
+  };
+  priceInfo?: unknown;
+  [key: string]: unknown;
+}
+
+/**
  * 對話限制數據
  */
 export interface ConversationLimitData {
@@ -104,7 +120,7 @@ export interface ModalsState {
     selectedUrl: string | null;
     useCard: boolean;
     forGift: boolean; // ✅ 標記是否用於送禮物
-    pendingGift: any | null; // ✅ 待發送的禮物數據
+    pendingGift: PendingGiftData | null; // ✅ 待發送的禮物數據
   };
   imageViewer: {
     show: boolean;
@@ -150,9 +166,9 @@ export interface UseModalManagerReturn {
   modals: ModalsState;
 
   // 通用方法
-  open: (modalName: keyof ModalsState, updates?: Record<string, any>) => void;
+  open: (modalName: keyof ModalsState, updates?: Record<string, unknown>) => void;
   close: (modalName: keyof ModalsState, clearData?: boolean) => void;
-  update: (modalName: keyof ModalsState, updates?: Record<string, any>) => void;
+  update: (modalName: keyof ModalsState, updates?: Record<string, unknown>) => void;
   setLoading: (modalName: keyof ModalsState, loading: boolean) => void;
 
   // 便捷方法 - 限制類
@@ -178,7 +194,7 @@ export interface UseModalManagerReturn {
   closeUnlockConfirm: () => void;
 
   // 便捷方法 - 選擇器類
-  showPhotoSelector: (useCardOrForGift?: boolean, pendingGift?: any) => void; // ✅ 支援禮物模式
+  showPhotoSelector: (useCardOrForGift?: boolean, pendingGift?: PendingGiftData) => void; // ✅ 支援禮物模式
   closePhotoSelector: () => void;
 
   // 便捷方法 - 查看器類
@@ -205,6 +221,34 @@ export interface UseModalManagerReturn {
   hasOpenModal: ComputedRef<boolean>;
   hasLoadingAction: ComputedRef<boolean>;
 }
+
+// ==================== 類型輔助工具 ====================
+
+/**
+ * 所有模態框值的聯合類型
+ */
+type ModalValue = ModalsState[keyof ModalsState];
+
+/**
+ * 類型守衛：檢查模態框是否有 loading 屬性
+ */
+const hasLoadingProperty = (modal: ModalValue): modal is ModalValue & { loading: boolean } => {
+  return 'loading' in modal;
+};
+
+/**
+ * 類型守衛：檢查模態框是否有 type 屬性
+ */
+const hasTypeProperty = (modal: ModalValue): modal is ModalValue & { type: string } => {
+  return 'type' in modal;
+};
+
+/**
+ * 類型守衛：檢查模態框是否有 data 屬性
+ */
+const hasDataProperty = (modal: ModalValue): modal is ModalValue & { data: Record<string, unknown> } => {
+  return 'data' in modal;
+};
 
 // ==================== Composable 主函數 ====================
 
@@ -358,23 +402,25 @@ export function useModalManager(): UseModalManagerReturn {
    * @param modalName - 模態框名稱
    * @param updates - 要更新的數據
    */
-  const open = (modalName: keyof ModalsState, updates: Record<string, any> = {}): void => {
-    if (!modals[modalName]) {
+  const open = (modalName: keyof ModalsState, updates: Record<string, unknown> = {}): void => {
+    const modal = modals[modalName];
+    if (!modal) {
       logger.warn(`Modal "${modalName}" not found`);
       return;
     }
 
-    (modals[modalName] as any).show = true;
+    // 所有模態框都有 show 屬性（BaseModal）
+    modal.show = true;
 
     // 更新數據
     if (updates && typeof updates === 'object') {
       Object.keys(updates).forEach(key => {
         if (key === 'show') return; // 忽略 show 屬性
 
-        const modal = modals[modalName] as any;
-        if (modal.hasOwnProperty(key)) {
-          modal[key] = updates[key];
-        } else if (modal.data && modal.data.hasOwnProperty(key)) {
+        // 使用類型守衛安全存取
+        if (key in modal) {
+          (modal as Record<string, unknown>)[key] = updates[key];
+        } else if (hasDataProperty(modal) && key in modal.data) {
           modal.data[key] = updates[key];
         }
       });
@@ -387,17 +433,17 @@ export function useModalManager(): UseModalManagerReturn {
    * @param clearData - 是否清空數據（默認 false）
    */
   const close = (modalName: keyof ModalsState, clearData: boolean = false): void => {
-    if (!modals[modalName]) {
+    const modal = modals[modalName];
+    if (!modal) {
       logger.warn(`Modal "${modalName}" not found`);
       return;
     }
 
-    (modals[modalName] as any).show = false;
-
-    const modal = modals[modalName] as any;
+    // 所有模態框都有 show 屬性（BaseModal）
+    modal.show = false;
 
     // 清空 loading 狀態（如果有）
-    if (modal.hasOwnProperty('loading')) {
+    if (hasLoadingProperty(modal)) {
       modal.loading = false;
     }
 
@@ -414,7 +460,11 @@ export function useModalManager(): UseModalManagerReturn {
         modals.imageViewer.url = '';
         modals.imageViewer.alt = '';
       } else if (modalName === 'potionConfirm' || modalName === 'potionLimit') {
-        (modals[modalName] as any).type = '';
+        // 使用類型守衛安全存取 type 屬性
+        const typedModal = modals[modalName];
+        if (hasTypeProperty(typedModal)) {
+          typedModal.type = '';
+        }
       } else if (modalName === 'buffDetails') {
         modals.buffDetails.type = '';
       }
@@ -426,8 +476,9 @@ export function useModalManager(): UseModalManagerReturn {
    * @param modalName - 模態框名稱
    * @param updates - 要更新的數據
    */
-  const update = (modalName: keyof ModalsState, updates: Record<string, any> = {}): void => {
-    if (!modals[modalName]) {
+  const update = (modalName: keyof ModalsState, updates: Record<string, unknown> = {}): void => {
+    const modal = modals[modalName];
+    if (!modal) {
       logger.warn(`Modal "${modalName}" not found`);
       return;
     }
@@ -435,10 +486,10 @@ export function useModalManager(): UseModalManagerReturn {
     Object.keys(updates).forEach(key => {
       if (key === 'show') return; // 忽略 show 屬性
 
-      const modal = modals[modalName] as any;
-      if (modal.hasOwnProperty(key)) {
-        modal[key] = updates[key];
-      } else if (modal.data && modal.data.hasOwnProperty(key)) {
+      // 使用類型守衛安全存取
+      if (key in modal) {
+        (modal as Record<string, unknown>)[key] = updates[key];
+      } else if (hasDataProperty(modal) && key in modal.data) {
         modal.data[key] = updates[key];
       }
     });
@@ -450,13 +501,14 @@ export function useModalManager(): UseModalManagerReturn {
    * @param loading - loading 狀態
    */
   const setLoading = (modalName: keyof ModalsState, loading: boolean): void => {
-    if (!modals[modalName]) {
+    const modal = modals[modalName];
+    if (!modal) {
       logger.warn(`Modal "${modalName}" not found`);
       return;
     }
 
-    const modal = modals[modalName] as any;
-    if (modal.hasOwnProperty('loading')) {
+    // 使用類型守衛安全設置 loading
+    if (hasLoadingProperty(modal)) {
       modal.loading = loading;
     }
   };
@@ -502,7 +554,7 @@ export function useModalManager(): UseModalManagerReturn {
    * @param useCardOrForGift - 影片模式時:是否使用影片卡; 禮物模式時:true表示送禮物
    * @param pendingGift - 待發送的禮物數據（禮物模式時使用）
    */
-  const showPhotoSelector = (useCardOrForGift: boolean = false, pendingGift?: any): void => {
+  const showPhotoSelector = (useCardOrForGift: boolean = false, pendingGift?: PendingGiftData): void => {
     if (pendingGift) {
       // ✅ 禮物模式
       open('photoSelector', { forGift: true, pendingGift, useCard: false });
@@ -552,14 +604,16 @@ export function useModalManager(): UseModalManagerReturn {
 
   // 是否有任何模態框正在顯示
   const hasOpenModal = computed(() => {
-    return Object.values(modals).some((modal: any) => modal.show === true);
+    return Object.values(modals).some((modal: ModalValue) => modal.show === true);
   });
 
   // 是否有任何確認操作正在進行
   const hasLoadingAction = computed(() => {
-    return ['resetConfirm', 'potionConfirm', 'unlockConfirm'].some(
-      key => (modals[key as keyof ModalsState] as any).loading
-    );
+    const loadableModalKeys: Array<keyof ModalsState> = ['resetConfirm', 'potionConfirm', 'unlockConfirm'];
+    return loadableModalKeys.some(key => {
+      const modal = modals[key];
+      return hasLoadingProperty(modal) && modal.loading;
+    });
   });
 
   // ====================

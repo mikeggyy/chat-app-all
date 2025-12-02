@@ -1,4 +1,5 @@
 import { ref, onBeforeUnmount, type Ref } from 'vue';
+import { logger } from '../../utils/logger.js';
 
 /**
  * 語音音頻播放管理的返回類型
@@ -57,7 +58,10 @@ export function useVoiceAudioPlayer(): VoiceAudioPlayerReturn {
           player.removeEventListener('ended', handler);
           eventHandlers.delete(id);
         }
-      } catch {}
+      } catch (error) {
+        // ✅ 修復：統一使用 logger 記錄音訊暫停錯誤
+        logger.warn('[useVoiceAudioPlayer] 暫停音訊時發生錯誤:', error);
+      }
     });
     audioPlayers.clear();
 
@@ -109,7 +113,10 @@ export function useVoiceAudioPlayer(): VoiceAudioPlayerReturn {
         // 清除內聯屬性
         player.onended = null;
         player.onerror = null;
-      } catch {}
+      } catch (error) {
+        // ✅ 修復：統一使用 logger 記錄清理錯誤
+        logger.warn('[useVoiceAudioPlayer] 清理音訊時發生錯誤:', error);
+      }
     });
     audioPlayers.clear();
     eventHandlers.clear();

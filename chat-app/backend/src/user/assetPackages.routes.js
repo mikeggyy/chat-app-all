@@ -6,6 +6,10 @@
 import express from "express";
 import { getFirestoreDb } from "../firebase/index.js";
 import { relaxedRateLimiter } from "../middleware/rateLimiterConfig.js";
+import {
+  sendSuccess,
+  sendError,
+} from "../../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
@@ -93,16 +97,10 @@ router.get("/api/assets/packages", relaxedRateLimiter, async (req, res) => {
 
     logger.info(`[資產套餐API] 獲取解鎖卡套餐成功: ${packages.length} 個 (來源: asset_packages)`);
 
-    res.json({
-      success: true,
-      packages,
-    });
+    sendSuccess(res, { packages });
   } catch (error) {
     logger.error("[資產套餐API] 獲取解鎖卡套餐失敗:", error);
-    res.status(500).json({
-      success: false,
-      message: "獲取套餐列表失敗",
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取套餐列表失敗");
   }
 });
 
@@ -132,16 +130,10 @@ router.get("/api/potions/packages", relaxedRateLimiter, async (req, res) => {
 
     logger.info(`[藥水商品API] 獲取藥水商品成功: ${potions.length} 個`);
 
-    res.json({
-      success: true,
-      potions,
-    });
+    sendSuccess(res, { potions });
   } catch (error) {
     logger.error("[藥水商品API] 獲取藥水商品失敗:", error);
-    res.status(500).json({
-      success: false,
-      message: "獲取藥水列表失敗",
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取藥水列表失敗");
   }
 });
 

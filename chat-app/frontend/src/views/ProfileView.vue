@@ -15,7 +15,9 @@ import { useFirebaseAuth } from "../composables/useFirebaseAuth";
 import { useProfileEditor } from "../composables/useProfileEditor";
 import { useAvatarUpload } from "../composables/useAvatarUpload";
 import { useSettings } from "../composables/useSettings";
+import { useLoginReward } from "../composables/useLoginReward";
 import { clearTestSession } from "../services/testAuthSession";
+import LoginRewardModal from "../components/LoginRewardModal.vue";
 import {
   FALLBACK_USER,
   BUILTIN_AVATAR_OPTIONS,
@@ -41,6 +43,7 @@ const {
   clearUserProfile,
   tier,
   tierName,
+  isLite, // ✅ 2025-11-30 新增：Lite 等級支援
   isVIP,
   isVVIP,
   isPaidMember,
@@ -65,8 +68,8 @@ const avatarPreview: Ref<string> = ref(FALLBACK_USER.photoURL);
 
 // ✅ 2025-11-25 修復：必須先初始化 avatarUpload，因為下方的 watch 會立即執行並引用它
 const avatarUpload = useAvatarUpload({
-  // @ts-ignore - UserProfile 和 AvatarUpdateResult 類型不完全兼容
-  onUpdate: updateUserAvatar,
+  // 類型斷言：UserProfile 兼容 AvatarUpdateResult（都有 photoURL）
+  onUpdate: updateUserAvatar as (url: string) => Promise<{ photoURL?: string }>,
   avatarPreview,
 });
 
@@ -114,6 +117,31 @@ const settings = useSettings({
   onLogout: handleLogout,
 });
 
+// ==================== 每日登入獎勵 ====================
+
+const loginReward = useLoginReward();
+
+// 下一個里程碑（用於顯示）
+const loginNextMilestone = computed(() => {
+  if (!loginReward.status.value?.nextMilestone) return null;
+  return loginReward.status.value.nextMilestone;
+});
+
+// 打開每日獎勵彈窗
+const openDailyRewardModal = async () => {
+  if (requireLogin({ feature: "每日獎勵" })) {
+    return;
+  }
+  // 強制刷新狀態
+  await loginReward.fetchStatus();
+  loginReward.openModal();
+};
+
+// 處理領取獎勵
+const handleClaimReward = async () => {
+  await loginReward.claimReward();
+};
+
 // ==================== 統計彈窗 ====================
 
 const isStatsModalOpen: Ref<boolean> = ref(false);
@@ -143,6 +171,12 @@ const closeStatsModal = () => {
 
 const handleQuickActionSelect = async (action: { key?: string } | null): Promise<void> => {
   if (!action || typeof action !== "object") {
+    return;
+  }
+
+  // 特殊處理：每日獎勵（彈窗而非路由）
+  if (action.key === "daily-reward") {
+    await openDailyRewardModal();
     return;
   }
 
@@ -303,9 +337,12 @@ onMounted(async () => {
   // 不再同時調用 ensureProfileLoaded，避免競態條件
   if (userId) {
     try {
-      await initializeProfileData(userId);
+      await Promise.all([
+        initializeProfileData(userId),
+        loginReward.fetchStatus(), // 獲取每日登入獎勵狀態
+      ]);
       if (import.meta.env.DEV) {
-        console.debug('[ProfileView] 初始化完成, userId:', userId, 'balance:', balance.value);
+        logger.debug('[ProfileView] 初始化完成, userId:', userId, 'balance:', balance.value);
       }
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -367,9 +404,11 @@ watch(
       <div class="profile-hero__overlay"></div>
 
       <header class="profile-hero__top">
+        <!-- ✅ 2025-11-30 更新：新增 Lite 等級支援 -->
         <ProfileVIPCard
-          :tier="(tier as 'free' | 'vip' | 'vvip')"
+          :tier="(tier as 'free' | 'lite' | 'vip' | 'vvip')"
           :tier-name="tierName"
+          :is-lite="isLite"
           :is-v-i-p="isVIP"
           :is-v-v-i-p="isVVIP"
           :is-paid-member="isPaidMember"
@@ -437,6 +476,7 @@ watch(
 
     <ProfileQuickActions
       :has-unread-notifications="hasUnreadNotifications"
+      :has-unclaimed-reward="loginReward.canClaim.value"
       @action-select="handleQuickActionSelect"
     />
   </main>
@@ -500,6 +540,22 @@ watch(
     @buy-unlock-card="handleBuyUnlockCard"
     @use-unlock-card="handleUseUnlockCard"
     @use-potion="handleUsePotion"
+  />
+
+  <!-- 每日登入獎勵彈窗 -->
+  <LoginRewardModal
+    :is-open="loginReward.showRewardModal.value"
+    :can-claim="loginReward.canClaim.value"
+    :is-claiming="loginReward.isClaiming.value"
+    :current-streak="loginReward.currentStreak.value"
+    :today-reward="loginReward.todayReward.value"
+    :week-rewards="loginReward.weekRewards.value"
+    :month-rewards="loginReward.monthRewards.value"
+    :display-milestones="loginReward.displayMilestones.value"
+    :next-milestone="loginNextMilestone"
+    :claim-result="loginReward.lastClaimResult.value"
+    @close="loginReward.closeModal"
+    @claim="handleClaimReward"
   />
 </template>
 

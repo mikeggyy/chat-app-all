@@ -214,7 +214,6 @@ const { initializeChat } = useChatInitialization({
   loadActivePotions,
   loadActiveUnlocks,
   loadHistory,
-  // @ts-ignore - useChatSetup 還有 @ts-nocheck，導致類型推斷不正確
   addConversationHistory,
   loadVoiceStats,
   fetchPhotoStats,
@@ -368,7 +367,7 @@ onBeforeUnmount(() => {
       :video-cards="videoCards"
       :show-gift-selector="showGiftSelector"
       :balance="balance"
-      :membership-tier="(user?.membershipTier as 'free' | 'vip' | 'vvip') || 'free'"
+      :membership-tier="(user?.membershipTier as 'free' | 'lite' | 'vip' | 'vvip') || 'free'"
       @cancel-reset="cancelResetConversation"
       @confirm-reset="confirmResetConversation"
       @close-character-info="closeCharacterInfo"

@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline';
 import { useNotifications } from '../composables/useNotifications';
 
-// Note: Notification interface removed - using flexible type in handler instead
-
 const router = useRouter();
-const { notifications } = useNotifications();
+const { notifications, isLoading, fetchNotifications, markAsRead } = useNotifications();
+
+// 頁面載入時獲取通知
+onMounted(() => {
+  fetchNotifications();
+});
 
 const handleBack = (): void => {
   router.back();
@@ -33,9 +37,14 @@ const formatTimestamp = (dateString: string): string => {
   }
 };
 
-const handleNotificationClick = (notification: { id: string | number; [key: string]: any }): void => {
+const handleNotificationClick = async (notification: { id: string; isRead?: boolean; [key: string]: any }): Promise<void> => {
   if (!notification || !notification.id) {
     return;
+  }
+
+  // 標記為已讀
+  if (!notification.isRead) {
+    await markAsRead(notification.id);
   }
 
   // 導航到通知詳細頁面
@@ -82,7 +91,11 @@ const handleNotificationClick = (notification: { id: string | number; [key: stri
         </li>
       </ul>
 
-      <div v-if="notifications.length === 0" class="empty-state">
+      <div v-if="isLoading" class="loading-state">
+        <p>載入中...</p>
+      </div>
+
+      <div v-else-if="notifications.length === 0" class="empty-state">
         <p>目前沒有通知</p>
       </div>
     </section>
@@ -249,6 +262,7 @@ const handleNotificationClick = (notification: { id: string | number; [key: stri
   color: rgba(148, 163, 184, 0.9);
 }
 
+.loading-state,
 .empty-state {
   display: flex;
   align-items: center;

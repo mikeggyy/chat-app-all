@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { PencilSquareIcon } from "@heroicons/vue/24/outline";
+import type { UserProfile } from "@/types";
 
-interface UserProfile {
-  displayName?: string;
-  [key: string]: any;
-}
-
+// ✅ 2025-11-30 更新：新增 Lite 等級支援
 interface Props {
   profile: UserProfile;
   avatarPreview?: string;
@@ -14,6 +11,7 @@ interface Props {
   displayedId?: string;
   tier?: string;
   tierName?: string;
+  isLite?: boolean;
   isVIP?: boolean;
   isVVIP?: boolean;
   isPaidMember?: boolean;
@@ -28,6 +26,7 @@ const props = withDefaults(defineProps<Props>(), {
   displayedId: "",
   tier: "free",
   tierName: "免費會員",
+  isLite: false,
   isVIP: false,
   isVVIP: false,
   isPaidMember: false,
@@ -43,15 +42,18 @@ const emit = defineEmits<{
   "avatar-error": [];
 }>();
 
+// ✅ 2025-11-30 更新：新增 Lite 徽章
 const vipBadgeClass = computed(() => {
   if (props.isVVIP) return "vvip";
   if (props.isVIP) return "vip";
+  if (props.isLite) return "lite";
   return "";
 });
 
 const vipBadgeText = computed(() => {
   if (props.isVVIP) return "VVIP";
   if (props.isVIP) return "VIP";
+  if (props.isLite) return "Lite";
   return "";
 });
 
@@ -247,6 +249,11 @@ const displayName = computed(() => {
   color: white;
   border: 2px solid rgba(15, 23, 42, 0.95);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+  // ✅ 2025-11-30 新增：Lite 徽章樣式
+  &.lite {
+    background: linear-gradient(135deg, #10b981, #14b8a6);
+  }
 
   &.vip {
     background: linear-gradient(135deg, #fbbf24, #f59e0b);

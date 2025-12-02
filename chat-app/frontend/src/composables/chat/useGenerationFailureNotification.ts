@@ -5,6 +5,7 @@
  */
 
 import { ref, type Ref } from 'vue';
+import { logger } from '../../utils/logger.js';
 
 export interface GenerationFailure {
   type: 'photo' | 'video';
@@ -49,7 +50,7 @@ export function useGenerationFailureNotification(): UseGenerationFailureNotifica
       try {
         localStorage.setItem('generation_failures', JSON.stringify(failures.value));
       } catch (error) {
-        console.warn('[GenerationFailure] 無法保存到 localStorage:', error);
+        logger.warn('[GenerationFailure] 無法保存到 localStorage:', error);
       }
     }
   };
@@ -65,7 +66,7 @@ export function useGenerationFailureNotification(): UseGenerationFailureNotifica
       try {
         localStorage.setItem('generation_failures', JSON.stringify(failures.value));
       } catch (error) {
-        console.warn('[GenerationFailure] 無法更新 localStorage:', error);
+        logger.warn('[GenerationFailure] 無法更新 localStorage:', error);
       }
     }
   };
@@ -80,7 +81,7 @@ export function useGenerationFailureNotification(): UseGenerationFailureNotifica
     try {
       localStorage.removeItem('generation_failures');
     } catch (error) {
-      console.warn('[GenerationFailure] 無法清除 localStorage:', error);
+      logger.warn('[GenerationFailure] 無法清除 localStorage:', error);
     }
   };
 
@@ -113,7 +114,7 @@ export function useGenerationFailureNotification(): UseGenerationFailureNotifica
       }
     }
   } catch (error) {
-    console.warn('[GenerationFailure] 無法從 localStorage 加載:', error);
+    logger.warn('[GenerationFailure] 無法從 localStorage 加載:', error);
   }
 
   return {

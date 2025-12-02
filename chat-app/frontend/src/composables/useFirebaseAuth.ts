@@ -14,6 +14,7 @@ import {
 import { getFirebaseApp } from "../utils/firebase.js";
 import { loadTestSession } from "../services/testAuthSession.js";
 import { clearTokenCache } from "../utils/api.js";
+import { logger } from "../utils/logger.js";
 
 // ==================== 類型定義 ====================
 
@@ -56,7 +57,7 @@ const signInWithGoogle = async (): Promise<SignInResult> => {
   const auth = getAuthInstance();
 
   // ✅ 2025-11-25：統一使用 popup 登入（簡化邏輯，所有環境都用 popup）
-  console.log('[useFirebaseAuth] 🔵 使用 popup 登入方式');
+  logger.log('[useFirebaseAuth] 🔵 使用 popup 登入方式');
   const result = await signInWithPopup(auth, provider);
   return {
     result,
@@ -66,30 +67,30 @@ const signInWithGoogle = async (): Promise<SignInResult> => {
 };
 
 const resolveRedirectResult = async (): Promise<SignInResult | null> => {
-  console.log('[useFirebaseAuth] 🔵 準備呼叫 getRedirectResult');
+  logger.log('[useFirebaseAuth] 🔵 準備呼叫 getRedirectResult');
   const auth = getAuthInstance();
 
   try {
     const result = await getRedirectResult(auth);
-    console.log('[useFirebaseAuth] 🟢 getRedirectResult 完成', {
+    logger.log('[useFirebaseAuth] 🟢 getRedirectResult 完成', {
       hasResult: !!result,
       hasUser: !!result?.user,
       uid: result?.user?.uid,
     });
 
     if (!result) {
-      console.log('[useFirebaseAuth] 🟡 getRedirectResult 返回 null（可能不是 redirect 登入）');
+      logger.log('[useFirebaseAuth] 🟡 getRedirectResult 返回 null（可能不是 redirect 登入）');
       return null;
     }
 
-    console.log('[useFirebaseAuth] 🟢 成功獲取 redirect 登入結果！');
+    logger.log('[useFirebaseAuth] 🟢 成功獲取 redirect 登入結果！');
     return {
       result,
       method: "redirect",
       redirected: true,
     };
   } catch (error) {
-    console.error('[useFirebaseAuth] ❌ getRedirectResult 錯誤:', error);
+    logger.error('[useFirebaseAuth] ❌ getRedirectResult 錯誤:', error);
     throw error;
   }
 };

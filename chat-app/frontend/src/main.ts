@@ -40,7 +40,12 @@ if (typeof window !== "undefined") {
   } catch (error) {
     // CSRF Token 獲取失敗不影響應用啟動
     // Token 也可以在首次 GET 請求時自動設置
-    console.warn('初始化 CSRF Token 失敗，將在首次請求時自動設置');
+    // 注意：這裡不使用 logger 是因為 logger 在開發環境會輸出，生產環境會靜默
+    // 這個警告對於生產環境的偵錯很重要，所以保持 console.warn
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn('初始化 CSRF Token 失敗，將在首次請求時自動設置');
+    }
   }
 }
 

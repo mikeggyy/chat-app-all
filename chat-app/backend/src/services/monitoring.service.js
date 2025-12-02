@@ -313,9 +313,10 @@ export const getCacheStatistics = async () => {
 
   try {
     // 查詢會員配置緩存失敗統計
+    // ✅ 2025-11-30 更新：新增 Lite 等級
     const membershipStatsSnapshot = await db
       .collection('cache_failure_stats')
-      .where('tier', 'in', ['free', 'vip', 'vvip'])
+      .where('tier', 'in', ['free', 'lite', 'vip', 'vvip'])
       .get();
 
     const membershipStats = {};
@@ -361,9 +362,10 @@ export const resetCacheFailureStats = async (cacheType = 'all') => {
     let resetCount = 0;
 
     if (cacheType === 'membership' || cacheType === 'all') {
+      // ✅ 2025-11-30 更新：新增 Lite 等級
       const membershipStatsSnapshot = await db
         .collection('cache_failure_stats')
-        .where('tier', 'in', ['free', 'vip', 'vvip'])
+        .where('tier', 'in', ['free', 'lite', 'vip', 'vvip'])
         .get();
 
       const batch = db.batch();

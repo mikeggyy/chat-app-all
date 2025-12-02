@@ -30,8 +30,13 @@ if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
 
 app.use(cors({
   origin: (origin, callback) => {
-    // 允許沒有 origin 的請求（例如：Postman、curl）
+    // ✅ 2025-12-01 修復：生產環境中拒絕沒有 origin 的請求
     if (!origin) {
+      if (process.env.NODE_ENV === 'production') {
+        // 生產環境：拒絕沒有 origin 的請求（更安全）
+        return callback(new Error('CORS 錯誤：生產環境不允許無 origin 的請求'));
+      }
+      // 開發環境：允許 Postman、curl 等工具
       return callback(null, true);
     }
 
@@ -99,6 +104,9 @@ import productsRoutes from "./routes/products.routes.js";
 import categoriesRoutes from "./routes/categories.routes.js";
 import aiSettingsRoutes from "./routes/ai-settings.routes.js";
 import voicesRoutes from "./routes/voices.routes.js";
+import rewardsRoutes from "./routes/rewards.routes.js";
+import flashSalesRoutes from "./routes/flashSales.routes.js";
+import notificationsRoutes from "./routes/notifications.routes.js";
 
 // 註冊路由（所有路由都需要管理員權限）
 app.use("/api/dashboard", authMiddleware, adminMiddleware, dashboardRoutes);
@@ -121,6 +129,9 @@ app.use("/api/products", authMiddleware, adminMiddleware, productsRoutes);
 app.use("/api/categories", authMiddleware, adminMiddleware, categoriesRoutes);
 app.use("/api/ai-settings", authMiddleware, adminMiddleware, aiSettingsRoutes);
 app.use("/api/voices", authMiddleware, adminMiddleware, voicesRoutes);
+app.use("/api/rewards", authMiddleware, adminMiddleware, rewardsRoutes);
+app.use("/api/flash-sales", authMiddleware, adminMiddleware, flashSalesRoutes);
+app.use("/api/notifications", authMiddleware, adminMiddleware, notificationsRoutes);
 
 // 404 處理
 app.use((req, res) => {

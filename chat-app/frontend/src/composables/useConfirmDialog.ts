@@ -5,6 +5,7 @@
  */
 
 import { ref, type Ref } from 'vue';
+import { logger } from '../utils/logger.js';
 
 // ==================== 類型定義 ====================
 
@@ -68,7 +69,7 @@ export function useConfirmDialog(): UseConfirmDialogReturn {
     return new Promise((resolve, reject) => {
       // ✅ 修復：如果有正在進行的對話框，先關閉它（返回 false）
       if (dialogState.value.isOpen && dialogState.value.resolve) {
-        console.warn('[useConfirmDialog] 覆蓋正在進行的確認對話框');
+        logger.warn('[useConfirmDialog] 覆蓋正在進行的確認對話框');
         dialogState.value.resolve(false);
       }
 

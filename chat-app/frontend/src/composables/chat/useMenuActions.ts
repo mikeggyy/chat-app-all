@@ -4,8 +4,9 @@
  * 從 ChatView.vue 提取為獨立 composable
  */
 
-import type { Ref, ComputedRef } from 'vue';
-import type { UseModalManagerReturn } from './useModalManager.js';
+import { isRef, type Ref, type ComputedRef } from 'vue';
+import { logger } from '../../utils/logger.js';
+import type { PotionType } from './useModalManager.js';
 
 // ==================== 類型定義 ====================
 
@@ -21,13 +22,35 @@ export interface UnlockTicketsState {
 }
 
 /**
+ * MenuActions 所需的 Modal 方法子集
+ * 只包含 handleMenuAction 實際使用的方法
+ */
+export interface MenuModals {
+  showResetConfirm: () => void;
+  showCharacterInfo: () => void;
+  showUnlockLimit: () => void;
+  showUnlockConfirm: () => void;
+  showPotionLimit: (type: PotionType) => void;
+  showPotionConfirm: (type: PotionType) => void;
+  showCharacterRanking: () => void;
+}
+
+/**
+ * 用戶藥水數據（支持 Ref 包裝或直接對象）
+ */
+export interface UserPotionsData {
+  memoryBoost: number;
+  brainBoost: number;
+}
+
+/**
  * useMenuActions 依賴項
  */
 export interface UseMenuActionsDeps {
-  /** Modal 管理器（來自 useModalManager） */
-  modals: UseModalManagerReturn;
-  /** 用戶藥水數據（來自 usePotionManagement） */
-  userPotions: Ref<{ memoryBoost: number; brainBoost: number }>;
+  /** Modal 管理器（只需部分方法） */
+  modals: MenuModals;
+  /** 用戶藥水數據（支持 Ref 或直接對象） */
+  userPotions: Ref<UserPotionsData> | UserPotionsData;
   /** 解鎖卡數據（來自 useUnlockTickets） */
   unlockTickets: {
     hasCharacterTickets: ComputedRef<boolean>;
@@ -60,6 +83,13 @@ export interface UseMenuActionsReturn {
 }
 
 // ==================== Composable 主函數 ====================
+
+/**
+ * 獲取藥水數據（處理 Ref 或直接對象）
+ */
+const getPotionsData = (userPotions: Ref<UserPotionsData> | UserPotionsData): UserPotionsData => {
+  return isRef(userPotions) ? userPotions.value : userPotions;
+};
 
 /**
  * Menu Actions 處理邏輯
@@ -97,9 +127,10 @@ export const useMenuActions = (deps: UseMenuActionsDeps): UseMenuActionsReturn =
         break;
 
       case "memory":
-      case "memory-boost":
+      case "memory-boost": {
         // 記憶藥水
-        if (userPotions.value.memoryBoost <= 0) {
+        const potions = getPotionsData(userPotions);
+        if (potions.memoryBoost <= 0) {
           // 顯示商城引導彈窗（無藥水）
           modals.showPotionLimit("memoryBoost");
           return;
@@ -107,11 +138,13 @@ export const useMenuActions = (deps: UseMenuActionsDeps): UseMenuActionsReturn =
         // 顯示確認彈窗（有藥水）
         modals.showPotionConfirm("memoryBoost");
         break;
+      }
 
       case "brain":
-      case "brain-boost":
+      case "brain-boost": {
         // 腦力藥水
-        if (userPotions.value.brainBoost <= 0) {
+        const potions = getPotionsData(userPotions);
+        if (potions.brainBoost <= 0) {
           // 顯示商城引導彈窗（無藥水）
           modals.showPotionLimit("brainBoost");
           return;
@@ -119,6 +152,7 @@ export const useMenuActions = (deps: UseMenuActionsDeps): UseMenuActionsReturn =
         // 顯示確認彈窗（有藥水）
         modals.showPotionConfirm("brainBoost");
         break;
+      }
 
       case "share":
         // 分享對話
@@ -132,7 +166,7 @@ export const useMenuActions = (deps: UseMenuActionsDeps): UseMenuActionsReturn =
 
       default:
         // 未知操作
-        console.warn(`[useMenuActions] Unknown action: ${action}`);
+        logger.warn(`[useMenuActions] Unknown action: ${action}`);
     }
   };
 

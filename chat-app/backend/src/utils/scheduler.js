@@ -13,6 +13,10 @@
  */
 
 import logger from './logger.js';
+import {
+  sendSuccess,
+  sendError,
+} from "../../../../shared/utils/errorFormatter.js";
 
 // ============================================
 // 定時任務處理函數
@@ -210,14 +214,14 @@ export const createSchedulerRoutes = (router) => {
 
       if (!expectedToken || schedulerToken !== expectedToken) {
         logger.warn('[定時任務] ⚠️ 未授權的調度請求');
-        return res.status(401).json({ error: 'Unauthorized' });
+        return sendError(res, "UNAUTHORIZED", "未授權的調度請求");
       }
 
       const result = await runExpiredMembershipCheck();
-      res.json(result);
+      sendSuccess(res, result);
     } catch (error) {
       logger.error('[定時任務] HTTP 觸發失敗:', error);
-      res.status(500).json({ error: error.message });
+      sendError(res, "INTERNAL_SERVER_ERROR", error.message);
     }
   });
 
@@ -232,14 +236,14 @@ export const createSchedulerRoutes = (router) => {
 
       if (!expectedToken || schedulerToken !== expectedToken) {
         logger.warn('[定時任務] ⚠️ 未授權的調度請求');
-        return res.status(401).json({ error: 'Unauthorized' });
+        return sendError(res, "UNAUTHORIZED", "未授權的調度請求");
       }
 
       const result = await runIdempotencyCleanup();
-      res.json(result);
+      sendSuccess(res, result);
     } catch (error) {
       logger.error('[定時任務] HTTP 觸發失敗:', error);
-      res.status(500).json({ error: error.message });
+      sendError(res, "INTERNAL_SERVER_ERROR", error.message);
     }
   });
 
@@ -249,7 +253,7 @@ export const createSchedulerRoutes = (router) => {
    */
   router.get('/api/scheduler/status', (req, res) => {
     const status = getSchedulerStatus();
-    res.json(status);
+    sendSuccess(res, status);
   });
 
   logger.info('[定時任務] ✅ 已註冊調度器 HTTP 端點');

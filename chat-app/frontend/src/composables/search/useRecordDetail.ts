@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, computed, type Ref, type ComputedRef } from "vue";
 import { useRoute, useRouter, type Router, type RouteLocationNormalizedLoaded } from "vue-router";
 import { HeartIcon, ChatBubbleLeftRightIcon, TrophyIcon } from "@heroicons/vue/24/solid";
@@ -19,7 +18,7 @@ type HeroIcon = FunctionalComponent<SVGAttributes>;
 /**
  * Panel type identifier
  */
-type PanelType = "reconnect" | "ranking" | "contribution";
+export type PanelType = "reconnect" | "ranking" | "contribution";
 
 /**
  * Icon key for badge display
@@ -69,9 +68,10 @@ interface RecordEntry {
 
 /**
  * Character data structure
+ * id 為可選以兼容 ConversationItem 的 character 屬性
  */
 interface Character {
-  id: string;
+  id?: string;
   display_name?: string;
   name?: string;
   background?: string;
@@ -115,7 +115,7 @@ interface ContributionCharacter {
 /**
  * Conversation data structure
  */
-interface Conversation {
+export interface Conversation {
   conversationId?: string;
   characterId?: string;
   id?: string;
@@ -260,9 +260,10 @@ export function useRecordDetail(
     // If ranking panel, use popularCharacters
     if (panel.currentType.value === "ranking") {
       return popularCharacters.value.map((item: PopularCharacter, index: number): RecordEntry => {
+        const itemId = item.id || '';
         return {
-          id: `popular-record-${item.id}-${index}`,
-          matchId: item.id,
+          id: `popular-record-${itemId}-${index}`,
+          matchId: itemId,
           name: item.display_name || item.name || "未知角色",
           description: item.background || "",
           image: item.portraitUrl || item.avatar || "/ai-role/match-role-01.webp",
@@ -324,7 +325,7 @@ export function useRecordDetail(
       const isConversation = 'conversationId' in item || 'characterId' in item;
       const matchId: string = isConversation
         ? (item as Conversation).conversationId || (item as Conversation).characterId || item.id || ""
-        : item.id;
+        : item.id || "";
       const character: Character | undefined = isConversation
         ? (item as Conversation).character
         : (item as MatchFallback);
@@ -405,7 +406,7 @@ export function useRecordDetail(
 
   // Open panel - wraps panel.open and adds business logic
   const openRecentRecords = async (type: PanelType = "reconnect"): Promise<void> => {
-    await panel.open(type, async (panelType: PanelType) => {
+    await panel.open(type, async (panelType: string) => {
       // If ranking panel, reset and load ranking data
       if (panelType === "ranking") {
         await fetchPopularCharacters({ reset: true });

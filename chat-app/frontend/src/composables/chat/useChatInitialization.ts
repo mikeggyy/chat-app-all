@@ -38,7 +38,7 @@ export interface UseChatInitializationDeps {
   loadActivePotions: () => Promise<void>;
   loadActiveUnlocks: () => Promise<void>;
   loadHistory: (userId: string, matchId: string) => Promise<void>;
-  addConversationHistory: (matchId: string) => Promise<void>;
+  addConversationHistory: (matchId: string) => Promise<unknown>;
   loadVoiceStats: (userId: string, options?: { skipGlobalLoading?: boolean }) => Promise<void>;
   fetchPhotoStats: () => Promise<void>;
   loadBalance: (userId: string, options?: { skipGlobalLoading?: boolean }) => Promise<void>;

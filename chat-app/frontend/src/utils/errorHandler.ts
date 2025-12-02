@@ -4,6 +4,7 @@
  */
 
 import { useToast } from '../composables/useToast.js';
+import { logger } from './logger.js';
 
 /**
  * 錯誤類型
@@ -237,7 +238,7 @@ export function handleError(
 
   // 記錄錯誤到控制台（開發環境）
   if (import.meta.env.DEV) {
-    console.error('[Error Handler]', {
+    logger.error('[Error Handler]', {
       type: parsedError.type,
       code: parsedError.code,
       message: finalMessage,
@@ -257,7 +258,7 @@ export function handleError(
     try {
       onError(parsedError);
     } catch (callbackError) {
-      console.error('[Error Handler] Error in callback:', callbackError);
+      logger.error('[Error Handler] Error in callback:', callbackError);
     }
   }
 

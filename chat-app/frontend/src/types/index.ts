@@ -50,6 +50,16 @@ export interface User {
   isGuest?: boolean;
 }
 
+/**
+ * UserProfile - 統一的用戶資料類型
+ * 用於組件和 composables 中的用戶資料傳遞
+ * 所有欄位為可選，支持動態屬性以保持向後兼容
+ */
+export type UserProfile = Partial<User> & {
+  id?: string;
+  [key: string]: any;
+};
+
 // ==================== 消息相關 ====================
 
 export type MessageRole = 'user' | 'partner' | 'ai';
@@ -88,6 +98,8 @@ export interface Partner {
   hobbies?: string[];
   occupation?: string;
   first_message?: string;
+  // API 可能返回的替代屬性名稱
+  name?: string; // 等同於 display_name
 }
 
 // ==================== Firebase Auth 相關 ====================
@@ -136,6 +148,10 @@ export interface LimitCheckResult {
   total: number;
   used?: number;
   resetTime?: Date | string;
+  // 廣告相關屬性（API 可能返回）
+  dailyAdLimit?: number;
+  adsWatchedToday?: number;
+  isUnlocked?: boolean;
 }
 
 export interface PhotoLimitInfo {
@@ -147,11 +163,15 @@ export interface PhotoLimitInfo {
   cards: number;
   tier: string;
   resetPeriod?: string;
+  // API 可能返回的替代屬性名稱
+  photosLimit?: number; // 等同於 total
+  photoCards?: number;  // 等同於 cards
 }
 
 // ==================== 會員相關 ====================
 
-export type MembershipTier = 'free' | 'vip' | 'vvip';
+// ✅ 2025-11-30 更新：新增 Lite 等級
+export type MembershipTier = 'free' | 'lite' | 'vip' | 'vvip';
 
 export interface MembershipFeatures {
   conversationLimit: number;

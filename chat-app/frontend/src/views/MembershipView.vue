@@ -12,6 +12,7 @@ import MembershipTabs from '../components/membership/MembershipTabs.vue';
 import PlanCard from '../components/membership/PlanCard.vue';
 import FeaturesList from '../components/membership/FeaturesList.vue';
 import ComparisonTable from '../components/membership/ComparisonTable.vue';
+import UpgradeConfirmModal from '../components/membership/UpgradeConfirmModal.vue';
 
 /**
  * MembershipView - 會員中心頁面（重構後）
@@ -34,6 +35,10 @@ const { success, error: showError, warning } = useToast();
 const { requireLogin } = useGuestGuard();
 
 const isUpgrading: Ref<boolean> = ref(false);
+
+// ✅ 2025-11-30 新增：升級確認彈窗狀態
+const showUpgradeModal = ref(false);
+const selectedTier = ref<Tier | null>(null);
 
 // 會員配置從 config/membership.js 導入
 const activeTierId: Ref<string> = ref(membershipTiers[0].id);
@@ -67,9 +72,10 @@ const handleBack = (): void => {
 };
 
 /**
- * 升級會員
+ * 點擊升級按鈕 - 開啟確認彈窗
+ * ✅ 2025-11-30 更新：改為顯示確認彈窗，展示補差價明細
  */
-const handleUpgrade = async (tier: Tier): Promise<void> => {
+const handleUpgrade = (tier: Tier): void => {
   if (!tier || isUpgrading.value) {
     return;
   }
@@ -90,16 +96,35 @@ const handleUpgrade = async (tier: Tier): Promise<void> => {
     return;
   }
 
-  if (currentTier.value === 'vvip' && tier.id === 'vip') {
-    warning('無法從 VVIP 降級至 VIP');
+  // ✅ 2025-11-30 更新：檢查降級
+  const tierOrder: Record<string, number> = { free: 0, lite: 1, vip: 2, vvip: 3 };
+  if (tierOrder[tier.id] < tierOrder[currentTier.value]) {
+    warning('無法降級會員等級');
     return;
   }
 
+  // 開啟確認彈窗
+  selectedTier.value = tier;
+  showUpgradeModal.value = true;
+};
+
+/**
+ * 確認升級 - 執行升級操作
+ * ✅ 2025-11-30 新增：從彈窗確認後執行
+ */
+const handleConfirmUpgrade = async (tier: Tier): Promise<void> => {
+  if (!tier || !user.value?.id) {
+    return;
+  }
+
+  // 關閉彈窗
+  showUpgradeModal.value = false;
   isUpgrading.value = true;
 
   try {
     // TODO: 整合真實的支付流程
-    await upgradeMembership(user.value.id, tier.id as 'free' | 'vip' | 'vvip', {
+    // ✅ 2025-11-30 更新：新增 Lite 等級支援
+    await upgradeMembership(user.value.id, tier.id as 'free' | 'lite' | 'vip' | 'vvip', {
       paymentMethod: 'credit_card',
     });
 
@@ -115,7 +140,16 @@ const handleUpgrade = async (tier: Tier): Promise<void> => {
     showError(message);
   } finally {
     isUpgrading.value = false;
+    selectedTier.value = null;
   }
+};
+
+/**
+ * 關閉升級彈窗
+ */
+const handleCloseUpgradeModal = (): void => {
+  showUpgradeModal.value = false;
+  selectedTier.value = null;
 };
 
 // 初始化時載入會員資料
@@ -125,7 +159,8 @@ onMounted(async () => {
       await loadMembership(user.value.id, { skipGlobalLoading: true });
 
       // 如果用戶已經是付費會員，預設選中對應的等級
-      if (currentTier.value === 'vip' || currentTier.value === 'vvip') {
+      // ✅ 2025-11-30 更新：新增 Lite 等級支援
+      if (currentTier.value === 'lite' || currentTier.value === 'vip' || currentTier.value === 'vvip') {
         activeTierId.value = currentTier.value;
       }
     } catch (error) {
@@ -168,6 +203,15 @@ onMounted(async () => {
       <!-- Comparison Table -->
       <ComparisonTable :features="comparisonFeatures" />
     </section>
+
+    <!-- ✅ 2025-11-30 新增：升級確認彈窗（顯示補差價明細） -->
+    <UpgradeConfirmModal
+      :is-open="showUpgradeModal"
+      :tier="selectedTier"
+      :user-id="user?.id || ''"
+      @close="handleCloseUpgradeModal"
+      @confirm="handleConfirmUpgrade"
+    />
   </div>
 </template>
 

@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue';
+import { ref, onBeforeUnmount, type Ref } from 'vue';
 import {
   fetchCharacterCreationFlow,
   updateCharacterCreationFlow,
@@ -7,6 +7,7 @@ import {
   clearStoredCharacterCreationFlowId,
   createCharacterCreationFlow,
 } from '../../services/characterCreation.service.js';
+import { logger } from '../../utils/logger.js';
 
 const SUMMARY_STORAGE_KEY = 'character-create-summary';
 const GENDER_STORAGE_KEY = 'characterCreation.gender';
@@ -372,7 +373,10 @@ export function useFlowSync(): UseFlowSyncReturn {
       if (metadata) {
         payload.metadata = metadata;
       }
-      syncSummaryToBackend(payload).catch((): void => {});
+      // ✅ 修復：統一使用 logger 記錄錯誤
+      syncSummaryToBackend(payload).catch((error): void => {
+        logger.warn('[useFlowSync] scheduleVoiceSync 同步失敗:', error);
+      });
     }, 400);
   };
 
@@ -446,7 +450,10 @@ export function useFlowSync(): UseFlowSyncReturn {
         ['male', 'female', 'non-binary'].forEach((gender: string): void => {
           window.sessionStorage.removeItem(`ai-magician-usage-${gender}`);
         });
-      } catch {}
+      } catch (error) {
+        // ✅ 修復：統一使用 logger 記錄錯誤（可能是隱私模式）
+        logger.warn('[useFlowSync] clearStoredData 失敗:', error);
+      }
     }
   };
 
@@ -459,6 +466,11 @@ export function useFlowSync(): UseFlowSyncReturn {
       voiceSyncTimer = null;
     }
   };
+
+  // ✅ 修復：自動在組件卸載時清理定時器
+  onBeforeUnmount(() => {
+    cleanupTimers();
+  });
 
   return {
     // 狀態

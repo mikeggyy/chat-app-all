@@ -46,10 +46,12 @@ export function useRankingPagination(
   /**
    * 是否正在載入初始數據
    */
+  // ✅ 修復：邏輯錯誤 - `!hasMore.value === false` 會被解析為 `(!hasMore.value) === false`
+  // 正確邏輯：初始載入時 hasMore 應該為 false（還沒有加載過數據）
   const isInitialLoading = computed<boolean>(
     () =>
       loading.value &&
-      !hasMore.value === false &&
+      hasMore.value === false &&
       sentinelRef.value === null
   );
 

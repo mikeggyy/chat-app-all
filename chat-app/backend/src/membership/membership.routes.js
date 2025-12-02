@@ -15,6 +15,7 @@ import {
   checkFeatureAccess,
   getUserFeatures,
   clearMembershipConfigCache, // ✅ Quick Win #4: 添加手動清除緩存功能
+  getUpgradePricePreview, // ✅ 2025-11-30 新增：補差價升級價格預覽
 } from "./membership.service.js";
 import { getUserById } from "../user/user.service.js";
 import {
@@ -49,9 +50,48 @@ router.get("/api/membership/:userId", requireFirebaseAuth, requireOwnership("use
 });
 
 /**
+ * ✅ 2025-11-30 新增：獲取升級價格預覽（補差價計算）
+ * GET /api/membership/:userId/upgrade-price/:targetTier
+ *
+ * 方案 A 補差價模式：
+ * - 計算當前訂閱剩餘價值
+ * - 返回升級需支付的差額
+ * - 升級後到期日從今天起算 30 天
+ */
+router.get("/api/membership/:userId/upgrade-price/:targetTier", requireFirebaseAuth, requireOwnership("userId"), relaxedRateLimiter, async (req, res, next) => {
+  try {
+    const { userId, targetTier } = req.params;
+
+    // 驗證目標等級
+    if (!["lite", "vip", "vvip"].includes(targetTier)) {
+      return sendError(res, "VALIDATION_ERROR", "無效的目標會員等級", {
+        field: "targetTier",
+        validValues: ["lite", "vip", "vvip"],
+        received: targetTier,
+      });
+    }
+
+    const priceInfo = await getUpgradePricePreview(userId, targetTier);
+
+    sendSuccess(res, {
+      ...priceInfo,
+      message: priceInfo.description,
+    });
+  } catch (error) {
+    // 處理特定錯誤（如：只能升級到更高等級）
+    if (error.message.includes("只能升級到更高")) {
+      return sendError(res, "VALIDATION_ERROR", error.message, {
+        code: "INVALID_UPGRADE_PATH",
+      });
+    }
+    next(error);
+  }
+});
+
+/**
  * 升級會員
  * POST /api/membership/:userId/upgrade
- * Body: { tier: "vip" | "vvip", durationMonths?: number, autoRenew?: boolean, idempotencyKey: string }
+ * Body: { tier: "lite" | "vip" | "vvip", durationMonths?: number, autoRenew?: boolean, idempotencyKey: string }
  * 🔒 冪等性保護：防止重複升級和發放獎勵
  * ✅ 輸入驗證：使用統一的驗證中間件
  */
@@ -60,11 +100,12 @@ router.post("/api/membership/:userId/upgrade", requireFirebaseAuth, requireOwner
     const { userId } = req.params;
     const { tier, durationMonths, autoRenew, idempotencyKey } = req.body;
 
+    // ✅ 2025-11-30 更新：新增 lite 等級
     // 驗證會員等級
-    if (!tier || !["vip", "vvip"].includes(tier)) {
-      return sendError(res, "VALIDATION_ERROR", "請提供有效的會員等級（vip 或 vvip）", {
+    if (!tier || !["lite", "vip", "vvip"].includes(tier)) {
+      return sendError(res, "VALIDATION_ERROR", "請提供有效的會員等級（lite, vip 或 vvip）", {
         field: "tier",
-        validValues: ["vip", "vvip"],
+        validValues: ["lite", "vip", "vvip"],
         received: tier,
       });
     }
@@ -249,7 +290,7 @@ router.get("/api/membership/:userId/features", requireFirebaseAuth, requireOwner
 /**
  * ✅ Quick Win #4: 手動清除會員配置緩存
  * POST /api/membership/admin/clear-cache
- * Body: { tier?: "free" | "vip" | "vvip" } - 不提供則清除所有緩存
+ * Body: { tier?: "free" | "lite" | "vip" | "vvip" } - 不提供則清除所有緩存
  * 🔒 需要開發模式或管理員權限
  */
 router.post("/api/membership/admin/clear-cache", requireFirebaseAuth, standardRateLimiter, async (req, res, next) => {

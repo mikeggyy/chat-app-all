@@ -6,6 +6,8 @@
  */
 
 import type { Ref, ComputedRef } from 'vue';
+import { unref } from 'vue';
+import { logger } from '../../utils/logger.js';
 import type { LimitCheckResult } from '../../types';
 
 // ==================== 類型定義 ====================
@@ -120,19 +122,20 @@ export const useSendMessage = (params: UseSendMessageParams): UseSendMessageRetu
 
     // userId 或 matchId 缺失是異常情況，記錄警告
     if (!userId) {
-      console.warn('[useSendMessage] 無法發送消息：用戶未登入');
+      logger.warn('[useSendMessage] 無法發送消息：用戶未登入');
       showError('請先登入');
       return;
     }
 
     if (!matchId) {
-      console.warn('[useSendMessage] 無法發送消息：未選擇對話對象');
+      logger.warn('[useSendMessage] 無法發送消息：未選擇對話對象');
       return;
     }
 
     // Guest message limit check
-    const isGuestValue = (isGuest as any).value ?? isGuest;
-    const canGuestSendValue = (canGuestSendMessage as any).value ?? canGuestSendMessage;
+    // 使用 unref() 安全地處理 Ref 或普通值
+    const isGuestValue = unref(isGuest);
+    const canGuestSendValue = unref(canGuestSendMessage);
 
     if (isGuestValue && !canGuestSendValue) {
       requireLogin({ feature: "發送訊息" });
@@ -145,9 +148,10 @@ export const useSendMessage = (params: UseSendMessageParams): UseSendMessageRetu
       showConversationLimit({
         characterName: getPartnerDisplayName(),
         remainingMessages: limitCheck.remaining || 0,
-        dailyAdLimit: (limitCheck as any).dailyAdLimit || 10,
-        adsWatchedToday: (limitCheck as any).adsWatchedToday || 0,
-        isUnlocked: (limitCheck as any).isUnlocked || false,
+        // LimitCheckResult 介面已包含這些可選屬性
+        dailyAdLimit: limitCheck.dailyAdLimit ?? 10,
+        adsWatchedToday: limitCheck.adsWatchedToday ?? 0,
+        isUnlocked: limitCheck.isUnlocked ?? false,
         characterUnlockCards: getCharacterTickets() || 0,
       });
       return;

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import logger from "../../utils/logger.js";
 import { requireFirebaseAuth } from "../../auth/firebaseAuth.middleware.js";
+import { requireAdmin } from "../../middleware/adminAuth.middleware.js";
 import { validateRequest } from "../../middleware/validation.middleware.js";
 import { characterCreationSchemas } from "../characterCreation.schemas.js";
 import {
@@ -127,17 +128,14 @@ generationLogsRouter.get(
   }
 );
 
-// GET /generation-logs - 查詢所有生成記錄（管理用）
-// TODO: 後續需要添加管理員權限驗證
+// GET /generation-logs - 查詢所有生成記錄（管理員專用）
 generationLogsRouter.get(
   "/generation-logs",
   requireFirebaseAuth,
+  requireAdmin, // 🔒 需要管理員權限
   validateRequest(characterCreationSchemas.allGenerationLogs),
   (req, res, next) => {
     try {
-      // 🔒 基礎認證：目前只要求登入，未來可添加管理員權限檢查
-      const userId = req.firebaseUser.uid;
-
       const limit = Number(req.query.limit) || 50;
       const offset = Number(req.query.offset) || 0;
       const status = trimString(req.query.status) || null;

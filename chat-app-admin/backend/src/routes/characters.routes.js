@@ -6,6 +6,31 @@ import { deleteCharacter } from "../services/character/character.service.js";
 const router = express.Router();
 
 /**
+ * ⚠️ 重要：靜態路由必須定義在動態路由之前，否則會被 /:characterId 攔截
+ */
+
+/**
+ * GET /api/characters/stats/overview
+ * 獲取系統統計概覽（低成本操作）
+ * 基於角色文檔中緩存的統計數據
+ *
+ * 🔒 權限：所有管理員
+ * ✅ 2025-12-01 修復：移到動態路由之前，避免被 /:characterId 攔截
+ */
+router.get("/stats/overview", requireMinRole("moderator"), async (req, res) => {
+  try {
+    // 導入優化的統計服務
+    const { getSystemStatsOverview } = await import("../services/character/characterStats.service.js");
+
+    const stats = await getSystemStatsOverview();
+
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: "獲取統計概覽失敗", message: error.message });
+  }
+});
+
+/**
  * GET /api/characters
  * 獲取角色列表
  * 🔒 權限：所有管理員
@@ -134,26 +159,6 @@ router.post("/:characterId/sync-chat-users", requireMinRole("admin"), async (req
     });
   } catch (error) {
     res.status(500).json({ error: "同步失敗", message: error.message });
-  }
-});
-
-/**
- * GET /api/characters/stats/overview
- * 獲取系統統計概覽（低成本操作）
- * 基於角色文檔中緩存的統計數據
- *
- * 🔒 權限：所有管理員
- */
-router.get("/stats/overview", requireMinRole("moderator"), async (req, res) => {
-  try {
-    // 導入優化的統計服務
-    const { getSystemStatsOverview } = await import("../services/character/characterStats.service.js");
-
-    const stats = await getSystemStatsOverview();
-
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ error: "獲取統計概覽失敗", message: error.message });
   }
 });
 

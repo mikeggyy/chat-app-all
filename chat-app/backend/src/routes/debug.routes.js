@@ -5,6 +5,10 @@
 
 import { Router } from 'express';
 import { getFirebaseAdminAuth } from '../firebase/index.js';
+import {
+  sendSuccess,
+  sendError,
+} from "../../../../shared/utils/errorFormatter.js";
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -22,10 +26,7 @@ if (process.env.NODE_ENV !== 'production') {
       const { token } = req.body;
 
       if (!token) {
-        return res.status(400).json({
-          success: false,
-          error: '缺少 token',
-        });
+        return sendError(res, "VALIDATION_ERROR", "缺少 token", { field: "token" });
       }
 
       logger.info('[Debug] 開始驗證 token...');
@@ -47,8 +48,7 @@ if (process.env.NODE_ENV !== 'production') {
 
       logger.info('[Debug] ✅ Token 驗證成功');
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: 'Token 驗證成功',
         user: {
           uid: decoded.uid,
@@ -61,16 +61,9 @@ if (process.env.NODE_ENV !== 'production') {
     } catch (error) {
       logger.error('[Debug] ❌ Token 驗證失敗:', error);
 
-      return res.status(401).json({
-        success: false,
-        error: 'Token 驗證失敗',
+      return sendError(res, "AUTH_TOKEN_INVALID", "Token 驗證失敗", {
         code: error.code || 'unknown',
-        message: error.message,
-        details: {
-          errorCode: error.code,
-          errorMessage: error.message,
-          stack: error.stack?.split('\n').slice(0, 3).join('\n'),
-        },
+        errorMessage: error.message,
       });
     }
   });
@@ -83,19 +76,14 @@ if (process.env.NODE_ENV !== 'production') {
     try {
       const auth = getFirebaseAdminAuth();
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: 'Firebase Admin SDK 已初始化',
         projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
         nodeEnv: process.env.NODE_ENV || 'development',
         useEmulator: process.env.USE_FIREBASE_EMULATOR === 'true',
       });
     } catch (error) {
-      return res.status(500).json({
-        success: false,
-        error: 'Firebase Admin SDK 初始化失敗',
-        message: error.message,
-      });
+      return sendError(res, "INTERNAL_SERVER_ERROR", "Firebase Admin SDK 初始化失敗");
     }
   });
 
@@ -107,10 +95,7 @@ if (process.env.NODE_ENV !== 'production') {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-      return res.status(401).json({
-        success: false,
-        error: '缺少 Authorization header',
-      });
+      return sendError(res, "AUTH_MISSING_TOKEN", "缺少 Authorization header");
     }
 
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
@@ -119,8 +104,7 @@ if (process.env.NODE_ENV !== 'production') {
       const auth = getFirebaseAdminAuth();
       const decoded = await auth.verifyIdToken(token);
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: '認證成功',
         user: {
           uid: decoded.uid,
@@ -128,11 +112,8 @@ if (process.env.NODE_ENV !== 'production') {
         },
       });
     } catch (error) {
-      return res.status(401).json({
-        success: false,
-        error: '認證失敗',
+      return sendError(res, "AUTH_TOKEN_INVALID", "認證失敗", {
         code: error.code,
-        message: error.message,
       });
     }
   });

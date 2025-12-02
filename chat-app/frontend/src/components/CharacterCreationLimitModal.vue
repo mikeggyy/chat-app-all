@@ -13,8 +13,8 @@ import {
 interface Props {
   isOpen: boolean;
   usedCreations?: number;
-  totalLimit?: number;
-  standardTotal?: number | null;
+  totalLimit?: number | string;
+  standardTotal?: number | string | null;
   isTestAccount?: boolean;
   membershipTier?: string;
   createCards?: number;
@@ -39,7 +39,7 @@ interface Emits {
 const emit = defineEmits<Emits>();
 
 // 用於顯示的限制數量（測試帳號使用標準限制）
-const displayTotal = computed<number>(() => {
+const displayTotal = computed<number | string>(() => {
   return props.standardTotal !== null ? props.standardTotal : props.totalLimit;
 });
 

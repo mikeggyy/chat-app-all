@@ -11,6 +11,10 @@ import { ensureAuthState } from "../services/authBootstrap.js";
 import { isGuestUser } from "../../../../shared/config/testAccounts.js";
 import { apiCache, cacheKeys, cacheTTL } from "../services/apiCache.service.js";
 import { apiJson } from "../utils/api.js";
+import { logger } from "../utils/logger.js";
+
+// 類型安全的 requestIdleCallback 檢測
+const hasRequestIdleCallback = typeof window !== 'undefined' && 'requestIdleCallback' in window;
 
 // 使用動態導入實現路由懶加載
 const LoginView = () => import("../views/LoginView.vue");
@@ -49,8 +53,8 @@ const preloadCriticalRoutes = (): void => {
     MatchViewImport(); // 預加載 MatchView chunk
   };
 
-  if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(preload, { timeout: 2000 });
+  if (hasRequestIdleCallback) {
+    window.requestIdleCallback(preload, { timeout: 2000 });
   } else {
     // 降級：使用 setTimeout
     setTimeout(preload, 1000);
@@ -111,7 +115,10 @@ const routes: RouteRecordRaw[] = [
     // ✅ 效能優化：路由層級數據預取
     beforeEnter: async (_to, _from, next) => {
       // 預熱配對數據緩存（不阻塞路由導航）
-      prefetchMatchData().catch(() => {});
+      // ✅ 修復：記錄預取錯誤而非靜默忽略
+      prefetchMatchData().catch((error) => {
+        logger.warn('[Router] prefetchMatchData 失敗:', error);
+      });
       next();
     },
   },
@@ -295,16 +302,16 @@ const ensureAuthTokenOrReset = (): boolean => {
 };
 
 router.beforeEach(async (to, _from, next) => {
-  console.log('[Router Guard] 🔵 導航至:', to.name, '來自:', _from.name);
+  logger.log('[Router Guard] 🔵 導航至:', to.name, '來自:', _from.name);
 
   // 🔒 修復競態條件：等待認證狀態完全初始化
   // 這確保在檢查 hasCompletedOnboarding 之前，用戶資料已經完全載入
   await ensureAuthState();
-  console.log('[Router Guard] 🟢 ensureAuthState 完成');
+  logger.log('[Router Guard] 🟢 ensureAuthState 完成');
 
   const authenticated = isAuthenticated.value;
   const hasToken = hasValidAuthToken();
-  console.log('[Router Guard] 🔵 認證狀態:', { authenticated, hasToken });
+  logger.log('[Router Guard] 🔵 認證狀態:', { authenticated, hasToken });
 
   // 允許訪問登入頁、onboarding 頁和遊客升級頁
   const publicPages = ["login", "onboarding", "guest-upgrade"];
@@ -390,20 +397,18 @@ routingScope.run(() => {
 
     try {
       await router.isReady();
-    } catch (_error) {
-      if (import.meta.env.DEV) {
-
-      }
+    } catch (error) {
+      // ✅ 修復：記錄錯誤而非靜默忽略
+      logger.warn('[Router] router.isReady() 失敗:', error);
     }
 
     const current = router.currentRoute.value;
     if (current?.name !== "login") {
       try {
         await router.replace({ name: "login" });
-      } catch (_error) {
-        if (import.meta.env.DEV) {
-
-        }
+      } catch (error) {
+        // ✅ 修復：記錄錯誤而非靜默忽略
+        logger.warn('[Router] 導航到 login 失敗:', error);
       }
     }
   };
@@ -414,10 +419,9 @@ routingScope.run(() => {
     }
     stopTokenMonitor();
     tokenMonitorId = window.setInterval(() => {
-      checkTokenAndRedirect().catch((_error) => {
-        if (import.meta.env.DEV) {
-
-        }
+      checkTokenAndRedirect().catch((error) => {
+        // ✅ 修復：記錄錯誤而非靜默忽略
+        logger.warn('[Router] Token monitor check 失敗:', error);
       });
     }, 15000);
   };
@@ -425,7 +429,7 @@ routingScope.run(() => {
   startTokenMonitor();
   checkTokenAndRedirect().catch((error) => {
     if (import.meta.env.DEV) {
-      console.warn('[Router] Token check failed:', error);
+      logger.warn('[Router] Token check failed:', error);
     }
   });
 
@@ -441,7 +445,7 @@ routingScope.run(() => {
         await router.isReady();
       } catch (error) {
         if (import.meta.env.DEV) {
-          console.warn('[Router] Router not ready:', error);
+          logger.warn('[Router] Router not ready:', error);
         }
       }
 
@@ -461,7 +465,7 @@ routingScope.run(() => {
             await router.replace({ name: targetRoute });
           } catch (routeError) {
             if (import.meta.env.DEV) {
-              console.warn('[Router] Navigation to', targetRoute, 'failed:', routeError);
+              logger.warn('[Router] Navigation to', targetRoute, 'failed:', routeError);
             }
           }
         }
@@ -471,7 +475,7 @@ routingScope.run(() => {
           await router.replace({ name: "login" });
         } catch (error) {
           if (import.meta.env.DEV) {
-            console.warn('[Router] Navigation to login failed:', error);
+            logger.warn('[Router] Navigation to login failed:', error);
           }
         }
       }

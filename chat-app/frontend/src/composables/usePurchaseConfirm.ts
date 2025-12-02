@@ -1,4 +1,5 @@
 import { ref, Ref, onBeforeUnmount } from 'vue';
+import { logger } from '../utils/logger.js';
 
 // ============================================================================
 // Type Definitions
@@ -116,7 +117,7 @@ export function usePurchaseConfirm(): UsePurchaseConfirmReturn {
   const handleConfirm = (): void => {
     // ✅ 防抖：如果正在處理，直接返回，防止重複點擊
     if (dialogState.value.isProcessing) {
-      console.warn('[usePurchaseConfirm] 正在處理中，忽略重複點擊');
+      logger.warn('[usePurchaseConfirm] 正在處理中，忽略重複點擊');
       return;
     }
 
@@ -150,7 +151,7 @@ export function usePurchaseConfirm(): UsePurchaseConfirmReturn {
   const handleCancel = (): void => {
     // ✅ 取消時也檢查是否正在處理
     if (dialogState.value.isProcessing) {
-      console.warn('[usePurchaseConfirm] 正在處理中，無法取消');
+      logger.warn('[usePurchaseConfirm] 正在處理中，無法取消');
       return;
     }
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import logger from "../../utils/logger.js";
 import { requireFirebaseAuth } from "../../auth/firebaseAuth.middleware.js";
+import { requireAdmin } from "../../middleware/adminAuth.middleware.js";
 import { validateRequest } from "../../middleware/validation.middleware.js";
 import { characterCreationSchemas } from "../characterCreation.schemas.js";
 import {
@@ -17,17 +18,14 @@ import { trimString } from "../characterCreation.helpers.js";
 
 const statsRouter = Router();
 
-// GET /generation-stats - 查詢所有生成統計
-// TODO: 後續需要添加管理員權限驗證
+// GET /generation-stats - 查詢所有生成統計（管理員專用）
 statsRouter.get(
   "/generation-stats",
   requireFirebaseAuth,
+  requireAdmin, // 🔒 需要管理員權限
   validateRequest(characterCreationSchemas.generationStats),
   (req, res, next) => {
     try {
-      // 🔒 基礎認證：目前只要求登入，未來可添加管理員權限檢查
-      const userId = req.firebaseUser.uid;
-
       const stats = getGenerationStats(null);
       sendSuccess(res, { stats });
     } catch (error) {

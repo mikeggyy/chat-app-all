@@ -31,7 +31,7 @@ const handleGoogleLogin = async (): Promise<void> => {
         email: user.email || '',
         displayName: user.displayName || '',
         photoURL: user.photoURL || '',
-      } as any);
+      });
     }
 
     // 導向首頁

@@ -6,6 +6,7 @@
 import { createLimitService, RESET_PERIOD } from "../services/baseLimitService.js";
 import { PHOTO_LIMITS } from "../config/limits.js";
 import { getUserById } from "../user/user.service.js";
+import logger from "../utils/logger.js";
 
 // 創建拍照限制服務實例
 export const photoLimitService = createLimitService({
@@ -35,18 +36,21 @@ export const photoLimitService = createLimitService({
 
 /**
  * 獲取重置週期（根據會員等級）
+ * ✅ 2025-11-30 更新：新增 Lite 等級支援
  */
 const getResetPeriod = (tier) => {
   if (tier === "guest") {
     return "none"; // 遊客沒有拍照權限
   } else if (tier === "free") {
-    return PHOTO_LIMITS.RESET_PERIOD.FREE; // lifetime
+    return PHOTO_LIMITS.RESET_PERIOD.FREE; // none (終生限制)
+  } else if (tier === "lite") {
+    return PHOTO_LIMITS.RESET_PERIOD.LITE; // none (需金幣購買)
   } else if (tier === "vvip") {
-    return PHOTO_LIMITS.RESET_PERIOD.VVIP; // monthly
+    return PHOTO_LIMITS.RESET_PERIOD.VVIP; // none (使用卡片)
   } else if (tier === "vip") {
-    return PHOTO_LIMITS.RESET_PERIOD.VIP; // monthly
+    return PHOTO_LIMITS.RESET_PERIOD.VIP; // none (使用卡片)
   }
-  return "monthly";
+  return "none";
 };
 
 /**
@@ -61,7 +65,7 @@ const getPhotoUnlockCards = async (userId) => {
     return user?.assets?.photoUnlockCards || 0;
   } catch (error) {
     // 記錄錯誤但返回 0，避免阻斷流程
-    console.warn(`[photoLimit] 獲取用戶 ${userId} 照片卡數量失敗:`, error.message);
+    logger.warn(`[photoLimit] 獲取用戶 ${userId} 照片卡數量失敗:`, error.message);
     return 0;
   }
 };
@@ -150,14 +154,14 @@ export const purchasePhotoCards = async (userId, quantity = 1, paymentInfo = {})
  * 獲取用戶拍照使用統計
  */
 export const getPhotoStats = async (userId) => {
-  console.log('[getPhotoStats] 開始獲取照片統計，userId:', userId);
+  logger.debug('[getPhotoStats] 開始獲取照片統計，userId:', userId);
 
   const stats = await photoLimitService.getStats(userId);
-  console.log('[getPhotoStats] photoLimitService.getStats 返回:', JSON.stringify(stats, null, 2));
+  logger.debug('[getPhotoStats] photoLimitService.getStats 返回:', JSON.stringify(stats, null, 2));
 
   // 獲取 unlockTickets 中的照片卡
   const photoCards = await getPhotoUnlockCards(userId);
-  console.log('[getPhotoStats] photoCards:', photoCards);
+  logger.debug('[getPhotoStats] photoCards:', photoCards);
 
   // 整合計算：基礎次數 + unlockTickets 照片卡
   const totalWithCards = stats.total === -1 ? -1 : (stats.total + photoCards);
@@ -171,7 +175,7 @@ export const getPhotoStats = async (userId) => {
     try {
       lastResetDate = lastResetDate.toDate().toISOString();
     } catch (e) {
-      console.error('[getPhotoStats] lastResetDate 轉換失敗:', e);
+      logger.error('[getPhotoStats] lastResetDate 轉換失敗:', e);
       lastResetDate = null;
     }
   }
@@ -190,7 +194,7 @@ export const getPhotoStats = async (userId) => {
     lastResetDate,
   };
 
-  console.log('[getPhotoStats] 最終結果:', JSON.stringify(result, null, 2));
+  logger.debug('[getPhotoStats] 最終結果:', JSON.stringify(result, null, 2));
   return result;
 };
 

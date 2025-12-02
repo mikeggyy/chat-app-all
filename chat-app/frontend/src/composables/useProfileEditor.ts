@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * useProfileEditor Composable
  *
@@ -297,7 +296,7 @@ export function useProfileEditor(
 
     // 驗證年齡
     const age = form.age;
-    if (age !== null && age !== undefined && age !== "") {
+    if (age !== null && age !== undefined) {
       const ageNum = Number(age);
       if (!isValidAge(ageNum)) {
         formErrors.age = `年齡必須在 ${PROFILE_LIMITS.MIN_AGE} 到 ${PROFILE_LIMITS.MAX_AGE} 歲之間`;
@@ -414,7 +413,7 @@ export function useProfileEditor(
 
     const normalizedGender = normalizeGender(form.gender);
     const normalizedAge =
-      form.age !== null && form.age !== undefined && form.age !== ""
+      form.age !== null && form.age !== undefined
         ? Number(form.age)
         : null;
     const source = normalizedProfileSource.value;

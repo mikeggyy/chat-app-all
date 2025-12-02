@@ -1,36 +1,40 @@
-// @ts-nocheck
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { getFirebaseApp } from '../utils/firebase.js';
 import { apiJson } from '../utils/api.js';
 import { useUserProfile } from '../composables/useUserProfile.js';
+import { logger } from '../utils/logger.js';
 import {
   loadTestSession,
   isTestSessionValid,
   clearTestSession,
 } from './testAuthSession.js';
 import { generateRandomUserName } from '../utils/randomUserName.js';
-
-interface UserProfile {
-  id: string;
-  uid: string;
-  displayName: string;
-  email: string;
-  photoURL: string;
-  locale: string;
-  lastLoginAt: string;
-  updatedAt: string;
-  createdAt: string;
-  conversations: any[];
-  favorites: any[];
-  notificationOptIn: boolean;
-  signInProvider: string;
-  hasCompletedOnboarding?: boolean; // ✅ 新增：onboarding 完成狀態
-}
+import type { UserProfile } from '../types';
 
 interface TestSession {
   userId: string;
   profile?: UserProfile;
 }
+
+/**
+ * Extended Firebase User interface for accessing non-standard properties
+ * These properties exist at runtime but are not in official Firebase types
+ */
+interface FirebaseUserExtended {
+  reloadUserInfo?: {
+    languageCode?: string;
+  };
+  languageCode?: string;
+}
+
+/**
+ * Safely extract locale from Firebase User
+ * Handles both standard and extended properties
+ */
+const getLocaleFromFirebaseUser = (user: FirebaseUser): string => {
+  const extended = user as unknown as FirebaseUserExtended;
+  return extended.reloadUserInfo?.languageCode ?? extended.languageCode ?? 'zh-TW';
+};
 
 interface ApiResponse<T> {
   success?: boolean;
@@ -49,10 +53,7 @@ const buildFallbackProfile = (firebaseUser: FirebaseUser): UserProfile => {
     displayName: firebaseUser.displayName ?? generateRandomUserName(),
     email: firebaseUser.email ?? '',
     photoURL: firebaseUser.photoURL ?? '/avatars/defult-01.webp',
-    locale:
-      (firebaseUser as any).reloadUserInfo?.languageCode ??
-      (firebaseUser as any).languageCode ??
-      'zh-TW',
+    locale: getLocaleFromFirebaseUser(firebaseUser),
     lastLoginAt: firebaseUser.metadata?.lastSignInTime ?? nowIso,
     updatedAt: firebaseUser.metadata?.lastSignInTime ?? nowIso,
     createdAt: firebaseUser.metadata?.creationTime ?? nowIso,
@@ -88,7 +89,7 @@ export const ensureAuthState = (): Promise<void> => {
     return authReadyPromise;
   }
 
-  const { setUserProfile, clearUserProfile, loadUserProfile } =
+  const { setUserProfile, clearUserProfile } =
     useUserProfile();
   let auth;
 
@@ -113,14 +114,14 @@ export const ensureAuthState = (): Promise<void> => {
     resolve = promiseResolve;
 
     onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      console.log('[AuthBootstrap] 🔵 onAuthStateChanged 觸發', {
+      logger.log('[AuthBootstrap] 🔵 onAuthStateChanged 觸發', {
         hasUser: !!firebaseUser,
         uid: firebaseUser?.uid,
       });
 
       try {
         if (!firebaseUser) {
-          console.log('[AuthBootstrap] 🟡 沒有 Firebase 用戶，檢查測試會話');
+          logger.log('[AuthBootstrap] 🟡 沒有 Firebase 用戶，檢查測試會話');
           // 沒有 Firebase 使用者時，嘗試使用測試登入會話恢復狀態
           const testSession = loadTestSession() as TestSession | null;
 
@@ -145,13 +146,13 @@ export const ensureAuthState = (): Promise<void> => {
         }
 
         const fallbackProfile = buildFallbackProfile(firebaseUser);
-        console.log('[AuthBootstrap] 🔵 Fallback profile 建立完成', {
+        logger.log('[AuthBootstrap] 🔵 Fallback profile 建立完成', {
           uid: fallbackProfile.uid,
           displayName: fallbackProfile.displayName,
         });
 
         const syncProfile = async (): Promise<void> => {
-          console.log('[AuthBootstrap] 🔵 開始同步用戶資料');
+          logger.log('[AuthBootstrap] 🔵 開始同步用戶資料');
           // 檢查網路狀態
           const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
@@ -161,7 +162,7 @@ export const ensureAuthState = (): Promise<void> => {
           const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
           try {
-            console.log('[AuthBootstrap] 🔵 GET /api/users/:id');
+            logger.log('[AuthBootstrap] 🔵 GET /api/users/:id');
             // 嘗試從後端獲取現有用戶資料
             const existing = await apiJson(
               `/api/users/${encodeURIComponent(firebaseUser.uid)}`,
@@ -169,7 +170,7 @@ export const ensureAuthState = (): Promise<void> => {
             ) as ApiResponse<UserProfile>;
 
             clearTimeout(timeoutId);
-            console.log('[AuthBootstrap] 🟢 成功獲取用戶資料', existing.data || existing);
+            logger.log('[AuthBootstrap] 🟢 成功獲取用戶資料', existing.data || existing);
             // 成功獲取後端數據，使用最新的完整資料
             setUserProfile(existing.data || existing as unknown as UserProfile);
             return;
@@ -186,20 +187,20 @@ export const ensureAuthState = (): Promise<void> => {
 
             // ✅ 2025-11-25 修復：網路錯誤、離線或超時時，使用 fallback profile 而非卡住
             if (networkError || isOffline || isTimeout) {
-              console.warn('[AuthBootstrap] 網路問題或超時，使用本地 fallback profile');
+              logger.warn('[AuthBootstrap] 網路問題或超時，使用本地 fallback profile');
               setUserProfile(fallbackProfile);
               return;
             }
 
             // 404/500 錯誤：用戶不存在，嘗試創建新用戶
             if (notFound) {
-              console.log('[AuthBootstrap] 🟡 用戶不存在 (404/500)，準備創建新用戶');
+              logger.log('[AuthBootstrap] 🟡 用戶不存在 (404/500)，準備創建新用戶');
               // ✅ 2025-11-25：新用戶創建也需要超時機制
               const createController = new AbortController();
               const createTimeoutId = setTimeout(() => createController.abort(), timeoutMs);
 
               try {
-                console.log('[AuthBootstrap] 🔵 POST /api/users (創建新用戶)');
+                logger.log('[AuthBootstrap] 🔵 POST /api/users (創建新用戶)');
                 const idToken = await firebaseUser.getIdToken();
                 const created = await apiJson('/api/users', {
                   method: 'POST',
@@ -211,7 +212,7 @@ export const ensureAuthState = (): Promise<void> => {
                 }) as ApiResponse<UserProfile>;
 
                 clearTimeout(createTimeoutId);
-                console.log('[AuthBootstrap] 🟢 成功創建新用戶', created.data || created);
+                logger.log('[AuthBootstrap] 🟢 成功創建新用戶', created.data || created);
                 // 使用後端返回的新建用戶資料（包含所有正確的預設值）
                 setUserProfile(created.data || created as unknown as UserProfile);
                 return;
@@ -219,7 +220,7 @@ export const ensureAuthState = (): Promise<void> => {
                 clearTimeout(createTimeoutId);
                 // ✅ 2025-11-25 修復：創建失敗或超時時也使用 fallback profile
                 const isCreateTimeout = createError?.name === 'AbortError';
-                console.warn('[AuthBootstrap] 創建用戶失敗或超時，使用本地 fallback profile', {
+                logger.warn('[AuthBootstrap] 創建用戶失敗或超時，使用本地 fallback profile', {
                   isTimeout: isCreateTimeout,
                   error: createError?.message,
                 });
@@ -231,7 +232,7 @@ export const ensureAuthState = (): Promise<void> => {
         };
 
         await syncProfile();
-        console.log('[AuthBootstrap] 🟢 syncProfile 完成，準備 resolve');
+        logger.log('[AuthBootstrap] 🟢 syncProfile 完成，準備 resolve');
         resolveOnce();
       } catch (error) {
         clearUserProfile();

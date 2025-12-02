@@ -1,5 +1,12 @@
 import { ref, type Ref } from 'vue';
-import type { Message } from '../../types';
+
+/**
+ * Minimal photo interface for edit mode operations
+ * Compatible with both Message and Photo types
+ */
+export interface PhotoItem {
+  id?: string;
+}
 
 /**
  * 照片編輯模式 - 相依項接口
@@ -20,7 +27,7 @@ export interface PhotoEditModeReturn {
   enterEditMode: () => void;
   cancelEditMode: () => void;
   toggleSelection: (photoId: string) => void;
-  handlePhotoClick: (photo: Message, onView: (photo: Message) => void) => void;
+  handlePhotoClick: <T extends PhotoItem>(photo: T, onView: (photo: T) => void) => void;
 }
 
 /**
@@ -68,7 +75,7 @@ export function usePhotoEditMode(
    * @param photo - 照片對象
    * @param onView - 查看照片的回調
    */
-  const handlePhotoClick = (photo: Message, onView: (photo: Message) => void): void => {
+  const handlePhotoClick = <T extends PhotoItem>(photo: T, onView: (photo: T) => void): void => {
     if (isEditMode.value && photo.id) {
       toggleSelection(photo.id);
     } else if (!isEditMode.value) {

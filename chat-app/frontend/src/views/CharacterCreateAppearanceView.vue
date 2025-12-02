@@ -211,9 +211,9 @@ const toggleStyle = (styleId: string): void => {
 // AI 魔法師處理
 const handleAIMagicianClick = async (): Promise<void> => {
   const result = await callAIMagician(
-    appearanceForm.styles as any,
+    appearanceForm.styles,
     referencePreview.value,
-    referenceFocus.value as any
+    referenceFocus.value
   );
 
   if (result) {
@@ -284,8 +284,9 @@ const handleClose = (): void => {
 
 // 參考圖片處理（包裝 composable 函數）
 const handleCropConfirmWrapper = (result: string | CropResult): void => {
-  const cropResult = typeof result === 'string' ? { croppedImage: result } : result;
-  handleCropConfirm(cropResult as any, saveAppearanceState);
+  // 提取圖片字串以符合 handleCropConfirm 的參數類型
+  const imageString = typeof result === 'string' ? result : result.croppedImage;
+  handleCropConfirm(imageString, saveAppearanceState);
 };
 
 const handleReferenceClearWrapper = (): void => {

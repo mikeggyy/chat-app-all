@@ -11,6 +11,7 @@ import { ref, computed } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { apiJson } from '../../utils/api.js';
 import { generateUnlockCharacterRequestId } from '../../utils/requestId.js';
+import { logger } from '../../utils/logger.js';
 import type { FirebaseAuthService } from '../../types';
 
 // ==================== 類型定義 ====================
@@ -180,7 +181,7 @@ export function useCharacterUnlock(deps: UseCharacterUnlockDeps): UseCharacterUn
       }
     } catch (error) {
       // Silent fail - 不影響用戶體驗
-      console.warn('[解鎖狀態] 載入活躍解鎖失敗:', error);
+      logger.warn('[解鎖狀態] 載入活躍解鎖失敗:', error);
     } finally {
       // 數據加載完成，允許顯示圖標
       isUnlockDataLoaded.value = true;
@@ -257,7 +258,7 @@ export function useCharacterUnlock(deps: UseCharacterUnlockDeps): UseCharacterUn
         isUnlockDataLoaded.value = true;
 
         // 重新加載解鎖卡餘額（背景更新，不影響 UI）
-        loadTicketsBalance(userId).catch(console.error);
+        loadTicketsBalance(userId).catch((err) => logger.error('[解鎖狀態] 重新載入票券餘額失敗:', err));
 
         // 顯示解鎖成功訊息
         const characterName = getPartnerDisplayName() || '角色';

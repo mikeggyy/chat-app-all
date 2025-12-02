@@ -43,8 +43,12 @@ async function monitorMembershipData() {
   };
 
   try {
-    // 查詢所有付費會員（vip 和 vvip）
+    // ✅ 2025-11-30 更新：查詢所有付費會員（lite, vip 和 vvip）
     console.log('📊 正在查詢付費會員數據...\n');
+
+    const liteSnapshot = await db.collection('users')
+      .where('membershipTier', '==', 'lite')
+      .get();
 
     const vipSnapshot = await db.collection('users')
       .where('membershipTier', '==', 'vip')
@@ -55,11 +59,12 @@ async function monitorMembershipData() {
       .get();
 
     const allPaidUsers = [
+      ...liteSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
       ...vipSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
       ...vvipSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
     ];
 
-    console.log(`✅ 找到 ${allPaidUsers.length} 個付費會員（VIP: ${vipSnapshot.size}, VVIP: ${vvipSnapshot.size}）\n`);
+    console.log(`✅ 找到 ${allPaidUsers.length} 個付費會員（Lite: ${liteSnapshot.size}, VIP: ${vipSnapshot.size}, VVIP: ${vvipSnapshot.size}）\n`);
 
     const now = new Date();
 

@@ -4,10 +4,12 @@ import type { QuickAction } from "../../config/profile";
 
 interface Props {
   hasUnreadNotifications?: boolean;
+  hasUnclaimedReward?: boolean;
 }
 
 withDefaults(defineProps<Props>(), {
   hasUnreadNotifications: false,
+  hasUnclaimedReward: false,
 });
 
 const emit = defineEmits<{
@@ -35,7 +37,7 @@ const handleActionClick = (action: QuickAction) => {
           <span class="quick-action__icon">
             <component :is="action.icon" class="icon" aria-hidden="true" />
             <span
-              v-if="action.key === 'notifications' && hasUnreadNotifications"
+              v-if="(action.key === 'notifications' && hasUnreadNotifications) || (action.key === 'daily-reward' && hasUnclaimedReward)"
               class="quick-action__badge"
               aria-hidden="true"
             ></span>
@@ -53,7 +55,7 @@ const handleActionClick = (action: QuickAction) => {
   position: relative;
   ul {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     margin: 0;
     padding: 0.75rem 0.75rem;
     list-style: none;

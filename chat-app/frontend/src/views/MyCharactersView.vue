@@ -196,7 +196,7 @@ const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boo
     return;
   }
 
-  console.log('[MyCharacters] 🔄 開始載入角色列表，用戶 ID:', normalizedId);
+  logger.log('[MyCharacters] 🔄 開始載入角色列表，用戶 ID:', normalizedId);
 
   const currentToken = ++charactersRequestToken;
   isCharactersLoading.value = true;
@@ -210,7 +210,7 @@ const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boo
       return;
     }
 
-    console.log('[MyCharacters] ✅ 成功載入角色：', {
+    logger.log('[MyCharacters] ✅ 成功載入角色：', {
       count: response?.characters?.length || 0,
       characters: response?.characters
     });
@@ -222,7 +222,7 @@ const loadUserCharacters = async (id: string, options: { skipGlobalLoading?: boo
     if (currentToken !== charactersRequestToken) {
       return;
     }
-    console.error('[MyCharacters] ❌ 載入角色失敗：', error);
+    logger.error('[MyCharacters] ❌ 載入角色失敗：', error);
     userCharactersRaw.value = [];
     charactersError.value = (error as Error)?.message ?? "載入角色列表失敗，請稍後再試。";
     if (import.meta.env.DEV) {

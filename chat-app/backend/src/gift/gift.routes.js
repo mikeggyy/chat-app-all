@@ -90,7 +90,7 @@ router.get("/history", requireFirebaseAuth, relaxedRateLimiter, asyncHandler(asy
       offset: offset ? parseInt(offset, 10) : undefined,
     };
 
-    const result = getUserGiftHistory(userId, options);
+    const result = await getUserGiftHistory(userId, options);
 
     sendSuccess(res, result);
   } catch (error) {
@@ -109,7 +109,7 @@ router.get("/stats/:characterId", requireFirebaseAuth, relaxedRateLimiter, async
     const userId = req.firebaseUser.uid;
     const { characterId } = req.params;
 
-    const result = getCharacterGiftStats(userId, characterId);
+    const result = await getCharacterGiftStats(userId, characterId);
 
     sendSuccess(res, result);
   } catch (error) {

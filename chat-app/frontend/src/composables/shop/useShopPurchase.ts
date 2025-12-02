@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, type Ref } from "vue";
 import { useToast } from "../useToast.js";
 import { usePurchaseConfirm } from "../usePurchaseConfirm.js";
@@ -271,7 +270,9 @@ export function useShopPurchase(options: UseShopPurchaseOptions = {} as UseShopP
 
       if (result.success) {
         // 更新金幣餘額（跳過全域loading避免閃爍）
-        await loadBalance(user.value.id, { skipGlobalLoading: true });
+        if (user.value?.id) {
+          await loadBalance(user.value.id, { skipGlobalLoading: true });
+        }
 
         success(`成功購買 ${item.name}！已加入庫存`);
       } else {

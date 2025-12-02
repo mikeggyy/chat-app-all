@@ -37,6 +37,10 @@ interface VoiceAPIResponse {
  */
 interface FetchVoicesResponse {
   voices?: VoiceAPIResponse[];
+  // API 可能將數據包裝在 data 字段中
+  data?: {
+    voices?: VoiceAPIResponse[];
+  };
 }
 
 /**
@@ -185,7 +189,7 @@ export function useVoiceLoading(): UseVoiceLoadingReturn {
       const response = await fetchAllVoices() as unknown as FetchVoicesResponse;
 
       // 支援兩種格式：response.voices 或 response.data.voices
-      const voices = response?.voices || (response as any)?.data?.voices;
+      const voices = response?.voices ?? response?.data?.voices;
 
       if (voices && Array.isArray(voices)) {
         // 轉換 API 返回的語音格式

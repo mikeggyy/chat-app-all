@@ -13,6 +13,10 @@
 import express from "express";
 import logger from "../utils/logger.js";
 import {
+  sendSuccess,
+  sendError,
+} from "../../../../shared/utils/errorFormatter.js";
+import {
   cleanupStaleUpgradeLocks,
   getLockedUsers
 } from "../services/membershipLockCleanup.service.js";
@@ -40,10 +44,7 @@ const validateCronRequest = (req, res, next) => {
       userAgent,
       ip: req.ip,
     });
-    return res.status(403).json({
-      success: false,
-      error: "只允許 Cloud Scheduler 調用此端點",
-    });
+    return sendError(res, "FORBIDDEN", "只允許 Cloud Scheduler 調用此端點");
   }
 
   // 方法 2：驗證 OIDC token（推薦）
@@ -78,10 +79,8 @@ router.post("/cleanup-locks", validateCronRequest, async (req, res) => {
     });
 
     // 返回結果給 Cloud Scheduler（用於監控）
-    res.json({
-      success: true,
+    sendSuccess(res, {
       task: "cleanup-locks",
-      timestamp: new Date().toISOString(),
       result: {
         scanned: result.scanned,
         cleaned: result.cleaned,
@@ -91,13 +90,7 @@ router.post("/cleanup-locks", validateCronRequest, async (req, res) => {
     });
   } catch (error) {
     logger.error("[Cron] 鎖定清理任務失敗", error);
-
-    res.status(500).json({
-      success: false,
-      task: "cleanup-locks",
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", error.message);
   }
 });
 
@@ -113,20 +106,14 @@ router.get("/status", validateCronRequest, async (req, res) => {
 
     const staleCount = lockedUsers.filter((u) => u.isStale).length;
 
-    res.json({
-      success: true,
-      timestamp: new Date().toISOString(),
+    sendSuccess(res, {
       totalLocked: lockedUsers.length,
       staleLocks: staleCount,
       users: lockedUsers,
     });
   } catch (error) {
     logger.error("[Cron] 查詢鎖定狀態失敗", error);
-
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", error.message);
   }
 });
 
@@ -138,10 +125,7 @@ router.get("/status", validateCronRequest, async (req, res) => {
  */
 router.post("/test", (req, res) => {
   if (process.env.NODE_ENV === "production") {
-    return res.status(403).json({
-      success: false,
-      error: "測試端點僅在開發環境可用",
-    });
+    return sendError(res, "FORBIDDEN", "測試端點僅在開發環境可用");
   }
 
   logger.info("[Cron] 測試端點被調用", {
@@ -149,10 +133,8 @@ router.post("/test", (req, res) => {
     body: req.body,
   });
 
-  res.json({
-    success: true,
+  sendSuccess(res, {
     message: "Cron 端點測試成功",
-    timestamp: new Date().toISOString(),
     receivedData: req.body,
   });
 });
@@ -185,10 +167,8 @@ router.post("/expired-memberships", validateCronRequest, async (req, res) => {
         duration: result.duration,
       });
 
-      res.json({
-        success: true,
+      sendSuccess(res, {
         task: "expired-memberships",
-        timestamp: new Date().toISOString(),
         result: {
           totalChecked: result.totalChecked,
           expired: result.expired,
@@ -202,13 +182,7 @@ router.post("/expired-memberships", validateCronRequest, async (req, res) => {
     }
   } catch (error) {
     logger.error("[Cron] 過期會員檢查任務失敗", error);
-
-    res.status(500).json({
-      success: false,
-      task: "expired-memberships",
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", error.message);
   }
 });
 
@@ -230,10 +204,8 @@ router.post("/idempotency-cleanup", validateCronRequest, async (req, res) => {
     if (result.success) {
       logger.info("[Cron] 冪等性清理任務完成", result.stats);
 
-      res.json({
-        success: true,
+      sendSuccess(res, {
         task: "idempotency-cleanup",
-        timestamp: new Date().toISOString(),
         result: result.stats,
       });
     } else {
@@ -241,13 +213,7 @@ router.post("/idempotency-cleanup", validateCronRequest, async (req, res) => {
     }
   } catch (error) {
     logger.error("[Cron] 冪等性清理任務失敗", error);
-
-    res.status(500).json({
-      success: false,
-      task: "idempotency-cleanup",
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", error.message);
   }
 });
 

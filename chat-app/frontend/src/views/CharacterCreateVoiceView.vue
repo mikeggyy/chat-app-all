@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { finalizeCharacterCreation } from "../services/characterCreation.service.js";
 import { useUserProfile } from "../composables/useUserProfile.js";
 import { useToast } from "../composables/useToast.js";
+import { logger } from "../utils/logger";
 import CharacterCreatedModal from "../components/CharacterCreatedModal.vue";
 import VoiceHeader from "../components/voice-selection/VoiceHeader.vue";
 import VoiceFilters from "../components/voice-selection/VoiceFilters.vue";
@@ -15,18 +16,10 @@ import VoiceActions from "../components/voice-selection/VoiceActions.vue";
 import { useVoiceAudioPlayer } from "../composables/voice-selection/useVoiceAudioPlayer.js";
 import { useVoiceFiltering } from "../composables/voice-selection/useVoiceFiltering.js";
 import { useFlowSync } from "../composables/voice-selection/useFlowSync.js";
-import { useVoiceLoading } from "../composables/voice-selection/useVoiceLoading.js";
+import { useVoiceLoading, type VoicePreset } from "../composables/voice-selection/useVoiceLoading.js";
 import { useDraftFlow } from "../composables/character-creation/useDraftFlow.js";
 
-// Types
-interface VoicePreset {
-  id: string;
-  name?: string;
-  gender?: string;
-  locale?: string;
-  [key: string]: any;
-}
-
+// Types - 使用從 useVoiceLoading 導入的 VoicePreset
 interface PersonaSummary {
   name: string;
   tagline: string;
@@ -42,13 +35,25 @@ interface AppearanceSummary {
 interface SummaryData {
   persona?: PersonaSummary;
   appearance?: AppearanceSummary | null;
-  voice?: VoicePreset | null;
+  voice?: Partial<VoicePreset> | null;
   gender?: string;
 }
 
 interface CreatedCharacter {
   id: string;
-  [key: string]: any;
+  display_name: string;
+  gender?: string;
+  portraitUrl?: string;
+  portrait_url?: string; // API 可能返回 snake_case
+  background?: string;
+  secret_background?: string;
+  first_message?: string;
+  voice?: {
+    id?: string;
+    name?: string;
+    label?: string;
+    description?: string;
+  } | string;
 }
 
 const router = useRouter();
@@ -134,7 +139,7 @@ const finalizeCreation = async (): Promise<void> => {
     // 獲取用戶選擇的圖片 URL
     const selectedImageUrl = (summaryData.value as SummaryData | null)?.appearance?.image || null;
 
-    console.log('[CharacterCreateVoiceView] 📸 準備創建角色，圖片信息：', {
+    logger.log('[CharacterCreateVoiceView] 📸 準備創建角色，圖片信息：', {
       selectedImageUrl,
       summaryData: summaryData.value,
       flowId: flowId.value
@@ -147,7 +152,7 @@ const finalizeCreation = async (): Promise<void> => {
       selectedImageUrl
     ) as CreatedCharacter;
 
-    console.log('[CharacterCreateVoiceView] ✅ 角色創建成功，返回數據：', character);
+    logger.log('[CharacterCreateVoiceView] ✅ 角色創建成功，返回數據：', character);
 
     // 🔥 修復：使用 summaryData 的完整數據來豐富返回的角色資料
     // 確保成功對話框顯示用戶選擇的所有設定
@@ -167,7 +172,7 @@ const finalizeCreation = async (): Promise<void> => {
       first_message: character.first_message || summaryData.value?.persona?.prompt || '',
     };
 
-    console.log('[CharacterCreateVoiceView] 📝 豐富後的角色數據：', enrichedCharacter);
+    logger.log('[CharacterCreateVoiceView] 📝 豐富後的角色數據：', enrichedCharacter);
 
     // 保存角色資料並顯示成功彈窗
     createdCharacter.value = enrichedCharacter;
@@ -183,7 +188,7 @@ const finalizeCreation = async (): Promise<void> => {
     ccStore.resetFlow();  // 重置整個流程（包括 AI 魔法師計數）
     ccStore.clearSession();  // 清除 sessionStorage
 
-    console.log('[CharacterCreateVoiceView] 已清除所有暫存資料、草稿和 store 狀態');
+    logger.log('[CharacterCreateVoiceView] 已清除所有暫存資料、草稿和 store 狀態');
 
     // 顯示成功訊息
     showSuccess("角色創建成功！");
@@ -222,9 +227,10 @@ watch(
       return;
     }
     if (voiceId && voiceId !== previous) {
-      const preset = (voicePresets.value as any).find((item: any) => item.id === voiceId);
+      const preset = voicePresets.value.find((item) => item.id === voiceId);
       if (preset) {
-        updateVoiceSelection(preset as any);
+        // VoicePreset from useVoiceLoading is compatible with useFlowSync's expected type
+        updateVoiceSelection(preset as VoicePreset);
       }
     }
     if (!voiceId) {
@@ -235,19 +241,20 @@ watch(
 
 watch(
   () => filteredVoicePresets.value,
-  (presets: any) => {
+  (presets) => {
     if (!hasLoadedSummary.value || suppressSync || flowSuppressSync) {
       return;
     }
     const exists = presets.some(
-      (preset: any) => preset.id === selectedVoiceId.value
+      (preset) => preset.id === selectedVoiceId.value
     );
     if (!exists && presets.length) {
       suppressSync = true;
       selectedVoiceId.value = presets[0].id;
       suppressSync = false;
       const preset = presets[0];
-      updateVoiceSelection(preset as any);
+      // VoicePreset from useVoiceFiltering is compatible with useFlowSync's expected type
+      updateVoiceSelection(preset as VoicePreset);
     }
   },
   { deep: true }
@@ -274,9 +281,10 @@ onMounted(async () => {
   // 如果還沒有選中語音，默認選擇第一個
   if (!selectedVoiceId.value && filteredVoicePresets.value.length) {
     suppressSync = true;
-    selectedVoiceId.value = (filteredVoicePresets.value[0] as any).id;
+    selectedVoiceId.value = filteredVoicePresets.value[0].id;
     suppressSync = false;
-    updateVoiceSelection(filteredVoicePresets.value[0] as any);
+    // VoicePreset from useVoiceFiltering is compatible with useFlowSync's expected type
+    updateVoiceSelection(filteredVoicePresets.value[0] as VoicePreset);
   }
 });
 
@@ -324,7 +332,7 @@ onBeforeUnmount(() => {
     <!-- 角色創建成功彈窗 -->
     <CharacterCreatedModal
       v-if="createdCharacter"
-      :character="(createdCharacter as any)"
+      :character="createdCharacter"
       :is-visible="isCharacterCreatedModalVisible"
       @close="handleCloseModal"
       @view-character="handleViewCharacter"

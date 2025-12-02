@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, shallowRef, watch, type CSSProperties } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserProfile } from '../composables/useUserProfile';
 import { useFirebaseAuth } from '../composables/useFirebaseAuth';
@@ -353,13 +353,13 @@ onBeforeUnmount(() => {
     <!-- 背景輪播 -->
     <MatchBackground
       :carousel-matches="carousel.carouselMatches.value"
-      :background-track-style="(carousel.backgroundTrackStyle.value as any)"
+      :background-track-style="(carousel.backgroundTrackStyle.value as CSSProperties)"
       :is-image-loaded="carousel.isImageLoaded"
     />
 
     <!-- 內容輪播 -->
     <div class="content-wrapper" ref="carouselContainerRef">
-      <div class="carousel-track" :style="carousel.trackStyle.value as any">
+      <div class="carousel-track" :style="carousel.trackStyle.value as CSSProperties">
         <!-- ✅ 修復閃爍問題：使用穩定的 slot 作為 key，重用 DOM 元素 -->
         <MatchCard
           v-for="item in carousel.carouselMatches.value"

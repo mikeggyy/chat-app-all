@@ -53,6 +53,7 @@ const POTIONS_DATA = [
     // 排序
     order: 1,
     // 狀態
+    status: 'active',  // ✅ 修復：API 查詢使用 status 而非 enabled
     enabled: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -88,6 +89,7 @@ const POTIONS_DATA = [
     // 排序
     order: 2,
     // 狀態
+    status: 'active',  // ✅ 修復：API 查詢使用 status 而非 enabled
     enabled: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

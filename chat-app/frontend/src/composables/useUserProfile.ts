@@ -5,6 +5,7 @@
 
 import { computed, reactive, type ComputedRef } from "vue";
 import { apiJson } from "../utils/api";
+import { logger } from "../utils/logger.js";
 import { useFirebaseAuth } from "./useFirebaseAuth.js";
 import { normalizeArray, normalizeGender } from "../../../shared/utils/userUtils.js";
 import { generateRandomUserName } from "../utils/randomUserName.js";
@@ -31,6 +32,49 @@ interface CacheEntry {
   data: User;
   timestamp: number;
 }
+
+/**
+ * API 響應的用戶資料載荷
+ * 包含向後兼容的備用屬性名稱
+ */
+interface UserPayload extends Partial<User> {
+  // 錢包餘額的備用屬性（向後兼容）
+  walletBalance?: number;
+  coins?: number;
+  balance?: number;
+}
+
+/**
+ * API 響應包裝器
+ * 處理 { success: true, data: T } 或直接返回 T 的情況
+ */
+interface ApiResponseWrapper<T> {
+  success?: boolean;
+  data?: T;
+}
+
+/**
+ * 對話值類型
+ * 對話陣列可能包含字串或各種物件格式
+ */
+interface ConversationValue {
+  conversationId?: string;
+  characterId?: string;
+  character?: { id?: string };
+  matchId?: string;
+  id?: string;
+}
+
+/**
+ * 從 API 響應中提取數據
+ * 處理嵌套的 { data: T } 格式
+ */
+const extractApiData = <T>(response: T | ApiResponseWrapper<T>): T => {
+  if (response && typeof response === 'object' && 'data' in response) {
+    return (response as ApiResponseWrapper<T>).data as T;
+  }
+  return response as T;
+};
 
 export interface UseUserProfileReturn {
   user: ComputedRef<User | null>;
@@ -62,7 +106,7 @@ const firebaseAuth = useFirebaseAuth();
 
 // ==================== 內部工具函數 ====================
 
-const normalizeUser = (payload: Partial<User> = {}): User => {
+const normalizeUser = (payload: UserPayload = {}): User => {
   const nowIso = new Date().toISOString();
   const id = payload.id ?? "";
   const createdAt = payload.createdAt ?? nowIso;
@@ -76,9 +120,9 @@ const normalizeUser = (payload: Partial<User> = {}): User => {
 
   // 解析錢包餘額（向後兼容：支援讀取舊格式）
   const walletBalance = payload.wallet?.balance
-    ?? (payload as any).walletBalance
-    ?? (payload as any).coins
-    ?? (payload as any).balance
+    ?? payload.walletBalance
+    ?? payload.coins
+    ?? payload.balance
     ?? 0;
 
   const wallet: Wallet = {
@@ -163,40 +207,38 @@ const loadUserProfile = async (id: string, options: LoadUserProfileOptions = {})
     if (age < CACHE_TTL) {
       const cached = cacheEntry.data;
       baseState.user = cached;
-      console.debug(`[useUserProfile] 使用緩存資料: ${id}, 年齡: ${Math.round(age / 1000)}秒`);
+      logger.debug(`[useUserProfile] 使用緩存資料: ${id}, 年齡: ${Math.round(age / 1000)}秒`);
       return cached;
     } else {
       // 緩存已過期，從 Map 中刪除
       profileCache.delete(id);
-      console.debug(`[useUserProfile] 緩存已過期並刪除: ${id}, 年齡: ${Math.round(age / 1000)}秒`);
+      logger.debug(`[useUserProfile] 緩存已過期並刪除: ${id}, 年齡: ${Math.round(age / 1000)}秒`);
     }
   }
 
   // 🔒 修復競態條件：檢查是否已有正在進行的請求
   if (!force && loadingProfiles.has(id)) {
-    console.debug(`[useUserProfile] 重用正在進行的請求: ${id}`);
+    logger.debug(`[useUserProfile] 重用正在進行的請求: ${id}`);
     return loadingProfiles.get(id)!;
   }
 
   // 緩存不存在或已過期，從 API 獲取新資料
   const loadPromise = (async (): Promise<User> => {
     try {
-      console.debug(`[useUserProfile] 從 API 獲取用戶資料: ${id}`);
+      logger.debug(`[useUserProfile] 從 API 獲取用戶資料: ${id}`);
       const response = await apiJson(`/api/users/${encodeURIComponent(id)}`, {
         skipGlobalLoading,
       });
 
       // ✅ 修復：處理嵌套的 API 響應格式（與 authBootstrap.ts 保持一致）
       // API 可能返回 { success: true, data: {...} } 或直接返回 {...}
-      const data = (response as any)?.data || response;
+      const data = extractApiData<UserPayload>(response);
 
       return cacheUserProfile(data);
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('[useUserProfile] 載入用戶資料失敗:', error);
-      }
+      logger.error('[useUserProfile] 載入用戶資料失敗:', error);
       if (fallback) {
-        console.debug('[useUserProfile] 使用 fallback 數據');
+        logger.debug('[useUserProfile] 使用 fallback 數據');
         return cacheUserProfile({ ...fallback, id });
       }
       throw error;
@@ -248,7 +290,7 @@ const updateUserAvatar = async (photoURL: string): Promise<User> => {
 
   // ✅ 2025-11-25 修復：處理嵌套的 API 響應格式
   // API 可能返回 { success: true, data: {...} } 或直接返回 {...}
-  const data = (updated as any)?.data || updated;
+  const data = extractApiData<UserPayload>(updated);
 
   return cacheUserProfile(data);
 };
@@ -309,7 +351,7 @@ const updateUserProfileDetails = async (patch: UpdateUserProfilePatch = {}): Pro
 
   // ✅ 2025-11-25 修復：處理嵌套的 API 響應格式
   // API 可能返回 { success: true, data: {...} } 或直接返回 {...}
-  const data = (updated as any)?.data || updated;
+  const data = extractApiData<UserPayload>(updated);
 
   const cached = cacheUserProfile(data);
 
@@ -476,12 +518,14 @@ const resetConversationHistory = async (conversationId: string): Promise<User> =
         return value !== conversationId;
       }
       if (value && typeof value === "object") {
+        // 將 value 視為 ConversationValue 類型
+        const conv = value as ConversationValue;
         const identifier =
-          (value as any).conversationId ??
-          (value as any).characterId ??
-          (value as any).character?.id ??
-          (value as any).matchId ??
-          (value as any).id ??
+          conv.conversationId ??
+          conv.characterId ??
+          conv.character?.id ??
+          conv.matchId ??
+          conv.id ??
           "";
         return identifier !== conversationId;
       }

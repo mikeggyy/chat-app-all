@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, watch, onBeforeUnmount, Ref } from "vue";
 import { logger } from "../utils/logger.js";
 
@@ -113,20 +112,24 @@ export function useInfiniteScroll(
     }
   };
 
-  // 監聽 containerRef 的變化，當元素掛載後綁定事件
-  watch(containerRef, (newEl: HTMLElement | null, oldEl: HTMLElement | null) => {
-    // 移除舊元素的事件監聽
-    if (oldEl && scrollHandler) {
-      oldEl.removeEventListener('scroll', scrollHandler);
-    }
+  // 監聯 containerRef 的變化，當元素掛載後綁定事件
+  watch(
+    () => containerRef.value,
+    (newEl: HTMLElement | null, oldEl: HTMLElement | null | undefined) => {
+      // 移除舊元素的事件監聽
+      if (oldEl && scrollHandler) {
+        oldEl.removeEventListener('scroll', scrollHandler);
+      }
 
-    // 為新元素添加事件監聯
-    if (newEl) {
-      scrollHandler = handleScroll as any;
-      // ✅ 修復：使用 scrollHandler 確保添加和移除使用相同的引用
-      newEl.addEventListener('scroll', scrollHandler, { passive: true });
-    }
-  }, { immediate: true });
+      // 為新元素添加事件監聯
+      if (newEl) {
+        scrollHandler = handleScroll as (this: HTMLElement, ev: Event) => void;
+        // ✅ 修復：使用 scrollHandler 確保添加和移除使用相同的引用
+        newEl.addEventListener('scroll', scrollHandler, { passive: true });
+      }
+    },
+    { immediate: true }
+  );
 
   onBeforeUnmount(() => {
     if (containerRef.value && scrollHandler) {

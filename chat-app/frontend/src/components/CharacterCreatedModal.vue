@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { XMarkIcon } from "@heroicons/vue/24/outline";
+import { logger } from '../utils/logger.js';
 
 interface Voice {
   description?: string;
@@ -29,10 +30,9 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 // 🔍 調試：當 props 變化時記錄角色資料
-import { watch } from "vue";
 watch(() => props.character, (newChar) => {
   if (newChar && props.isVisible) {
-    console.log('[CharacterCreatedModal] 🎉 收到角色資料：', {
+    logger.log('[CharacterCreatedModal] 🎉 收到角色資料：', {
       portraitUrl: newChar.portraitUrl,
       display_name: newChar.display_name,
       gender: newChar.gender,

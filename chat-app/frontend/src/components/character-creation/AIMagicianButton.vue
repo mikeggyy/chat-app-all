@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch, type ComputedRef } from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
+import { logger } from '../../utils/logger.js';
 
 // Types
 interface Props {
@@ -32,7 +33,7 @@ const buttonText: ComputedRef<string> = computed(() => {
 });
 
 const handleClick = (): void => {
-  console.log('[AIMagicianButton] 按鈕被點擊', {
+  logger.log('[AIMagicianButton] 按鈕被點擊', {
     isDisabled: isDisabled.value,
     isGenerating: props.isGenerating,
     remainingUsage: props.remainingUsage
@@ -44,7 +45,7 @@ const handleClick = (): void => {
 
 // 🔥 調試：監聽 isGenerating 變化
 watch(() => props.isGenerating, (newVal, oldVal) => {
-  console.log('[AIMagicianButton] isGenerating 變化:', {
+  logger.log('[AIMagicianButton] isGenerating 變化:', {
     old: oldVal,
     new: newVal,
     buttonText: buttonText.value,

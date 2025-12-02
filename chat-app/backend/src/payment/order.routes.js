@@ -1,5 +1,6 @@
 /**
  * 訂單管理 API 路由
+ * ✅ 2025-12-02 優化：添加冪等性保護，防止重複創建訂單
  */
 
 import express from "express";
@@ -27,6 +28,9 @@ import {
   relaxedRateLimiter,
   strictRateLimiter,
 } from "../middleware/rateLimiterConfig.js";
+import { handleIdempotentRequest } from "../utils/idempotency.js";
+import { IDEMPOTENCY_TTL } from "../config/limits.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -101,6 +105,7 @@ router.get(
 /**
  * POST /api/orders
  * 創建新訂單
+ * ✅ 2025-12-02 優化：添加冪等性保護，防止重複創建訂單
  */
 router.post(
   "/",
@@ -119,25 +124,47 @@ router.post(
         currency,
         paymentMethod,
         metadata,
+        idempotencyKey, // ✅ 新增：冪等性鍵
       } = req.body;
 
-    const order = await createOrder({
-      userId,
-      type,
-      productId,
-      productName,
-      quantity,
-      amount,
-      currency,
-      paymentMethod,
-      metadata,
-    });
+      // ✅ 財務操作必須提供冪等性鍵
+      if (!idempotencyKey) {
+        return sendError(
+          res,
+          "VALIDATION_ERROR",
+          "缺少必要參數：idempotencyKey（財務操作必須提供冪等性鍵以防止重複訂單）",
+          { field: "idempotencyKey" }
+        );
+      }
 
-    sendSuccess(res, { order }, 201);
-  } catch (error) {
-    sendError(res, "SERVER_ERROR", error.message);
+      // ✅ 使用冪等性處理防止重複創建訂單
+      const requestId = `order:create:${userId}:${idempotencyKey}`;
+      const order = await handleIdempotentRequest(
+        requestId,
+        async () => {
+          return await createOrder({
+            userId,
+            type,
+            productId,
+            productName,
+            quantity,
+            amount,
+            currency,
+            paymentMethod,
+            metadata,
+          });
+        },
+        { ttl: IDEMPOTENCY_TTL.COIN_PACKAGE }
+      );
+
+      logger.info(`[訂單] 創建訂單成功: userId=${userId}, orderId=${order.id}, type=${type}`);
+      sendSuccess(res, { order }, 201);
+    } catch (error) {
+      logger.error(`[訂單] 創建訂單失敗: ${error.message}`);
+      sendError(res, "SERVER_ERROR", error.message);
+    }
   }
-});
+);
 
 /**
  * GET /api/orders/:orderId
@@ -204,6 +231,7 @@ router.get(
 /**
  * PATCH /api/orders/:orderId/complete
  * 完成訂單（支付成功後調用）
+ * ✅ 2025-12-02 優化：添加冪等性保護，防止重複完成訂單
  */
 router.patch(
   "/:orderId/complete",
@@ -214,26 +242,37 @@ router.patch(
     try {
       const userId = req.firebaseUser.uid;
       const { orderId } = req.params;
-      const { metadata } = req.body;
+      const { metadata, idempotencyKey } = req.body;
 
-    const order = await getOrder(orderId);
+      const order = await getOrder(orderId);
 
-    if (!order) {
-      return sendError(res, "RESOURCE_NOT_FOUND", "找不到該訂單", { orderId }, 404);
+      if (!order) {
+        return sendError(res, "RESOURCE_NOT_FOUND", "找不到該訂單", { orderId }, 404);
+      }
+
+      // 檢查權限
+      if (order.userId !== userId) {
+        return sendError(res, "FORBIDDEN", "無權操作此訂單", { orderId }, 403);
+      }
+
+      // ✅ 使用冪等性處理防止重複完成訂單（使用 orderId 作為默認冪等性鍵）
+      const requestId = `order:complete:${orderId}:${idempotencyKey || orderId}`;
+      const updatedOrder = await handleIdempotentRequest(
+        requestId,
+        async () => {
+          return await completeOrder(orderId, metadata);
+        },
+        { ttl: IDEMPOTENCY_TTL.COIN_PACKAGE }
+      );
+
+      logger.info(`[訂單] 完成訂單: userId=${userId}, orderId=${orderId}`);
+      sendSuccess(res, { order: updatedOrder });
+    } catch (error) {
+      logger.error(`[訂單] 完成訂單失敗: ${error.message}`);
+      sendError(res, "SERVER_ERROR", error.message);
     }
-
-    // 檢查權限
-    if (order.userId !== userId) {
-      return sendError(res, "FORBIDDEN", "無權操作此訂單", { orderId }, 403);
-    }
-
-    const updatedOrder = await completeOrder(orderId, metadata);
-
-    sendSuccess(res, { order: updatedOrder });
-  } catch (error) {
-    sendError(res, "SERVER_ERROR", error.message);
   }
-});
+);
 
 /**
  * PATCH /api/orders/:orderId/cancel

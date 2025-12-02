@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * 樂觀更新 Composable
  * 提供樂觀 UI 更新功能，在等待 API 響應前先更新 UI
@@ -6,6 +5,7 @@
  */
 
 import { ref, Ref } from 'vue';
+import { logger } from '../utils/logger.js';
 import { useToast } from './useToast.js';
 
 /**
@@ -169,7 +169,7 @@ export function useOptimisticUpdate(options: UseOptimisticUpdateOptions = {}): O
 
     // 檢查是否已有相同的更新在進行中
     if (pendingUpdates.value.has(key)) {
-      console.warn(`[Optimistic Update] 更新 "${key}" 已在進行中，跳過重複請求`);
+      logger.warn(`[Optimistic Update] 更新 "${key}" 已在進行中，跳過重複請求`);
       return pendingUpdates.value.get(key) as Promise<T>;
     }
 
@@ -199,7 +199,7 @@ export function useOptimisticUpdate(options: UseOptimisticUpdateOptions = {}): O
 
       // 5. 錯誤處理
       const errorInstance = error instanceof Error ? error : new Error(String(error));
-      console.error(`[Optimistic Update] 更新 "${key}" 失敗:`, errorInstance);
+      logger.error(`[Optimistic Update] 更新 "${key}" 失敗:`, errorInstance);
 
       if (showErrorToast) {
         showError(errorInstance.message || errorMessage);
@@ -288,7 +288,7 @@ export function useOptimisticList(): OptimisticListReturn {
     const index = list.value.findIndex(finder as (item: T) => boolean);
 
     if (index === -1) {
-      console.warn(`[Optimistic List] 找不到項目 ID: ${itemId}`);
+      logger.warn(`[Optimistic List] 找不到項目 ID: ${itemId}`);
       return;
     }
 
@@ -319,7 +319,7 @@ export function useOptimisticList(): OptimisticListReturn {
     const index = list.value.findIndex(finder as (item: T) => boolean);
 
     if (index === -1) {
-      console.warn(`[Optimistic List] 找不到項目 ID: ${itemId}`);
+      logger.warn(`[Optimistic List] 找不到項目 ID: ${itemId}`);
       return;
     }
 
@@ -347,7 +347,7 @@ export function useOptimisticList(): OptimisticListReturn {
     const index = list.value.findIndex((item: T) => item.id === itemId);
 
     if (index === -1) {
-      console.warn(`[Optimistic List] 找不到項目 ID: ${itemId}`);
+      logger.warn(`[Optimistic List] 找不到項目 ID: ${itemId}`);
       return;
     }
 
@@ -355,11 +355,11 @@ export function useOptimisticList(): OptimisticListReturn {
 
     return optimistic.execute(`toggle-${itemId}-${String(property)}`, {
       optimisticUpdate: () => {
-        list.value[index][property] = !originalValue;
+        (list.value[index] as Record<string, unknown>)[property as string] = !originalValue;
       },
       apiCall,
       rollback: () => {
-        list.value[index][property] = originalValue;
+        (list.value[index] as Record<string, unknown>)[property as string] = originalValue;
       },
     });
   };

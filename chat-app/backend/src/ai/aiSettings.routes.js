@@ -6,6 +6,10 @@
 import express from "express";
 import { refreshAiSettings, getAiSettings } from "../services/aiSettings.service.js";
 import { standardRateLimiter } from "../middleware/rateLimiterConfig.js";
+import {
+  sendSuccess,
+  sendError,
+} from "../../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
@@ -17,19 +21,10 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const settings = await getAiSettings();
-
-    res.json({
-      success: true,
-      settings,
-      cached: true, // 可能來自緩存
-    });
+    sendSuccess(res, { settings, cached: true });
   } catch (error) {
     logger.error("[AI Settings API] 獲取 AI 設定失敗:", error);
-    res.status(500).json({
-      success: false,
-      error: "獲取 AI 設定失敗",
-      message: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取 AI 設定失敗");
   }
 });
 
@@ -50,19 +45,14 @@ router.post("/refresh", standardRateLimiter, async (req, res) => {
 
     logger.info("[AI Settings API] ✅ AI 設定緩存已刷新");
 
-    res.json({
-      success: true,
+    sendSuccess(res, {
       message: "AI 設定緩存已成功刷新",
       settings,
       refreshedAt: new Date().toISOString(),
     });
   } catch (error) {
     logger.error("[AI Settings API] 刷新 AI 設定緩存失敗:", error);
-    res.status(500).json({
-      success: false,
-      error: "刷新 AI 設定緩存失敗",
-      message: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "刷新 AI 設定緩存失敗");
   }
 });
 
@@ -80,24 +70,13 @@ router.get("/:serviceName", async (req, res) => {
     const serviceSettings = allSettings[serviceName];
 
     if (!serviceSettings) {
-      return res.status(404).json({
-        success: false,
-        error: `找不到服務 "${serviceName}" 的設定`,
-      });
+      return sendError(res, "RESOURCE_NOT_FOUND", `找不到服務 "${serviceName}" 的設定`);
     }
 
-    res.json({
-      success: true,
-      serviceName,
-      settings: serviceSettings,
-    });
+    sendSuccess(res, { serviceName, settings: serviceSettings });
   } catch (error) {
     logger.error(`[AI Settings API] 獲取服務 "${req.params.serviceName}" 設定失敗:`, error);
-    res.status(500).json({
-      success: false,
-      error: "獲取 AI 服務設定失敗",
-      message: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取 AI 服務設定失敗");
   }
 });
 

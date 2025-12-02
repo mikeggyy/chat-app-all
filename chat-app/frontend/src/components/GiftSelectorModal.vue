@@ -4,7 +4,8 @@ import { XMarkIcon, CurrencyDollarIcon } from '@heroicons/vue/24/outline';
 import { getGiftList, getGiftPrice, RARITY_CONFIG } from '../config/gifts';
 
 // 會員等級類型
-type MembershipTier = 'free' | 'vip' | 'vvip';
+// ✅ 2025-11-30 更新：新增 Lite 等級
+type MembershipTier = 'free' | 'lite' | 'vip' | 'vvip';
 
 interface Props {
   isOpen?: boolean;
@@ -128,8 +129,9 @@ const hasDiscount = computed(() => {
           </div>
 
           <!-- 折扣提示 -->
+          <!-- ✅ 2025-11-30 更新：新增 Lite 等級折扣 -->
           <div v-if="hasDiscount" class="gift-modal__discount-tip">
-            <span class="discount-badge">{{ membershipTier === 'vip' ? 'VIP 9折' : 'VVIP 8折' }}</span>
+            <span class="discount-badge">{{ membershipTier === 'lite' ? 'Lite 95折' : membershipTier === 'vip' ? 'VIP 9折' : 'VVIP 8折' }}</span>
             優惠中！
           </div>
 

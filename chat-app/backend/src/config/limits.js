@@ -42,7 +42,7 @@ export const TEST_ACCOUNT_LIMITS = {
   // 建議測試值：3 (快速測試), 10 (標準), 999 (幾乎無限)
   ADS_DAILY: 999,
 
-  // 會員等級（"free" | "vip" | "vvip"）
+  // 會員等級（"free" | "lite" | "vip" | "vvip"）
   // 可以改成 "free" 來測試免費用戶的限制行為
   MEMBERSHIP_TIER: "free",
 
@@ -57,16 +57,21 @@ export const TEST_ACCOUNT_LIMITS = {
  * ✅ P1-1 修復：明確定義重置周期
  * - 實際實現：conversationLimit.service.js 使用 RESET_PERIOD.DAILY
  * - 對話次數每日凌晨重置（提升用戶體驗）
+ *
+ * ✅ 2025-12-01 修復：同步前端會員頁面顯示的限制值
  */
 export const CONVERSATION_LIMITS = {
   // 免費用戶每個角色的對話次數
   FREE_PER_CHARACTER: 10,
 
-  // VIP 用戶每個角色的對話次數
-  VIP_PER_CHARACTER: 20,
+  // ✅ 2025-12-01 新增：Lite 用戶每個角色的對話次數（符合前端顯示）
+  LITE_PER_CHARACTER: 30,
 
-  // VVIP 用戶每個角色的對話次數
-  VVIP_PER_CHARACTER: 50,
+  // ✅ 2025-12-01 修復：VIP 用戶每個角色的對話次數（原 20，改為符合前端顯示的 100）
+  VIP_PER_CHARACTER: 100,
+
+  // ✅ 2025-12-01 修復：VVIP 用戶無限對話（原 50，改為 -1 表示無限制）
+  VVIP_PER_CHARACTER: -1,
 
   // 免費用戶每天可觀看廣告解鎖的次數
   FREE_DAILY_AD_LIMIT: 10,
@@ -126,20 +131,25 @@ export const PHOTO_LIMITS = {
   // 免費用戶終生限制（永不重置）
   FREE_LIFETIME: 3,
 
-  // VIP 用戶基礎限制（實際次數來自開通時發放的卡片）
-  VIP_MONTHLY: 0,
+  // ✅ 2025-12-01 修復：Lite 用戶每月 10 張（符合前端顯示）
+  LITE_MONTHLY: 10,
 
-  // VVIP 用戶基礎限制（實際次數來自開通時發放的卡片）
-  VVIP_MONTHLY: 0,
+  // ✅ 2025-12-01 修復：VIP 用戶每月 30 張（符合前端顯示）
+  VIP_MONTHLY: 30,
+
+  // ✅ 2025-12-01 修復：VVIP 用戶每月 100 張（符合前端顯示）
+  VVIP_MONTHLY: 100,
 
   // 測試帳號限制（舊值，保留相容性，實際使用 TEST_ACCOUNT_LIMITS.PHOTOS）
   TEST_ACCOUNT: 100,
 
   // 重置週期
+  // ✅ 2025-12-01 更新：付費會員每月重置
   RESET_PERIOD: {
     FREE: "none", // 免費用戶永不重置（終生限制）
-    VIP: "none", // VIP 使用卡片，不重置
-    VVIP: "none", // VVIP 使用卡片，不重置
+    LITE: "monthly", // ✅ 修復：Lite 每月重置
+    VIP: "monthly", // ✅ 修復：VIP 每月重置
+    VVIP: "monthly", // ✅ 修復：VVIP 每月重置
     TEST: "none", // 測試帳號永不重置
   },
 };
@@ -156,6 +166,9 @@ export const VIDEO_LIMITS = {
   // 免費用戶無影片生成權限
   FREE_LIFETIME: 0,
 
+  // ✅ 2025-11-30 新增：Lite 用戶基礎限制（需金幣購買，無贈送卡片）
+  LITE_MONTHLY: 0,
+
   // VIP 用戶基礎限制（實際次數來自開通時發放的卡片）
   VIP_MONTHLY: 0,
 
@@ -166,8 +179,10 @@ export const VIDEO_LIMITS = {
   TEST_ACCOUNT: 10,
 
   // 重置週期
+  // ✅ 2025-11-30 更新：新增 LITE 等級
   RESET_PERIOD: {
     FREE: "none", // 免費用戶無權限
+    LITE: "none", // Lite 需金幣購買，無重置
     VIP: "none", // VIP 使用卡片，不重置
     VVIP: "none", // VVIP 使用卡片，不重置
     TEST: "monthly", // 測試帳號每月重置

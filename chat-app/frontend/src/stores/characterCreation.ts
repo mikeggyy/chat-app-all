@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { Ref, ComputedRef } from "vue";
+import { logger } from "../utils/logger.js";
 
 /**
  * 角色外觀數據
@@ -316,7 +317,7 @@ export const useCharacterCreationStore = defineStore("characterCreation", () => 
 
         // ✅ 修復：驗證解析後的數據是有效對象
         if (!state || typeof state !== 'object') {
-          console.warn("[CharacterCreationStore] sessionStorage 數據格式無效，已跳過");
+          logger.warn("[CharacterCreationStore] sessionStorage 數據格式無效，已跳過");
           return;
         }
 
@@ -333,7 +334,7 @@ export const useCharacterCreationStore = defineStore("characterCreation", () => 
         aiMagicianUsageCount.value = Number.isFinite(usageCount) && usageCount >= 0 ? usageCount : 0;
       }
     } catch (error) {
-      console.error("[CharacterCreationStore] 從 sessionStorage 加載失敗:", error);
+      logger.error("[CharacterCreationStore] 從 sessionStorage 加載失敗:", error);
     }
   };
 
@@ -355,7 +356,7 @@ export const useCharacterCreationStore = defineStore("characterCreation", () => 
       };
       sessionStorage.setItem("character-creation-state", JSON.stringify(state));
     } catch (error) {
-      console.error("[CharacterCreationStore] 保存到 sessionStorage 失敗:", error);
+      logger.error("[CharacterCreationStore] 保存到 sessionStorage 失敗:", error);
     }
   };
 
@@ -367,7 +368,7 @@ export const useCharacterCreationStore = defineStore("characterCreation", () => 
     try {
       sessionStorage.removeItem("character-creation-state");
     } catch (error) {
-      console.warn("[CharacterCreationStore] 清除 sessionStorage 失敗:", error);
+      logger.warn("[CharacterCreationStore] 清除 sessionStorage 失敗:", error);
     }
   };
 

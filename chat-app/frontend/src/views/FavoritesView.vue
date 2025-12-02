@@ -6,6 +6,7 @@ import { HeartIcon } from "@heroicons/vue/24/solid";
 import { apiJson } from "../utils/api";
 import { fallbackMatches } from "../utils/matchFallback";
 import { useUserProfile } from "../composables/useUserProfile";
+import { logger } from "../utils/logger";
 
 // Types
 interface Match {
@@ -297,7 +298,7 @@ watch(
           ? response.conversations
           : []);
     } catch (error) {
-      console.error('獲取對話列表失敗:', error);
+      logger.error('獲取對話列表失敗:', error);
       fetchedConversations.value = [];
     }
   },

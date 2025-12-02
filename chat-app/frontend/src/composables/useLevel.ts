@@ -6,6 +6,7 @@
 
 import { ref } from 'vue';
 import { apiJson } from '../utils/api.js';
+import { logger } from '../utils/logger.js';
 
 // ==================== 類型定義 ====================
 
@@ -123,7 +124,7 @@ export function useLevel() {
       return levelConfig.value;
     } catch (err: any) {
       error.value = err?.message || '獲取等級配置失敗';
-      console.error('[useLevel] 獲取配置失敗:', err);
+      logger.error('[useLevel] 獲取配置失敗:', err);
       return null;
     } finally {
       isLoadingConfig.value = false;
@@ -156,7 +157,7 @@ export function useLevel() {
       return levelData;
     } catch (err: any) {
       error.value = err?.message || '獲取角色等級失敗';
-      console.error('[useLevel] 獲取角色等級失敗:', err);
+      logger.error('[useLevel] 獲取角色等級失敗:', err);
       return null;
     } finally {
       isLoading.value = false;
@@ -207,7 +208,7 @@ export function useLevel() {
       return result?.data?.list || result?.data?.levels || [];
     } catch (err: any) {
       error.value = err?.message || '獲取等級列表失敗';
-      console.error('[useLevel] 獲取等級列表失敗:', err);
+      logger.error('[useLevel] 獲取等級列表失敗:', err);
       return [];
     } finally {
       isLoading.value = false;
@@ -245,7 +246,7 @@ export function useLevel() {
       return result?.data?.ranking || [];
     } catch (err: any) {
       error.value = err?.message || '獲取排行榜失敗';
-      console.error('[useLevel] 獲取排行榜失敗:', err);
+      logger.error('[useLevel] 獲取排行榜失敗:', err);
       return [];
     } finally {
       isLoading.value = false;
@@ -279,7 +280,7 @@ export function useLevel() {
       return result?.data || null;
     } catch (err: any) {
       error.value = err?.message || '獲取排名失敗';
-      console.error('[useLevel] 獲取排名失敗:', err);
+      logger.error('[useLevel] 獲取排名失敗:', err);
       return null;
     } finally {
       isLoading.value = false;
@@ -328,7 +329,7 @@ export function useLevel() {
       return result;
     } catch (err: any) {
       error.value = err?.message || '領取每日獎勵失敗';
-      console.error('[useLevel] 領取每日獎勵失敗:', err);
+      logger.error('[useLevel] 領取每日獎勵失敗:', err);
       return { alreadyClaimed: true, message: err?.message };
     } finally {
       isLoading.value = false;
@@ -349,7 +350,7 @@ export function useLevel() {
       });
       return result?.data || result;
     } catch (err: any) {
-      console.error('[useLevel] 計算等級失敗:', err);
+      logger.error('[useLevel] 計算等級失敗:', err);
       return null;
     }
   };

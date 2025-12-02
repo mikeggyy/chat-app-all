@@ -1,5 +1,6 @@
 import { ref, computed } from "vue";
 import type { Ref, ComputedRef } from "vue";
+import { logger } from "../../utils/logger.js";
 
 /**
  * 生成的圖片結果
@@ -92,13 +93,13 @@ export function useImageSelection() {
    */
   const selectImage = (resultId: string): void => {
     if (!resultId) {
-      console.warn("[useImageSelection] selectImage: resultId 為空");
+      logger.warn("[useImageSelection] selectImage: resultId 為空");
       return;
     }
 
     const result = generatedResults.value.find((r) => r.id === resultId);
     if (!result) {
-      console.warn(
+      logger.warn(
         `[useImageSelection] selectImage: 找不到 ID 為 ${resultId} 的圖片`
       );
       return;
@@ -119,7 +120,7 @@ export function useImageSelection() {
     // 總是自動選中第一張圖片
     if (results.length > 0) {
       selectedResultId.value = results[0].id;
-      console.log('[useImageSelection] 自動選中第一張:', {
+      logger.log('[useImageSelection] 自動選中第一張:', {
         id: results[0].id,
         total: results.length
       });

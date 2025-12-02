@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { apiJson } from '../../utils/api.js';
 import { fallbackMatches } from '../../utils/matchFallback.js';
+import { logger } from '../../utils/logger.js';
 import type { User } from '../../types';
 
 // ==================== 類型定義 ====================
@@ -89,6 +90,18 @@ export interface UseChatListStateReturn {
 
   // 方法
   selectTab: (tab: TabType) => void;
+}
+
+/**
+ * 收藏夾 API 回應格式
+ * API 可能返回直接的 { matches } 或包裝的 { data: { matches } }
+ */
+interface FavoritesApiResponse {
+  matches?: Match[];
+  data?: {
+    matches?: Match[];
+    [key: string]: any;
+  };
 }
 
 // ==================== 常量 ====================
@@ -194,8 +207,9 @@ const normalizeThread = (
           const day = `${date.getDate()}`.padStart(2, '0');
           return `${month}/${day}`;
         }
-      } catch {
-        // 日期解析失敗時使用預設時間
+      } catch (error) {
+        // ✅ 修復：統一使用 logger 記錄日期解析錯誤
+        logger.warn('[useChatListState] 日期解析失敗，使用預設時間:', updatedAt, error);
       }
     }
     return DEFAULT_TIMES[safeIndex % DEFAULT_TIMES.length];
@@ -471,7 +485,7 @@ export function useChatListState(options: UseChatListStateOptions): UseChatListS
             nextUserId
           )}/favorites?include=matches`,
           { skipGlobalLoading: true }
-        ) as any;
+        ) as FavoritesApiResponse;
 
         if (favoriteRequestToken !== token) {
           return;

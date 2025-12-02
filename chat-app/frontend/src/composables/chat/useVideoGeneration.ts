@@ -60,6 +60,22 @@ export interface GenerateVideoOptions {
 }
 
 /**
+ * 影片 API 回應格式
+ * API 可能返回直接的 { videoUrl } 或包裝的 { data: { videoUrl } }
+ */
+interface VideoApiResponse {
+  videoUrl?: string;
+  duration?: string;
+  resolution?: string;
+  data?: {
+    videoUrl?: string;
+    duration?: string;
+    resolution?: string;
+    [key: string]: any;
+  };
+}
+
+/**
  * useVideoGeneration 依賴項
  */
 export interface UseVideoGenerationDeps {
@@ -296,10 +312,11 @@ export function useVideoGeneration(deps: UseVideoGenerationDeps): UseVideoGenera
         skipGlobalLoading: true, // ✅ 允許用戶繼續聊天
       });
 
+      const typedVideoResult = videoResult as VideoApiResponse | null;
       const normalizedResult =
-        videoResult && typeof videoResult === 'object' && 'videoUrl' in videoResult
-          ? videoResult
-          : (videoResult as any)?.data || null;
+        typedVideoResult && typeof typedVideoResult === 'object' && 'videoUrl' in typedVideoResult
+          ? typedVideoResult
+          : typedVideoResult?.data || null;
 
       logger.log('[VideoGeneration] 影片 API 回應', {
         requestId,

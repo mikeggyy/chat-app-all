@@ -2,6 +2,17 @@ import { reactive } from 'vue';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Extend Window interface for dev tools
+ */
+declare global {
+  interface Window {
+    __apiCache?: ApiCacheService;
+    __cacheKeys?: typeof cacheKeys;
+    __cacheTTL?: typeof cacheTTL;
+  }
+}
+
+/**
  * 統一的 API 緩存服務
  * 提供長期數據緩存，減少重複的 API 請求
  *
@@ -275,7 +286,7 @@ class ApiCacheService {
     const CLEANUP_INTERVAL = 2 * 60 * 1000; // 優化：縮短為 2 分鐘
     const MAX_CACHE_SIZE = 1000; // 最大緩存項目數
 
-    this.cleanupInterval = setInterval(() => {
+    this.cleanupInterval = window.setInterval(() => {
       const now = Date.now();
       const keys = Array.from(this.timestamps.keys());
       let cleaned = 0;
@@ -307,7 +318,7 @@ class ApiCacheService {
       if (cleaned > 0) {
         logger.debug(`[API Cache] 🧹 自動清理: 移除 ${cleaned} 個過期緩存`);
       }
-    }, CLEANUP_INTERVAL) as any;
+    }, CLEANUP_INTERVAL);
   }
 
   /**
@@ -500,9 +511,9 @@ export const cacheTTL = {
  * 在瀏覽器控制台中暴露緩存服務，方便調試
  */
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  (window as any).__apiCache = apiCache;
-  (window as any).__cacheKeys = cacheKeys;
-  (window as any).__cacheTTL = cacheTTL;
+  window.__apiCache = apiCache;
+  window.__cacheKeys = cacheKeys;
+  window.__cacheTTL = cacheTTL;
 
   logger.debug('[API Cache] 🛠️ 開發工具已啟用，可在控制台使用:');
   logger.debug('  - window.__apiCache.getStats() - 查看統計');

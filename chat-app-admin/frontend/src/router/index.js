@@ -68,6 +68,24 @@ const routes = [
         component: () => import("../views/AISettings.vue"),
         meta: { title: "AI 參數設定", icon: "MagicStick" },
       },
+      {
+        path: "rewards",
+        name: "Rewards",
+        component: () => import("../views/Rewards.vue"),
+        meta: { title: "獎勵配置", icon: "Present" },
+      },
+      {
+        path: "flash-sales",
+        name: "FlashSales",
+        component: () => import("../views/FlashSales.vue"),
+        meta: { title: "限時閃購", icon: "Lightning" },
+      },
+      {
+        path: "notifications",
+        name: "Notifications",
+        component: () => import("../views/Notifications.vue"),
+        meta: { title: "通知管理", icon: "Bell" },
+      },
     ],
   },
 ];

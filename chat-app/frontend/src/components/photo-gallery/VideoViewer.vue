@@ -15,6 +15,7 @@
           <XMarkIcon class="icon" />
         </button>
         <video
+          ref="videoRef"
           :src="video.videoUrl || video.video?.url"
           class="video-viewer-player"
           controls
@@ -29,11 +30,13 @@
 </template>
 
 <script setup lang="ts">
-// Types
-
+import { ref, watch, onBeforeUnmount } from 'vue';
 import { XMarkIcon } from '@heroicons/vue/24/outline';
 
-defineProps({
+// ✅ 修復：追蹤 video 元素以便清理
+const videoRef = ref<HTMLVideoElement | null>(null);
+
+const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false,
@@ -45,6 +48,29 @@ defineProps({
 });
 
 defineEmits(['close']);
+
+// ✅ 修復：暫停視頻的輔助函數
+const pauseVideo = (): void => {
+  if (videoRef.value) {
+    videoRef.value.pause();
+    videoRef.value.currentTime = 0;
+  }
+};
+
+// ✅ 修復：當模態關閉時暫停視頻
+watch(
+  () => props.isOpen,
+  (isOpen) => {
+    if (!isOpen) {
+      pauseVideo();
+    }
+  }
+);
+
+// ✅ 修復：組件卸載時暫停視頻
+onBeforeUnmount(() => {
+  pauseVideo();
+});
 </script>
 
 <style scoped>

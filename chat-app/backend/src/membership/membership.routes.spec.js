@@ -478,7 +478,8 @@ describe('Membership API Routes', () => {
     });
 
     it('應該支援清除不同等級的緩存', async () => {
-      const tiers = ['free', 'vip', 'vvip'];
+      // ✅ 2025-11-30 更新：新增 lite 等級
+      const tiers = ['free', 'lite', 'vip', 'vvip'];
 
       for (const tier of tiers) {
         vi.clearAllMocks();

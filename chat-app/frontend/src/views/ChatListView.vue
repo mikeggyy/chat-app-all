@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onBeforeUpdate, reactive, ref, watch, type Ref } from 'vue';
+import { computed, onBeforeUnmount, onBeforeUpdate, reactive, ref, watch, type Ref, type ComponentPublicInstance } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserProfile } from '../composables/useUserProfile';
 import { useFirebaseAuth } from '../composables/useFirebaseAuth';
@@ -70,6 +70,13 @@ const { containerRef } = useInfiniteScroll(loadMoreConversations, {
   threshold: 200,
   enabled: true,
 });
+
+// Ref callback function for conditional binding (avoids `as any`)
+const setScrollContainerRef = (el: Element | ComponentPublicInstance | null): void => {
+  if (!isFavoriteTab.value && el instanceof HTMLElement) {
+    containerRef.value = el;
+  }
+};
 
 // 監聽用戶 ID 變化，載入對話列表
 watch(
@@ -580,7 +587,7 @@ const handleThreadSelect = (thread: Thread): void => {
     <section
       v-if="!isEmpty"
       :id="isFavoriteTab ? 'chat-thread-favorite' : 'chat-thread-all'"
-      :ref="!isFavoriteTab ? (containerRef as any) : undefined"
+      :ref="setScrollContainerRef"
       class="chat-thread-scroll chat-thread-list"
       role="list"
     >

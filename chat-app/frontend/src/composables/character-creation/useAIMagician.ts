@@ -1,5 +1,6 @@
 import { ref, computed, watchEffect, type Ref, type ComputedRef } from "vue";
 import { apiJson } from "../../utils/api.js";
+import { logger } from "../../utils/logger.js";
 
 const AI_MAGICIAN_LIMIT = 3;
 
@@ -9,8 +10,13 @@ const AI_MAGICIAN_LIMIT = 3;
 export interface AppearanceStyle {
   category: string;
   value: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
+
+/**
+ * 外觀樣式輸入 - 可以是樣式物件或樣式 ID 字串
+ */
+export type AppearanceStyleInput = AppearanceStyle | string;
 
 /**
  * 參考圖片焦點類型
@@ -36,9 +42,9 @@ export interface UseAIMagicianReturn {
   isGeneratingDescription: Ref<boolean>;
   referenceError: Ref<string>;
   handleAIMagician: (
-    appearanceStyles: AppearanceStyle[],
+    appearanceStyles: AppearanceStyleInput[],
     referencePreview: string | null,
-    referenceFocus: ReferenceFocus | null
+    referenceFocus: ReferenceFocus | string | null
   ) => Promise<string | null>;
 }
 
@@ -94,9 +100,9 @@ export function useAIMagician(savedGender: Ref<string | null>): UseAIMagicianRet
   });
 
   const handleAIMagician = async (
-    appearanceStyles: AppearanceStyle[],
+    appearanceStyles: AppearanceStyleInput[],
     referencePreview: string | null,
-    referenceFocus: ReferenceFocus | null
+    referenceFocus: ReferenceFocus | string | null
   ): Promise<string | null> => {
     if (isGeneratingDescription.value) {
       return null;
@@ -156,7 +162,7 @@ export function useAIMagician(savedGender: Ref<string | null>): UseAIMagicianRet
         sessionStorage.setItem(sessionKey, newUsageCount.toString());
       } catch {
         // sessionStorage 不可用，僅更新記憶體
-        console.warn('[useAIMagician] 無法保存使用次數到 sessionStorage');
+        logger.warn('[useAIMagician] 無法保存使用次數到 sessionStorage');
       }
       aiMagicianUsageCount.value = newUsageCount;
 

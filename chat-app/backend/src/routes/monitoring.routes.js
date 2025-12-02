@@ -16,6 +16,10 @@ import {
   resetCacheFailureStats,
   getMonitoringDashboard,
 } from "../services/monitoring.service.js";
+import {
+  sendSuccess,
+  sendError,
+} from "../../../../shared/utils/errorFormatter.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
@@ -37,17 +41,10 @@ const router = express.Router();
 router.get("/dashboard", async (req, res) => {
   try {
     const dashboard = await getMonitoringDashboard();
-
-    res.json({
-      success: true,
-      data: dashboard,
-    });
+    sendSuccess(res, dashboard);
   } catch (error) {
     logger.error("[監控 API] 獲取監控儀表板失敗", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取監控儀表板失敗");
   }
 });
 
@@ -72,16 +69,10 @@ router.get("/ad-watch/anomalies", async (req, res) => {
       minTodayCount: minTodayCount ? parseInt(minTodayCount, 10) : 8,
     });
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("[監控 API] 獲取廣告異常用戶失敗", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取廣告異常用戶失敗");
   }
 });
 
@@ -98,16 +89,10 @@ router.get("/ad-watch/user/:userId", async (req, res) => {
       days: days ? parseInt(days, 10) : 7,
     });
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("[監控 API] 檢測用戶廣告異常失敗", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "檢測用戶廣告異常失敗");
   }
 });
 
@@ -134,16 +119,10 @@ router.get("/refunds/statistics", async (req, res) => {
       groupBy: groupBy || 'day',
     });
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("[監控 API] 獲取退款統計失敗", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取退款統計失敗");
   }
 });
 
@@ -164,16 +143,10 @@ router.get("/refunds/high-frequency-users", async (req, res) => {
       days: days ? parseInt(days, 10) : 30,
     });
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("[監控 API] 獲取高頻退款用戶失敗", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取高頻退款用戶失敗");
   }
 });
 
@@ -188,17 +161,10 @@ router.get("/refunds/high-frequency-users", async (req, res) => {
 router.get("/cache/statistics", async (req, res) => {
   try {
     const result = await getCacheStatistics();
-
-    res.json({
-      success: true,
-      data: result,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("[監控 API] 獲取緩存統計失敗", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取緩存統計失敗");
   }
 });
 
@@ -214,17 +180,10 @@ router.post("/cache/reset", async (req, res) => {
     const { cacheType } = req.body;
 
     const result = await resetCacheFailureStats(cacheType || 'all');
-
-    res.json({
-      success: true,
-      data: result,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     logger.error("[監控 API] 重置緩存失敗計數失敗", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "重置緩存失敗計數失敗");
   }
 });
 

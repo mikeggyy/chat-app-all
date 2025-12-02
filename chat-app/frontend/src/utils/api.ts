@@ -1,6 +1,7 @@
 import { withGlobalLoading } from "../composables/useGlobalLoading.js";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth.js";
 import { apiCache } from "../services/apiCache.service.js";
+import { logger } from './logger.js';
 
 /**
  * API 請求選項
@@ -280,7 +281,7 @@ const safeJsonParse = async <T = any>(response: Response): Promise<T> => {
     try {
       return JSON.parse(text) as T;
     } catch {
-      console.warn('[API] 響應不是有效的 JSON:', text.substring(0, 100));
+      logger.warn('[API] 響應不是有效的 JSON:', text.substring(0, 100));
       throw new Error(`Expected JSON response but received: ${contentType || 'unknown'}`);
     }
   }
@@ -289,7 +290,7 @@ const safeJsonParse = async <T = any>(response: Response): Promise<T> => {
   try {
     return await response.json() as T;
   } catch (parseError) {
-    console.error('[API] JSON 解析失敗:', parseError);
+    logger.error('[API] JSON 解析失敗:', parseError);
     throw new Error('Failed to parse JSON response');
   }
 };
@@ -335,7 +336,7 @@ const buildRequestInit = async (options: Partial<ApiOptions> = {}): Promise<Requ
     // 調試日誌：記錄序列化前的 body
     const bodyObj = init.body as Record<string, any>;
     if (bodyObj?.appearance || bodyObj?.persona || bodyObj?.voice) {
-      console.log('[apiJson] Before JSON.stringify - body object:', {
+      logger.log('[apiJson] Before JSON.stringify - body object:', {
         bodyKeys: Object.keys(bodyObj),
         hasAppearance: !!bodyObj.appearance,
         appearanceKeys: bodyObj.appearance ? Object.keys(bodyObj.appearance) : [],
@@ -348,7 +349,7 @@ const buildRequestInit = async (options: Partial<ApiOptions> = {}): Promise<Requ
 
     // 調試日誌：記錄序列化後的 body
     if ((init.body as string).includes('appearance')) {
-      console.log('[apiJson] After JSON.stringify - body string (first 500 chars):', (init.body as string).substring(0, 500));
+      logger.log('[apiJson] After JSON.stringify - body string (first 500 chars):', (init.body as string).substring(0, 500));
     }
 
     init.headers = {
@@ -403,7 +404,7 @@ export const apiFetch = async (path: string, options: ApiOptions = {}): Promise<
       if (!response.ok) {
         // ✅ 處理 401 錯誤：token 過期，自動重試
         if (response.status === 401) {
-          console.warn('[API] Token 過期，嘗試重新獲取 token 並重試...');
+          logger.warn('[API] Token 過期，嘗試重新獲取 token 並重試...');
 
           // 清除 token 緩存
           clearTokenCache();
@@ -419,12 +420,12 @@ export const apiFetch = async (path: string, options: ApiOptions = {}): Promise<
               const retryResponse = await fetch(url, retryInit);
 
               if (retryResponse.ok) {
-                console.log('[API] 使用新 token 重試成功');
+                logger.log('[API] 使用新 token 重試成功');
                 return retryResponse;
               }
             }
           } catch (refreshError) {
-            console.error('[API] Token 重新獲取失敗:', refreshError);
+            logger.error('[API] Token 重新獲取失敗:', refreshError);
             // 如果重新獲取失敗，繼續拋出原始錯誤
           }
         }
@@ -450,7 +451,7 @@ export const apiFetch = async (path: string, options: ApiOptions = {}): Promise<
           }
         } catch (parseError) {
           // ✅ 修復：記錄解析錯誤以便調試
-          console.warn('[API] 無法解析錯誤響應:', parseError instanceof Error ? parseError.message : parseError);
+          logger.warn('[API] 無法解析錯誤響應:', parseError instanceof Error ? parseError.message : parseError);
         }
 
         const error = new Error(errorMessage) as ApiError;
@@ -511,11 +512,11 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
       const response = await apiFetch(path, { ...otherOptions, skipDeduplication: true });
 
       if (otherOptions.rawResponse) {
-        return response as any;
+        return response as unknown as T;
       }
 
       if (response.status === 204) {
-        return null as any;
+        return null as unknown as T;
       }
 
       // ✅ 修復：使用 safeJsonParse 處理 JSON 解析錯誤
@@ -528,7 +529,7 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
 
   // DEBUG: 追蹤非 GET 請求的回應
   if (method === 'DELETE') {
-    console.log('[apiJson] DELETE 請求完成:', {
+    logger.log('[apiJson] DELETE 請求完成:', {
       path,
       status: response.status,
       statusText: response.statusText,
@@ -537,11 +538,11 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
   }
 
   if (otherOptions.rawResponse) {
-    return response as any;
+    return response as unknown as T;
   }
 
   if (response.status === 204) {
-    return null as any;
+    return null as unknown as T;
   }
 
   // ✅ 修復：使用 safeJsonParse 處理 JSON 解析錯誤
@@ -549,7 +550,7 @@ export const apiJson = async <T = any>(path: string, options: ApiOptions = {}): 
 
   // DEBUG: 追蹤 DELETE 請求的 JSON 回應
   if (method === 'DELETE') {
-    console.log('[apiJson] DELETE 請求 JSON 回應:', jsonData);
+    logger.log('[apiJson] DELETE 請求 JSON 回應:', jsonData);
   }
 
   return jsonData;

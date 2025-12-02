@@ -35,18 +35,21 @@ export const videoLimitService = createLimitService({
 
 /**
  * 獲取重置週期（根據會員等級）
+ * ✅ 2025-11-30 更新：新增 Lite 等級支援
  */
 const getResetPeriod = (tier) => {
   if (tier === "guest") {
     return "none"; // 遊客沒有影片生成權限
   } else if (tier === "free") {
-    return VIDEO_LIMITS.RESET_PERIOD.FREE; // none
+    return VIDEO_LIMITS.RESET_PERIOD.FREE; // none (無權限)
+  } else if (tier === "lite") {
+    return VIDEO_LIMITS.RESET_PERIOD.LITE; // none (需金幣購買)
   } else if (tier === "vvip") {
-    return VIDEO_LIMITS.RESET_PERIOD.VVIP; // monthly
+    return VIDEO_LIMITS.RESET_PERIOD.VVIP; // none (使用卡片)
   } else if (tier === "vip") {
-    return VIDEO_LIMITS.RESET_PERIOD.VIP; // monthly
+    return VIDEO_LIMITS.RESET_PERIOD.VIP; // none (使用卡片)
   }
-  return "monthly";
+  return "none";
 };
 
 /**

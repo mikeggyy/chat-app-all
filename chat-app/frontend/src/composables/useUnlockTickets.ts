@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, computed, Ref, ComputedRef } from 'vue';
 import { apiJson } from '../utils/api.js';
 import {
@@ -6,6 +5,7 @@ import {
   generateUnlockPhotoRequestId,
   generateUnlockVideoRequestId,
 } from '../utils/requestId.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 // ============================================================================
 // Type Definitions
@@ -164,7 +164,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
    * @param userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
    * @param options - 選項
    */
-  const loadBalance = async (userId: string, options: LoadOptions = {}): Promise<BalanceResponse> => {
+  const loadBalance = async (_userId: string, options: LoadOptions = {}): Promise<BalanceResponse> => {
     // userId 參數已廢棄，保留是為了向後兼容
     // 後端現在從認證 token 自動獲取 userId
 
@@ -190,7 +190,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
 
       return data;
     } catch (err) {
-      const errorMessage = (err as any)?.message || '載入解鎖卡餘額失敗';
+      const errorMessage = getErrorMessage(err, '載入解鎖卡餘額失敗');
       error.value = errorMessage;
       throw err;
     } finally {
@@ -240,7 +240,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
 
       return data;
     } catch (err) {
-      const errorMessage = (err as any)?.message || '使用角色解鎖券失敗';
+      const errorMessage = getErrorMessage(err, '使用角色解鎖券失敗');
       error.value = errorMessage;
       throw err;
     } finally {
@@ -255,8 +255,8 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
    * @param options - 選項
    */
   const usePhotoCard = async (
-    userId: string,
-    characterId: string,
+    _userId: string,
+    _characterId: string,
     options: LoadOptions = {}
   ): Promise<UseCardResponse> => {
     // userId 和 characterId 參數已廢棄，保留是為了向後兼容
@@ -268,7 +268,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
 
     try {
       // 生成唯一請求ID（用於冪等性保護）
-      const requestId: string = generateUnlockPhotoRequestId(userId || 'user');
+      const requestId: string = generateUnlockPhotoRequestId(_userId || 'user');
 
       const data: UseCardResponse = await apiJson('/api/unlock-tickets/use/photo', {
         method: 'POST',
@@ -285,7 +285,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
 
       return data;
     } catch (err) {
-      const errorMessage = (err as any)?.message || '使用照片解鎖卡失敗';
+      const errorMessage = getErrorMessage(err, '使用照片解鎖卡失敗');
       error.value = errorMessage;
       throw err;
     } finally {
@@ -300,8 +300,8 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
    * @param options - 選項
    */
   const useVideoCard = async (
-    userId: string,
-    characterId: string,
+    _userId: string,
+    _characterId: string,
     options: LoadOptions = {}
   ): Promise<UseCardResponse> => {
     // userId 和 characterId 參數已廢棄，保留是為了向後兼容
@@ -313,7 +313,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
 
     try {
       // 生成唯一請求ID（用於冪等性保護）
-      const requestId: string = generateUnlockVideoRequestId(userId || 'user');
+      const requestId: string = generateUnlockVideoRequestId(_userId || 'user');
 
       const data: UseCardResponse = await apiJson('/api/unlock-tickets/use/video', {
         method: 'POST',
@@ -330,7 +330,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
 
       return data;
     } catch (err) {
-      const errorMessage = (err as any)?.message || '使用視訊卡失敗';
+      const errorMessage = getErrorMessage(err, '使用視訊卡失敗');
       error.value = errorMessage;
       throw err;
     } finally {
@@ -345,7 +345,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
    * @param options - 選項
    */
   const checkTicketAvailability = async (
-    userId: string,
+    _userId: string,
     ticketType: string,
     options: LoadOptions = {}
   ): Promise<boolean> => {
@@ -376,7 +376,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
    * @param userId - 用戶 ID（已廢棄，現在從認證 token 自動獲取）
    * @param options - 選項
    */
-  const loadHistory = async (userId: string, options: LoadOptions = {}): Promise<HistoryResponse> => {
+  const loadHistory = async (_userId: string, options: LoadOptions = {}): Promise<HistoryResponse> => {
     // userId 參數已廢棄，保留是為了向後兼容
     // 後端現在從認證 token 自動獲取 userId
 
@@ -391,7 +391,7 @@ export function useUnlockTickets(): UseUnlockTicketsReturn {
       ticketsState.value.usageHistory = data.history || [];
       return data;
     } catch (err) {
-      const errorMessage = (err as any)?.message || '載入使用記錄失敗';
+      const errorMessage = getErrorMessage(err, '載入使用記錄失敗');
       error.value = errorMessage;
       throw err;
     } finally {

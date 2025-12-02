@@ -1,8 +1,10 @@
 /**
  * 商品分類管理 API 路由
+ * ✅ 2025-12-01 修復：加入權限驗證中間件
  */
 
 import express from 'express';
+import { requireMinRole, requireRole } from '../middleware/admin.middleware.js';
 import {
   getAllCategories,
   createCategory,
@@ -13,7 +15,7 @@ import {
 const router = express.Router();
 
 // 獲取所有分類
-router.get('/', async (req, res) => {
+router.get('/', requireMinRole('moderator'), async (req, res) => {
   try {
     const categories = await getAllCategories();
     res.json({
@@ -29,7 +31,7 @@ router.get('/', async (req, res) => {
 });
 
 // 新增分類
-router.post('/', async (req, res) => {
+router.post('/', requireMinRole('admin'), async (req, res) => {
   try {
     const result = await createCategory(req.body);
     res.json({
@@ -45,7 +47,7 @@ router.post('/', async (req, res) => {
 });
 
 // 更新分類
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireMinRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await updateCategory(id, req.body);
@@ -62,7 +64,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // 刪除分類
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('super_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     await deleteCategory(id);

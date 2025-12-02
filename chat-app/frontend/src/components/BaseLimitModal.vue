@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onBeforeUnmount } from 'vue';
 import { useRouter, type Router } from 'vue-router';
 import {
   XMarkIcon,
@@ -81,6 +81,9 @@ const emit = defineEmits<Emits>();
 const router: Router = useRouter();
 const isWatchingAd = ref<boolean>(false);
 
+// ✅ 修復：追蹤定時器以便清理
+let watchAdTimerId: ReturnType<typeof setTimeout> | null = null;
+
 // 使用配置 composable
 const {
   config,
@@ -103,11 +106,18 @@ const handleWatchAd = async (): Promise<void> => {
   if (!canWatchAd.value || isWatchingAd.value) return;
 
   isWatchingAd.value = true;
+
+  // ✅ 修復：清理之前的定時器（如果有）
+  if (watchAdTimerId !== null) {
+    clearTimeout(watchAdTimerId);
+  }
+
   try {
     emit('watchAd');
   } finally {
-    setTimeout(() => {
+    watchAdTimerId = setTimeout(() => {
       isWatchingAd.value = false;
+      watchAdTimerId = null;
     }, 1000);
   }
 };
@@ -161,6 +171,14 @@ watch(
     }
   }
 );
+
+// ✅ 修復：組件卸載時清理定時器
+onBeforeUnmount(() => {
+  if (watchAdTimerId !== null) {
+    clearTimeout(watchAdTimerId);
+    watchAdTimerId = null;
+  }
+});
 </script>
 
 <template>

@@ -6,6 +6,7 @@
 import { ref, nextTick, onBeforeUnmount, unref, type Ref, type ComputedRef } from 'vue';
 import { apiJson } from '../../utils/api.js';
 import { writeCachedHistory } from '../../utils/conversationCache.js';
+import { logger } from '../../utils/logger.js';
 import { getGiftById } from '../../config/gifts.js';
 import { generateVoiceRequestId, generatePhotoRequestId, generateGiftRequestId } from '../../utils/requestId.js';
 import { giftQueue } from '../../utils/requestQueue.js';
@@ -409,7 +410,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
 
       // 創建禮物消息（帶 emoji）
       const giftMessageId = `msg-gift-${Date.now()}`;
-      const characterName = partner.value?.display_name || (partner.value as any)?.name || '對方';
+      const characterName = partner.value?.display_name || partner.value?.name || '對方';
       const giftMessage: Message = {
         id: giftMessageId,
         role: 'user',
@@ -468,7 +469,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           body: {
             characterData: {
               id: matchId,
-              display_name: partner.value?.display_name || (partner.value as any)?.name,
+              display_name: partner.value?.display_name || partner.value?.name,
               background: partner.value?.background,
               portraitUrl: partner.value?.portraitUrl,
             },
@@ -517,7 +518,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           if (scrollToBottom) scrollToBottom();
         } else if (responseData?.needsRefund) {
           // ✅ 2025-11-24：禮物回應生成失敗，需要退款
-          console.error('[禮物] 禮物回應生成失敗，正在處理退款:', {
+          logger.error('[禮物] 禮物回應生成失敗，正在處理退款:', {
             error: responseData.error,
             message: responseData.errorMessage,
             technical: responseData.technicalDetails
@@ -539,9 +540,9 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
               body: { messageIds: [giftMessageId] },
               skipGlobalLoading: true,
             });
-            console.log('[禮物] ✅ 已從資料庫刪除禮物訊息:', giftMessageId);
+            logger.log('[禮物] ✅ 已從資料庫刪除禮物訊息:', giftMessageId);
           } catch (deleteError) {
-            console.error('[禮物] ❌ 從資料庫刪除禮物訊息失敗:', deleteError);
+            logger.error('[禮物] ❌ 從資料庫刪除禮物訊息失敗:', deleteError);
           }
 
           // 調用退款 API
@@ -565,7 +566,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
               toast.error(`${responseData.errorMessage}，退款處理中，請稍後檢查餘額`);
             }
           } catch (refundError) {
-            console.error('[禮物] 退款失敗:', refundError);
+            logger.error('[禮物] 退款失敗:', refundError);
             toast.error(`${responseData.errorMessage}，退款處理中，請稍後檢查餘額`);
           }
 
@@ -583,7 +584,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
         }
 
         // ✅ 2025-11-24：網絡錯誤也嘗試退款
-        console.error('[禮物] 禮物回應請求失敗，嘗試退款:', photoError);
+        logger.error('[禮物] 禮物回應請求失敗，嘗試退款:', photoError);
 
         // 移除禮物消息
         const giftMsgIndex = messages.value.findIndex((m) => m.id === giftMessageId);
@@ -598,9 +599,9 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
             body: { messageIds: [giftMessageId] },
             skipGlobalLoading: true,
           });
-          console.log('[禮物] ✅ 已從資料庫刪除禮物訊息:', giftMessageId);
+          logger.log('[禮物] ✅ 已從資料庫刪除禮物訊息:', giftMessageId);
         } catch (deleteError) {
-          console.error('[禮物] ❌ 從資料庫刪除禮物訊息失敗:', deleteError);
+          logger.error('[禮物] ❌ 從資料庫刪除禮物訊息失敗:', deleteError);
         }
 
         try {
@@ -617,7 +618,7 @@ export function useChatActions(params: UseChatActionsParams): UseChatActionsRetu
           });
           toast.error(`禮物回應生成失敗，已退款 ${giftData.priceInfo?.finalPrice || gift.price} 金幣`);
         } catch (refundError) {
-          console.error('[禮物] 退款失敗:', refundError);
+          logger.error('[禮物] 退款失敗:', refundError);
           toast.error('禮物回應生成失敗，退款處理中');
         }
 

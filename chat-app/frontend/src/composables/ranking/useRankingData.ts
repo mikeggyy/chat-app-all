@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * 排行榜數據管理 Composable
  * 負責數據獲取、狀態管理和元數據處理
@@ -6,9 +5,9 @@
 
 import { ref, shallowRef, computed, type Ref, type ShallowRef, type ComputedRef } from 'vue';
 import { fetchRanking, RANKING_PAGE_SIZE } from '../../services/ranking.service.js';
-import { apiJsonCached, apiJson, apiCache } from '../../utils/api.js';
+import { apiJson } from '../../utils/api.js';
 import { fallbackMatches } from '../../utils/matchFallback.js';
-import { cacheKeys, cacheTTL } from '../../services/apiCache.service.js';
+import { cacheKeys, apiCache } from '../../services/apiCache.service.js';
 import { logger } from '../../utils/logger.js';
 import {
   normalizeIdentifier,
@@ -142,7 +141,7 @@ export function useRankingData(): UseRankingDataReturn {
         matches = cachedData;
       } else {
         matches = await apiJson("/api/characters");
-        apiCache.set(cacheKey, matches, cacheTTL.matches);
+        apiCache.set(cacheKey, matches);
       }
 
       assignMatchMetadata(matches);

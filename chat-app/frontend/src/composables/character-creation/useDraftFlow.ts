@@ -2,6 +2,7 @@
  * 管理未完成的角色創建流程（草稿）
  */
 import { ref, type Ref } from "vue";
+import { logger } from "../../utils/logger.js";
 
 const DRAFT_FLOW_KEY = "character-creation-draft-flow";
 
@@ -39,7 +40,7 @@ export function useDraftFlow() {
 
       // ✅ 修復：驗證草稿數據完整性
       if (!draft || !draft.flowId || !draft.createdAt || !draft.step) {
-        console.warn('[useDraftFlow] 草稿數據不完整，清除');
+        logger.warn('[useDraftFlow] 草稿數據不完整，清除');
         clearDraft();
         return null;
       }
@@ -49,7 +50,7 @@ export function useDraftFlow() {
 
       // ✅ 修復：驗證日期解析結果，防止 NaN 導致過期檢查失敗
       if (isNaN(createdTime)) {
-        console.warn('[useDraftFlow] 草稿日期格式無效，清除', draft.createdAt);
+        logger.warn('[useDraftFlow] 草稿日期格式無效，清除', draft.createdAt);
         clearDraft();
         return null;
       }
@@ -67,7 +68,7 @@ export function useDraftFlow() {
       draftFlow.value = draft;
       return draft;
     } catch (error) {
-      console.error("[useDraftFlow] 檢查草稿失敗", error);
+      logger.error("[useDraftFlow] 檢查草稿失敗", error);
       clearDraft();
       return null;
     }
@@ -85,9 +86,9 @@ export function useDraftFlow() {
       localStorage.setItem(DRAFT_FLOW_KEY, JSON.stringify(flow));
       hasDraft.value = true;
       draftFlow.value = flow;
-      console.log("[useDraftFlow] 草稿已保存", flow);
+      logger.log("[useDraftFlow] 草稿已保存", flow);
     } catch (error) {
-      console.error("[useDraftFlow] 保存草稿失敗", error);
+      logger.error("[useDraftFlow] 保存草稿失敗", error);
     }
   };
 
@@ -103,9 +104,9 @@ export function useDraftFlow() {
       localStorage.removeItem(DRAFT_FLOW_KEY);
       hasDraft.value = false;
       draftFlow.value = null;
-      console.log("[useDraftFlow] 草稿已清除");
+      logger.log("[useDraftFlow] 草稿已清除");
     } catch (error) {
-      console.error("[useDraftFlow] 清除草稿失敗", error);
+      logger.error("[useDraftFlow] 清除草稿失敗", error);
     }
   };
 

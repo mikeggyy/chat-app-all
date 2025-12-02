@@ -21,6 +21,8 @@
 /**
  * MembershipTabs - 會員方案切換標籤組件
  * 職責：顯示會員方案選項並處理切換
+ *
+ * ✅ 2025-11-30 更新：支援 3 個方案 (Lite, VIP, VVIP)
  */
 
 // Types
@@ -48,8 +50,9 @@ defineEmits<Emits>();
 .membership-tabs {
   margin: -1rem 1.25rem 1.5rem;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: repeat(3, 1fr); /* ✅ 更新：3 欄支援 Lite, VIP, VVIP */
+  gap: 0.5rem;
+  padding: 0.5rem;
   background: rgba(20, 25, 50, 0.9);
   border-radius: 20px;
   border: 1px solid rgba(96, 165, 250, 0.2);

@@ -37,7 +37,13 @@ import { characterStylesRouter } from "./characterStyles/characterStyles.routes.
 import assetPurchaseRouter from "./user/assetPurchase.routes.js";
 import assetPackagesRouter from "./user/assetPackages.routes.js";
 import shopRouter from "./shop/shop.routes.js";
+import bundleRouter from "./payment/bundle.routes.js";
 import aiSettingsRouter from "./ai/aiSettings.routes.js";
+import loginRewardRouter from "./services/loginReward.routes.js";
+import firstPurchaseRouter from "./services/firstPurchase.routes.js";
+import specialOfferRouter from "./services/specialOffer.routes.js";
+import flashSaleRouter from "./services/flashSale.routes.js";
+import notificationRouter from "./services/notification.routes.js";
 import cronRouter from "./routes/cron.routes.js";
 import monitoringRouter from "./routes/monitoring.routes.js";
 import levelRouter from "./level/level.routes.js";
@@ -223,6 +229,12 @@ app.use("/api/character-styles", characterStylesRouter);
 app.use(assetPurchaseRouter);
 app.use(assetPackagesRouter);
 app.use(shopRouter);
+app.use(bundleRouter);  // 組合禮包 API
+app.use(loginRewardRouter);  // 登入獎勵 API
+app.use(firstPurchaseRouter);  // 首購優惠 API
+app.use("/api/offers", specialOfferRouter);  // 特殊優惠 API（首購、回歸）
+app.use("/api/flash-sales", flashSaleRouter);  // 限時閃購 API
+app.use(notificationRouter);  // 通知 API
 
 // 定時任務路由（Cloud Scheduler）
 app.use("/api/cron", cronRouter);

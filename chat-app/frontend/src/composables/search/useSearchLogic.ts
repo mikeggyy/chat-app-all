@@ -1,6 +1,7 @@
 import { ref, computed, onMounted, type Ref, type ComputedRef } from "vue";
 import { fallbackMatches } from "../../utils/matchFallback.js";
 import { apiJsonCached } from "../../utils/api.js";
+import { logger } from "../../utils/logger.js";
 
 // 定義角色匹配介面
 interface Match {
@@ -21,11 +22,12 @@ interface Match {
 }
 
 // 定義顯示結果介面
+// 與 SearchResults.vue 的 CharacterProfile 類型兼容
 interface DisplayResult {
   id: string;
   matchId: string;
-  name: string | undefined;
-  description: string | undefined;
+  name: string;
+  description: string;
   image: string;
   author: string;
 }
@@ -61,13 +63,13 @@ export function useSearchLogic(): UseSearchLogicReturn {
 
       if (Array.isArray(data) && data.length > 0) {
         allCharacters.value = data;
-        console.log(`[搜尋] 成功載入 ${data.length} 個角色`);
+        logger.log(`[搜尋] 成功載入 ${data.length} 個角色`);
       } else {
-        console.warn("[搜尋] API 返回空數據，使用 fallback 數據");
+        logger.warn("[搜尋] API 返回空數據，使用 fallback 數據");
         allCharacters.value = fallbackMatches;
       }
     } catch (error) {
-      console.error("[搜尋] 載入角色失敗:", error);
+      logger.error("[搜尋] 載入角色失敗:", error);
       // 失敗時使用 fallback 數據
       allCharacters.value = fallbackMatches;
     } finally {
@@ -148,8 +150,8 @@ export function useSearchLogic(): UseSearchLogicReturn {
     return source.map((match: Match, index: number): DisplayResult => ({
       id: `search-result-${match.id}-${index}`,
       matchId: match.id,
-      name: match.display_name,
-      description: match.background,
+      name: match.display_name || '未知角色',
+      description: match.background || '',
       image: match.portraitUrl,
       author: formatCreatorHandle(match),
     }));

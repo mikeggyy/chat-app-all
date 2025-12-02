@@ -4,7 +4,7 @@
  * 負責管理對話列表的收藏、刪除操作和操作提示訊息
  */
 
-import { reactive } from 'vue';
+import { reactive, onBeforeUnmount } from 'vue';
 import type { Ref } from 'vue';
 import { apiJson } from '../../utils/api.js';
 import type { User } from '../../types';
@@ -318,6 +318,11 @@ export function useChatListActions(deps: UseChatListActionsDeps): UseChatListAct
       actionMessageTimer = 0;
     }
   };
+
+  // ✅ 修復：自動在組件卸載時清理定時器
+  onBeforeUnmount(() => {
+    cleanup();
+  });
 
   // ==========================================
   // 返回

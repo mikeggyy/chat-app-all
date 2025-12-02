@@ -68,7 +68,26 @@ interface DecoratedEntry {
   score: number;
   rank: number;
   stats: Metadata;
-  [key: string]: any;
+  [key: string]: unknown;
+}
+
+// Component-compatible types (matches RankingPodium/RankingList props)
+interface ComponentRankingEntry {
+  id: string;
+  name: string;
+  avatar: string;
+  score: number;
+  rank: number;
+  subtitle?: string;
+  handle?: string;
+  title?: string;
+  [key: string]: unknown;
+}
+
+interface ComponentPodiumByRank {
+  first?: ComponentRankingEntry;
+  second?: ComponentRankingEntry;
+  third?: ComponentRankingEntry;
 }
 
 interface PeriodOption {
@@ -634,7 +653,7 @@ watch(
     />
 
     <RankingPodium
-      :podium-by-rank="(podiumByRank as any)"
+      :podium-by-rank="(podiumByRank as ComponentPodiumByRank)"
       :format-score="formatScore"
       :is-ready="podiumReady"
       @navigate="handleEntryNavigate"
@@ -642,7 +661,7 @@ watch(
 
     <RankingList
       ref="rankingListRef"
-      :entries="(decoratedEntries as any)"
+      :entries="(decoratedEntries as ComponentRankingEntry[])"
       :format-score="formatScore"
       :is-loading="isInitialLoading"
       :is-loading-more="isLoadingMore"

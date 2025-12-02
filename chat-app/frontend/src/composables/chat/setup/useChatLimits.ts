@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Chat 限制服務
  * 管理對話、語音、照片等使用限制
@@ -11,6 +10,10 @@ import { usePhotoLimit } from '../../usePhotoLimit.js';
 import { useGuestGuard } from '../../useGuestGuard.js';
 import { useCoins } from '../../useCoins.js';
 import { useUnlockTickets } from '../../useUnlockTickets.js';
+import type { LimitCheckResult } from '../../../types';
+
+// Re-export for backwards compatibility
+export type { LimitCheckResult };
 
 // ==================== 類型定義 ====================
 
@@ -78,16 +81,8 @@ export interface UseUnlockTicketsReturn {
   formattedTickets: ComputedRef<FormattedTickets>;
 }
 
-/**
- * 限制檢查結果
- */
-export interface LimitCheckResult {
-  allowed: boolean;
-  remaining: number;
-  total: number;
-  used?: number;
-  resetTime?: Date | string;
-}
+// LimitCheckResult 已從 '../../../types' 導入，避免重複定義
+// 包含屬性: allowed, remaining, total, used?, resetTime?, dailyAdLimit?, adsWatchedToday?, isUnlocked?
 
 /**
  * 每角色限制數據
@@ -124,7 +119,7 @@ export interface PhotoCheckResult extends LimitCheckResult {
  */
 export interface AdUnlockResult {
   success: boolean;
-  remaining: number;
+  remaining?: number;
   message?: string;
   adId?: string;
 }
@@ -146,9 +141,8 @@ export interface UseChatLimitsReturn {
   loadVoiceStats: (userId?: string, options?: any) => Promise<any>;
 
   // Photo Limit
-  checkPhotoLimit: () => Promise<PhotoCheckResult | LimitCheckResult>;
   fetchPhotoStats: () => Promise<any>;
-  canGeneratePhoto: () => Promise<PhotoCheckResult | LimitCheckResult>;
+  canGeneratePhoto: () => Promise<any>;
   photoRemaining: ComputedRef<number>;
 
   // Guest Guard
@@ -194,7 +188,6 @@ export function useChatLimits(): UseChatLimitsReturn {
 
   // Photo Limit
   const {
-    checkPhotoLimit,
     fetchPhotoStats,
     canGeneratePhoto,
     remaining: photoRemaining,
@@ -236,7 +229,6 @@ export function useChatLimits(): UseChatLimitsReturn {
     loadVoiceStats,
 
     // Photo Limit
-    checkPhotoLimit,
     fetchPhotoStats,
     canGeneratePhoto,
     photoRemaining,

@@ -5,11 +5,21 @@ import LoadingSpinner from "../LoadingSpinner.vue";
 import { COIN_ICON_PATH } from "../../config/assets";
 
 // Types
+interface PurchaseStatus {
+  canPurchase: boolean;
+  reason?: string | null;
+  nextAvailableAt?: Date | string | null;
+  purchaseCount?: number;
+  lastPurchaseAt?: Date | string | null;
+}
+
 interface ShopItemData {
   id: string;
   name: string;
   price: number;
   isCoinPackage?: boolean;
+  isBundlePackage?: boolean;  // ✅ 新增：組合禮包標記
+  currency?: string;          // ✅ 新增：貨幣類型
   badge?: string;
   popular?: boolean;
   emoji?: string;
@@ -19,6 +29,7 @@ interface ShopItemData {
   bonusText?: string;
   description?: string;
   effect?: string;
+  purchaseStatus?: PurchaseStatus | null;  // ✅ 新增：購買狀態
   [key: string]: any;
 }
 
@@ -55,10 +66,33 @@ const priceFormatter = new Intl.NumberFormat("zh-TW", {
 const formatCoins = (value: number): string => coinsFormatter.format(value);
 const formatPrice = (value: number): string => priceFormatter.format(value);
 
+// 是否為真金購買（金幣套餐或組合禮包）
+const isRealMoneyPurchase: ComputedRef<boolean> = computed(() => {
+  return props.item.isCoinPackage || props.item.isBundlePackage || false;
+});
+
+// 是否因為限購而無法購買
+const isPurchaseLimited: ComputedRef<boolean> = computed(() => {
+  const status = props.item.purchaseStatus;
+  return status ? !status.canPurchase : false;
+});
+
+// 限購原因文字
+const purchaseLimitReason: ComputedRef<string> = computed(() => {
+  const status = props.item.purchaseStatus;
+  if (status && !status.canPurchase) {
+    return status.reason || "已購買";
+  }
+  return "";
+});
+
 // 是否禁用購買按鈕
 const isDisabled: ComputedRef<boolean> = computed(() => {
   if (props.isPurchasing) return true;
-  if (!props.item.isCoinPackage && props.balance < props.item.price) return true;
+  // 檢查限購狀態
+  if (isPurchaseLimited.value) return true;
+  // 金幣套餐和組合禮包使用真金購買，不檢查金幣餘額
+  if (!isRealMoneyPurchase.value && props.balance < props.item.price) return true;
   if (
     props.item.id === "potion-brain-boost" &&
     props.membershipTier === "vvip"
@@ -70,6 +104,9 @@ const isDisabled: ComputedRef<boolean> = computed(() => {
 
 // 禁用提示
 const disabledTitle: ComputedRef<string> = computed(() => {
+  if (isPurchaseLimited.value) {
+    return purchaseLimitReason.value;
+  }
   if (
     props.item.id === "potion-brain-boost" &&
     props.membershipTier === "vvip"
@@ -139,20 +176,24 @@ const handleCoinIconError = (): void => {
       <button
         type="button"
         class="shop-item__buy-button"
+        :class="{ 'shop-item__buy-button--limited': isPurchaseLimited }"
         :disabled="isDisabled"
         :title="disabledTitle"
         @click="handlePurchase"
       >
         <LoadingSpinner v-if="isPurchasing" size="sm" />
+        <div v-else-if="isPurchaseLimited" class="button-content button-content--limited">
+          <span class="button-limited-text">{{ purchaseLimitReason }}</span>
+        </div>
         <div v-else class="button-content">
           <span class="button-price">
             {{
-              item.isCoinPackage
+              isRealMoneyPurchase
                 ? formatPrice(item.price)
                 : formatCoins(item.price)
             }}
           </span>
-          <span v-if="!item.isCoinPackage" class="button-label"
+          <span v-if="!isRealMoneyPurchase" class="button-label"
             >金幣</span
           >
         </div>
@@ -367,6 +408,21 @@ const handleCoinIconError = (): void => {
         filter: drop-shadow(0 2px 6px rgba(251, 191, 36, 0.3));
       }
     }
+
+    &--bundle {
+      background: linear-gradient(
+        135deg,
+        rgba(236, 72, 153, 0.25),
+        rgba(251, 191, 36, 0.15)
+      );
+      border: 1px solid rgba(236, 72, 153, 0.3);
+      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.2);
+
+      .shop-item__icon {
+        color: #ec4899;
+        filter: drop-shadow(0 2px 6px rgba(236, 72, 153, 0.3));
+      }
+    }
   }
 
   &__icon {
@@ -501,6 +557,32 @@ const handleCoinIconError = (): void => {
       color: rgba(255, 255, 255, 0.85);
       font-weight: 600;
       letter-spacing: 0.03em;
+    }
+
+    .button-content--limited {
+      gap: 0;
+    }
+
+    .button-limited-text {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: 0.02em;
+    }
+
+    &--limited {
+      background: linear-gradient(
+        135deg,
+        rgba(100, 116, 139, 0.7),
+        rgba(71, 85, 105, 0.6)
+      );
+      box-shadow: none;
+      cursor: not-allowed;
+
+      &:hover {
+        transform: none;
+        box-shadow: none;
+      }
     }
   }
 }

@@ -6,7 +6,7 @@
 import { getUserById, upsertUser } from "../user/user.service.js";
 import { getUserProfileWithCache, deleteCachedUserProfile } from "../user/userProfileCache.service.js";
 import { getWalletBalance, createWalletUpdate } from "../user/walletHelpers.js";
-import { MEMBERSHIP_TIERS, hasFeatureAccess } from "./membership.config.js";
+import { MEMBERSHIP_TIERS, SUBSCRIPTION_PRICES, hasFeatureAccess } from "./membership.config.js";
 import { grantTickets } from "./unlockTickets.service.js";
 import { addCoins, TRANSACTION_TYPES } from "../payment/coins.service.js";
 import { createTransactionInTx } from "../payment/transaction.service.js";
@@ -42,7 +42,7 @@ export const clearMembershipConfigCache = (tier = null) => {
 /**
  * 從 Firestore 獲取會員配置（帶快取）
  * ✅ P1-2 優化：增強 fallback 降級策略，使用漸進式重試
- * @param {string} tier - 會員等級 (free, vip, vvip)
+ * @param {string} tier - 會員等級 (free, lite, vip, vvip)
  * @returns {Promise<Object>} 會員配置
  */
 const getMembershipConfigFromFirestore = async (tier) => {
@@ -138,6 +138,136 @@ const getMembershipConfigFromFirestore = async (tier) => {
 
   return fallbackConfig;
 };
+
+// ============================================
+// 補差價升級計算系統（方案 A）
+// ============================================
+
+/**
+ * 計算升級補差價
+ * ✅ 2025-11-30 新增：方案 A 補差價升級
+ *
+ * 計算公式：
+ * - 剩餘價值 = 舊方案日價 × 剩餘天數
+ * - 升級費用 = 新方案月費 - 剩餘價值
+ * - 最低費用 = 0（剩餘價值超過新方案時免費升級）
+ *
+ * @param {string} currentTier - 當前會員等級 (free, lite, vip)
+ * @param {string} targetTier - 目標會員等級 (lite, vip, vvip)
+ * @param {number} daysRemaining - 當前訂閱剩餘天數
+ * @param {string} billingCycle - 訂閱週期 (monthly, quarterly, yearly)
+ * @returns {Object} 升級價格詳情
+ */
+export const calculateProRatedUpgradePrice = (
+  currentTier,
+  targetTier,
+  daysRemaining = 0,
+  billingCycle = "monthly"
+) => {
+  // 等級順序驗證
+  const tierOrder = { free: 0, lite: 1, vip: 2, vvip: 3 };
+
+  if (tierOrder[targetTier] === undefined) {
+    throw new Error(`無效的目標會員等級：${targetTier}`);
+  }
+
+  if (tierOrder[targetTier] <= tierOrder[currentTier]) {
+    throw new Error("只能升級到更高的會員等級");
+  }
+
+  // 獲取新方案價格
+  const targetPrices = SUBSCRIPTION_PRICES[targetTier];
+  if (!targetPrices) {
+    throw new Error(`找不到會員等級價格：${targetTier}`);
+  }
+  const targetMonthlyPrice = targetPrices.monthly.price;
+
+  // 計算當前方案剩餘價值
+  let remainingValue = 0;
+  let currentDailyRate = 0;
+
+  if (currentTier !== "free" && daysRemaining > 0) {
+    const currentPrices = SUBSCRIPTION_PRICES[currentTier];
+    if (currentPrices) {
+      const currentMonthlyPrice = currentPrices.monthly.price;
+      // 以 30 天為一個月計算日價
+      currentDailyRate = Math.round((currentMonthlyPrice / 30) * 100) / 100;
+      remainingValue = Math.round(currentDailyRate * daysRemaining);
+    }
+  }
+
+  // 計算升級費用（最低為 0）
+  const upgradePrice = Math.max(0, targetMonthlyPrice - remainingValue);
+
+  // 計算節省金額
+  const savings = targetMonthlyPrice - upgradePrice;
+
+  return {
+    currentTier,
+    targetTier,
+    billingCycle,
+
+    // 當前方案資訊
+    currentDailyRate,
+    daysRemaining,
+    remainingValue,
+
+    // 新方案資訊
+    targetMonthlyPrice,
+
+    // 升級費用
+    upgradePrice,
+    savings,
+
+    // 升級後的到期日（從今天起算 30 天）
+    newExpiryDays: 30,
+
+    // 說明文字
+    description: remainingValue > 0
+      ? `原方案剩餘 ${daysRemaining} 天（價值 NT$${remainingValue}），升級只需補 NT$${upgradePrice}`
+      : `升級至 ${MEMBERSHIP_TIERS[targetTier]?.name || targetTier} 需 NT$${upgradePrice}`,
+  };
+};
+
+/**
+ * 獲取用戶升級價格預覽
+ * @param {string} userId - 用戶 ID
+ * @param {string} targetTier - 目標會員等級
+ * @returns {Promise<Object>} 升級價格詳情
+ */
+export const getUpgradePricePreview = async (userId, targetTier) => {
+  const user = await getUserProfileWithCache(userId);
+  if (!user) {
+    throw new Error("找不到用戶");
+  }
+
+  const currentTier = user.membershipTier || "free";
+
+  // 計算剩餘天數
+  let daysRemaining = 0;
+  if (currentTier !== "free" && user.membershipExpiresAt) {
+    const expiresAt = new Date(user.membershipExpiresAt);
+    const now = new Date();
+    if (expiresAt > now) {
+      daysRemaining = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  const priceInfo = calculateProRatedUpgradePrice(
+    currentTier,
+    targetTier,
+    daysRemaining
+  );
+
+  return {
+    ...priceInfo,
+    userId,
+    currentTierName: MEMBERSHIP_TIERS[currentTier]?.name || currentTier,
+    targetTierName: MEMBERSHIP_TIERS[targetTier]?.name || targetTier,
+    currentExpiresAt: user.membershipExpiresAt,
+  };
+};
+
 /**
  * 獲取用戶的完整會員資訊
  */
@@ -274,10 +404,13 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
   const currentTier = user.membershipTier || "free";
 
   // 檢查是否為降級操作
-  const tierOrder = { free: 0, vip: 1, vvip: 2 };
+  // ✅ 2025-11-30 更新：新增 Lite 等級支援
+  const tierOrder = { free: 0, lite: 1, vip: 2, vvip: 3 };
   if (tierOrder[targetTier] < tierOrder[currentTier]) {
     throw new Error("不支援降級操作，請取消當前訂閱");
   }
+
+  const now = new Date();
 
   // ✅ Quick Win #1: 防止重複升級導致多次獎勵發放
   // 檢查同一等級同一天內是否已經升級過
@@ -291,21 +424,12 @@ export const upgradeMembership = async (userId, targetTier, options = {}) => {
     }
   }
 
-  const now = new Date();
   const durationMonths = options.durationMonths || 1;
 
-  // 計算到期日
-  let expiresAt;
-  if (currentTier !== "free" && user.membershipExpiresAt) {
-    // 如果已經是付費會員，從當前到期日延長
-    expiresAt = new Date(user.membershipExpiresAt);
-    if (expiresAt < now) {
-      expiresAt = now; // 如果已過期，從現在開始算
-    }
-  } else {
-    expiresAt = new Date(now);
-  }
-
+  // ✅ 2025-11-30 修改：方案 A 補差價模式
+  // 到期日一律從今天起算，不累加舊的剩餘天數
+  // 補差價的計算由 calculateProRatedUpgradePrice 處理
+  let expiresAt = new Date(now);
   expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
 
   // TODO: 這裡應該整合支付系統
@@ -774,10 +898,11 @@ export const checkAndDowngradeExpiredMemberships = async () => {
   try {
     const now = new Date();
 
-    // 🔍 查詢所有付費會員（vip 或 vvip），且狀態為 active
+    // 🔍 查詢所有付費會員（lite, vip 或 vvip），且狀態為 active
+    // ✅ 2025-11-30 更新：新增 Lite 等級
     const usersSnapshot = await db
       .collection("users")
-      .where("membershipTier", "in", ["vip", "vvip"])
+      .where("membershipTier", "in", ["lite", "vip", "vvip"])
       .where("membershipStatus", "==", "active")
       .get();
 
@@ -973,4 +1098,7 @@ export default {
   distributeMonthlyRewards,
   clearMembershipConfigCache, // 新增：清除會員配置快取
   checkAndDowngradeExpiredMemberships, // 🔒 P2-2: 批量過期會員檢查
+  // ✅ 2025-11-30 新增：補差價升級系統
+  calculateProRatedUpgradePrice,
+  getUpgradePricePreview,
 };

@@ -1,6 +1,7 @@
 /**
  * 金幣系統服務
  * 處理金幣的消費、充值、交易記錄
+ * ✅ 2025-12-02 優化：整合管理員操作審計日誌
  */
 
 import { getUserById, upsertUser } from "../user/user.service.js";
@@ -23,6 +24,7 @@ import {
 import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import { CacheManager } from "../utils/CacheManager.js";
 import logger from "../utils/logger.js";
+import { logRefund } from "../services/adminAudit.service.js";
 
 // ✅ 優化：使用統一的 CacheManager 替代自定義緩存
 const aiFeaturePricesCache = new CacheManager({
@@ -573,10 +575,11 @@ export const refundCoins = (userId, amount, reason) => {
  * @param {number} options.refundDaysLimit - 退款期限（天數），默認 7 天
  * @param {boolean} options.forceRefund - 是否強制退款（跳過時間和資產使用檢查），默認 false
  *                                        ⚠️ 僅供管理員使用，需要在路由層驗證管理員權限
+ * @param {string} options.adminId - 執行退款的管理員 ID（用於審計）
  * @returns {Promise<Object>} 退款結果
  */
 export const refundPurchase = async (userId, transactionId, reason, options = {}) => {
-  const { refundDaysLimit = 7, forceRefund = false } = options;
+  const { refundDaysLimit = 7, forceRefund = false, adminId = null } = options;
 
   // ✅ P0-1 安全檢查：記錄強制退款操作（便於審計）
   if (forceRefund) {
@@ -588,7 +591,8 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
 
   const db = getFirestoreDb();
 
-  return await db.runTransaction(async (transaction) => {
+  // ✅ 2025-12-02 修復：將 transaction 結果存儲到變量，以便後續審計日誌使用
+  const result = await db.runTransaction(async (transaction) => {
     // 1. 查詢原交易
     const txRef = db.collection("transactions").doc(transactionId);
     const txDoc = await transaction.get(txRef);
@@ -841,6 +845,30 @@ export const refundPurchase = async (userId, transactionId, reason, options = {}
       },
     };
   });
+
+  // ✅ 2025-12-02 新增：記錄退款審計日誌（Transaction 完成後異步記錄）
+  if (adminId || forceRefund) {
+    try {
+      await logRefund(
+        adminId || "system",
+        userId,
+        transactionId,
+        result.refundAmount,
+        reason,
+        forceRefund,
+        {
+          originalAmount: result.originalAmount,
+          isPartialRefund: result.isPartialRefund,
+          usedAssetValue: result.usedAssetValue,
+        }
+      );
+    } catch (auditError) {
+      // 審計日誌失敗不應影響主流程
+      logger.error(`[退款] 審計日誌記錄失敗:`, auditError);
+    }
+  }
+
+  return result;
 };
 
 /**

@@ -17,9 +17,11 @@ const MODEL_USAGE_COLLECTION = "model_usage_stats";
 /**
  * Brain Boost 藥水的每日使用限制
  * 防止單個用戶過度使用導致成本爆炸
+ * ✅ 2025-11-30 更新：新增 Lite 等級
  */
 const BRAIN_BOOST_DAILY_LIMIT = {
   free: 30, // 免費用戶：每天 30 次對話
+  lite: 50, // Lite 用戶：每天 50 次對話
   vip: 100, // VIP 用戶：每天 100 次對話
   vvip: 300, // VVIP 用戶：每天 300 次對話（他們本身就用 GPT-4o，這個藥水對他們無效）
 };

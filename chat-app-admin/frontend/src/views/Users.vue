@@ -288,12 +288,40 @@ const editForm = reactive({
   },
 });
 
+// ✅ 2025-12-01 修復：增加更完整的表單驗證規則
 const editRules = {
   email: [
     { required: true, message: "請輸入郵箱", trigger: "blur" },
     { type: "email", message: "請輸入正確的郵箱格式", trigger: "blur" },
   ],
-  displayName: [{ required: true, message: "請輸入顯示名稱", trigger: "blur" }],
+  displayName: [
+    { required: true, message: "請輸入顯示名稱", trigger: "blur" },
+    { min: 2, max: 50, message: "顯示名稱長度應在 2-50 個字符之間", trigger: "blur" },
+  ],
+  membershipTier: [
+    { required: true, message: "請選擇會員等級", trigger: "change" },
+  ],
+  coins: [
+    {
+      validator: (rule, value, callback) => {
+        if (value === undefined || value === null || value === "") {
+          callback();
+          return;
+        }
+        const num = Number(value);
+        if (isNaN(num)) {
+          callback(new Error("金幣必須是數字"));
+        } else if (num < 0) {
+          callback(new Error("金幣不能為負數"));
+        } else if (!Number.isInteger(num)) {
+          callback(new Error("金幣必須是整數"));
+        } else {
+          callback();
+        }
+      },
+      trigger: "blur",
+    },
+  ],
 };
 
 function getMembershipTagType(tier) {

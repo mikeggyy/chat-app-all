@@ -26,14 +26,17 @@ interface GiftPriceResult {
 
 /**
  * 會員等級
+ * ✅ 2025-11-30 更新：新增 Lite 等級
  */
-type MembershipTier = 'free' | 'vip' | 'vvip';
+type MembershipTier = 'free' | 'lite' | 'vip' | 'vvip';
 
 /**
  * 會員折扣映射
+ * ✅ 2025-11-30 更新：新增 Lite 折扣
  */
 const DISCOUNT_MAP: Record<MembershipTier, number> = {
   free: 0,
+  lite: 0.05,  // 95折
   vip: 0.1,    // 9折
   vvip: 0.2,   // 8折
 };

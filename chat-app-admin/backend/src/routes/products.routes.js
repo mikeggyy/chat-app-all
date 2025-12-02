@@ -1,8 +1,10 @@
 /**
  * 商品管理 API 路由
+ * ✅ 2025-12-01 修復：加入權限驗證中間件
  */
 
 import express from 'express';
+import { requireMinRole, requireRole } from '../middleware/admin.middleware.js';
 import {
   getAllCoinPackages,
   createCoinPackage,
@@ -25,7 +27,7 @@ const router = express.Router();
  */
 
 // 獲取所有金幣套餐
-router.get('/coins', async (req, res) => {
+router.get('/coins', requireMinRole('moderator'), async (req, res) => {
   try {
     const packages = await getAllCoinPackages();
     res.json({
@@ -41,7 +43,7 @@ router.get('/coins', async (req, res) => {
 });
 
 // 新增金幣套餐
-router.post('/coins', async (req, res) => {
+router.post('/coins', requireMinRole('admin'), async (req, res) => {
   try {
     const result = await createCoinPackage(req.body);
     res.json({
@@ -57,7 +59,7 @@ router.post('/coins', async (req, res) => {
 });
 
 // 更新金幣套餐
-router.put('/coins/:id', async (req, res) => {
+router.put('/coins/:id', requireMinRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await updateCoinPackage(id, req.body);
@@ -74,7 +76,7 @@ router.put('/coins/:id', async (req, res) => {
 });
 
 // 刪除金幣套餐
-router.delete('/coins/:id', async (req, res) => {
+router.delete('/coins/:id', requireRole('super_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     await deleteCoinPackage(id);
@@ -95,7 +97,7 @@ router.delete('/coins/:id', async (req, res) => {
  */
 
 // 獲取所有禮物
-router.get('/gifts', async (req, res) => {
+router.get('/gifts', requireMinRole('moderator'), async (req, res) => {
   try {
     const gifts = await getAllGifts();
     res.json({
@@ -111,7 +113,7 @@ router.get('/gifts', async (req, res) => {
 });
 
 // 新增禮物
-router.post('/gifts', async (req, res) => {
+router.post('/gifts', requireMinRole('admin'), async (req, res) => {
   try {
     const result = await createGift(req.body);
     res.json({
@@ -127,7 +129,7 @@ router.post('/gifts', async (req, res) => {
 });
 
 // 更新禮物
-router.put('/gifts/:id', async (req, res) => {
+router.put('/gifts/:id', requireMinRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await updateGift(id, req.body);
@@ -144,7 +146,7 @@ router.put('/gifts/:id', async (req, res) => {
 });
 
 // 刪除禮物
-router.delete('/gifts/:id', async (req, res) => {
+router.delete('/gifts/:id', requireRole('super_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     await deleteGift(id);
@@ -165,7 +167,7 @@ router.delete('/gifts/:id', async (req, res) => {
  */
 
 // 獲取所有道具
-router.get('/potions', async (req, res) => {
+router.get('/potions', requireMinRole('moderator'), async (req, res) => {
   try {
     const potions = await getAllPotions();
     res.json({
@@ -181,7 +183,7 @@ router.get('/potions', async (req, res) => {
 });
 
 // 新增道具
-router.post('/potions', async (req, res) => {
+router.post('/potions', requireMinRole('admin'), async (req, res) => {
   try {
     const result = await createPotion(req.body);
     res.json({
@@ -197,7 +199,7 @@ router.post('/potions', async (req, res) => {
 });
 
 // 更新道具
-router.put('/potions/:id', async (req, res) => {
+router.put('/potions/:id', requireMinRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const result = await updatePotion(id, req.body);
@@ -214,7 +216,7 @@ router.put('/potions/:id', async (req, res) => {
 });
 
 // 刪除道具
-router.delete('/potions/:id', async (req, res) => {
+router.delete('/potions/:id', requireRole('super_admin'), async (req, res) => {
   try {
     const { id } = req.params;
     await deletePotion(id);
@@ -242,7 +244,7 @@ import {
 } from './products-universal.service.js';
 
 // 獲取指定集合的所有商品
-router.get('/collection/:collectionName', async (req, res) => {
+router.get('/collection/:collectionName', requireMinRole('moderator'), async (req, res) => {
   try {
     const { collectionName } = req.params;
     const products = await getProductsByCollection(collectionName);
@@ -259,7 +261,7 @@ router.get('/collection/:collectionName', async (req, res) => {
 });
 
 // 新增商品到指定集合
-router.post('/collection/:collectionName', async (req, res) => {
+router.post('/collection/:collectionName', requireMinRole('admin'), async (req, res) => {
   try {
     const { collectionName } = req.params;
     const result = await createProduct(collectionName, req.body);
@@ -276,7 +278,7 @@ router.post('/collection/:collectionName', async (req, res) => {
 });
 
 // 更新指定集合的商品
-router.put('/collection/:collectionName/:id', async (req, res) => {
+router.put('/collection/:collectionName/:id', requireMinRole('admin'), async (req, res) => {
   try {
     const { collectionName, id } = req.params;
     const result = await updateProduct(collectionName, id, req.body);
@@ -293,7 +295,7 @@ router.put('/collection/:collectionName/:id', async (req, res) => {
 });
 
 // 刪除指定集合的商品
-router.delete('/collection/:collectionName/:id', async (req, res) => {
+router.delete('/collection/:collectionName/:id', requireRole('super_admin'), async (req, res) => {
   try {
     const { collectionName, id } = req.params;
     await deleteProduct(collectionName, id);

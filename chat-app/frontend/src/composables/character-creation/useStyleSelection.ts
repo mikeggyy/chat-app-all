@@ -1,6 +1,7 @@
 import { ref, onMounted } from "vue";
 import type { Ref } from "vue";
 import { apiJson } from "../../utils/api.js";
+import { logger } from "../../utils/logger.js";
 
 const STYLE_THUMBNAIL_BASE = "/character-create/styles";
 const STYLE_VERSION = "v2";
@@ -106,7 +107,7 @@ export function useStyleSelection(): UseStyleSelectionReturn {
         );
       } catch (error) {
         // ✅ 修復：記錄 sessionStorage 錯誤，便於調試
-        console.warn('[useStyleSelection] 保存風格版本到 sessionStorage 失敗:', error);
+        logger.warn('[useStyleSelection] 保存風格版本到 sessionStorage 失敗:', error);
       }
       return false; // Version mismatch, need to clear
     }

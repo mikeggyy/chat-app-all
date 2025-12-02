@@ -3,6 +3,7 @@ import type { Ref, ComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import type { Router } from "vue-router";
 import { apiJson } from "../../utils/api.js";
+import { logger } from "../../utils/logger.js";
 import { useUserProfile } from "../useUserProfile.js";
 import { useToast } from "../useToast.js";
 import {
@@ -29,6 +30,26 @@ interface AppearanceData {
  */
 interface ClearStateOptions {
   preserveGender?: boolean;
+}
+
+/**
+ * 用戶資產 API 響應
+ */
+interface UserAssetsResponse {
+  data?: {
+    createCards?: number;
+    [key: string]: any;
+  };
+}
+
+/**
+ * 角色創建限制 API 響應
+ */
+interface CharacterCreationLimitsResponse {
+  data?: {
+    remainingFreeCreations?: number;
+    [key: string]: any;
+  };
 }
 
 /**
@@ -123,10 +144,10 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
         {
           skipGlobalLoading: true,
         }
-      ) as any;
+      ) as UserAssetsResponse;
 
       if (assetsResponse?.data) {
-        userCreateCards.value = assetsResponse.data.createCards || 0;
+        userCreateCards.value = assetsResponse.data.createCards ?? 0;
       }
 
       // 獲取免費創建次數（從 limits API）
@@ -135,10 +156,10 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
         {
           skipGlobalLoading: true,
         }
-      ) as any;
+      ) as CharacterCreationLimitsResponse;
 
       if (limitsResponse?.data) {
-        freeCreationsRemaining.value = limitsResponse.data.remainingFreeCreations || 0;
+        freeCreationsRemaining.value = limitsResponse.data.remainingFreeCreations ?? 0;
       }
     } catch (error) {
       // 使用預設值
@@ -192,7 +213,7 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
     isGenerateConfirmVisible.value = false;
 
     // 調試日誌：檢查 appearanceData
-    console.log('[confirmGenerate] appearanceData:', {
+    logger.log('[confirmGenerate] appearanceData:', {
       hasDescription: !!appearanceData.description,
       descriptionLength: appearanceData.description?.length || 0,
       hasStyles: !!appearanceData.styles,
@@ -252,7 +273,7 @@ export function usePurchaseFlow(savedGender: Ref<string>): UsePurchaseFlowReturn
         storeCharacterCreationFlowId(flow.id);
 
         // 調試日誌：檢查保存後的 flow
-        console.log('[confirmGenerate] Flow saved:', {
+        logger.log('[confirmGenerate] Flow saved:', {
           flowId: flow.id,
           hasAppearance: !!flow.appearance,
           hasDescription: !!flow.appearance?.description,

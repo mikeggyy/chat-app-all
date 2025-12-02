@@ -222,16 +222,16 @@ onMounted(async () => {
       }
 
       // 調試日誌：查看完整的 API 返回數據
-      console.log('[角色創建限制] API 返回數據:', response);
-      console.log('[角色創建限制] response.limit:', response?.limit);
-      console.log('[角色創建限制] response.data:', response?.data);
-      console.log('[角色創建限制] response.data?.limit:', response?.data?.limit);
+      logger.log('[角色創建限制] API 返回數據:', response);
+      logger.log('[角色創建限制] response.limit:', response?.limit);
+      logger.log('[角色創建限制] response.data:', response?.data);
+      logger.log('[角色創建限制] response.data?.limit:', response?.data?.limit);
 
       // 後端使用 sendSuccess() 會將數據包裝為 { success: true, data: {...} }
       const limitData = response?.data?.limit || response?.limit;
 
       if (limitData) {
-        console.log('[角色創建限制] 使用的 limitData:', limitData);
+        logger.log('[角色創建限制] 使用的 limitData:', limitData);
 
         // 如果 remaining 是 -1 代表無限制
         const newValue = limitData.remaining === -1
@@ -441,8 +441,8 @@ onBeforeUnmount(() => {
     <CharacterCreationLimitModal
       :is-open="showLimitModal"
       :used-creations="usedCreations"
-      :total-limit="(totalLimit as any)"
-      :standard-total="(standardTotal as any)"
+      :total-limit="totalLimit"
+      :standard-total="standardTotal"
       :is-test-account="isTestAccount"
       :membership-tier="membershipTier"
       :create-cards="createCards"

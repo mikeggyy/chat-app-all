@@ -5,6 +5,7 @@
  */
 
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
+import { logger } from '../utils/logger.js';
 
 // ==================== 類型定義 ====================
 
@@ -53,7 +54,7 @@ const startLoading = (): void => {
   if (activeRequests.value < MAX_ACTIVE_REQUESTS) {
     activeRequests.value += 1;
   } else {
-    console.warn('[useGlobalLoading] 達到最大活動請求數限制，可能存在計數器洩漏');
+    logger.warn('[useGlobalLoading] 達到最大活動請求數限制，可能存在計數器洩漏');
   }
 };
 
@@ -72,7 +73,7 @@ const stopLoading = (): void => {
  */
 const resetLoading = (): void => {
   if (activeRequests.value !== 0) {
-    console.warn(`[useGlobalLoading] 重置計數器，之前的值: ${activeRequests.value}`);
+    logger.warn(`[useGlobalLoading] 重置計數器，之前的值: ${activeRequests.value}`);
   }
   activeRequests.value = 0;
   isForcedHidden.value = false;

@@ -4,6 +4,7 @@
  */
 
 import { ref, computed, Ref, ComputedRef } from 'vue';
+import { logger } from '../utils/logger.js';
 
 /**
  * 加載狀態管理選項
@@ -209,7 +210,7 @@ export function useLoadingState(
           try {
             onError(error as Error);
           } catch (callbackError) {
-            console.error('[useLoadingState] onError callback threw:', callbackError);
+            logger.error('[useLoadingState] onError callback threw:', callbackError);
           }
         }
         throw error;

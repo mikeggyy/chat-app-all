@@ -5,7 +5,7 @@ import { useSearchLogic } from "../composables/search/useSearchLogic";
 import { useRecentConversations } from "../composables/search/useRecentConversations";
 import { usePopularRanking } from "../composables/search/usePopularRanking";
 import { useContributionRanking } from "../composables/search/useContributionRanking";
-import { useRecordDetail } from "../composables/search/useRecordDetail";
+import { useRecordDetail, type PanelType } from "../composables/search/useRecordDetail";
 
 // 組件
 import SearchBar from "../components/search/SearchBar.vue";
@@ -18,7 +18,11 @@ import RecordDetailPanel from "../components/search/RecordDetailPanel.vue";
 // Types
 interface CharacterProfile {
   matchId?: string;
-  [key: string]: any;
+  id?: string;
+  name?: string;
+  image?: string;
+  author?: string;
+  description?: string;
 }
 
 const router = useRouter();
@@ -66,12 +70,17 @@ const {
   handleRecordsScroll,
   openChatForEntry,
 } = useRecordDetail(
-  recentConversations as any,
+  recentConversations,
   popularCharacters,
   popularHasMore,
   fetchPopularCharacters,
   contributionCharacters
 );
+
+// 事件處理器包裝函數 - 將 string 轉換為 PanelType
+const handleOpenPanel = (panelType: string): void => {
+  openRecentRecords(panelType as PanelType);
+};
 
 // 打開聊天
 const openChat = (profile: CharacterProfile | null): void => {
@@ -103,7 +112,7 @@ const openChat = (profile: CharacterProfile | null): void => {
           :conversations="recentlyViewed"
           :is-loading="isLoadingRecent"
           :show-empty="Boolean(user?.id && recentConversations.length === 0)"
-          @open-panel="(openRecentRecords as any)"
+          @open-panel="handleOpenPanel"
           @character-click="openChat"
         />
 
@@ -111,7 +120,7 @@ const openChat = (profile: CharacterProfile | null): void => {
         <PopularRankingPanel
           :characters="popularRanking"
           :is-loading="isLoadingPopular"
-          @open-panel="(openRecentRecords as any)"
+          @open-panel="handleOpenPanel"
           @character-click="openChat"
         />
 
@@ -127,7 +136,7 @@ const openChat = (profile: CharacterProfile | null): void => {
       <!-- 搜尋結果 -->
       <template v-else>
         <SearchResults
-          :results="(displayedResults as any)"
+          :results="displayedResults"
           :query="searchQuery"
           :is-fallback="isFallbackResult"
           @reset="resetSearch"

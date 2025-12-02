@@ -10,6 +10,11 @@
           免費
         </div>
         <div
+          class="comparison-table__cell comparison-table__cell--header comparison-table__cell--lite"
+        >
+          Lite
+        </div>
+        <div
           class="comparison-table__cell comparison-table__cell--header comparison-table__cell--vip"
         >
           VIP
@@ -39,6 +44,11 @@
           </div>
           <div class="comparison-table__cell">{{ item.free }}</div>
           <div
+            class="comparison-table__cell comparison-table__cell--highlight-lite"
+          >
+            {{ item.lite }}
+          </div>
+          <div
             class="comparison-table__cell comparison-table__cell--highlight"
           >
             {{ item.vip }}
@@ -58,12 +68,15 @@
 /**
  * ComparisonTable - 會員方案對比表格組件
  * 職責：顯示各會員方案的功能對比
+ *
+ * ✅ 2025-11-30 更新：新增 Lite 欄位
  */
 
 // Types
 interface ComparisonItem {
   name: string;
   free: string;
+  lite: string;
   vip: string;
   vvip: string;
 }
@@ -99,7 +112,7 @@ defineProps<Props>();
 
 .comparison-table__header {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
 }
@@ -117,6 +130,14 @@ defineProps<Props>();
   color: rgba(217, 226, 255, 0.9);
   font-size: 0.8rem;
   letter-spacing: 0.05em;
+}
+
+.comparison-table__cell--lite {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.2),
+    rgba(20, 184, 166, 0.2)
+  );
 }
 
 .comparison-table__cell--vip {
@@ -152,7 +173,7 @@ defineProps<Props>();
 
 .comparison-table__row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
 }
@@ -162,6 +183,12 @@ defineProps<Props>();
   font-weight: 500;
   padding-left: 0.75rem;
   color: rgba(217, 226, 255, 0.85);
+}
+
+.comparison-table__cell--highlight-lite {
+  background: rgba(16, 185, 129, 0.1);
+  font-weight: 600;
+  color: rgba(110, 231, 183, 0.95);
 }
 
 .comparison-table__cell--highlight {
@@ -180,13 +207,13 @@ defineProps<Props>();
 @media (max-width: 640px) {
   .comparison-table__header,
   .comparison-table__row {
-    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr 0.8fr;
     gap: 0.25rem;
   }
 
   .comparison-table__cell {
     padding: 0.5rem 0.25rem;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
   }
 
   .comparison-table__cell--name {

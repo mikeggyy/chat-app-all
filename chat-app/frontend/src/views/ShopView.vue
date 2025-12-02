@@ -14,16 +14,22 @@ import ShopCategories from "../components/shop/ShopCategories.vue";
 import ShopItemsList from "../components/shop/ShopItemsList.vue";
 import { apiJson } from "../utils/api";
 import { useShopCategories } from "../composables/shop/useShopCategories";
-import { useShopItems } from "../composables/shop/useShopItems";
-import { useShopPurchase } from "../composables/shop/useShopPurchase";
+import {
+  useShopItems,
+  type AssetPackageData,
+  type PotionPackageData,
+  type BundlePackageData,
+} from "../composables/shop/useShopItems";
+import { useShopPurchase, type ShopItem } from "../composables/shop/useShopPurchase";
 
-// Types
-interface AssetPackage {
-  [key: string]: any;
-}
-
-interface PotionPackage {
-  [key: string]: any;
+// Type for component event (compatible with ShopItem)
+interface ShopItemEvent {
+  id: string;
+  name: string;
+  price: number;
+  category?: string;
+  isCoinPackage?: boolean;
+  [key: string]: unknown;
 }
 
 const router = useRouter();
@@ -44,8 +50,9 @@ const { error: showError } = useToast();
 const { dialogState, handleConfirm, handleCancel } = usePurchaseConfirm();
 
 const isCoinIconAvailable: Ref<boolean> = ref(true);
-const assetPackages: Ref<AssetPackage[]> = ref([]);
-const potionPackages: Ref<PotionPackage[]> = ref([]);
+const assetPackages: Ref<AssetPackageData[]> = ref([]);
+const potionPackages: Ref<PotionPackageData[]> = ref([]);
+const bundlePackages: Ref<BundlePackageData[]> = ref([]);
 const isLoadingPackages: Ref<boolean> = ref(false);
 
 // 使用分類管理 Composable
@@ -60,9 +67,10 @@ const {
 
 // 使用商品管理 Composable
 const { filteredItems, COIN_ICON_PATH: _COIN_ICON_PATH } = useShopItems(
-  packages as any,
-  assetPackages as any,
-  potionPackages as any,
+  packages,
+  assetPackages,
+  potionPackages,
+  bundlePackages,
   activeCategory
 );
 
@@ -90,6 +98,13 @@ const handleCoinIconError = () => {
   }
 };
 
+// Wrapper function to handle component event type conversion
+// ShopItemEvent and ShopItem have slightly different required properties
+// but the runtime data always includes category from the shop items
+const onPurchase = (item: ShopItemEvent): void => {
+  handlePurchase(item as unknown as ShopItem);
+};
+
 // 從 API 加載解鎖卡套餐
 const loadAssetPackages = async () => {
   try {
@@ -114,6 +129,31 @@ const loadPotionPackages = async () => {
   }
 };
 
+// 從 API 加載組合禮包
+const loadBundlePackages = async () => {
+  try {
+    // 如果已登入，使用帶狀態的端點
+    const userId = user.value?.id;
+    const isGuest = userId ? isGuestUser(userId) : true;
+
+    if (!isGuest && userId) {
+      // 已登入用戶：獲取含購買狀態的禮包列表
+      const response = await apiJson("/api/bundles/me");
+      if (response.success) {
+        bundlePackages.value = response.packages || [];
+      }
+    } else {
+      // 訪客用戶：獲取公開禮包列表
+      const response = await apiJson("/api/bundles");
+      if (response.success) {
+        bundlePackages.value = response.packages || [];
+      }
+    }
+  } catch (error) {
+    logger.error("加載組合禮包失敗:", error);
+  }
+};
+
 // 監聽路由變化，更新分類（當用戶在商城頁面內導航時）
 watch(
   () => route.query.category,
@@ -132,7 +172,7 @@ onMounted(async () => {
   // 加載所有商品數據（公開 API，不需要認證）
   isLoadingPackages.value = true;
   try {
-    await Promise.all([loadAssetPackages(), loadPotionPackages()]);
+    await Promise.all([loadAssetPackages(), loadPotionPackages(), loadBundlePackages()]);
   } catch (err) {
     logger.error("加載商品失敗:", err);
   } finally {
@@ -193,7 +233,7 @@ onMounted(async () => {
       :membership-tier="membershipInfo?.tier || 'free'"
       :is-coin-icon-available="isCoinIconAvailable"
       :category-description="activeCategoryInfo?.description"
-      @purchase="(handlePurchase as any)"
+      @purchase="onPurchase"
       @coin-icon-error="handleCoinIconError"
     />
 

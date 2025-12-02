@@ -3,11 +3,13 @@ import { computed } from "vue";
 import { BoltIcon, SparklesIcon } from "@heroicons/vue/24/solid";
 import { ClockIcon } from "@heroicons/vue/24/outline";
 
-type MembershipTier = "free" | "vip" | "vvip";
+// ✅ 2025-11-30 更新：新增 Lite 等級
+type MembershipTier = "free" | "lite" | "vip" | "vvip";
 
 interface Props {
   tier?: MembershipTier;
   tierName?: string;
+  isLite?: boolean;
   isVIP?: boolean;
   isVVIP?: boolean;
   isPaidMember?: boolean;
@@ -20,6 +22,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   tier: "free",
   tierName: "免費會員",
+  isLite: false,
   isVIP: false,
   isVVIP: false,
   isPaidMember: false,
@@ -33,9 +36,11 @@ const emit = defineEmits<{
   "upgrade-click": [];
 }>();
 
+// ✅ 2025-11-30 更新：新增 Lite 樣式
 const cardClass = computed(() => {
   if (props.isVVIP) return "vip-card--vvip";
   if (props.isVIP) return "vip-card--vip";
+  if (props.isLite) return "vip-card--lite";
   return "vip-card--free";
 });
 
@@ -51,10 +56,12 @@ const expiryWarningClass = computed(() => {
   return "";
 });
 
+// ✅ 2025-11-30 更新：新增 Lite 按鈕文字
 const buttonText = computed(() => {
   if (props.isVVIP) return "續訂會員";
   if (props.isVIP) return "升級至 VVIP";
-  return "開通 VIP";
+  if (props.isLite) return "升級至 VIP";
+  return "開通會員";
 });
 
 const handleUpgradeClick = () => {
@@ -133,6 +140,17 @@ const handleUpgradeClick = () => {
     background: linear-gradient(135deg, rgba(30, 33, 48, 0.9), rgba(20, 23, 38, 0.95));
   }
 
+  // ✅ 2025-11-30 新增：Lite 樣式
+  &--lite {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(20, 184, 166, 0.1));
+    border-color: rgba(16, 185, 129, 0.3);
+
+    &:hover {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(20, 184, 166, 0.15));
+      border-color: rgba(16, 185, 129, 0.5);
+    }
+  }
+
   &--vip {
     background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
     border-color: rgba(251, 191, 36, 0.3);
@@ -172,6 +190,12 @@ const handleUpgradeClick = () => {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.15);
 
+    // ✅ 2025-11-30 新增：Lite 樣式
+    .vip-card--lite & {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(20, 184, 166, 0.15));
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
     .vip-card--vip & {
       background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
       border-color: rgba(251, 191, 36, 0.3);
@@ -187,6 +211,11 @@ const handleUpgradeClick = () => {
     width: 22px;
     height: 22px;
     color: rgba(226, 232, 240, 0.7);
+
+    // ✅ 2025-11-30 新增：Lite 樣式
+    .vip-card--lite & {
+      color: #10b981;
+    }
 
     .vip-card--vip & {
       color: #fbbf24;
@@ -211,6 +240,11 @@ const handleUpgradeClick = () => {
     color: #f1f5f9;
     line-height: 1.2;
     white-space: nowrap;
+
+    // ✅ 2025-11-30 新增：Lite 樣式
+    .vip-card--lite & {
+      color: #10b981;
+    }
 
     .vip-card--vip & {
       color: #fbbf24;
@@ -269,6 +303,11 @@ const handleUpgradeClick = () => {
 
     .vip-card:hover & {
       color: rgba(226, 232, 240, 0.9);
+    }
+
+    // ✅ 2025-11-30 新增：Lite 樣式
+    .vip-card--lite:hover & {
+      color: #10b981;
     }
 
     .vip-card--vip:hover & {

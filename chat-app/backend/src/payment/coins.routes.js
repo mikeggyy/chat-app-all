@@ -167,15 +167,9 @@ router.get(
       offset: offset ? parseInt(offset, 10) : undefined,
     });
 
-    res.json({
-      success: true,
-      ...history,
-    });
+    sendSuccess(res, history);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取交易記錄失敗");
   }
 });
 
@@ -192,13 +186,9 @@ router.get(
   async (req, res) => {
   try {
     const packages = await getCoinPackages();
-
-    res.json(packages);
+    sendSuccess(res, packages);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "INTERNAL_SERVER_ERROR", "獲取金幣套餐失敗");
   }
 });
 
@@ -221,17 +211,11 @@ router.post(
     const { packageId, paymentInfo, idempotencyKey } = req.body;
 
     if (!packageId) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供 packageId",
-      });
+      return sendError(res, "VALIDATION_ERROR", "請提供 packageId", { field: "packageId" });
     }
 
     if (!idempotencyKey) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供 idempotencyKey（冪等性鍵）以防止重複購買",
-      });
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", { field: "idempotencyKey" });
     }
 
     // 檢查是否啟用開發模式繞過
@@ -260,8 +244,7 @@ router.post(
           { ttl: IDEMPOTENCY_TTL.COIN_PACKAGE } // 15 分鐘
         );
 
-        return res.json({
-          success: true,
+        return sendSuccess(res, {
           message: "購買成功（開發模式）",
           devMode: true,
           ...result,
@@ -278,16 +261,10 @@ router.post(
       // 2. 等待支付完成
       // 3. 驗證支付成功後才執行購買
 
-      return res.status(501).json({
-        success: false,
-        error: "支付系統尚未整合，請聯繫管理員",
-      });
+      return sendError(res, "NOT_IMPLEMENTED", "支付系統尚未整合，請聯繫管理員");
     }
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "PURCHASE_FAILED", error.message);
   }
 });
 
@@ -311,17 +288,11 @@ router.post(
     const { amount, idempotencyKey } = req.body;
 
     if (!amount || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供有效的 amount",
-      });
+      return sendError(res, "VALIDATION_ERROR", "請提供有效的 amount", { field: "amount" });
     }
 
     if (!idempotencyKey) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供 idempotencyKey（冪等性鍵）以防止重複充值",
-      });
+      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複充值", { field: "idempotencyKey" });
     }
 
     // ✅ 修復：限制僅測試帳號可用
@@ -346,8 +317,7 @@ router.post(
         { ttl: IDEMPOTENCY_TTL.COIN_RECHARGE } // 15 分鐘
       );
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: `成功充值 ${amount} 金幣`,
         ...result,
       });
@@ -356,10 +326,7 @@ router.post(
       return sendError(res, "FORBIDDEN", error.message);
     }
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "BAD_REQUEST", error.message);
   }
 });
 
@@ -382,10 +349,7 @@ router.post(
     const { balance } = req.body;
 
     if (typeof balance !== "number" || balance < 0) {
-      return res.status(400).json({
-        success: false,
-        error: "請提供有效的金幣數量（必須為非負整數）",
-      });
+      return sendError(res, "VALIDATION_ERROR", "請提供有效的金幣數量（必須為非負整數）", { field: "balance" });
     }
 
     // ✅ 加強：使用統一的驗證函數
@@ -399,8 +363,7 @@ router.post(
 
       const result = await setCoinsBalance(userId, Math.floor(balance));
 
-      return res.json({
-        success: true,
+      return sendSuccess(res, {
         message: `成功設定金幣餘額為 ${result.newBalance}`,
         ...result,
       });
@@ -409,10 +372,7 @@ router.post(
       return sendError(res, "FORBIDDEN", error.message);
     }
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
+    sendError(res, "BAD_REQUEST", error.message);
   }
 });
 

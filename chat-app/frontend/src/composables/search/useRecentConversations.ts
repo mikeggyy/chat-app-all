@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ref, computed, watch, type Ref, type ComputedRef } from "vue";
 import { apiJson } from "../../utils/api.js";
 import { fallbackMatches } from "../../utils/matchFallback.js";
@@ -20,8 +19,9 @@ interface ConversationCharacter {
 
 /**
  * API 返回的對話記錄項目
+ * 與 useRecordDetail.Conversation 結構兼容
  */
-interface ConversationItem {
+export interface ConversationItem {
   conversationId?: string;
   characterId?: string;
   id?: string;

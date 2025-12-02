@@ -33,6 +33,21 @@ const importScripts = [
     description: "導入角色創建可選風格配置",
   },
   {
+    name: "藥水商品",
+    file: "scripts/import-potions.js",
+    description: "導入藥水商品配置",
+  },
+  {
+    name: "資產套餐",
+    file: "scripts/import-asset-packages.js",
+    description: "導入解鎖卡、創建卡等資產套餐",
+  },
+  {
+    name: "組合禮包",
+    file: "scripts/import-bundle-packages.js",
+    description: "導入組合禮包配置",
+  },
+  {
     name: "測試資料",
     file: "scripts/seed-test-data.js",
     description: "導入測試用戶和對話資料（可選）",

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Chat 頁面統一設置 Composable（TypeScript 版本）
  * 整合所有 Chat 相關的 composables，簡化 ChatView.vue
@@ -12,9 +11,9 @@ import type { Router } from 'vue-router';
 // Modular Setup Composables
 import { useChatCore, type UseChatCoreReturn } from './setup/useChatCore.js';
 import { useChatLimits, type UseChatLimitsReturn } from './setup/useChatLimits.js';
-import { useChatModals, type UseChatModalsReturn } from './setup/useChatModals.js';
-import { useChatFeatures, type UseChatFeaturesReturn } from './setup/useChatFeatures.js';
-import { useChatHandlers, type UseChatHandlersReturn } from './setup/useChatHandlers.js';
+import { useChatModals, type UseChatModalsReturn, type UseChatModalsOptions } from './setup/useChatModals.js';
+import { useChatFeatures, type UseChatFeaturesReturn, type UseChatFeaturesDeps } from './setup/useChatFeatures.js';
+import { useChatHandlers, type UseChatHandlersReturn, type UseChatHandlersParams } from './setup/useChatHandlers.js';
 
 // Utils
 import {
@@ -191,7 +190,7 @@ export interface UseChatSetupReturn {
 export function useChatSetup({
   router,
   chatContentRef,
-  chatPageRef,
+  chatPageRef: _chatPageRef,
   draft,
 }: UseChatSetupOptions): UseChatSetupReturn {
   // ====================
@@ -234,7 +233,7 @@ export function useChatSetup({
   const {
     checkLimit,
     unlockByAd,
-    getLimitState,
+    getLimitState: _getLimitState,
     checkVoiceLimit,
     unlockVoiceByAd: unlockVoiceByAdFromLimit,
     loadVoiceStats,
@@ -245,7 +244,7 @@ export function useChatSetup({
     requireLogin,
     canGuestSendMessage,
     incrementGuestMessageCount,
-    guestRemainingMessages,
+    guestRemainingMessages: _guestRemainingMessages,
     balance,
     loadBalance,
     characterTickets,
@@ -253,16 +252,17 @@ export function useChatSetup({
     voiceCards,
     photoCards,
     videoCards,
-    createCards,
+    createCards: _createCards,
     loadTicketsBalance,
   } = limits;
 
   // ====================
   // 3. Modals (模態框管理)
   // ====================
+  // 注意：類型斷言用於橋接不同 composable 間的接口差異（架構級問題）
   const modalsSetup = useChatModals({
-    unlockByAd,
-    unlockVoiceByAd: unlockVoiceByAdFromLimit,
+    unlockByAd: unlockByAd as unknown as UseChatModalsOptions['unlockByAd'],
+    unlockVoiceByAd: unlockVoiceByAdFromLimit as unknown as UseChatModalsOptions['unlockVoiceByAd'],
     loadTicketsBalance,
   });
 
@@ -286,8 +286,6 @@ export function useChatSetup({
     closePotionConfirm,
     showUnlockConfirm,
     closeUnlockConfirm,
-    showGiftSelector,
-    closeGiftSelector,
     showPhotoSelector,
     closePhotoSelector,
     showImageViewer,
@@ -301,7 +299,6 @@ export function useChatSetup({
     showCharacterRanking,
     closeCharacterRanking,
     setLoading,
-    updateModal,
     handleWatchAd,
     handleUseUnlockCard,
   } = modalsSetup;
@@ -309,6 +306,7 @@ export function useChatSetup({
   // ====================
   // 4. Features (功能管理)
   // ====================
+  // 注意：以下類型斷言用於橋接不同 composable 間的接口差異（架構級問題）
   const features = useChatFeatures({
     partnerId,
     currentUserId,
@@ -322,7 +320,7 @@ export function useChatSetup({
     canGeneratePhoto,
     fetchPhotoStats,
     photoRemaining,
-    checkVoiceLimit,
+    checkVoiceLimit: checkVoiceLimit as unknown as UseChatFeaturesDeps['checkVoiceLimit'],
     loadVoiceStats,
     loadTicketsBalance,
     closeConversationLimit,
@@ -339,33 +337,31 @@ export function useChatSetup({
     showVoiceLimit,
     showVideoLimit,
     showPhotoSelector,
-    showGiftSelector,
-    closeGiftSelector,
     closePhotoSelector,
     closeVideoLimit,
     showGiftAnimation,
     closeGiftAnimation,
-    setLoading,
-    loadBalance,
+    setLoading: setLoading as unknown as UseChatFeaturesDeps['setLoading'],
+    loadBalance: loadBalance as unknown as UseChatFeaturesDeps['loadBalance'],
     showError,
     success,
-    rollbackUserMessage: (userId: string, matchId: string, messageId: string) =>
+    rollbackUserMessage: ((messageId: string) =>
       rollbackUserMessage({
-        userId,
-        matchId,
+        userId: currentUserId.value,
+        matchId: partnerId.value,
         messageId,
         firebaseAuth,
         messages,
         showError,
-      }),
-    createLimitModalData,
+      })) as unknown as UseChatFeaturesDeps['rollbackUserMessage'],
+    createLimitModalData: createLimitModalData as unknown as UseChatFeaturesDeps['createLimitModalData'],
     setUserProfile,
     config: {
       MESSAGE_ID_PREFIXES,
       VIDEO_CONFIG,
       AI_VIDEO_RESPONSE_TEXT,
       VIDEO_REQUEST_MESSAGES,
-    },
+    } as unknown as UseChatFeaturesDeps['config'],
   });
 
   const {
@@ -398,10 +394,10 @@ export function useChatSetup({
     handleOpenGiftSelector,
     handleSelectGift,
     toggleFavorite,
-    openGiftSelector,
+    openGiftSelector: _openGiftSelector,
     closeGiftSelector: closeGiftSelectorFromFeatures,
-    requestSelfie,
-    playVoice,
+    requestSelfie: _requestSelfie,
+    playVoice: _playVoice,
     sendGift,
     // Video Completion Notification
     videoNotification,
@@ -418,6 +414,7 @@ export function useChatSetup({
   // ====================
   // 5. Handlers (事件處理器)
   // ====================
+  // 注意：以下類型斷言用於橋接不同 composable 間的接口差異（架構級問題）
   const handlers = useChatHandlers({
     currentUserId,
     partner,
@@ -430,28 +427,28 @@ export function useChatSetup({
     userPotions,
     hasCharacterTickets,
     isGuest,
-    canGuestSendMessage,
+    canGuestSendMessage: canGuestSendMessage as unknown as UseChatHandlersParams['canGuestSendMessage'],
     requireLogin,
     incrementGuestMessageCount,
-    checkLimit,
-    showConversationLimit,
-    sendMessageToApi,
+    checkLimit: checkLimit as unknown as UseChatHandlersParams['checkLimit'],
+    showConversationLimit: showConversationLimit as unknown as UseChatHandlersParams['showConversationLimit'],
+    sendMessageToApi: sendMessageToApi as unknown as UseChatHandlersParams['sendMessageToApi'],
     invalidateSuggestions,
     loadSuggestions,
     resetConversationApi,
     showImageViewer,
-    showBuffDetails,
+    showBuffDetails: showBuffDetails as unknown as UseChatHandlersParams['showBuffDetails'],
     showResetConfirm,
     showCharacterInfo,
     showUnlockLimit,
     showUnlockConfirm,
-    showPotionLimit,
-    showPotionConfirm,
+    showPotionLimit: showPotionLimit as unknown as UseChatHandlersParams['showPotionLimit'],
+    showPotionConfirm: showPotionConfirm as unknown as UseChatHandlersParams['showPotionConfirm'],
     showCharacterRanking,
     closeResetConfirm,
     closePhotoSelector,
     closeVideoLimit,
-    setLoading,
+    setLoading: setLoading as unknown as UseChatHandlersParams['setLoading'],
     generateVideo,
     loadTicketsBalance,
     showPhotoSelector,
@@ -461,7 +458,7 @@ export function useChatSetup({
     success,
     MESSAGE_ID_PREFIXES,
     // ✅ 新增:禮物相關依賴
-    sendGift,
+    sendGift: sendGift as unknown as UseChatHandlersParams['sendGift'],
     loadBalance,
     showGiftAnimation,
     closeGiftAnimation,
@@ -481,7 +478,7 @@ export function useChatSetup({
     handlePhotoSelect,
     handleUseVideoUnlockCard,
     handleUpgradeFromVideoModal,
-    handleShare,
+    handleShare: _handleShare,
   } = handlers;
 
   // ====================

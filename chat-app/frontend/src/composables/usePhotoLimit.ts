@@ -78,13 +78,13 @@ export function usePhotoLimit(): UsePhotoLimitReturn {
   const userId = computed(() => user.value?.id || '');
 
   const tier = computed(() => {
-    const data = photoLimitData.value as PhotoLimitInfo | LimitCheckResult | null;
-    return (data as any)?.tier || 'free';
+    const data = photoLimitData.value as PhotoLimitInfo | null;
+    return data?.tier || 'free';
   });
 
   const remaining = computed(() => {
     const data = photoLimitData.value as PhotoLimitInfo | LimitCheckResult | null;
-    return (data as any)?.remaining || 0;
+    return data?.remaining || 0;
   });
 
   const used = computed(() => {
@@ -93,13 +93,15 @@ export function usePhotoLimit(): UsePhotoLimitReturn {
   });
 
   const total = computed(() => {
-    const data = photoLimitData.value as PhotoLimitInfo | LimitCheckResult | null;
-    return (data as any)?.photosLimit || (data as any)?.total || 0;
+    const data = photoLimitData.value as PhotoLimitInfo | null;
+    // API 可能返回 photosLimit 或 total
+    return data?.photosLimit ?? data?.total ?? 0;
   });
 
   const cards = computed(() => {
     const data = photoLimitData.value as PhotoLimitInfo | null;
-    return (data as any)?.photoCards || 0; // ✅ 修復：後端返回的是 photoCards
+    // API 返回 photoCards 或 cards
+    return data?.photoCards ?? data?.cards ?? 0;
   });
 
   const resetPeriod = computed(() => {
@@ -164,17 +166,23 @@ export function usePhotoLimit(): UsePhotoLimitReturn {
       return '';
     }
 
-    const tierValue = (data as any).tier || 'free';
+    const tierValue = data.tier || 'free';
     const resetPeriodValue = data.resetPeriod || 'lifetime';
-    const photosLimit = (data as any).photosLimit || (data as any).total || 0;
+    const photosLimit = data.photosLimit ?? data.total ?? 0;
 
-    if (resetPeriodValue === 'lifetime') {
+    // ✅ 2025-11-30 更新：新增 Lite 等級支援
+    if (resetPeriodValue === 'lifetime' || resetPeriodValue === 'none') {
+      if (tierValue === 'lite') {
+        return `Lite 會員可用金幣購買 AI 照片`;
+      }
       return `免費用戶終生 ${photosLimit} 次`;
     } else if (resetPeriodValue === 'monthly') {
       if (tierValue === 'vvip') {
         return `VVIP 會員每月 ${photosLimit} 次`;
       } else if (tierValue === 'vip') {
         return `VIP 會員每月 ${photosLimit} 次`;
+      } else if (tierValue === 'lite') {
+        return `Lite 會員可用金幣購買 AI 照片`;
       }
     }
 

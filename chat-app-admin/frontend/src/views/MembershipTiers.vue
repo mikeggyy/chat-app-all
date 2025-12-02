@@ -18,12 +18,14 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="功能限制" min-width="300">
+        <el-table-column label="功能限制" min-width="400">
           <template #default="{ row }">
             <div style="font-size: 12px">
-              <div>對話: {{ row.features?.messagesPerCharacter === -1 ? '無限' : row.features?.messagesPerCharacter }}</div>
-              <div>語音: {{ row.features?.voicesPerCharacter === -1 ? '無限' : row.features?.voicesPerCharacter }}</div>
-              <div>創建角色: {{ row.features?.maxCreatedCharacters }}/月</div>
+              <div>對話: {{ row.features?.messagesPerCharacter === -1 ? '無限' : row.features?.messagesPerCharacter }}/角色</div>
+              <div>語音: {{ row.features?.voicesPerCharacter === -1 ? '無限' : row.features?.voicesPerCharacter }}/角色</div>
+              <div>AI 照片: {{ row.features?.monthlyPhotos || 0 }}/月</div>
+              <div>解鎖券: {{ row.features?.characterUnlockCards || 0 }}/月</div>
+              <div>移除廣告: {{ row.features?.requireAds === false ? '✓' : '✗' }}</div>
             </div>
           </template>
         </el-table-column>
@@ -148,10 +150,14 @@
           <el-input-number v-model="editForm.features.dailyAdLimitPerCharacter" :min="0" />
         </el-form-item>
 
-        <el-divider content-position="left">開通時發放</el-divider>
+        <el-divider content-position="left">每月福利（訂閱期間每月發放）</el-divider>
 
-        <el-form-item label="角色解鎖票">
-          <el-input-number v-model="editForm.features.characterUnlockTickets" :min="0" />
+        <el-form-item label="每月 AI 照片額度">
+          <el-input-number v-model="editForm.features.monthlyPhotos" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="每月角色解鎖券">
+          <el-input-number v-model="editForm.features.characterUnlockCards" :min="0" />
         </el-form-item>
 
         <el-form-item label="創建角色卡">
@@ -205,6 +211,9 @@ const editDialogVisible = ref(false);
 const saveLoading = ref(false);
 const editFormRef = ref(null);
 
+/**
+ * ✅ 2025-11-30 更新：新增 monthlyPhotos, prioritySupport 等欄位
+ */
 const editForm = reactive({
   id: "",
   name: "",
@@ -229,14 +238,24 @@ const editForm = reactive({
     adsToUnlock: 0,
     unlockedMessagesPerAd: 5,
     dailyAdLimitPerCharacter: 3,
-    characterUnlockTickets: 0,
+    // 每月福利
+    monthlyPhotos: 0,
+    characterUnlockCards: 0,
     characterCreationCards: 0,
     photoUnlockCards: 0,
     videoUnlockCards: 0,
     monthlyCoinsBonus: 0,
     coinsDiscount: 0,
+    // AI 功能
     aiPhotoGeneration: false,
     aiPhotoDiscount: 0,
+    aiVideoDiscount: 0,
+    // 專屬特權
+    prioritySupport: false,
+    vipBadge: false,
+    vvipBadge: false,
+    earlyAccess: false,
+    exclusiveCharacters: false,
   },
 });
 

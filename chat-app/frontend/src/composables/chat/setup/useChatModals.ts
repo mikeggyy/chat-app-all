@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Chat 模態框管理（TypeScript 版本）
  * 統一管理所有彈窗的顯示/隱藏狀態
@@ -78,8 +77,6 @@ export function useChatModals({
     closePhotoLimit,
     showVideoLimit,
     closeVideoLimit,
-    showGiftSelector,
-    closeGiftSelector,
     showPhotoSelector,
     closePhotoSelector,
     showImageViewer,
@@ -88,6 +85,10 @@ export function useChatModals({
     closeGiftAnimation,
     showCharacterRanking,
     closeCharacterRanking,
+    showComboAnimation,
+    closeComboAnimation,
+    showLevelUpAnimation,
+    closeLevelUpAnimation,
     setLoading,
     hasOpenModal,
     hasLoadingAction,
@@ -125,7 +126,6 @@ export function useChatModals({
     showVoiceLimit,
     showPhotoLimit,
     showVideoLimit,
-    showGiftSelector,
     showPhotoSelector,
     showImageViewer,
     showCharacterRanking,
@@ -142,7 +142,6 @@ export function useChatModals({
     closeVoiceLimit,
     closePhotoLimit,
     closeVideoLimit,
-    closeGiftSelector,
     closePhotoSelector,
     closeImageViewer,
     closeCharacterRanking,
@@ -163,6 +162,10 @@ export function useChatModals({
     update,
     showGiftAnimation,
     closeGiftAnimation,
+    showComboAnimation,
+    closeComboAnimation,
+    showLevelUpAnimation,
+    closeLevelUpAnimation,
     hasOpenModal,
     hasLoadingAction,
   };

@@ -209,20 +209,66 @@ export const sendError = (res, errorCode, customMessage = null, details = null) 
  *
  * @param {Object} res - Express Response
  * @param {*} data - 響應數據
+ * @param {number|Object} [statusOrMeta] - HTTP 狀態碼（默認 200）或元數據對象
  * @param {Object} [meta] - 元數據（分頁、統計等）
  *
  * @example
  * sendSuccess(res, users, { total: 100, page: 1, limit: 20 });
+ * sendSuccess(res, newUser, 201); // 201 Created
+ * sendSuccess(res, newUser, 201, { requestId: 'req_123' });
  */
-export const sendSuccess = (res, data, meta = null) => {
+export const sendSuccess = (res, data, statusOrMeta = null, meta = null) => {
+  // 判斷第三個參數是狀態碼還是元數據
+  let statusCode = 200;
+  let metaData = meta;
+
+  if (typeof statusOrMeta === "number") {
+    statusCode = statusOrMeta;
+  } else if (statusOrMeta && typeof statusOrMeta === "object") {
+    metaData = statusOrMeta;
+  }
+
   const response = {
     success: true,
     data,
+    timestamp: new Date().toISOString(),
   };
 
-  if (meta) {
-    response.meta = meta;
+  if (metaData) {
+    response.meta = metaData;
   }
+
+  res.status(statusCode).json(response);
+};
+
+/**
+ * 快速發送分頁成功響應
+ *
+ * @param {Object} res - Express Response
+ * @param {Array} items - 數據列表
+ * @param {Object} pagination - 分頁信息
+ * @param {number} pagination.total - 總數
+ * @param {number} pagination.page - 當前頁碼
+ * @param {number} pagination.limit - 每頁數量
+ * @param {boolean} [pagination.hasMore] - 是否還有更多
+ *
+ * @example
+ * sendPaginatedSuccess(res, users, { total: 100, page: 1, limit: 20 });
+ */
+export const sendPaginatedSuccess = (res, items, pagination) => {
+  const { total, page, limit, hasMore } = pagination;
+
+  const response = {
+    success: true,
+    data: items,
+    meta: {
+      total,
+      page,
+      limit,
+      hasMore: hasMore !== undefined ? hasMore : (page * limit < total),
+      timestamp: new Date().toISOString(),
+    },
+  };
 
   res.json(response);
 };

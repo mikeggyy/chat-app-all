@@ -93,6 +93,7 @@ import { useRouter } from "vue-router";
 import { useUserProfile } from "../composables/useUserProfile";
 import { useGlobalLoading } from "../composables/useGlobalLoading";
 import { useFirebaseAuth } from "../composables/useFirebaseAuth";
+import { logger } from "../utils/logger";
 
 type Gender = 'male' | 'female' | 'other';
 
@@ -178,18 +179,18 @@ const calculatedAge = computed<number | null>(() => {
 // ✅ 2025-11-25 修復：確保用戶資料已載入
 // 如果用戶資料為空，嘗試從 Firebase 重新載入
 const ensureUserLoaded = async (): Promise<boolean> => {
-  console.log('[OnboardingView] 檢查用戶狀態', {
+  logger.log('[OnboardingView] 檢查用戶狀態', {
     hasUser: !!user.value,
     userId: user.value?.id,
   });
 
   // 如果用戶資料已存在且有 id，直接返回成功
   if (user.value?.id) {
-    console.log('[OnboardingView] 用戶資料已載入');
+    logger.log('[OnboardingView] 用戶資料已載入');
     return true;
   }
 
-  console.warn('[OnboardingView] 用戶資料為空，嘗試重新載入');
+  logger.warn('[OnboardingView] 用戶資料為空，嘗試重新載入');
 
   try {
     // 從 Firebase 獲取當前用戶 UID
@@ -197,25 +198,25 @@ const ensureUserLoaded = async (): Promise<boolean> => {
     const firebaseUser = auth.currentUser;
 
     if (!firebaseUser?.uid) {
-      console.error('[OnboardingView] 無法獲取 Firebase 用戶');
+      logger.error('[OnboardingView] 無法獲取 Firebase 用戶');
       return false;
     }
 
-    console.log('[OnboardingView] 重新載入用戶資料', { uid: firebaseUser.uid });
+    logger.log('[OnboardingView] 重新載入用戶資料', { uid: firebaseUser.uid });
 
     // 重新載入用戶資料
     await loadUserProfile(firebaseUser.uid, { force: true });
 
     // 再次檢查
     if (user.value?.id) {
-      console.log('[OnboardingView] 用戶資料重新載入成功');
+      logger.log('[OnboardingView] 用戶資料重新載入成功');
       return true;
     }
 
-    console.error('[OnboardingView] 重新載入後用戶資料仍為空');
+    logger.error('[OnboardingView] 重新載入後用戶資料仍為空');
     return false;
   } catch (error) {
-    console.error('[OnboardingView] 重新載入用戶資料失敗', error);
+    logger.error('[OnboardingView] 重新載入用戶資料失敗', error);
     return false;
   }
 };
@@ -256,7 +257,7 @@ const handleSubmit = async (): Promise<void> => {
       hasCompletedOnboarding: true,
     };
 
-    console.log('[OnboardingView] 準備更新用戶資料', {
+    logger.log('[OnboardingView] 準備更新用戶資料', {
       userId: user.value?.id,
       submitData,
     });
@@ -264,7 +265,7 @@ const handleSubmit = async (): Promise<void> => {
     // 更新用戶資料
     await updateUserProfileDetails(submitData);
 
-    console.log('[OnboardingView] 用戶資料更新成功');
+    logger.log('[OnboardingView] 用戶資料更新成功');
 
     // 等待 Vue 響應式更新完成
     await nextTick();
@@ -272,15 +273,15 @@ const handleSubmit = async (): Promise<void> => {
     // ✅ 2025-11-25 修復：放寬驗證邏輯，避免用戶卡在 onboarding 流程
     // 只記錄警告但允許繼續導航（即使狀態未正確更新，也讓用戶進入主頁面）
     if (user.value?.hasCompletedOnboarding !== true) {
-      console.warn('[OnboardingView] 用戶狀態可能未正確更新，但允許繼續');
+      logger.warn('[OnboardingView] 用戶狀態可能未正確更新，但允許繼續');
     }
 
-    console.log('[OnboardingView] 準備導航至 match 頁面');
+    logger.log('[OnboardingView] 準備導航至 match 頁面');
 
     // 使用 replace 代替 push，避免循環導航
     await router.replace({ name: "match" });
   } catch (error) {
-    console.error('[OnboardingView] 提交失敗', error);
+    logger.error('[OnboardingView] 提交失敗', error);
     errorMessage.value = (error as Error).message || "更新失敗，請稍後再試";
     isSubmitting.value = false;
   } finally {
@@ -290,17 +291,17 @@ const handleSubmit = async (): Promise<void> => {
 
 // ✅ 2025-11-25 新增：頁面載入時驗證用戶狀態
 onMounted(async () => {
-  console.log('[OnboardingView] 頁面載入，驗證用戶狀態');
+  logger.log('[OnboardingView] 頁面載入，驗證用戶狀態');
 
   // 如果用戶資料為空，嘗試載入
   if (!user.value?.id) {
-    console.warn('[OnboardingView] 頁面載入時用戶資料為空，嘗試重新載入');
+    logger.warn('[OnboardingView] 頁面載入時用戶資料為空，嘗試重新載入');
     await ensureUserLoaded();
   }
 
   // 如果已完成 onboarding，直接導航到 match 頁面
   if (user.value?.hasCompletedOnboarding) {
-    console.log('[OnboardingView] 用戶已完成 onboarding，導航至 match 頁面');
+    logger.log('[OnboardingView] 用戶已完成 onboarding，導航至 match 頁面');
     await router.replace({ name: "match" });
   }
 });

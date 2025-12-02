@@ -7,10 +7,11 @@
  * 這是一個示範實作，展示如何從 ChatView.vue 中提取消息管理邏輯
  */
 
-import { ref, computed, Ref, unref } from 'vue';
+import { ref, computed, Ref, unref, onBeforeUnmount } from 'vue';
 import { useUserProfile } from '../useUserProfile.js';
 import { useFirebaseAuth } from '../useFirebaseAuth.js';
 import { apiJson } from '../../utils/api.js';
+import { logger } from '../../utils/logger.js';
 import {
   fetchConversationHistory,
   appendConversationMessages,
@@ -40,7 +41,7 @@ export function useChatMessages(partnerId: string | Ref<string>) {
         const token = await firebaseAuth.getCurrentUserIdToken();
         if (token) return token;
       } catch (error) {
-        console.warn('[useChatMessages] 獲取 token 失敗:', error);
+        logger.warn('[useChatMessages] 獲取 token 失敗:', error);
         // 繼續執行，下面會拋出 Error
       }
     }
@@ -50,6 +51,7 @@ export function useChatMessages(partnerId: string | Ref<string>) {
 
   /**
    * 合併消息列表，保留臨時的影片 loading 卡片和照片 loading 卡片
+   * ✅ 修復：根據 createdAt 時間戳將 loading 卡片插入正確位置，而非放在最後
    */
   const mergeMessagesPreservingLoadingCards = (
     currentMessages: any[],
@@ -65,8 +67,17 @@ export function useChatMessages(partnerId: string | Ref<string>) {
       return newMessages;
     }
 
-    // 合併：新消息 + loading 消息
-    return [...newMessages, ...loadingMessages];
+    // ✅ 修復：根據 createdAt 時間戳合併，保持正確的時間順序
+    const allMessages = [...newMessages, ...loadingMessages];
+
+    // 按照 createdAt 時間排序
+    allMessages.sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeA - timeB;
+    });
+
+    return allMessages;
   };
 
   // 狀態
@@ -79,7 +90,7 @@ export function useChatMessages(partnerId: string | Ref<string>) {
   let messageSequence = 0;
   let replyTimerId: number | null = null;
   let historyLoadToken = 0;
-  let pendingRetryTimerId: number | null = null;
+  let pendingRetryTimerId: ReturnType<typeof setTimeout> | null = null;
   let pendingSyncInFlight = false;
 
   // Computed
@@ -233,12 +244,13 @@ export function useChatMessages(partnerId: string | Ref<string>) {
       await requestReply(userId, charId);
 
     } catch (error) {
-      console.error(`[useChatMessages] ❌ 消息發送失敗:`, error);
+      // ✅ 修復：統一使用 logger 記錄錯誤
+      logger.error(`[useChatMessages] ❌ 消息發送失敗:`, error);
 
       // ✅ 2025-11-24 修復：發送失敗時立即刪除訊息
       const userMsgIndex = messages.value.findIndex(m => m.id === userMessageId);
       if (userMsgIndex >= 0) {
-        console.log('[useChatMessages] 發送失敗，從列表中刪除訊息:', userMessageId);
+        logger.log('[useChatMessages] 發送失敗，從列表中刪除訊息:', userMessageId);
         messages.value = messages.value.filter(m => m.id !== userMessageId);
         // 同時從待同步隊列中刪除
         removePendingMessagesById(userId, charId, [userMessageId]);
@@ -299,7 +311,7 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     pendingRetryTimerId = setTimeout(() => {
       // ✅ 修復：添加 catch 處理異步錯誤，防止 unhandled rejection
       syncPendingMessages().catch(error => {
-        console.error('[useChatMessages] 同步待處理消息失敗:', error);
+        logger.error('[useChatMessages] 同步待處理消息失敗:', error);
       });
     }, 2000); // 2 秒後嘗試同步
   };
@@ -397,6 +409,11 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     }
   };
 
+  // ✅ 修復：自動在組件卸載時清理定時器
+  onBeforeUnmount(() => {
+    cleanup();
+  });
+
   /**
    * 手動重試失敗的消息
    * @param messageId - 失敗消息的 ID
@@ -406,24 +423,24 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     const charId = currentPartnerId.value;
 
     if (!userId || !charId) {
-      console.error('[useChatMessages] 無法重試：缺少 userId 或 charId');
+      logger.error('[useChatMessages] 無法重試：缺少 userId 或 charId');
       return;
     }
 
     // 查找失敗的消息
     const failedMsgIndex = messages.value.findIndex(m => m.id === messageId);
     if (failedMsgIndex < 0) {
-      console.error('[useChatMessages] 找不到要重試的消息');
+      logger.error('[useChatMessages] 找不到要重試的消息');
       return;
     }
 
     const failedMsg = messages.value[failedMsgIndex];
     if (failedMsg.state !== 'failed' && failedMsg.state !== 'retrying') {
-      console.warn('[useChatMessages] 消息狀態不是 failed 或 retrying，無需重試');
+      logger.warn('[useChatMessages] 消息狀態不是 failed 或 retrying，無需重試');
       return;
     }
 
-    console.log(`[useChatMessages] 手動重試消息: ${messageId}`);
+    logger.log(`[useChatMessages] 手動重試消息: ${messageId}`);
 
     // 重置消息狀態為 pending，清除錯誤信息
     messages.value[failedMsgIndex] = {
@@ -440,7 +457,7 @@ export function useChatMessages(partnerId: string | Ref<string>) {
     try {
       await syncMessageAndGetReply(userId, charId, failedMsg.text, messageId, 0);
     } catch (error) {
-      console.error('[useChatMessages] 手動重試失敗:', error);
+      logger.error('[useChatMessages] 手動重試失敗:', error);
     }
   };
 

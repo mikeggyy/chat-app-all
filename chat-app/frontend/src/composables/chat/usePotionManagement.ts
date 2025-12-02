@@ -6,6 +6,7 @@
 
 import { ref, computed, type Ref, type ComputedRef } from 'vue';
 import { apiJson } from '../../utils/api.js';
+import { logger } from '../../utils/logger.js';
 
 // ==================== 類型定義 ====================
 
@@ -154,7 +155,8 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
         };
       }
     } catch (error) {
-      // Silent fail - 不影響用戶體驗
+      // ✅ 修復：統一使用 logger 記錄錯誤
+      logger.warn('[loadPotions] 加載藥水數量失敗:', error);
     }
   };
 
@@ -173,16 +175,17 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
         skipGlobalLoading: true,
       });
 
-      console.log('[loadActivePotions] API 返回數據:', data);
+      // ✅ 修復：統一使用 logger 記錄日誌
+      logger.log('[loadActivePotions] API 返回數據:', data);
 
       // ✅ 修復：後端使用 sendSuccess 包裝響應，數據在 data.data 中
       // ✅ 加強類型檢查：確保 potions 是陣列
       const rawPotions = data?.data?.potions ?? data?.potions;
       const potions = Array.isArray(rawPotions) ? rawPotions : [];
       activePotionEffects.value = potions;
-      console.log('[loadActivePotions] 設置 activePotionEffects:', activePotionEffects.value);
+      logger.log('[loadActivePotions] 設置 activePotionEffects:', activePotionEffects.value);
     } catch (error) {
-      console.error('[loadActivePotions] 加載失敗:', error);
+      logger.error('[loadActivePotions] 加載失敗:', error);
       // Silent fail - 不影響用戶體驗
     }
   };
@@ -260,7 +263,8 @@ export function usePotionManagement(deps: UsePotionManagementDeps): UsePotionMan
         errorMessage = error;
       }
 
-      console.error('[使用藥水錯誤]', error); // 詳細日誌供調試
+      // ✅ 修復：統一使用 logger 記錄詳細錯誤
+      logger.error('[使用藥水錯誤]', error);
       showError(errorMessage);
       return false;
     }

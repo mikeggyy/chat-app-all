@@ -1,13 +1,15 @@
 import express from "express";
 import { db } from "../firebase/index.js";
+import { requireMinRole } from "../middleware/admin.middleware.js";
 
 const router = express.Router();
 
 /**
  * GET /api/conversations
  * 獲取對話列表（支援分頁和篩選）
+ * ✅ 2025-12-01 修復：加入權限驗證中間件
  */
-router.get("/", async (req, res) => {
+router.get("/", requireMinRole("moderator"), async (req, res) => {
   try {
     const {
       page = 1,
@@ -135,8 +137,9 @@ router.get("/", async (req, res) => {
 /**
  * GET /api/conversations/stats
  * 獲取對話統計資訊
+ * ✅ 2025-12-01 修復：加入權限驗證中間件
  */
-router.get("/stats", async (req, res) => {
+router.get("/stats", requireMinRole("moderator"), async (req, res) => {
   try {
     const snapshot = await db.collection("conversations").get();
 
@@ -220,8 +223,9 @@ router.get("/stats", async (req, res) => {
 /**
  * GET /api/conversations/:id
  * 獲取單一對話詳情（包含完整消息列表）
+ * ✅ 2025-12-01 修復：加入權限驗證中間件
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireMinRole("moderator"), async (req, res) => {
   try {
     const { id } = req.params;
     const doc = await db.collection("conversations").doc(id).get();

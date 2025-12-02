@@ -1,4 +1,5 @@
 import type { Message } from '../types';
+import { logger } from './logger.js';
 
 interface StorageUsage {
   total: number;
@@ -56,14 +57,14 @@ const readFromStore = (store: StoreType, key: string): Message[] | null => {
     const parsed = JSON.parse(raw);
     // ✅ 修復：驗證解析結果是陣列
     if (!Array.isArray(parsed)) {
-      console.warn(`[conversationCache] 緩存數據格式無效 (非陣列): ${key}`);
+      logger.warn(`[conversationCache] 緩存數據格式無效 (非陣列): ${key}`);
       store.removeItem(key); // 清理損壞的數據
       return null;
     }
     return parsed as Message[];
   } catch (error) {
     // ✅ 修復：記錄 JSON 解析錯誤，便於調試數據損壞問題
-    console.warn(`[conversationCache] JSON 解析失敗，清理損壞的緩存: ${key}`, error);
+    logger.warn(`[conversationCache] JSON 解析失敗，清理損壞的緩存: ${key}`, error);
     try {
       store.removeItem(key); // 主動清理損壞的數據
     } catch {
@@ -115,7 +116,7 @@ const writeToStore = (store: StoreType, key: string, value: Message[] | null): v
     store.setItem(key, JSON.stringify(sanitized));
   } catch (error) {
     if (error instanceof Error && error.name === 'QuotaExceededError') {
-      console.warn('[conversationCache] QuotaExceededError: localStorage 空間不足，嘗試清理...');
+      logger.warn('[conversationCache] QuotaExceededError: localStorage 空間不足，嘗試清理...');
 
       // ✅ 更激進的清理策略：清理所有類型的緩存
       try {
@@ -139,7 +140,7 @@ const writeToStore = (store: StoreType, key: string, value: Message[] | null): v
           }
         }
 
-        console.log(`[conversationCache] 找到 ${keysToRemove.length} 個緩存項，準備清理...`);
+        logger.log(`[conversationCache] 找到 ${keysToRemove.length} 個緩存項，準備清理...`);
 
         // 優先清理：移除非當前對話的緩存
         let removedCount = 0;
@@ -149,23 +150,23 @@ const writeToStore = (store: StoreType, key: string, value: Message[] | null): v
               store.removeItem(oldKey);
               removedCount++;
             } catch (e) {
-              console.error('[conversationCache] 清理緩存失敗:', oldKey, e);
+              logger.error('[conversationCache] 清理緩存失敗:', oldKey, e);
             }
           }
         }
 
-        console.log(`[conversationCache] 已清理 ${removedCount} 個緩存項`);
+        logger.log(`[conversationCache] 已清理 ${removedCount} 個緩存項`);
 
         // 再次嘗試存儲
         const sanitized = sanitizeForStorage(value);
         store.setItem(key, JSON.stringify(sanitized));
-        console.log('[conversationCache] 清理後重新存儲成功');
+        logger.log('[conversationCache] 清理後重新存儲成功');
       } catch (retryError) {
-        console.error('[conversationCache] 清理後仍然失敗，禁用 localStorage:', retryError);
+        logger.error('[conversationCache] 清理後仍然失敗，禁用 localStorage:', retryError);
         storageAvailable = false; // 禁用 localStorage，改用內存存儲
       }
     } else {
-      console.error('[conversationCache] localStorage 存儲失敗:', error);
+      logger.error('[conversationCache] localStorage 存儲失敗:', error);
       throw error; // 其他錯誤繼續拋出
     }
   }
@@ -277,7 +278,7 @@ export const clearPendingMessages = (userId: string, characterId: string): void 
 export const clearAllConversationCaches = (): number => {
   const storage = getStorage();
   if (!storage) {
-    console.log('[conversationCache] localStorage 不可用，無需清理');
+    logger.log('[conversationCache] localStorage 不可用，無需清理');
     return 0;
   }
 
@@ -309,7 +310,7 @@ export const clearAllConversationCaches = (): number => {
         storage.removeItem(key);
         removedCount++;
       } catch (e) {
-        console.error('[conversationCache] 清理緩存失敗:', key, e);
+        logger.error('[conversationCache] 清理緩存失敗:', key, e);
       }
     }
 
@@ -317,10 +318,10 @@ export const clearAllConversationCaches = (): number => {
     memoryHistoryStore.clear();
     memoryPendingStore.clear();
 
-    console.log(`[conversationCache] 清理完成，已移除 ${removedCount} 個緩存項`);
+    logger.log(`[conversationCache] 清理完成，已移除 ${removedCount} 個緩存項`);
     return removedCount;
   } catch (error) {
-    console.error('[conversationCache] 清理所有緩存失敗:', error);
+    logger.error('[conversationCache] 清理所有緩存失敗:', error);
     return 0;
   }
 };
@@ -369,7 +370,7 @@ export const estimateLocalStorageUsage = (): StorageUsage => {
       other: Math.round((totalBytes - conversationBytes) / 1024), // KB
     };
   } catch (error) {
-    console.error('[conversationCache] 估算 localStorage 使用量失敗:', error);
+    logger.error('[conversationCache] 估算 localStorage 使用量失敗:', error);
     return { total: 0, conversation: 0, other: 0 };
   }
 };
@@ -382,16 +383,16 @@ export const estimateLocalStorageUsage = (): StorageUsage => {
 export const checkAndCleanIfNeeded = (thresholdKB = 2048): boolean => {
   const usage = estimateLocalStorageUsage();
 
-  console.log(
+  logger.log(
     `[conversationCache] localStorage 使用情況: 總計 ${usage.total}KB, 對話 ${usage.conversation}KB, 其他 ${usage.other}KB`
   );
 
   if (usage.conversation > thresholdKB) {
-    console.warn(
+    logger.warn(
       `[conversationCache] 對話緩存超過閾值 ${thresholdKB}KB，開始預防性清理...`
     );
     const removed = clearAllConversationCaches();
-    console.log(`[conversationCache] 預防性清理完成，釋放了 ${removed} 個緩存項`);
+    logger.log(`[conversationCache] 預防性清理完成，釋放了 ${removed} 個緩存項`);
     return true;
   }
 

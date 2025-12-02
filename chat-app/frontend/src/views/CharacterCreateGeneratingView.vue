@@ -13,12 +13,33 @@ import {
   readStoredCharacterCreationFlowId,
   generateCharacterPersonaWithAI,
   generateCharacterImages,
+  type CharacterCreationFlow,
 } from "../services/characterCreation.service.js";
+
+// 類型定義：用於 useCharacterCreationFlow 的適配接口
+interface CharacterAppearanceForFlow {
+  id: string;
+  label: string;
+  image: string;
+  alt: string;
+  description: string;
+  styles: string[];
+  referenceInfo: Record<string, unknown> | null;
+}
+
+// 類型定義：Persona 數據結構
+interface PersonaData {
+  name?: string;
+  tagline?: string;
+  hiddenProfile?: string;
+  prompt?: string;
+}
 import { useGenderPreference } from "../composables/useGenderPreference.js";
 import { useCharacterCreationFlow } from "../composables/useCharacterCreationFlow.js";
 import { useDraftFlow } from "../composables/character-creation/useDraftFlow.js";
 import { useToast } from "../composables/useToast.js";
 import { useConfirmDialog } from "../composables/useConfirmDialog.js";
+import { logger } from "../utils/logger";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import GeneratingHeader from "../components/character-creation/GeneratingHeader.vue";
 import ProgressStep from "../components/character-creation/ProgressStep.vue";
@@ -27,6 +48,9 @@ import SettingsStep from "../components/character-creation/SettingsStep.vue";
 import GeneratingFooter from "../components/character-creation/GeneratingFooter.vue";
 
 // ==================== 使用新架構 ====================
+
+// ✅ 修復：追蹤導航計時器以便清理
+let navigationTimerId: ReturnType<typeof setTimeout> | null = null;
 
 // Pinia Store
 import { useCharacterCreationStore } from "../stores/characterCreation.js";
@@ -66,9 +90,9 @@ const selectedResultImage = computed(() => selectedResult.value?.url || '');
 const selectedResultAlt = computed(() => selectedResult.value?.alt || '生成角色預覽');
 const hasGeneratedImages = computed(() => store.hasGeneratedImages);
 
-// 🔥 Debug: 監聽 selectedResultId 變化
+// 🔥 Debug: 監聯 selectedResultId 變化
 watch(() => store.selectedImageId, (newVal, oldVal) => {
-  console.log('[GeneratingView] store.selectedImageId 變化:', {
+  logger.log('[GeneratingView] store.selectedImageId 變化:', {
     old: oldVal,
     new: newVal,
     timestamp: new Date().toISOString()
@@ -190,7 +214,7 @@ const confirmButtonLabel: ComputedRef<string> = computed(() => {
 
 // 🔥 Debug: 監聽 currentStep 變化
 watch(() => currentStep.value, (newVal, oldVal) => {
-  console.log('[GeneratingView] currentStep 變化:', {
+  logger.log('[GeneratingView] currentStep 變化:', {
     old: oldVal,
     new: newVal,
     storeSelectedImageId: store.selectedImageId,
@@ -226,15 +250,29 @@ const {
   setSuppressSync,
 } = useCharacterCreationFlow({
   personaForm,
-  selectedResult: selectedResult as any,
+  // 類型適配：store 圖片格式 (url) 轉換為 composable 期望格式 (image)
+  selectedResult: computed(() => {
+    const result = selectedResult.value;
+    if (!result) return null;
+    return {
+      id: result.id,
+      label: result.label,
+      image: result.url,
+      alt: result.alt,
+      description: '',
+      styles: [],
+      referenceInfo: null,
+    } as CharacterAppearanceForFlow;
+  }),
   selectedResultId,
   selectedResultLabel,
   selectedResultImage,
   selectedResultAlt,
   genderPreference,
-  normalizeGenderPreference: normalizeGenderPreference as any,
-  readStoredGenderPreference: readStoredGenderPreference as any,
-  ensureGenderPreference: ensureGenderPreference as any,
+  // 類型適配：函數簽名兼容
+  normalizeGenderPreference: (gender: string) => normalizeGenderPreference(gender),
+  readStoredGenderPreference: () => readStoredGenderPreference() || null,
+  ensureGenderPreference: (gender?: string) => ensureGenderPreference(gender ?? ''),
   currentStep,
 });
 
@@ -268,7 +306,9 @@ const triggerImageGeneration = async (): Promise<void> => {
         duration: 5000,
       });
 
-      setTimeout(() => {
+      // ✅ 修復：追蹤計時器以便清理
+      navigationTimerId = setTimeout(() => {
+        navigationTimerId = null;
         router.push({ name: "character-create-appearance" }).catch(() => {});
       }, 1000);
       return;
@@ -289,17 +329,17 @@ const triggerImageGeneration = async (): Promise<void> => {
       window.addEventListener("beforeunload", handleBeforeUnload);
     }
 
-    const { images, flow: updatedFlow } = (await generateCharacterImages(
+    const { images, flow: updatedFlow } = await generateCharacterImages(
       flowId.value,
       {
         quality: "standard",
         count: 4,
       }
-    )) as any;
+    );
 
     if (images && images.length > 0) {
       // 將生成的圖片更新到本地狀態和 store
-      const imageResults = images.map((img: any, index: number) => ({
+      const imageResults = images.map((img: { url: string }, index: number) => ({
         id: `generated-${index}`,
         label: `風格 ${index + 1}`,
         image: img.url,
@@ -310,7 +350,7 @@ const triggerImageGeneration = async (): Promise<void> => {
       }));
 
       // 設置圖片到 store（會自動選中第一張）
-      console.log('[GeneratingView] 準備設置圖片結果:', {
+      logger.log('[GeneratingView] 準備設置圖片結果:', {
         count: imageResults.length,
         firstId: imageResults[0]?.id
       });
@@ -324,7 +364,7 @@ const triggerImageGeneration = async (): Promise<void> => {
         }))
       );
 
-      console.log('[GeneratingView] 設置完成後 store.selectedImageId:', store.selectedImageId);
+      logger.log('[GeneratingView] 設置完成後 store.selectedImageId:', store.selectedImageId);
 
       // 同步到後端
       await nextTick();
@@ -332,7 +372,7 @@ const triggerImageGeneration = async (): Promise<void> => {
 
       // 更新 flow 記錄
       if (updatedFlow) {
-        applyFlowRecord(updatedFlow);
+        applyFlowRecord(updatedFlow as unknown as Parameters<typeof applyFlowRecord>[0]);
       }
 
       // 清除所有性別的 AI 魔法師使用次數
@@ -341,11 +381,11 @@ const triggerImageGeneration = async (): Promise<void> => {
           ["male", "female", "non-binary"].forEach((gender: string): void => {
             window.sessionStorage.removeItem(`ai-magician-usage-${gender}`);
           });
-          console.log(
+          logger.log(
             "[CharacterCreateGeneratingView] AI 魔法師使用次數已重置"
           );
         } catch (error) {
-          console.error(
+          logger.error(
             "[CharacterCreateGeneratingView] 清除 AI 魔法師使用次數失敗",
             error
           );
@@ -361,9 +401,9 @@ const triggerImageGeneration = async (): Promise<void> => {
             step: "generating",
             hasGeneratedImages: true,
           });
-          console.log("[CharacterCreateGeneratingView] 草稿已自動保存");
+          logger.log("[CharacterCreateGeneratingView] 草稿已自動保存");
         } catch (error) {
-          console.error("[CharacterCreateGeneratingView] 保存草稿失敗", error);
+          logger.error("[CharacterCreateGeneratingView] 保存草稿失敗", error);
         }
       }
     } else {
@@ -379,7 +419,9 @@ const triggerImageGeneration = async (): Promise<void> => {
       duration: 5000,
     });
 
-    setTimeout(() => {
+    // ✅ 修復：追蹤計時器以便清理
+    navigationTimerId = setTimeout(() => {
+      navigationTimerId = null;
       router.push({ name: "character-create-appearance" }).catch(() => {});
     }, 1000);
   } finally {
@@ -394,7 +436,7 @@ const triggerImageGeneration = async (): Promise<void> => {
 /**
  * 應用選中的結果到 Persona 表單
  */
-const applyResultToPersona = (result: any): void => {
+const applyResultToPersona = (result: { name?: string; tagline?: string; prompt?: string } | undefined): void => {
   setSuppressSync(true);
   setPersonaData({
     name: result?.name || "",
@@ -410,17 +452,17 @@ const applyResultToPersona = (result: any): void => {
  * 返回按鈕處理
  */
 const handleBack = async (): Promise<void> => {
-  console.log("[GeneratingView] handleBack 被調用", {
+  logger.log("[GeneratingView] handleBack 被調用", {
     currentStep: currentStep.value,
     timestamp: new Date().toISOString(),
   });
 
   if (currentStep.value === Step.SETTINGS) {
-    console.log("[GeneratingView] 🔍 從 SETTINGS 步驟返回, hasEditedContent:", hasEditedContent.value);
+    logger.log("[GeneratingView] 🔍 從 SETTINGS 步驟返回, hasEditedContent:", hasEditedContent.value);
 
     // 從設定步驟返回，詢問是否保存編輯
     if (hasEditedContent.value) {
-      console.log("[GeneratingView] 🔍 顯示保存確認對話框");
+      logger.log("[GeneratingView] 🔍 顯示保存確認對話框");
       const shouldSave = await confirm(
         "您已經填寫了角色設定內容。是否要保留此次編輯進度？",
         {
@@ -430,15 +472,15 @@ const handleBack = async (): Promise<void> => {
         }
       );
 
-      console.log("[GeneratingView] 🔍 用戶選擇:", shouldSave ? "保存" : "放棄");
+      logger.log("[GeneratingView] 🔍 用戶選擇:", shouldSave ? "保存" : "放棄");
 
       if (shouldSave) {
         if (flowId.value) {
           try {
-            await syncSummaryToBackend({} as any);
-            console.log("[CharacterCreateGeneratingView] 用戶選擇保存設定草稿");
+            await syncSummaryToBackend();
+            logger.log("[CharacterCreateGeneratingView] 用戶選擇保存設定草稿");
           } catch (error) {
-            console.error(
+            logger.error(
               "[CharacterCreateGeneratingView] 保存設定草稿失敗",
               error
             );
@@ -448,11 +490,11 @@ const handleBack = async (): Promise<void> => {
     }
 
     // 返回到選擇步驟
-    console.log("[GeneratingView] 🔍 準備切換到 SELECTION 步驟");
-    console.log("[GeneratingView] 🔍 切換前 currentStep.value:", currentStep.value);
-    console.log("[GeneratingView] 🔍 Step.SELECTION 的值:", Step.SELECTION);
+    logger.log("[GeneratingView] 🔍 準備切換到 SELECTION 步驟");
+    logger.log("[GeneratingView] 🔍 切換前 currentStep.value:", currentStep.value);
+    logger.log("[GeneratingView] 🔍 Step.SELECTION 的值:", Step.SELECTION);
     currentStep.value = Step.SELECTION;
-    console.log("[GeneratingView] 🔍 切換後 currentStep.value:", currentStep.value);
+    logger.log("[GeneratingView] 🔍 切換後 currentStep.value:", currentStep.value);
 
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -461,7 +503,7 @@ const handleBack = async (): Promise<void> => {
   }
 
   if (currentStep.value === Step.SELECTION) {
-    console.log('[GeneratingView] 在 SELECTION 步驟，檢查條件:', {
+    logger.log('[GeneratingView] 在 SELECTION 步驟，檢查條件:', {
       hasGeneratedImages: hasGeneratedImages.value,
       storeHasGeneratedImages: store.hasGeneratedImages,
       generatedImagesLength: store.generatedImages.length
@@ -469,7 +511,7 @@ const handleBack = async (): Promise<void> => {
 
     // 如果已經生成圖片，詢問是否保存草稿
     if (hasGeneratedImages.value) {
-      console.log('[GeneratingView] 準備顯示確認對話框...');
+      logger.log('[GeneratingView] 準備顯示確認對話框...');
       const shouldSave = await confirm(
         "您已經生成了角色圖片並消耗了相應額度。是否要保留此次編輯進度，下次可以繼續編輯？",
         {
@@ -478,7 +520,7 @@ const handleBack = async (): Promise<void> => {
           cancelText: "放棄進度",
         }
       );
-      console.log('[GeneratingView] 用戶選擇:', shouldSave);
+      logger.log('[GeneratingView] 用戶選擇:', shouldSave);
 
       if (shouldSave) {
         if (flowId.value) {
@@ -489,22 +531,22 @@ const handleBack = async (): Promise<void> => {
               step: "generating",
               hasGeneratedImages: true,
             });
-            console.log("[CharacterCreateGeneratingView] 用戶選擇保存草稿");
+            logger.log("[CharacterCreateGeneratingView] 用戶選擇保存草稿");
           } catch (error) {
-            console.error("[CharacterCreateGeneratingView] 保存草稿失敗", error);
+            logger.error("[CharacterCreateGeneratingView] 保存草稿失敗", error);
           }
         }
       } else {
         clearDraft();
-        console.log("[CharacterCreateGeneratingView] 用戶選擇放棄草稿");
+        logger.log("[CharacterCreateGeneratingView] 用戶選擇放棄草稿");
       }
     }
 
-    console.log('[GeneratingView] 準備導航到配對頁...');
+    logger.log('[GeneratingView] 準備導航到配對頁...');
     router.push({ name: "match" }).catch((err) => {
-      console.error('[GeneratingView] 導航失敗:', err);
+      logger.error('[GeneratingView] 導航失敗:', err);
     });
-    console.log('[GeneratingView] 導航已觸發，返回');
+    logger.log('[GeneratingView] 導航已觸發，返回');
     return;
   }
 
@@ -526,7 +568,7 @@ const persistCreationSummary = async (): Promise<void> => {
     });
   } catch (error: any) {
     // ⚠️ 重要：如果同步失敗，必須拋出錯誤阻止跳轉
-    console.error('[CharacterCreateGeneratingView] 保存角色設定失敗:', error);
+    logger.error('[CharacterCreateGeneratingView] 保存角色設定失敗:', error);
 
     // 顯示錯誤提示
     showErrorToast(error?.message || "保存角色設定失敗，請檢查網絡連接後重試");
@@ -540,7 +582,8 @@ const persistCreationSummary = async (): Promise<void> => {
  * 進入設定步驟
  */
 const enterSettingsStep = (): void => {
-  applyResultToPersona(selectedResult.value);
+  // GeneratedImage 不包含 persona 數據，傳遞空物件
+  applyResultToPersona(undefined);
   currentStep.value = Step.SETTINGS;
   if (typeof window !== "undefined") {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -558,11 +601,11 @@ const handleConfirm = async (): Promise<void> => {
 
     try {
       // 在進入設定步驟前，先同步選擇的外觀到後端
-      await syncSummaryToBackend({} as any);
+      await syncSummaryToBackend();
       enterSettingsStep();
     } catch (error: any) {
       // 同步失敗，停留在當前頁面
-      console.error('[CharacterCreateGeneratingView] 同步外觀數據失敗:', error);
+      logger.error('[CharacterCreateGeneratingView] 同步外觀數據失敗:', error);
       showErrorToast(error?.message || "保存外觀設定失敗，請檢查網絡連接後重試");
     }
     return;
@@ -579,7 +622,7 @@ const handleConfirm = async (): Promise<void> => {
       router.push({ name: "character-create-voice" }).catch(() => {});
     } catch (error) {
       // 保存失敗，停留在當前頁面，讓用戶重試
-      console.error('[CharacterCreateGeneratingView] 無法進入語音選擇步驟:', error);
+      logger.error('[CharacterCreateGeneratingView] 無法進入語音選擇步驟:', error);
     }
     return;
   }
@@ -630,14 +673,14 @@ const openAIMagician = async (): Promise<void> => {
     store.setAIMagicianLoading(true);
     store.setError(null);
 
-    const persona = (await generateCharacterPersonaWithAI(flowId.value)) as any;
+    const persona = await generateCharacterPersonaWithAI(flowId.value) as PersonaData | null;
 
     if (persona) {
       setSuppressSync(true);
       setPersonaData(persona);
       setSuppressSync(false);
       store.incrementAIMagicianUsage();
-      scheduleBackendSync({} as any);
+      scheduleBackendSync();
     }
   } catch (error: any) {
     const errorMessage = error?.message || "AI 魔法師生成失敗，請稍後再試";
@@ -725,7 +768,7 @@ onMounted(() => {
     if (draft && draft.hasGeneratedImages) {
       flowId.value = draft.flowId;
       store.createFlow(draft.flowId);
-      console.log("[CharacterCreateGeneratingView] 從草稿恢復 flowId:", draft.flowId);
+      logger.log("[CharacterCreateGeneratingView] 從草稿恢復 flowId:", draft.flowId);
     }
 
     // 確保 flowId 已初始化
@@ -751,11 +794,11 @@ onMounted(() => {
     }
 
     // 檢查是否已有生成的圖片
-    const currentFlow = (await fetchCharacterCreationFlow(flowId.value).catch(
+    const currentFlow: CharacterCreationFlow | null = await fetchCharacterCreationFlow(flowId.value).catch(
       () => {
         return null;
       }
-    )) as any;
+    );
 
     if (!currentFlow) {
       const errorMessage = "找不到角色創建流程，請返回重新開始";
@@ -786,7 +829,7 @@ onMounted(() => {
     if (flowHasGeneratedImages) {
       // 如果已有生成的圖片，直接使用
       const images = currentFlow.generation!.result!.images!;
-      const imageResults = images.map((img: any, index: number) => ({
+      const imageResults = images.map((img: { url: string }, index: number) => ({
         id: `generated-${index}`,
         label: `風格 ${index + 1}`,
         image: img.url,
@@ -826,9 +869,14 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopProgressAnimation();
   cleanupFlow();
-  // 確保移除 beforeunload 監聽
+  // 確保移除 beforeunload 監聯
   if (typeof window !== "undefined") {
     window.removeEventListener("beforeunload", handleBeforeUnload);
+  }
+  // ✅ 修復：清理導航計時器
+  if (navigationTimerId !== null) {
+    clearTimeout(navigationTimerId);
+    navigationTimerId = null;
   }
 });
 </script>

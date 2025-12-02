@@ -5,6 +5,44 @@ import { requireMinRole } from "../middleware/admin.middleware.js";
 const router = express.Router();
 
 /**
+ * 安全地將各種日期格式轉換為 ISO 字符串
+ * 支援 Firestore Timestamp、Date 對象、ISO 字符串、數字時間戳
+ */
+function safeToISOString(dateValue) {
+  if (!dateValue) return null;
+
+  // Firestore Timestamp (有 toDate 方法)
+  if (typeof dateValue.toDate === 'function') {
+    return dateValue.toDate().toISOString();
+  }
+
+  // 已經是 Date 對象
+  if (dateValue instanceof Date) {
+    return dateValue.toISOString();
+  }
+
+  // ISO 字符串
+  if (typeof dateValue === 'string') {
+    const parsed = new Date(dateValue);
+    return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+
+  // 數字時間戳（毫秒或秒）
+  if (typeof dateValue === 'number') {
+    // 如果是秒級時間戳，轉換為毫秒
+    const timestamp = dateValue < 1e12 ? dateValue * 1000 : dateValue;
+    return new Date(timestamp).toISOString();
+  }
+
+  // Firestore Timestamp 的 _seconds 格式
+  if (dateValue._seconds !== undefined) {
+    return new Date(dateValue._seconds * 1000).toISOString();
+  }
+
+  return null;
+}
+
+/**
  * GET /api/transactions
  * 獲取所有交易記錄（支援分頁和篩選）
  * 🔒 權限：admin 以上（財務數據敏感）
@@ -38,12 +76,48 @@ router.get("/", requireMinRole("admin"), async (req, res) => {
       query = query.where("status", "==", status);
     }
 
-    // 日期範圍篩選
-    if (startDate) {
-      query = query.where("createdAt", ">=", new Date(startDate));
-    }
-    if (endDate) {
-      query = query.where("createdAt", "<=", new Date(endDate));
+    // ✅ 2025-12-01 修復：日期範圍驗證和邊界檢查
+    if (startDate || endDate) {
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+
+      // 驗證日期格式
+      if (start && isNaN(start.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: "startDate 格式無效",
+        });
+      }
+      if (end && isNaN(end.getTime())) {
+        return res.status(400).json({
+          success: false,
+          error: "endDate 格式無效",
+        });
+      }
+
+      // 檢查日期範圍不超過 90 天（防止查詢過大數據集）
+      if (start && end) {
+        const daysDiff = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysDiff > 90) {
+          return res.status(400).json({
+            success: false,
+            error: "日期範圍不能超過 90 天",
+          });
+        }
+        if (daysDiff < 0) {
+          return res.status(400).json({
+            success: false,
+            error: "startDate 不能晚於 endDate",
+          });
+        }
+      }
+
+      if (start) {
+        query = query.where("createdAt", ">=", start);
+      }
+      if (end) {
+        query = query.where("createdAt", "<=", end);
+      }
     }
 
     // 獲取總數（先執行一次查詢）
@@ -80,9 +154,9 @@ router.get("/", requireMinRole("admin"), async (req, res) => {
         ...data,
         userName,
         userEmail,
-        // 格式化時間戳
-        createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : null,
-        updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null,
+        // 格式化時間戳（使用安全轉換函數）
+        createdAt: safeToISOString(data.createdAt),
+        updatedAt: safeToISOString(data.updatedAt),
       });
     }
 
@@ -216,8 +290,8 @@ router.get("/:id", requireMinRole("admin"), async (req, res) => {
         ...data,
         userName,
         userEmail,
-        createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : null,
-        updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : null,
+        createdAt: safeToISOString(data.createdAt),
+        updatedAt: safeToISOString(data.updatedAt),
       },
     });
   } catch (error) {

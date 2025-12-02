@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Match 手勢控制 Composable
  *
@@ -116,7 +115,7 @@ function readPoint(event: PointerEvent | TouchEvent): Point {
 export function useMatchGestures(options: UseMatchGesturesOptions = {}): UseMatchGesturesReturn {
   const {
     swipeThreshold = 80,
-    cardWidthRef,
+    cardWidthRef: _cardWidthRef,
     swipeOffsetRef,
     isAnimatingRef,
     onSwipeStart: onSwipeStartCallback,

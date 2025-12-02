@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Match 收藏管理 Composable
  *
@@ -22,7 +21,7 @@
  * const isFavorited = favorites.isFavorited('match-001');
  */
 
-import { ref, reactive, computed, type Ref } from 'vue';
+import { ref, reactive, type Ref } from 'vue';
 import { apiJson } from '../../utils/api.js';
 import { logger } from '../../utils/logger.js';
 import type { UserProfile } from '../../types';
@@ -215,7 +214,7 @@ export function useMatchFavorites(options: UseMatchFavoritesOptions): UseMatchFa
           return;
         }
 
-        const existingFavorites = Array.isArray(currentProfile.favorites)
+        const existingFavorites: string[] = Array.isArray(currentProfile.favorites)
           ? currentProfile.favorites
           : [];
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * useProfileData - 個人資料頁面數據管理 composable
  *
@@ -20,33 +19,12 @@ import { useNotifications } from "./useNotifications.js";
 import { useGuestGuard } from "./useGuestGuard.js";
 import { FALLBACK_USER, DEFAULT_USER_ASSETS } from "../config/profile.js";
 import { logger } from "../utils/logger.js";
+import type { UserProfile } from "../types";
 
 // ==================== 類型定義 ====================
 
 /**
- * 用戶資料類型
- */
-interface UserProfile {
-  id: string;
-  uid?: string;
-  displayName?: string;
-  locale?: string;
-  createdAt?: string;
-  defaultPrompt?: string;
-  email?: string;
-  photoURL?: string;
-  lastLoginAt?: string;
-  phoneNumber?: string | null;
-  gender?: string;
-  notificationOptIn?: boolean;
-  signInProvider?: string;
-  updatedAt?: string;
-  conversations?: Array<unknown>;
-  favorites?: Array<unknown>;
-}
-
-/**
- * 用戶資產類型
+ * 用戶資產類型（包含 potions，與 types/index.ts 的 UserAssets 有所不同）
  */
 interface UserAssets {
   characterUnlockCards: number;
@@ -55,21 +33,6 @@ interface UserAssets {
   voiceUnlockCards: number;
   createCards: number;
   potions: {
-    memoryBoost: number;
-    brainBoost: number;
-  };
-}
-
-/**
- * API 返回的資產數據類型
- */
-interface AssetApiResponse {
-  characterUnlockCards?: number;
-  photoUnlockCards?: number;
-  videoUnlockCards?: number;
-  voiceUnlockCards?: number;
-  createCards?: number;
-  potions?: {
     memoryBoost: number;
     brainBoost: number;
   };
@@ -93,6 +56,7 @@ interface UseProfileDataReturn {
   // 會員狀態
   tier: ComputedRef<string>;
   tierName: ComputedRef<string>;
+  isLite: ComputedRef<boolean>; // ✅ 2025-11-30 新增
   isVIP: ComputedRef<boolean>;
   isVVIP: ComputedRef<boolean>;
   isPaidMember: ComputedRef<boolean>;
@@ -147,8 +111,10 @@ export function useProfileData(): UseProfileDataReturn {
   } = useUserProfile();
 
   // 會員狀態
+  // ✅ 2025-11-30 更新：新增 isLite 支援
   const {
     currentTier,
+    isLite,
     isVIP,
     isVVIP,
     expiresAt,
@@ -157,14 +123,17 @@ export function useProfileData(): UseProfileDataReturn {
 
   // 計算會員相關屬性
   const tier = currentTier;
+  // ✅ 2025-11-30 更新：新增 Lite 會員名稱
   const tierName = computed(() => {
     switch (currentTier.value) {
+      case 'lite': return 'Lite 會員';
       case 'vip': return 'VIP 會員';
       case 'vvip': return 'VVIP 會員';
       default: return '免費會員';
     }
   });
-  const isPaidMember = computed(() => isVIP.value || isVVIP.value);
+  // ✅ 2025-11-30 更新：Lite 也是付費會員
+  const isPaidMember = computed(() => isLite.value || isVIP.value || isVVIP.value);
   const formattedExpiryDate = computed(() => {
     if (!expiresAt.value) return '無限期';
     try {
@@ -256,8 +225,8 @@ export function useProfileData(): UseProfileDataReturn {
       const data = response.data || response;
 
       logger.log('[useProfileData] 解析後的資產數據:', data);
-      console.log('[ProfileView] 🔍 API 返回的 balance:', data.balance);
-      console.log('[ProfileView] 🔍 更新前的 balance.value:', balance.value);
+      logger.log('[ProfileView] 🔍 API 返回的 balance:', data.balance);
+      logger.log('[ProfileView] 🔍 更新前的 balance.value:', balance.value);
 
       // ✅ 合併：同時更新資產和金幣餘額
       if (data && typeof data === "object") {
@@ -273,12 +242,12 @@ export function useProfileData(): UseProfileDataReturn {
 
         // ✅ 優化：從資產 API 同步更新金幣餘額，避免額外的 API 調用
         if (data.balance !== undefined) {
-          console.log('[ProfileView] 🔥 準備更新 balance 為:', data.balance);
+          logger.log('[ProfileView] 🔥 準備更新 balance 為:', data.balance);
           updateBalance(data.balance);
-          console.log('[ProfileView] ✅ 更新後的 balance.value:', balance.value);
+          logger.log('[ProfileView] ✅ 更新後的 balance.value:', balance.value);
           logger.log('[useProfileData] 金幣餘額已從資產 API 更新:', data.balance);
         } else {
-          console.warn('[ProfileView] ⚠️ API 響應中沒有 balance 欄位');
+          logger.warn('[ProfileView] ⚠️ API 響應中沒有 balance 欄位');
         }
 
         logger.log('[useProfileData] 資產已更新:', userAssets.value);
@@ -313,7 +282,7 @@ export function useProfileData(): UseProfileDataReturn {
       await Promise.allSettled([
         loadUserProfile(userId, { force: true }), // ✅ 強制刷新，繞過緩存
         loadMembership(),
-        loadTicketsBalance(),
+        loadTicketsBalance(userId),
         loadUserAssets(userId), // ✅ 會同時更新金幣餘額
       ]);
     } catch (error) {
@@ -370,6 +339,7 @@ export function useProfileData(): UseProfileDataReturn {
     // 會員狀態
     tier,
     tierName,
+    isLite, // ✅ 2025-11-30 新增
     isVIP,
     isVVIP,
     isPaidMember,

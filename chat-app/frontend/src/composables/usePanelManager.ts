@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { ref, computed, watch, onBeforeUnmount, Ref, ComputedRef } from 'vue';
-import { Router, RouteLocationNormalizedLoaded } from 'vue-router';
+import { Router, RouteLocationNormalizedLoaded, LocationQuery } from 'vue-router';
 import {
   HeartIcon,
   SparklesIcon,
@@ -36,13 +35,6 @@ interface PanelConfig {
  */
 interface PanelConfigMap {
   [key: string]: PanelConfig;
-}
-
-/**
- * Query object type
- */
-interface QueryObject {
-  [key: string]: string | string[] | undefined;
 }
 
 /**
@@ -123,7 +115,7 @@ export function usePanelManager(
    * @param {string|null} panelType - 面板類型，null 表示關閉
    */
   const updateQuery = (panelType: string | null): void => {
-    const nextQuery: Record<string, string | string[] | undefined> = { ...route.query };
+    const nextQuery: LocationQuery = { ...route.query };
     let changed = false;
 
     if (!panelType) {

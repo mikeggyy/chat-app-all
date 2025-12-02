@@ -1,10 +1,10 @@
-// @ts-nocheck
 /**
  * useChatHandlers.ts
  * Chat 事件處理器（TypeScript 版本）
  * 管理各種用戶交互事件的處理
  */
 
+import { ref } from 'vue';
 import { useSendMessage } from '../useSendMessage.js';
 import { useEventHandlers } from '../useEventHandlers.js';
 import { useMenuActions } from '../useMenuActions.js';
@@ -13,6 +13,8 @@ import { usePhotoVideoHandler } from '../usePhotoVideoHandler.js';
 import { useShareFunctionality } from '../useShareFunctionality.js';
 import { getGiftById } from '../../../config/gifts.js'; // ✅ 新增:導入禮物配置
 import type { Ref, ComputedRef } from 'vue';
+import type { ModalsState } from '../useModalManager.js';
+import type { MenuAction } from '../useMenuActions.js';
 import type { Router } from 'vue-router';
 import type { Partner, Message, LimitCheckResult } from '../../../types';
 import type { ShowConversationLimitOptions, RequireLoginOptions } from '../useSendMessage.js';
@@ -33,11 +35,12 @@ export interface ModalManager {
 }
 
 /**
- * 用戶藥水資料
+ * 用戶藥水資料（與 useMenuActions 的 UserPotionsData 兼容）
  */
 export interface UserPotions {
+  memoryBoost: number;
+  brainBoost: number;
   hasConversationBoost?: boolean;
-  [key: string]: any;
 }
 
 /**
@@ -79,7 +82,7 @@ export interface UseChatHandlersParams {
 
   // User Assets
   characterTickets: Ref<number>;
-  userPotions: UserPotions;
+  userPotions: Ref<UserPotions>;
   hasCharacterTickets: Ref<boolean> | ComputedRef<boolean>;
 
   // Guest Checks
@@ -138,7 +141,8 @@ export interface UseChatHandlersParams {
   loadBalance: (userId: string) => Promise<void>;
   showGiftAnimation: (emoji: string, name: string) => void;
   closeGiftAnimation: () => void;
-  modals: any; // ModalsState - 包含 photoSelector 等模態框數據
+  modals: ModalsState;
+
 }
 
 /**
@@ -156,8 +160,8 @@ export interface UseChatHandlersReturn {
   handleSuggestionClick: (suggestion: string) => Promise<void>;
   handleRequestSuggestions: () => Promise<void>;
 
-  // Menu Actions
-  handleMenuAction: ((action: string) => void) & { handleShare?: () => Promise<void> };
+  // Menu Actions (接受 string 以兼容組件 emit，內部轉換為 MenuAction)
+  handleMenuAction: (action: string) => void;
 
   // Conversation Reset
   cancelResetConversation: () => void;
@@ -184,7 +188,7 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     currentUserId,
     partner,
     partnerDisplayName,
-    partnerId,
+    partnerId: _partnerId,
     messages,
     draft,
     chatContentRef,
@@ -269,6 +273,9 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     handleSendMessage,
   });
 
+  // 使用 ref 來處理 handleShare 的延遲賦值（避免循環依賴）
+  const shareHandlerRef = ref<(() => Promise<void>) | null>(null);
+
   // Menu Actions
   const { handleMenuAction } = useMenuActions({
     modals: {
@@ -282,10 +289,15 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     },
     userPotions,
     unlockTickets: {
-      hasCharacterTickets,
-      characterTickets,
+      hasCharacterTickets: hasCharacterTickets as ComputedRef<boolean>,
+      characterTickets: characterTickets as ComputedRef<number>,
     },
-    handleShare: () => Promise.resolve(), // 暫時空實現，後面設置
+    handleShare: () => {
+      if (shareHandlerRef.value) {
+        return shareHandlerRef.value();
+      }
+      return Promise.resolve();
+    },
   });
 
   // Conversation Reset
@@ -339,8 +351,8 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     router,
   });
 
-  // 更新 handleMenuAction 的 handleShare
-  handleMenuAction.handleShare = handleShare;
+  // 設置 shareHandlerRef（供 handleMenuAction 使用）
+  shareHandlerRef.value = handleShare;
 
   return {
     // Send Message
@@ -354,8 +366,8 @@ export function useChatHandlers(options: UseChatHandlersParams): UseChatHandlers
     handleSuggestionClick,
     handleRequestSuggestions,
 
-    // Menu Actions
-    handleMenuAction,
+    // Menu Actions (包裝函數，將 string 轉換為 MenuAction)
+    handleMenuAction: (action: string) => handleMenuAction(action as MenuAction),
 
     // Conversation Reset
     cancelResetConversation,

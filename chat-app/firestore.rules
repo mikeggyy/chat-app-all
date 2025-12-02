@@ -78,6 +78,63 @@ service cloud.firestore {
       allow write: if false; // 只能由後端寫入
     }
 
+    // ========== 新增功能集合 ==========
+
+    // 閃購活動 - 所有認證用戶可讀，只能由後端管理
+    match /flash_sales/{saleId} {
+      allow read: if request.auth != null;
+      allow write: if false; // 只能由後端（管理員）寫入
+    }
+
+    // 登入獎勵記錄 - 用戶只能讀取自己的記錄
+    match /login_rewards/{rewardId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 特殊優惠 - 所有認證用戶可讀，只能由後端管理
+    match /special_offers/{offerId} {
+      allow read: if request.auth != null;
+      allow write: if false; // 只能由後端（管理員）寫入
+    }
+
+    // 角色創建流程 - 用戶只能訪問自己的創建流程
+    match /character_creation_flows/{flowId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // 用戶照片相簿 - 用戶只能訪問自己的照片
+    match /user_photos/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /photos/{photoId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // 用戶子集合：組合禮包購買記錄
+    match /users/{userId}/bundle_purchases/{bundleId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 用戶子集合：角色等級
+    match /users/{userId}/character_levels/{characterId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // 只能由後端寫入
+    }
+
+    // 用戶子集合：對話記錄
+    match /users/{userId}/conversations/{characterId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 用戶子集合：收藏角色
+    match /users/{userId}/favorites/{favoriteId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // 開發環境：允許所有操作（僅在 Emulator 模式）
     // ⚠️ 警告：此規則在生產環境已被禁用以確保安全性
     // 如需在開發環境使用寬鬆規則，請在本地 Firebase Emulator 中配置

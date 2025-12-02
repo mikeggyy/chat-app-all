@@ -25,6 +25,7 @@ import {
 } from "./potion.service.js";
 import { validateRequest, potionSchemas } from "../middleware/validation.middleware.js";
 import { IDEMPOTENCY_TTL } from "../config/limits.js";
+import { createFinancialRouteHandler } from "../utils/routeHelpers.js";
 import {
   purchaseRateLimiter,
   standardRateLimiter,
@@ -94,82 +95,48 @@ router.get(
  * Body: { idempotencyKey }
  * 購買後加入庫存，使用時才需要選擇角色
  * 🔒 冪等性保護：防止重複購買（必須提供 idempotencyKey）
+ * ✅ 2025-12-02 遷移：使用 createFinancialRouteHandler 統一處理
  */
 router.post(
   "/purchase/memory-boost",
   requireFirebaseAuth,
   purchaseRateLimiter,
   validateRequest(potionSchemas.purchaseMemoryBoost),
-  async (req, res, next) => {
-  try {
-    const userId = req.firebaseUser?.uid;
-    if (!userId) {
-      return sendError(res, "UNAUTHORIZED", "請先登入");
+  createFinancialRouteHandler(
+    async (req, res, userId) => {
+      return await purchaseMemoryBoost(userId);
+    },
+    {
+      operationType: "購買記憶增強藥水",
+      idempotencyPrefix: "potion-memory",
+      idempotencyTTL: IDEMPOTENCY_TTL.POTION_PURCHASE,
     }
-
-    const { idempotencyKey } = req.body;
-
-    if (!idempotencyKey) {
-      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
-        field: "idempotencyKey",
-      });
-    }
-
-    // 冪等性保護（必須）
-    const requestId = `potion-memory:${userId}:${idempotencyKey}`;
-    const result = await handleIdempotentRequest(
-      requestId,
-      async () => await purchaseMemoryBoost(userId),
-      { ttl: IDEMPOTENCY_TTL.POTION_PURCHASE } // 15 分鐘
-    );
-
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error("購買記憶增強藥水失敗:", error);
-    next(error);
-  }
-});
+  )
+);
 
 /**
  * 購買腦力激盪藥水
  * POST /api/potions/purchase/brain-boost
  * Body: { idempotencyKey }
  * 🔒 冪等性保護：防止重複購買（必須提供 idempotencyKey）
+ * ✅ 2025-12-02 遷移：使用 createFinancialRouteHandler 統一處理
  */
 router.post(
   "/purchase/brain-boost",
   requireFirebaseAuth,
   purchaseRateLimiter,
   validateRequest(potionSchemas.purchaseBrainBoost),
-  async (req, res, next) => {
-  try {
-    const userId = req.firebaseUser?.uid;
-    if (!userId) {
-      return sendError(res, "UNAUTHORIZED", "請先登入");
+  createFinancialRouteHandler(
+    async (req, res, userId) => {
+      return await purchaseBrainBoost(userId);
+    },
+    {
+      operationType: "購買腦力激盪藥水",
+      idempotencyPrefix: "potion-brain",
+      idempotencyTTL: IDEMPOTENCY_TTL.POTION_PURCHASE,
     }
-
-    const { idempotencyKey } = req.body;
-
-    if (!idempotencyKey) {
-      return sendError(res, "VALIDATION_ERROR", "請提供 idempotencyKey（冪等性鍵）以防止重複購買", {
-        field: "idempotencyKey",
-      });
-    }
-
-    // 冪等性保護（必須）
-    const requestId = `potion-brain:${userId}:${idempotencyKey}`;
-    const result = await handleIdempotentRequest(
-      requestId,
-      async () => await purchaseBrainBoost(userId),
-      { ttl: IDEMPOTENCY_TTL.POTION_PURCHASE } // 15 分鐘
-    );
-
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error("購買腦力激盪藥水失敗:", error);
-    next(error);
-  }
-});
+  )
+);
 
 /**
  * 使用記憶增強藥水

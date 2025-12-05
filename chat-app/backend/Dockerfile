@@ -29,18 +29,20 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 # Copy dependencies from builder
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy application source (includes shared/ directory)
+# Copy application source
 COPY . .
 
+# Create symlink for shared directory
+# index.js uses ../../../shared which resolves to /shared from /app/src/
+# So we need to link /shared -> /app/shared
+RUN ln -s /app/shared /shared
+
 # Force cache invalidation for shared directory
-# This ensures new files in shared/ are always copied
 ARG CACHE_BUST=unknown
 RUN echo "Cache bust: $CACHE_BUST"
 
-# Note: shared directory is now at /app/shared/ and can access /app/node_modules/
-
-# Change ownership to nodejs user
-RUN chown -R nodejs:nodejs /app
+# Change ownership to nodejs user (include /shared symlink)
+RUN chown -R nodejs:nodejs /app && chown -h nodejs:nodejs /shared
 
 # Switch to non-root user
 USER nodejs
@@ -48,9 +50,9 @@ USER nodejs
 # Expose port (Cloud Run will override this with PORT env var)
 EXPOSE 8080
 
-# Health check
+# Health check (使用 wget 避免 ESM/CommonJS 問題)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 8080) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

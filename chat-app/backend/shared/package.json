@@ -1,0 +1,10 @@
+{
+  "name": "shared",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Shared utilities for chat-app and chat-app-admin",
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "winston": "^3.17.0"
+  }
+}

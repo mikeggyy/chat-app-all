@@ -11,6 +11,7 @@ import { useNotifications } from "../composables/useNotifications";
 interface NotificationAction {
   label: string;
   type: 'primary' | 'secondary';
+  route?: string;
 }
 
 interface NotificationDetail {
@@ -34,6 +35,12 @@ const isLoading = ref<boolean>(true);
 let loadTimerId: ReturnType<typeof setTimeout> | null = null;
 
 const notificationId = computed(() => route.params.id as string);
+
+// 過濾掉沒有設定 label 的按鈕
+const validActions = computed(() => {
+  if (!notification.value?.actions) return [];
+  return notification.value.actions.filter(action => action.label && action.label.trim() !== '');
+});
 
 const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
@@ -64,11 +71,21 @@ const handleBack = (): void => {
 };
 
 const handleAction = (action: NotificationAction): void => {
-  // 根據不同的操作類型執行相應的邏輯
+  // 優先使用 route 屬性進行導航
+  if (action.route) {
+    router.push(action.route);
+    return;
+  }
+
+  // 向後兼容：根據 label 判斷導航
   if (action.label === "查看角色" || action.label === "查看訊息") {
-    // 可以導航到相應頁面
+    router.push("/chat");
   } else if (action.label === "立即體驗") {
     router.push({ name: "character-create-gender" });
+  } else if (action.label === "開始配對") {
+    router.push("/match");
+  } else if (action.label === "查看會員方案") {
+    router.push("/membership");
   }
 };
 
@@ -161,11 +178,11 @@ onBeforeUnmount(() => {
       </div>
 
       <footer
-        v-if="notification.actions && notification.actions.length > 0"
+        v-if="validActions.length > 0"
         class="notification-detail-actions"
       >
         <button
-          v-for="action in notification.actions"
+          v-for="action in validActions"
           :key="action.label"
           type="button"
           :class="['action-button', `action-button--${action.type}`]"

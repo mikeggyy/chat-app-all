@@ -15,7 +15,9 @@
     "install:app": "cd chat-app && npm install && cd backend && npm install && cd ../frontend && npm install",
     "install:admin": "cd chat-app-admin && npm install && cd backend && npm install && cd ../frontend && npm install",
     "cleanup-ports": "node scripts/cleanup-ports.js",
-    "kill-all-node": "node scripts/kill-all-node.js"
+    "kill-all-node": "node scripts/kill-all-node.js",
+    "deploy": "node scripts/deploy-backend.js",
+    "deploy:backend": "node scripts/deploy-backend.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

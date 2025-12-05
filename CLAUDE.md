@@ -31,6 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 清理端口 | `npm run cleanup-ports` |
 | 安裝所有依賴 | `npm run install:all` |
 | 驗證配置 | `npm run verify-config` |
+| **部署後端** | `npm run deploy` |
 
 **端口配置**: 主應用 `5173/4000`，管理後台 `5174/4001`（詳見 [PORTS.md](PORTS.md)）
 

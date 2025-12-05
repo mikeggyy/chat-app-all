@@ -4,9 +4,8 @@
  */
 
 import express from "express";
-import { db } from "../firebase/index.js";
+import { db, FieldValue } from "../firebase/index.js";
 import { requireMinRole, requireRole } from "../middleware/admin.middleware.js";
-import { FieldValue } from "firebase-admin/firestore";
 
 const router = express.Router();
 
@@ -165,6 +164,7 @@ router.post("/", requireMinRole("admin"), async (req, res) => {
       });
     }
 
+    const now = new Date();
     const notificationData = {
       title,
       message,
@@ -174,10 +174,10 @@ router.post("/", requireMinRole("admin"), async (req, res) => {
       priority: priority ?? NOTIFICATION_PRIORITY.NORMAL,
       actions: actions || [],
       isActive: isActive !== false,
-      startDate: startDate ? new Date(startDate) : FieldValue.serverTimestamp(),
+      startDate: startDate ? new Date(startDate) : now,
       endDate: endDate ? new Date(endDate) : null,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: now,
+      updatedAt: now,
       createdBy: req.user.uid,
     };
 

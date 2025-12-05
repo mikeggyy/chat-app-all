@@ -159,12 +159,17 @@
               <el-input
                 v-model="action.label"
                 placeholder="按鈕文字"
-                style="width: 150px"
+                style="width: 120px"
               />
               <el-select v-model="action.type" style="width: 100px">
                 <el-option label="主要" value="primary" />
                 <el-option label="次要" value="secondary" />
               </el-select>
+              <el-input
+                v-model="action.route"
+                placeholder="路由 (如 /match)"
+                style="width: 150px"
+              />
               <el-button type="danger" size="small" @click="removeAction(index)">
                 刪除
               </el-button>
@@ -307,7 +312,10 @@ const editNotification = (row) => {
   form.fullContent = row.fullContent || row.message;
   form.category = row.category || '系統公告';
   form.priority = row.priority || 1;
-  form.actions = row.actions ? [...row.actions] : [];
+  // 確保每個 action 都有 route 屬性
+  form.actions = row.actions
+    ? row.actions.map(a => ({ label: a.label || '', type: a.type || 'primary', route: a.route || '' }))
+    : [];
   form.isActive = row.isActive;
 
   if (row.startDate || row.endDate) {
@@ -406,7 +414,7 @@ const resetForm = () => {
 
 // 操作按鈕管理
 const addAction = () => {
-  form.actions.push({ label: '', type: 'primary' });
+  form.actions.push({ label: '', type: 'primary', route: '' });
 };
 
 const removeAction = (index) => {

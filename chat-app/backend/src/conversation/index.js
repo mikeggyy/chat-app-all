@@ -4,6 +4,7 @@ export {
   appendConversationMessages,
   clearConversationHistory,
   getConversationHistory,
+  getConversationHistorySimple,
   getConversationStoreSnapshot,
   getConversationCacheStats,
   replaceConversationHistory,

@@ -8,7 +8,8 @@
         class="features-list__item"
       >
         <span class="features-list__icon" aria-hidden="true">
-          <component :is="feature.icon" class="icon" />
+          <!-- ✅ 2025-12-03 更新：支援 API 字串 icon 和靜態組件 icon -->
+          <component :is="getIconComponent(feature.icon)" class="icon" />
         </span>
         <div class="features-list__content">
           <div class="features-list__header">
@@ -25,16 +26,52 @@
 </template>
 
 <script setup lang="ts">
+import {
+  StarIcon,
+  SparklesIcon,
+  SpeakerWaveIcon,
+  UserGroupIcon,
+  CpuChipIcon,
+  GiftIcon,
+  BoltIcon,
+  PhotoIcon,
+} from "@heroicons/vue/24/outline";
+
 /**
  * FeaturesList - 會員方案功能列表組件
  * 職責：顯示當前方案的所有功能特點
+ *
+ * ✅ 2025-12-03 更新：支援 API 字串 icon 和靜態組件 icon
  */
+
+// Icon 映射表（字串 -> 組件）
+const iconMap: Record<string, any> = {
+  StarIcon,
+  SparklesIcon,
+  SpeakerWaveIcon,
+  UserGroupIcon,
+  CpuChipIcon,
+  GiftIcon,
+  BoltIcon,
+  PhotoIcon,
+};
+
+/**
+ * 獲取 icon 組件
+ * 支援字串（API）和組件（靜態配置）
+ */
+const getIconComponent = (icon: any) => {
+  if (typeof icon === "string") {
+    return iconMap[icon] || StarIcon;
+  }
+  return icon;
+};
 
 // Types
 interface Feature {
   title: string;
   detail: string;
-  icon: any; // Component type
+  icon: any; // Component or string
   badge?: string | null;
   [key: string]: any;
 }
@@ -150,19 +187,45 @@ defineProps<Props>();
 
 /* 響應式設計 */
 @media (max-width: 640px) {
+  .features-section {
+    margin-top: 0;
+  }
+
+  .features-section__title {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .features-list {
+    gap: 0.5rem;
+  }
+
   .features-list__item {
     gap: 0.75rem;
-    padding: 0.85rem;
+    padding: 0.75rem;
   }
 
   .features-list__icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
   }
 
   .features-list__icon .icon {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .features-list__title {
+    font-size: 0.9rem;
+  }
+
+  .features-list__badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.5rem;
+  }
+
+  .features-list__detail {
+    font-size: 0.8rem;
   }
 }
 </style>

@@ -73,7 +73,8 @@ vi.mock('../middleware/validation.middleware.js', () => ({
   },
 }));
 
-vi.mock('../../../shared/utils/errorFormatter.js', () => ({
+// ✅ 2025-12-02 修復：修正 mock 路徑
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
   sendSuccess: (res, data, status) => res.status(status || 200).json({ success: true, ...data }),
   sendError: (res, code, message, details, status) => res.status(status || 400).json({ success: false, error: code, message, details }),
 }));
@@ -83,6 +84,34 @@ vi.mock('../middleware/rateLimiterConfig.js', () => ({
   standardRateLimiter: (req, res, next) => next(),
   relaxedRateLimiter: (req, res, next) => next(),
   strictRateLimiter: (req, res, next) => next(),
+}));
+
+// ✅ 2025-12-02 修復：添加缺失的 mock
+vi.mock('./coins.service.js', () => ({
+  addCoins: vi.fn(),
+  deductCoins: vi.fn(),
+  refundCoins: vi.fn(),
+}));
+
+vi.mock('../utils/idempotency.js', () => ({
+  handleIdempotentRequest: vi.fn(async (requestId, callback, options) => {
+    return await callback();
+  }),
+}));
+
+vi.mock('../config/limits.js', () => ({
+  IDEMPOTENCY_TTL: {
+    ORDER: 86400000,
+    DEFAULT: 86400000,
+  },
+}));
+
+vi.mock('../utils/logger.js', () => ({
+  default: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
 }));
 
 // Import mocked services
@@ -269,6 +298,7 @@ describe('Order API Routes', () => {
           amount: 100,
           currency: 'TWD',
           paymentMethod: 'CREDIT_CARD',
+          idempotencyKey: 'test-idempotency-key-001', // ✅ 2025-12-02 修復：添加必要的冪等性鍵
         });
 
       expect(response.status).toBe(201);
@@ -292,6 +322,7 @@ describe('Order API Routes', () => {
           tier: 'vip',
           duration: 1,
         },
+        idempotencyKey: 'test-idempotency-key-002', // ✅ 2025-12-02 修復：添加必要的冪等性鍵
       };
 
       const response = await request(app)

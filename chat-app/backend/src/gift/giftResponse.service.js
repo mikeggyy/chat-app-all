@@ -7,7 +7,7 @@ import logger from "../utils/logger.js";
 import { getGiftById, getResponseLevelByRarity } from "../config/gifts.js";
 import { getOpenAIClient } from "../ai/ai.service.js";
 import { generateGeminiImage } from "../ai/gemini.service.js";
-import { getConversationHistory, appendConversationMessage, deleteConversationMessages } from "../conversation/conversation.service.js";
+import { getConversationHistorySimple, appendConversationMessage, deleteConversationMessages } from "../conversation/conversation.service.js";
 import { savePhotoToAlbum } from "../photoAlbum/photoAlbum.service.js";
 import { uploadBase64Image, generateFilename } from "../firebase/storage.service.js";
 import { smartFetch } from "../utils/networkFetch.js";
@@ -51,7 +51,8 @@ ${characterData.background}
 
 直接輸出感謝訊息，不需要其他說明。`;
 
-    const conversationHistory = await getConversationHistory(userId, characterData.id);
+    // ✅ 使用簡化版函數獲取完整歷史
+    const conversationHistory = await getConversationHistorySimple(userId, characterData.id);
     const recentContext = conversationHistory.slice(-3); // 取最近3條對話作為上下文
 
     // 使用OpenAI生成個性化感謝訊息

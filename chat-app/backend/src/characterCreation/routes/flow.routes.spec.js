@@ -59,14 +59,17 @@ vi.mock('../../middleware/rateLimiterConfig.js', () => ({
   purchaseRateLimiter: (req, res, next) => next(),
 }));
 
-vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
-  sendSuccess: (res, data, statusCode = 200) => res.status(statusCode).json({ success: true, ...data }),
+// ✅ 2025-12-02 修復：mock 路徑需與實際 import 路徑一致（5 層上級）
+vi.mock('../../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, statusCode = 200) => res.status(typeof statusCode === 'number' ? statusCode : 200).json({ success: true, data }),
   sendError: (res, code, message, details) => {
+    const { error: detailError, ...safeDetails } = details || {};
     return res.status(code === 'RESOURCE_NOT_FOUND' ? 404 : code === 'FORBIDDEN' ? 403 : 400).json({
       success: false,
       error: code,
       message,
-      ...details
+      ...safeDetails,
+      ...(detailError ? { errorDetail: detailError } : {}),
     });
   },
 }));
@@ -128,8 +131,8 @@ describe('Flow API Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.flow).toBeDefined();
-      expect(response.body.flow.id).toBe('flow-001');
+      expect(response.body.data.flow).toBeDefined();
+      expect(response.body.data.flow.id).toBe('flow-001');
       expect(createCreationFlow).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'test-user-123',
@@ -181,8 +184,8 @@ describe('Flow API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.flow).toBeDefined();
-      expect(response.body.flow.id).toBe('flow-001');
+      expect(response.body.data.flow).toBeDefined();
+      expect(response.body.data.flow.id).toBe('flow-001');
     });
 
     it('應該返回 404 當流程不存在', async () => {
@@ -242,7 +245,7 @@ describe('Flow API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.flow.status).toBe('completed');
+      expect(response.body.data.flow.status).toBe('completed');
       expect(mergeCreationFlow).toHaveBeenCalledWith('flow-001', { status: 'completed' });
     });
 
@@ -407,7 +410,7 @@ describe('Flow API Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.charge).toBeDefined();
+      expect(response.body.data.charge).toBeDefined();
       expect(recordCreationCharge).toHaveBeenCalled();
     });
 
@@ -493,7 +496,7 @@ describe('Flow API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.deleted).toBe(2);
+      expect(response.body.data.deleted).toBe(2);
       expect(deleteImage).toHaveBeenCalledTimes(2);
     });
 
@@ -509,7 +512,7 @@ describe('Flow API Routes', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.deleted).toBe(0);
+      expect(response.body.data.deleted).toBe(0);
       expect(deleteImage).not.toHaveBeenCalled();
     });
 
@@ -594,8 +597,8 @@ describe('Flow API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.flow.status).toBe('cancelled');
-      expect(response.body.deletedImages).toBe(2);
+      expect(response.body.data.flow.status).toBe('cancelled');
+      expect(response.body.data.deletedImages).toBe(2);
       expect(deleteImage).toHaveBeenCalledTimes(2);
       expect(mergeCreationFlow).toHaveBeenCalledWith('flow-001', { status: 'cancelled' });
     });
@@ -614,7 +617,7 @@ describe('Flow API Routes', () => {
         .post('/api/character-creation/flows/flow-001/cancel');
 
       expect(response.status).toBe(200);
-      expect(response.body.deletedImages).toBe(0);
+      expect(response.body.data.deletedImages).toBe(0);
       expect(deleteImage).not.toHaveBeenCalled();
     });
 

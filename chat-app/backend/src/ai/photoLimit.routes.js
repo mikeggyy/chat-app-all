@@ -9,6 +9,7 @@ import {
   getPhotoStats,
   purchasePhotoCards,
 } from "./photoLimit.service.js";
+import logger from "../utils/logger.js";
 import { requireFirebaseAuth } from "../auth/firebaseAuth.middleware.js";
 import createLimitRouter from "../utils/createLimitRouter.js";
 import {
@@ -71,13 +72,12 @@ photoLimitRouter.get(
     const userId = req.firebaseUser.uid;
 
     try {
-      console.log('[PhotoLimit Stats] 開始獲取照片統計，userId:', userId);
+      logger.debug('[PhotoLimit Stats] 開始獲取照片統計', { userId });
       const result = await getPhotoStats(userId);
-      console.log('[PhotoLimit Stats] 成功獲取照片統計:', JSON.stringify(result, null, 2));
+      logger.debug('[PhotoLimit Stats] 成功獲取照片統計', { result });
       sendSuccess(res, result);
     } catch (error) {
-      console.error('[PhotoLimit Stats] 獲取照片統計失敗:', error);
-      console.error('[PhotoLimit Stats] 錯誤堆棧:', error.stack);
+      logger.error('[PhotoLimit Stats] 獲取照片統計失敗', { error: error.message, stack: error.stack });
       const status = getLimitErrorStatus(error);
       sendError(res, error, status);
     }

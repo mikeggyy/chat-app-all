@@ -13,6 +13,23 @@ import express from 'express';
 import request from 'supertest';
 
 // Mock all dependencies BEFORE importing the router
+// ✅ 2025-12-02 修復：添加 Firebase mock 避免環境變數錯誤
+vi.mock('../../firebase/index.js', () => ({
+  getFirestoreDb: vi.fn(() => ({
+    collection: vi.fn(() => ({
+      doc: vi.fn(() => ({
+        get: vi.fn(),
+        set: vi.fn(),
+        update: vi.fn(),
+      })),
+    })),
+  })),
+  FieldValue: {
+    increment: vi.fn((n) => n),
+    serverTimestamp: vi.fn(),
+  },
+}));
+
 vi.mock('../generationLog.service.js', () => ({
   getGenerationStats: vi.fn(),
 }));
@@ -40,6 +57,11 @@ vi.mock('../../auth/firebaseAuth.middleware.js', () => ({
   },
 }));
 
+// ✅ 2025-12-02 修復：添加 adminAuth middleware mock
+vi.mock('../../middleware/adminAuth.middleware.js', () => ({
+  requireAdmin: (req, res, next) => next(),
+}));
+
 vi.mock('../../middleware/validation.middleware.js', () => ({
   validateRequest: () => (req, res, next) => next(),
   characterCreationSchemas: {
@@ -50,9 +72,11 @@ vi.mock('../../middleware/validation.middleware.js', () => ({
   },
 }));
 
-vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
-  sendSuccess: (res, data, statusCode = 200) => res.status(statusCode).json({ success: true, ...data }),
+// ✅ 2025-12-02 修復：mock 路徑需與實際 import 路徑一致（5 層上級）
+vi.mock('../../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, statusCode = 200) => res.status(typeof statusCode === 'number' ? statusCode : 200).json({ success: true, data }),
   sendError: (res, code, message, details) => {
+    const { error: detailError, ...safeDetails } = details || {};
     return res.status(
       code === 'RESOURCE_NOT_FOUND' ? 404 :
       code === 'FORBIDDEN' ? 403 :
@@ -62,7 +86,8 @@ vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
       success: false,
       error: code,
       message,
-      ...details
+      ...safeDetails,
+      ...(detailError ? { errorDetail: detailError } : {}),
     });
   },
 }));
@@ -131,7 +156,7 @@ describe('Stats API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.stats).toEqual(mockStats);
+      expect(response.body.data.stats).toEqual(mockStats);
       expect(getGenerationStats).toHaveBeenCalledWith(null);
     });
 
@@ -168,7 +193,7 @@ describe('Stats API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.stats).toEqual(mockStats);
+      expect(response.body.data.stats).toEqual(mockStats);
       expect(getGenerationStats).toHaveBeenCalledWith('test-user-123');
     });
 
@@ -200,7 +225,7 @@ describe('Stats API Routes', () => {
         .get('/api/character-creation/generation-stats/user/test-user-123');
 
       expect(response.status).toBe(200);
-      expect(response.body.stats.totalGenerations).toBe(0);
+      expect(response.body.data.stats.totalGenerations).toBe(0);
     });
   });
 
@@ -225,9 +250,9 @@ describe('Stats API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.limit).toEqual(mockLimitCheck);
-      expect(response.body.stats).toEqual(mockCreationStats);
-      expect(response.body.remainingFreeCreations).toBe(3);
+      expect(response.body.data.limit).toEqual(mockLimitCheck);
+      expect(response.body.data.stats).toEqual(mockCreationStats);
+      expect(response.body.data.remainingFreeCreations).toBe(3);
       expect(canCreateCharacter).toHaveBeenCalledWith('test-user-123');
       expect(getCreationStats).toHaveBeenCalledWith('test-user-123');
     });
@@ -252,8 +277,8 @@ describe('Stats API Routes', () => {
         .get('/api/character-creation/limits/test-user-123');
 
       expect(response.status).toBe(200);
-      expect(response.body.remainingFreeCreations).toBe(0);
-      expect(response.body.stats.createCards).toBe(10);
+      expect(response.body.data.remainingFreeCreations).toBe(0);
+      expect(response.body.data.stats.createCards).toBe(10);
     });
 
     it('應該返回不允許創建（超過限制且無創建卡）', async () => {
@@ -276,8 +301,8 @@ describe('Stats API Routes', () => {
         .get('/api/character-creation/limits/test-user-123');
 
       expect(response.status).toBe(200);
-      expect(response.body.limit.allowed).toBe(false);
-      expect(response.body.stats.createCards).toBe(0);
+      expect(response.body.data.limit.allowed).toBe(false);
+      expect(response.body.data.stats.createCards).toBe(0);
     });
 
     it('應該拒絕查詢其他用戶的限制', async () => {
@@ -306,9 +331,9 @@ describe('Stats API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('成功使用創建角色卡');
-      expect(response.body.remainingCards).toBe(9);
-      expect(response.body.deducted).toBe(1);
+      expect(response.body.data.message).toBe('成功使用創建角色卡');
+      expect(response.body.data.remainingCards).toBe(9);
+      expect(response.body.data.deducted).toBe(1);
       expect(consumeUserAsset).toHaveBeenCalledWith('test-user-123', 'createCards', 1);
     });
 
@@ -353,8 +378,8 @@ describe('Stats API Routes', () => {
         .send({});
 
       expect(response.status).toBe(200);
-      expect(response.body.remainingCards).toBe(0);
-      expect(response.body.deducted).toBe(1);
+      expect(response.body.data.remainingCards).toBe(0);
+      expect(response.body.data.deducted).toBe(1);
     });
   });
 

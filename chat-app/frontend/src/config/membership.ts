@@ -139,6 +139,12 @@ export const membershipTiers: MembershipTier[] = [
         detail: "每月可生成 10 張 AI 照片",
         badge: null,
       },
+      {
+        icon: StarIcon,
+        title: "9.5 折優惠",
+        detail: "金幣購買、AI 拍照/影片享 9.5 折",
+        badge: null,
+      },
     ],
   },
   {
@@ -199,7 +205,7 @@ export const membershipTiers: MembershipTier[] = [
     id: "vvip",
     label: "VVIP",
     headline: "VVIP 黑卡禮遇",
-    description: "無限對話、無限語音，極致體驗，每月豐厚贈禮。",
+    description: "超大額度對話、語音，極致體驗，每月豐厚贈禮。",
     priceTag: "NT$ 599",
     pricePeriod: "/ 月",
     highlight: "極致尊榮",
@@ -213,21 +219,21 @@ export const membershipTiers: MembershipTier[] = [
     features: [
       {
         icon: SparklesIcon,
-        title: "無限對話",
-        detail: "所有角色無限對話，盡情暢聊",
-        badge: "無限制",
+        title: "500 次對話/角色",
+        detail: "每個角色每日 500 次對話",
+        badge: "超大額度",
       },
       {
         icon: SpeakerWaveIcon,
-        title: "無限語音",
-        detail: "無限次 TTS 語音播放",
-        badge: "無限制",
+        title: "200 次語音/角色",
+        detail: "每個角色每日 200 次語音播放",
+        badge: "超大額度",
       },
       {
         icon: UserGroupIcon,
-        title: "無限配對",
-        detail: "每日無限次角色配對",
-        badge: "無限制",
+        title: "100 次配對/日",
+        detail: "每日 100 次角色配對",
+        badge: "超大額度",
       },
       {
         icon: PhotoIcon,
@@ -260,6 +266,12 @@ export const membershipTiers: MembershipTier[] = [
 /**
  * 功能對比表格配置（2025-11-30 更新）
  */
+/**
+ * ✅ 2025-12-03 更新：VVIP 改為有上限（避免成本失控）
+ * - 對話：500 次/角色/日
+ * - 語音：200 次/角色/日
+ * - 配對：100 次/日
+ */
 export const comparisonFeatures: ComparisonCategory[] = [
   {
     category: "對話功能",
@@ -269,14 +281,14 @@ export const comparisonFeatures: ComparisonCategory[] = [
         free: "10 次",
         lite: "30 次",
         vip: "100 次",
-        vvip: "無限制",
+        vvip: "500 次",
       },
       {
         name: "語音播放",
         free: "10 次/角色",
         lite: "15 次/角色",
         vip: "50 次/角色",
-        vvip: "無限制",
+        vvip: "200 次/角色",
       },
     ],
   },
@@ -288,7 +300,7 @@ export const comparisonFeatures: ComparisonCategory[] = [
         free: "5 次",
         lite: "10 次",
         vip: "50 次",
-        vvip: "無限制",
+        vvip: "100 次",
       },
       {
         name: "進階搜尋",
@@ -338,21 +350,35 @@ export const comparisonFeatures: ComparisonCategory[] = [
       {
         name: "購買折扣",
         free: "-",
-        lite: "-",
+        lite: "9.5 折",
         vip: "9 折",
         vvip: "8 折",
       },
     ],
   },
   {
-    category: "其他",
+    category: "廣告與客服",
     items: [
       {
-        name: "移除廣告",
+        name: "無強制廣告",
         free: "✗",
         lite: "✓",
         vip: "✓",
         vvip: "✓",
+      },
+      {
+        name: "廣告獎勵可用",
+        free: "✓",
+        lite: "✓",
+        vip: "✓",
+        vvip: "✓",
+      },
+      {
+        name: "每次廣告解鎖對話",
+        free: "5 次",
+        lite: "8 次",
+        vip: "10 次",
+        vvip: "20 次",
       },
       {
         name: "優先客服",

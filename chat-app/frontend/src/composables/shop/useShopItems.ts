@@ -136,6 +136,7 @@ export interface ShopItem {
   currency?: string;
   contents?: BundlePackageData["contents"];
   purchaseStatus?: BundlePurchaseStatus | null;
+  purchaseLimit?: "once" | "monthly" | "weekly" | "none";  // ✅ 新增：限購類型
   // 排序
   order?: number;
 }
@@ -325,9 +326,20 @@ export function useShopItems(
 
   /**
    * 組合禮包商品（從 API 加載）
+   * 一次性禮包（purchaseLimit: "once"）購買後會被隱藏
    */
   const bundleItems = computed<ShopItem[]>(() => {
-    const items = bundlePackages.value.map((bundle) => {
+    // 過濾：一次性禮包購買後不顯示
+    const visibleBundles = bundlePackages.value.filter((bundle) => {
+      if (bundle.purchaseLimit === "once") {
+        // 一次性禮包：只有可購買時才顯示
+        return bundle.purchaseStatus?.canPurchase !== false;
+      }
+      // 其他限購類型都顯示
+      return true;
+    });
+
+    const items = visibleBundles.map((bundle) => {
       // 生成禮包內容描述
       const contentParts: string[] = [];
       if (bundle.contents.coins) {
@@ -366,6 +378,7 @@ export function useShopItems(
         contents: bundle.contents,
         order: bundle.order || 0,
         purchaseStatus: bundle.purchaseStatus || null,
+        purchaseLimit: bundle.purchaseLimit || "none",  // ✅ 新增：傳遞限購類型
       };
     });
 

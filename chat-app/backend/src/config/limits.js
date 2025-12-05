@@ -70,11 +70,14 @@ export const CONVERSATION_LIMITS = {
   // ✅ 2025-12-01 修復：VIP 用戶每個角色的對話次數（原 20，改為符合前端顯示的 100）
   VIP_PER_CHARACTER: 100,
 
-  // ✅ 2025-12-01 修復：VVIP 用戶無限對話（原 50，改為 -1 表示無限制）
-  VVIP_PER_CHARACTER: -1,
+  // ✅ 2025-12-03 調整：VVIP 用戶每角色 500 次對話（原無限，避免成本失控）
+  VVIP_PER_CHARACTER: 500,
 
   // 免費用戶每天可觀看廣告解鎖的次數
   FREE_DAILY_AD_LIMIT: 10,
+
+  // ✅ 2025-12-03 新增：Lite 用戶每天可觀看廣告解鎖的次數
+  LITE_DAILY_AD_LIMIT: 10,
 
   // VIP 用戶每天可觀看廣告解鎖的次數
   VIP_DAILY_AD_LIMIT: 10,
@@ -84,6 +87,9 @@ export const CONVERSATION_LIMITS = {
 
   // 免費用戶每次廣告解鎖的對話次數
   FREE_UNLOCKED_PER_AD: 5,
+
+  // ✅ 2025-12-03 新增：Lite 用戶每次廣告解鎖的對話次數
+  LITE_UNLOCKED_PER_AD: 8,
 
   // VIP 用戶每次廣告解鎖的對話次數
   VIP_UNLOCKED_PER_AD: 10,
@@ -106,14 +112,39 @@ export const VOICE_LIMITS = {
   // 免費用戶每個角色的語音次數
   FREE_PER_CHARACTER: 10,
 
+  // ✅ 2025-12-03 更新：Lite 用戶每角色語音次數
+  LITE_PER_CHARACTER: 15,
+
+  // ✅ 2025-12-03 更新：VIP 用戶每角色語音次數
+  VIP_PER_CHARACTER: 50,
+
+  // ✅ 2025-12-03 調整：VVIP 用戶每角色 200 次語音（原無限，避免成本失控）
+  VVIP_PER_CHARACTER: 200,
+
+  // === 廣告解鎖配置 ===
   // 免費用戶每天可觀看廣告解鎖的次數
   FREE_DAILY_AD_LIMIT: 10,
 
-  // 每次廣告解鎖的語音次數
-  UNLOCKED_PER_AD: 5,
+  // ✅ 2025-12-03 新增：Lite 用戶每天可觀看廣告解鎖的次數
+  LITE_DAILY_AD_LIMIT: 10,
 
-  // 付費會員無限語音（用 -1 表示）
-  PAID_UNLIMITED: -1,
+  // ✅ 2025-12-03 新增：VIP 用戶每天可觀看廣告解鎖的次數
+  VIP_DAILY_AD_LIMIT: 10,
+
+  // ✅ 2025-12-03 新增：VVIP 用戶每天可觀看廣告解鎖的次數
+  VVIP_DAILY_AD_LIMIT: 10,
+
+  // 免費用戶每次廣告解鎖的語音次數
+  FREE_UNLOCKED_PER_AD: 5,
+
+  // ✅ 2025-12-03 新增：Lite 用戶每次廣告解鎖的語音次數
+  LITE_UNLOCKED_PER_AD: 8,
+
+  // ✅ 2025-12-03 新增：VIP 用戶每次廣告解鎖的語音次數
+  VIP_UNLOCKED_PER_AD: 10,
+
+  // ✅ 2025-12-03 新增：VVIP 用戶每次廣告解鎖的語音次數
+  VVIP_UNLOCKED_PER_AD: 15,
 
   // ✅ P1-1 修復：重置週期（與 voiceLimit.service.js 一致）
   RESET_PERIOD: "daily", // 每日凌晨重置
@@ -220,23 +251,38 @@ export const MATCH_LIMITS = {
   // 免費用戶每日配對次數
   FREE_DAILY: 5,
 
-  // VIP 用戶每日配對次數
-  VIP_DAILY: 30,
+  // ✅ 2025-12-03 更新：Lite 用戶每日配對次數
+  LITE_DAILY: 10,
 
-  // VVIP 用戶無限配對（用 -1 表示）
-  VVIP_UNLIMITED: -1,
+  // ✅ 2025-12-03 更新：VIP 用戶每日配對次數（原 30，改為 50）
+  VIP_DAILY: 50,
+
+  // ✅ 2025-12-03 調整：VVIP 用戶每日 100 次配對（原無限，避免成本失控）
+  VVIP_DAILY: 100,
 
   // 免費用戶每天可觀看廣告解鎖的次數
   FREE_DAILY_AD_LIMIT: 10,
 
+  // ✅ 2025-12-03 新增：Lite 用戶每天可觀看廣告解鎖的次數
+  LITE_DAILY_AD_LIMIT: 10,
+
   // VIP 用戶每天可觀看廣告解鎖的次數
   VIP_DAILY_AD_LIMIT: 10,
+
+  // ✅ 2025-12-03 新增：VVIP 用戶每天可觀看廣告解鎖的次數
+  VVIP_DAILY_AD_LIMIT: 10,
 
   // 免費用戶每次廣告解鎖的配對次數
   FREE_UNLOCKED_PER_AD: 1,
 
+  // ✅ 2025-12-03 新增：Lite 用戶每次廣告解鎖的配對次數
+  LITE_UNLOCKED_PER_AD: 2,
+
   // VIP 用戶每次廣告解鎖的配對次數
   VIP_UNLOCKED_PER_AD: 5,
+
+  // ✅ 2025-12-03 新增：VVIP 用戶每次廣告解鎖的配對次數
+  VVIP_UNLOCKED_PER_AD: 10,
 };
 
 /**

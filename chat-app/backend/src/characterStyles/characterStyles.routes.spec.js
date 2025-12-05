@@ -12,6 +12,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
+// ✅ 2025-12-02 修復：使用 vi.hoisted 來處理 mock 提升問題
+const { adminState } = vi.hoisted(() => ({
+  adminState: { isAdmin: false },
+}));
+
 // Mock dependencies BEFORE importing the router
 vi.mock('../utils/routeHelpers.js', () => ({
   asyncHandler: (fn) => (req, res, next) => {
@@ -25,13 +30,41 @@ vi.mock('../utils/routeHelpers.js', () => ({
       message,
     });
   },
+  // ✅ 2025-12-02 修復：createAdminRouteHandler 需要在成功後調用 sendSuccess
+  createAdminRouteHandler: (handler, options = {}) => async (req, res, next) => {
+    // 使用 hoisted adminState 來檢查權限
+    if (!adminState.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: '需要管理員權限',
+      });
+    }
+    try {
+      const adminId = req.firebaseUser?.uid || 'admin';
+      const result = await handler(req, res, adminId);
+      // 調用 sendSuccess 返回結果
+      return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      // 根據錯誤類型決定狀態碼
+      const isValidationError = error.message && (
+        error.message.includes('必填') ||
+        error.message.includes('驗證') ||
+        error.message.includes('格式')
+      );
+      const status = isValidationError ? 400 : 500;
+      return res.status(status).json({
+        success: false,
+        error: isValidationError ? 'VALIDATION_ERROR' : 'INTERNAL_SERVER_ERROR',
+        message: error.message,
+      });
+    }
+  },
 }));
 
-// Mock admin middleware
-let isAdmin = false;
 vi.mock('../middleware/adminAuth.middleware.js', () => ({
   requireAdmin: (req, res, next) => {
-    if (!isAdmin) {
+    if (!adminState.isAdmin) {
       return res.status(403).json({
         success: false,
         error: 'FORBIDDEN',
@@ -53,6 +86,23 @@ vi.mock('./characterStyles.service.js', () => ({
   getCharacterStyle: (...args) => mockGetCharacterStyle(...args),
   upsertCharacterStyle: (...args) => mockUpsertCharacterStyle(...args),
   deleteCharacterStyle: (...args) => mockDeleteCharacterStyle(...args),
+}));
+
+// ✅ 2025-12-02 修復：添加缺失的 mock
+vi.mock('../services/adminAudit.service.js', () => ({
+  ADMIN_AUDIT_TYPES: {
+    CREATE: 'CREATE',
+    UPDATE: 'UPDATE',
+    DELETE: 'DELETE',
+  },
+  logAdminAction: vi.fn(),
+}));
+
+vi.mock('../auth/firebaseAuth.middleware.js', () => ({
+  requireFirebaseAuth: (req, res, next) => {
+    req.firebaseUser = { uid: 'test-user-123' };
+    next();
+  },
 }));
 
 // Import the router after mocks
@@ -83,7 +133,7 @@ describe('Character Styles API Routes', () => {
     process.env.NODE_ENV = 'test';
 
     // 重置管理員權限
-    isAdmin = false;
+    adminState.isAdmin = false;
   });
 
   describe('GET / - 列出所有角色風格', () => {
@@ -185,7 +235,7 @@ describe('Character Styles API Routes', () => {
   describe('POST /:id - 創建/更新角色風格（管理員）', () => {
     beforeEach(() => {
       // 設置為管理員
-      isAdmin = true;
+      adminState.isAdmin =true;
     });
 
     it('應該成功創建新的角色風格', async () => {
@@ -265,7 +315,7 @@ describe('Character Styles API Routes', () => {
     });
 
     it('應該拒絕非管理員訪問', async () => {
-      isAdmin = false;
+      adminState.isAdmin =false;
 
       const response = await request(app)
         .post('/api/character-styles/modern')
@@ -284,7 +334,7 @@ describe('Character Styles API Routes', () => {
   describe('DELETE /:id - 刪除角色風格（管理員）', () => {
     beforeEach(() => {
       // 設置為管理員
-      isAdmin = true;
+      adminState.isAdmin =true;
     });
 
     it('應該成功刪除角色風格', async () => {
@@ -308,7 +358,7 @@ describe('Character Styles API Routes', () => {
     });
 
     it('應該拒絕非管理員訪問', async () => {
-      isAdmin = false;
+      adminState.isAdmin =false;
 
       const response = await request(app).delete('/api/character-styles/modern');
 
@@ -332,7 +382,7 @@ describe('Character Styles API Routes', () => {
     });
 
     it('管理端點需要管理員權限', async () => {
-      isAdmin = false;
+      adminState.isAdmin =false;
 
       const response1 = await request(app)
         .post('/api/character-styles/test')
@@ -344,7 +394,7 @@ describe('Character Styles API Routes', () => {
     });
 
     it('管理員可以執行所有操作', async () => {
-      isAdmin = true;
+      adminState.isAdmin =true;
       mockUpsertCharacterStyle.mockResolvedValue({ id: 'test', label: 'Test', era: 'modern' });
       mockDeleteCharacterStyle.mockResolvedValue();
 

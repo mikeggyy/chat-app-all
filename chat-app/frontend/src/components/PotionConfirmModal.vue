@@ -267,6 +267,7 @@ const handleOverlayClick = (event: MouseEvent): void => {
 .potion-actions {
   padding: 1.5rem;
   display: flex;
+  justify-content: center;
   gap: 0.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }

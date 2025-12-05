@@ -108,21 +108,24 @@ const overlayClasses = computed(() => ({
   "is-dragging": isDragging.value,
 }));
 
-const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max);
 
-const drawRoundedRect = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void => {
+const drawRoundedRect = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+): void => {
   const r = clamp(radius, 0, Math.min(width, height) / 2);
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + width - r, y);
   ctx.quadraticCurveTo(x + width, y, x + width, y + r);
   ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(
-    x + width,
-    y + height,
-    x + width - r,
-    y + height
-  );
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
   ctx.lineTo(x + r, y + height);
   ctx.quadraticCurveTo(x, y + height, x, y + height - r);
   ctx.lineTo(x, y + r);
@@ -205,7 +208,9 @@ const updateSliderBounds = (): void => {
   clampCropPosition();
 };
 
-const onImageLoad = (event: Event | { target: HTMLImageElement | null }): void => {
+const onImageLoad = (
+  event: Event | { target: HTMLImageElement | null }
+): void => {
   const image = event?.target as HTMLImageElement | null;
   const container = cropContainerRef.value;
   if (!image || !container) return;
@@ -258,10 +263,7 @@ const createCroppedImage = (): string | null => {
   const image = imageRef.value;
   if (!image || !crop.width || !crop.height) return null;
 
-  const outputWidth = Math.max(
-    1,
-    Math.round(crop.width * imageMetrics.scaleX)
-  );
+  const outputWidth = Math.max(1, Math.round(crop.width * imageMetrics.scaleX));
   const outputHeight = Math.max(
     1,
     Math.round(crop.height * imageMetrics.scaleY)
@@ -347,11 +349,7 @@ watch(
   (next) => {
     if (!crop.height && next === 0) return;
     const ratio = targetAspectRatio.value;
-    let safeValue = clamp(
-      Math.round(next),
-      sliderRange.min,
-      sliderRange.max
-    );
+    let safeValue = clamp(Math.round(next), sliderRange.min, sliderRange.max);
     let nextHeight = safeValue;
     let nextWidth = Math.round(nextHeight * ratio);
 
@@ -467,21 +465,18 @@ onBeforeUnmount(() => {
   background: rgba(10, 12, 24, 0.82);
   backdrop-filter: blur(8px);
   padding: clamp(1rem, 3vw, 2.5rem);
-  padding-bottom: calc(clamp(1rem, 3vw, 2.5rem) + 80px);
   overflow-y: auto;
 }
 
 .avatar-cropper__panel {
   width: min(1080px, 100%);
   max-width: calc(100vw - 2rem);
-  max-height: calc(100vh - 160px);
   background: #101119;
   border-radius: 28px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   box-shadow: 0 28px 68px rgba(4, 6, 18, 0.6);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   margin: auto;
 }
 
@@ -533,7 +528,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 1.25rem;
   padding: 1.75rem;
-  overflow-y: auto;
 }
 
 .avatar-cropper__stage {
@@ -608,7 +602,7 @@ onBeforeUnmount(() => {
 
 .avatar-cropper__footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 0.85rem;
   padding: 1.5rem 1.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);

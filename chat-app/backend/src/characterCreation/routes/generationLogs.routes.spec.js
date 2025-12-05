@@ -48,9 +48,11 @@ vi.mock('../../middleware/validation.middleware.js', () => ({
   },
 }));
 
-vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
-  sendSuccess: (res, data, statusCode = 200) => res.status(statusCode).json({ success: true, ...data }),
+// ✅ 2025-12-02 修復：mock 路徑需與實際 import 路徑一致（5 層上級）
+vi.mock('../../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, statusCode = 200) => res.status(typeof statusCode === 'number' ? statusCode : 200).json({ success: true, data }),
   sendError: (res, code, message, details) => {
+    const { error: detailError, ...safeDetails } = details || {};
     return res.status(
       code === 'RESOURCE_NOT_FOUND' ? 404 :
       code === 'FORBIDDEN' ? 403 :
@@ -59,7 +61,8 @@ vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
       success: false,
       error: code,
       message,
-      ...details
+      ...safeDetails,
+      ...(detailError ? { errorDetail: detailError } : {}),
     });
   },
 }));
@@ -70,6 +73,20 @@ vi.mock('../../utils/logger.js', () => ({
     error: vi.fn(),
     warn: vi.fn(),
     debug: vi.fn(),
+  },
+}));
+
+// ✅ 2025-12-02 修復：添加缺失的 mock
+vi.mock('../../middleware/adminAuth.middleware.js', () => ({
+  requireAdmin: (req, res, next) => next(),
+}));
+
+vi.mock('../characterCreation.schemas.js', () => ({
+  characterCreationSchemas: {
+    userGenerationLogs: {},
+    generationLog: {},
+    flowGenerationLog: {},
+    allGenerationLogs: {},
   },
 }));
 
@@ -122,8 +139,8 @@ describe('GenerationLogs API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.logs).toEqual(mockLogs);
-      expect(response.body.count).toBe(2);
+      expect(response.body.data.logs).toEqual(mockLogs);
+      expect(response.body.data.count).toBe(2);
       expect(getUserGenerationLogs).toHaveBeenCalledWith('test-user-123', { limit: 50, offset: 0 });
     });
 
@@ -181,7 +198,7 @@ describe('GenerationLogs API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.log).toEqual(mockLog);
+      expect(response.body.data.log).toEqual(mockLog);
       expect(getGenerationLog).toHaveBeenCalledWith('log-001');
     });
 
@@ -227,9 +244,9 @@ describe('GenerationLogs API Routes', () => {
         .get('/api/character-creation/generation-logs/log-002');
 
       expect(response.status).toBe(200);
-      expect(response.body.log).toEqual(mockLog);
-      expect(response.body.log.metadata).toBeDefined();
-      expect(response.body.log.result).toBeDefined();
+      expect(response.body.data.log).toEqual(mockLog);
+      expect(response.body.data.log.metadata).toBeDefined();
+      expect(response.body.data.log.result).toBeDefined();
     });
   });
 
@@ -254,7 +271,7 @@ describe('GenerationLogs API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.log).toEqual(mockLog);
+      expect(response.body.data.log).toEqual(mockLog);
       expect(getCreationFlow).toHaveBeenCalledWith('flow-001');
       expect(getFlowGenerationLog).toHaveBeenCalledWith('flow-001');
     });
@@ -321,9 +338,9 @@ describe('GenerationLogs API Routes', () => {
         .get('/api/character-creation/generation-logs/flow/flow-002');
 
       expect(response.status).toBe(200);
-      expect(response.body.log.logs).toHaveLength(4);
-      expect(response.body.log.logs[0].type).toBe('persona');
-      expect(response.body.log.logs[3].type).toBe('image');
+      expect(response.body.data.log.logs).toHaveLength(4);
+      expect(response.body.data.log.logs[0].type).toBe('persona');
+      expect(response.body.data.log.logs[3].type).toBe('image');
     });
   });
 
@@ -345,7 +362,7 @@ describe('GenerationLogs API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.logs).toBeDefined();
+      expect(response.body.data.logs).toBeDefined();
       expect(getAllGenerationLogs).toHaveBeenCalledWith({ limit: 50, offset: 0, status: null });
     });
 

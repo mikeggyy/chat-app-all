@@ -15,6 +15,11 @@ import express from 'express';
 import request from 'supertest';
 import transactionRouter from './transaction.routes.js';
 
+// ✅ 2025-12-02 修復：使用 vi.hoisted 來處理 mock 提升問題
+const { adminState } = vi.hoisted(() => ({
+  adminState: { isAdmin: true, isSuperAdmin: true },
+}));
+
 // Mock all dependencies
 vi.mock('./transaction.service.js', () => ({
   getUserTransactions: vi.fn(),
@@ -66,7 +71,8 @@ vi.mock('../middleware/validation.middleware.js', () => ({
   },
 }));
 
-vi.mock('../../../shared/utils/errorFormatter.js', () => ({
+// ✅ 2025-12-02 修復：修正 mock 路徑
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
   sendSuccess: (res, data) => res.json({ success: true, ...data }),
   sendError: (res, code, message, details) => res.status(400).json({ success: false, error: code, message, details }),
   ApiError: class ApiError extends Error {
@@ -87,6 +93,56 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
+// ✅ 2025-12-02 修復：添加缺失的 mock，需要正確處理權限和響應
+vi.mock('../utils/routeHelpers.js', () => ({
+  createAdminRouteHandler: (handler, options = {}) => async (req, res, next) => {
+    const { requireSuperAdmin = false } = options;
+
+    // 權限檢查
+    if (requireSuperAdmin && !adminState.isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: '需要超級管理員權限',
+      });
+    }
+
+    if (!adminState.isAdmin && !adminState.isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: '需要管理員權限',
+      });
+    }
+
+    try {
+      const adminId = req.firebaseUser?.uid || 'admin';
+      const result = await handler(req, res, adminId);
+      return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: 'INTERNAL_SERVER_ERROR',
+        message: error.message,
+      });
+    }
+  },
+}));
+
+vi.mock('../services/adminAudit.service.js', () => ({
+  ADMIN_AUDIT_TYPES: {
+    CREATE: 'CREATE',
+    UPDATE: 'UPDATE',
+    DELETE: 'DELETE',
+  },
+  logAdminAction: vi.fn(),
+}));
+
+vi.mock('../middleware/rateLimiterConfig.js', () => ({
+  standardRateLimiter: (req, res, next) => next(),
+  relaxedRateLimiter: (req, res, next) => next(),
+}));
+
 // Import mocked services
 import * as transactionService from './transaction.service.js';
 
@@ -101,6 +157,10 @@ describe('Transaction API Routes', () => {
 
     // 清除所有 mock
     vi.clearAllMocks();
+
+    // 重置管理員權限（預設為超級管理員）
+    adminState.isAdmin = true;
+    adminState.isSuperAdmin = true;
   });
 
   describe('GET /api/transactions - 獲取用戶交易記錄', () => {

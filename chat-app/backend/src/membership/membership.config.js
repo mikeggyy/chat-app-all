@@ -196,15 +196,15 @@ export const MEMBERSHIP_TIERS = {
       // 配對與搜尋
       dailyMatchLimit: 10,                // 每日配對 10 次（Free: 5）
       advancedSearch: false,              // 無進階搜尋
-      matchAdsToUnlock: 1,
+      matchAdsToUnlock: 1,                // ✅ 可選擇看廣告解鎖配對
       unlockedMatchesPerAd: 2,            // 每次廣告解鎖 2 次配對
       dailyMatchAdLimit: 10,
 
-      // 廣告相關 - 移除廣告
-      requireAds: false,                  // ✅ 不需要看廣告
-      adsToUnlock: 0,
-      unlockedMessagesPerAd: 0,
-      dailyAdLimitPerCharacter: 0,
+      // ✅ 2025-12-03 修復：廣告相關 - 無強制廣告，但可選擇看廣告獲得額外次數
+      requireAds: false,                  // 無強制廣告（主要賣點）
+      adsToUnlock: 1,                     // ✅ 修復：可選擇看廣告解鎖
+      unlockedMessagesPerAd: 8,           // ✅ 修復：每次廣告解鎖 8 次對話（與 limits.js 一致）
+      dailyAdLimitPerCharacter: 10,       // ✅ 修復：每角色每天最多看 10 次廣告
 
       // 解鎖票與卡片 - 無贈送
       characterUnlockCards: 0,
@@ -215,13 +215,13 @@ export const MEMBERSHIP_TIERS = {
       // AI 特殊功能
       aiPhotoGeneration: false,           // 需金幣購買
       aiVideoGeneration: false,
-      aiPhotoDiscount: 0,
-      aiVideoDiscount: 0,
+      aiPhotoDiscount: 0.05,              // ✅ 2025-12-03 新增：AI 拍照 9.5 折
+      aiVideoDiscount: 0.05,              // ✅ 2025-12-03 新增：AI 影片 9.5 折
 
       // 每月福利
       monthlyPhotos: 10,                  // 每月 AI 照片 10 張
       monthlyCoinsBonus: 0,               // 無金幣贈送
-      coinsDiscount: 0,                   // 無金幣折扣
+      coinsDiscount: 0.05,                // ✅ 2025-12-03 新增：金幣購買 9.5 折
     }
   },
 
@@ -258,15 +258,15 @@ export const MEMBERSHIP_TIERS = {
       // 配對與搜尋
       dailyMatchLimit: 50,                // ✅ 提升到 50（原 30）
       advancedSearch: true,               // 進階搜尋功能
-      matchAdsToUnlock: 0,                // ✅ VIP 不需看廣告解鎖配對
-      unlockedMatchesPerAd: 0,
-      dailyMatchAdLimit: 0,
+      matchAdsToUnlock: 1,                // ✅ 2025-12-03 修復：可選擇看廣告解鎖配對
+      unlockedMatchesPerAd: 5,            // 每次廣告解鎖 5 次配對
+      dailyMatchAdLimit: 10,
 
-      // 廣告相關 - 移除廣告
-      requireAds: false,                  // ✅ VIP 不需要看廣告
-      adsToUnlock: 0,
-      unlockedMessagesPerAd: 0,
-      dailyAdLimitPerCharacter: 0,
+      // ✅ 2025-12-03 修復：廣告相關 - 無強制廣告，但可選擇看廣告獲得額外次數
+      requireAds: false,                  // 無強制廣告
+      adsToUnlock: 1,                     // ✅ 修復：可選擇看廣告解鎖
+      unlockedMessagesPerAd: 10,          // ✅ 修復：每次廣告解鎖 10 次對話（與 limits.js 一致）
+      dailyAdLimitPerCharacter: 10,       // 每角色每天最多看 10 次廣告
 
       // 每月贈送（訂閱期間每月發放）
       characterUnlockCards: 1,            // ✅ 每月贈送 1 張角色解鎖卡
@@ -303,14 +303,14 @@ export const MEMBERSHIP_TIERS = {
     currency: "TWD",
     billingCycle: "monthly",
     features: {
-      // 對話限制 - 無限制
-      messagesPerCharacter: -1,           // ✅ 無限對話
-      unlimitedChats: true,               // ✅ 無限對話
+      // 對話限制 - ✅ 2025-12-03 調整：設定合理上限避免成本失控
+      messagesPerCharacter: 500,          // ✅ 每角色 500 次/日（原無限）
+      unlimitedChats: false,              // ✅ 調整為有限制
       totalCharacters: -1,
 
-      // 語音限制 - 無限制
-      voicesPerCharacter: -1,             // ✅ 無限語音播放
-      unlimitedVoice: true,
+      // 語音限制 - ✅ 2025-12-03 調整：設定合理上限
+      voicesPerCharacter: 200,            // ✅ 每角色 200 次/日（原無限）
+      unlimitedVoice: false,              // ✅ 調整為有限制
 
       // AI 設定 - 高級配置
       aiModel: "gpt-4o-mini",             // 使用最新模型
@@ -321,18 +321,18 @@ export const MEMBERSHIP_TIERS = {
       canCreateCharacters: true,
       maxCreatedCharacters: 10,           // ✅ 提升到 10 個（原 3）
 
-      // 配對與搜尋 - 無限制
-      dailyMatchLimit: -1,                // 無限配對
+      // 配對與搜尋 - ✅ 2025-12-03 調整：設定合理上限
+      dailyMatchLimit: 100,               // ✅ 每日 100 次配對（原無限）
       advancedSearch: true,
-      matchAdsToUnlock: 0,
-      unlockedMatchesPerAd: 0,
-      dailyMatchAdLimit: 0,
+      matchAdsToUnlock: 1,                // ✅ 2025-12-03 修復：可選擇看廣告解鎖配對
+      unlockedMatchesPerAd: 10,           // 每次廣告解鎖 10 次配對
+      dailyMatchAdLimit: 10,
 
-      // 廣告相關 - 完全移除
-      requireAds: false,                  // ✅ 完全不需要廣告
-      adsToUnlock: 0,
-      unlockedMessagesPerAd: 0,
-      dailyAdLimitPerCharacter: 0,
+      // ✅ 2025-12-03 修復：廣告相關 - 無強制廣告，但可選擇看廣告獲得額外次數
+      requireAds: false,                  // 無強制廣告
+      adsToUnlock: 1,                     // ✅ 修復：可選擇看廣告解鎖
+      unlockedMessagesPerAd: 20,          // ✅ 修復：每次廣告解鎖 20 次對話（與 limits.js 一致）
+      dailyAdLimitPerCharacter: 10,       // 每角色每天最多看 10 次廣告
 
       // 每月贈送（訂閱期間每月發放）
       characterUnlockCards: 3,            // ✅ 每月贈送 3 張角色解鎖卡

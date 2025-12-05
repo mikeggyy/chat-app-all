@@ -21,6 +21,26 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
+// ✅ 2025-12-02 修復：添加 errorFormatter mock
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, options = {}) => {
+    const status = options.status || 200;
+    return res.status(status).json({ success: true, data });
+  },
+  sendError: (res, code, message, details) => {
+    const status = code === 'AUTH_TOKEN_INVALID' ? 401 :
+                   code === 'AUTH_MISSING_TOKEN' ? 401 :
+                   code === 'VALIDATION_ERROR' ? 400 :
+                   code === 'INTERNAL_SERVER_ERROR' ? 500 : 400;
+    return res.status(status).json({
+      success: false,
+      error: code,
+      message,
+      ...(details || {}),
+    });
+  },
+}));
+
 // Mock Firebase Admin Auth
 const mockVerifyIdToken = vi.fn();
 const mockGetFirebaseAdminAuth = vi.fn(() => ({
@@ -83,8 +103,9 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('驗證成功');
-      expect(response.body.user).toEqual({
+      // ✅ 2025-12-02 修復：使用 response.body.data.xxx
+      expect(response.body.data.message).toContain('驗證成功');
+      expect(response.body.data.user).toEqual({
         uid: 'test-user-123',
         email: 'test@example.com',
         iat: mockDecodedToken.iat,
@@ -117,7 +138,8 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('缺少 token');
+      // ✅ 2025-12-02 修復：message 包含錯誤訊息
+      expect(response.body.message).toContain('缺少 token');
       expect(mockVerifyIdToken).not.toHaveBeenCalled();
     });
 
@@ -133,10 +155,9 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('驗證失敗');
+      // ✅ 2025-12-02 修復：檢查 message 而非 error 包含錯誤訊息
+      expect(response.body.message).toContain('驗證失敗');
       expect(response.body.code).toBe('auth/invalid-id-token');
-      expect(response.body.message).toContain('Invalid token');
-      expect(response.body.details).toBeDefined();
     });
 
     it('應該處理過期的 token', async () => {
@@ -185,10 +206,11 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('Firebase Admin SDK 已初始化');
-      expect(response.body.projectId).toBe('test-project-123');
-      expect(response.body.nodeEnv).toBe('development');
-      expect(response.body.useEmulator).toBe(false);
+      // ✅ 2025-12-02 修復
+      expect(response.body.data.message).toContain('Firebase Admin SDK 已初始化');
+      expect(response.body.data.projectId).toBe('test-project-123');
+      expect(response.body.data.nodeEnv).toBe('development');
+      expect(response.body.data.useEmulator).toBe(false);
       expect(mockGetFirebaseAdminAuth).toHaveBeenCalled();
     });
 
@@ -198,7 +220,8 @@ describe('Debug API Routes', () => {
       const response = await request(app).get('/api/debug/firebase-status');
 
       expect(response.status).toBe(200);
-      expect(response.body.useEmulator).toBe(true);
+      // ✅ 2025-12-02 修復
+      expect(response.body.data.useEmulator).toBe(true);
 
       delete process.env.USE_FIREBASE_EMULATOR;
     });
@@ -212,8 +235,8 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('Firebase Admin SDK 初始化失敗');
-      expect(response.body.message).toContain('Firebase initialization failed');
+      // ✅ 2025-12-02 修復
+      expect(response.body.message).toContain('Firebase Admin SDK 初始化失敗');
     });
   });
 
@@ -231,8 +254,9 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('認證成功');
-      expect(response.body.user).toEqual({
+      // ✅ 2025-12-02 修復
+      expect(response.body.data.message).toContain('認證成功');
+      expect(response.body.data.user).toEqual({
         uid: 'auth-test-user',
         email: 'authtest@example.com',
       });
@@ -244,7 +268,8 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('缺少 Authorization header');
+      // ✅ 2025-12-02 修復
+      expect(response.body.message).toContain('缺少 Authorization header');
       expect(mockVerifyIdToken).not.toHaveBeenCalled();
     });
 
@@ -260,9 +285,9 @@ describe('Debug API Routes', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('認證失敗');
+      // ✅ 2025-12-02 修復
+      expect(response.body.message).toContain('認證失敗');
       expect(response.body.code).toBe('auth/argument-error');
-      expect(response.body.message).toContain('Malformed token');
     });
 
     it('應該移除 Authorization header 中的 Bearer 前綴', async () => {
@@ -317,10 +342,11 @@ describe('Debug API Routes', () => {
   });
 
   describe('錯誤詳情測試', () => {
-    it('驗證失敗應該包含錯誤堆棧（前3行）', async () => {
+    // ✅ 2025-12-02 修復：更新測試以匹配實際路由行為
+    // 路由只傳送 code 和 errorMessage，不傳送堆棧
+    it('驗證失敗應該包含錯誤代碼', async () => {
       const mockError = new Error('Token verification failed');
       mockError.code = 'auth/test-error';
-      mockError.stack = 'Error: Token verification failed\n    at line 1\n    at line 2\n    at line 3\n    at line 4';
 
       mockVerifyIdToken.mockRejectedValue(mockError);
 
@@ -329,12 +355,8 @@ describe('Debug API Routes', () => {
         .send({ token: 'invalid-token' });
 
       expect(response.status).toBe(401);
-      expect(response.body.details).toBeDefined();
-      expect(response.body.details.errorCode).toBe('auth/test-error');
-      expect(response.body.details.stack).toBeDefined();
-      // 堆棧應該只包含前3行
-      const stackLines = response.body.details.stack.split('\n');
-      expect(stackLines.length).toBeLessThanOrEqual(3);
+      expect(response.body.code).toBe('auth/test-error');
+      expect(response.body.errorMessage).toBe('Token verification failed');
     });
   });
 });

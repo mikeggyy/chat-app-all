@@ -5,12 +5,13 @@
  * ✅ 在事務中重新獲取會員等級（防止過期會員仍享受折扣）
  * ✅ 使用 deductCoins 服務（已有 Transaction 保護）
  * ✅ 2025-01-19: 修復 Transaction 內動態 import 導致的 500 錯誤
+ * ✅ 2025-12-02: 優化重複查詢 - 移除冗餘的 getUserById 調用
  */
 
 import { getGiftById, isValidGift, getGiftList } from "../config/gifts.js";
-import { getUserById } from "../user/user.service.js";
 import { deductCoins } from "../payment/coins.service.js";
-import { getUserTier } from "../utils/membershipUtils.js";
+import { getUserTier, extractTierFromUser } from "../utils/membershipUtils.js";
+import { getUserProfileWithCache } from "../user/userProfileCache.service.js";
 import { getFirestoreDb, FieldValue } from "../firebase/index.js";
 import logger from "../utils/logger.js";
 import { getWalletBalance, createWalletUpdate } from "../user/walletHelpers.js";
@@ -47,6 +48,7 @@ const calculateGiftPrice = (giftId, membershipTier) => {
 /**
  * 送禮物給角色
  * ✅ P1-2 修復：將所有操作合併到單一 Transaction 中，確保原子性
+ * ✅ 2025-12-02 優化：減少重複的 Firestore 查詢
  */
 export const sendGift = async (userId, characterId, giftId) => {
   // 驗證禮物是否存在
@@ -54,17 +56,17 @@ export const sendGift = async (userId, characterId, giftId) => {
     throw new Error(`無效的禮物ID：${giftId}`);
   }
 
-  // 獲取用戶資料
-  const user = await getUserById(userId);
-  if (!user) {
-    throw new Error("找不到用戶");
-  }
-
   // 獲取禮物資料
   const gift = getGiftById(giftId);
 
-  // ✅ 修復：獲取最新的會員等級（防止過期會員仍享受折扣）
-  const tier = await getUserTier(userId);
+  // ✅ 優化：使用緩存獲取用戶資料，並傳入 getUserTier 避免重複查詢
+  const cachedUser = await getUserProfileWithCache(userId);
+  if (!cachedUser) {
+    throw new Error("找不到用戶");
+  }
+
+  // ✅ 優化：傳入已有的用戶對象，避免 getUserTier 再次查詢
+  const tier = await getUserTier(userId, { user: cachedUser });
   const pricing = calculateGiftPrice(giftId, tier);
 
   // ✅ P1-2 修復：使用單一 Transaction 執行所有操作
@@ -329,10 +331,14 @@ export const getCharacterGiftStats = async (userId, characterId) => {
 
 /**
  * 獲取所有禮物列表（供前端選擇）
+ * ✅ 2025-12-02 優化：減少重複查詢
  */
 export const getAvailableGifts = async (userId) => {
   const gifts = getGiftList();
-  const tier = await getUserTier(userId);
+
+  // ✅ 優化：使用緩存獲取用戶資料
+  const user = await getUserProfileWithCache(userId);
+  const tier = await getUserTier(userId, { user });
 
   // 為每個禮物計算價格
   const giftsWithPricing = gifts.map((gift) => {
@@ -351,10 +357,12 @@ export const getAvailableGifts = async (userId) => {
 
 /**
  * 獲取禮物價格列表（考慮用戶會員等級）
+ * ✅ 2025-12-02 優化：減少重複查詢，使用緩存
  */
 export const getGiftPricing = async (userId) => {
-  const user = await getUserById(userId);
-  const tier = user ? await getUserTier(userId) : "free";
+  // ✅ 優化：使用緩存獲取用戶資料，然後傳入 getUserTier
+  const user = await getUserProfileWithCache(userId);
+  const tier = await getUserTier(userId, { user });
 
   // 獲取所有禮物
   const gifts = getGiftList();
@@ -371,7 +379,7 @@ export const getGiftPricing = async (userId) => {
     };
   });
 
-  const balance = user ? (user.walletBalance || 0) : 0;
+  const balance = user ? getWalletBalance(user) : 0;
 
   return {
     userId,

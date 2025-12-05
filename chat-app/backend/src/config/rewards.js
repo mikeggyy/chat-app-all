@@ -7,6 +7,7 @@
  */
 
 import { getFirestoreDb } from "../firebase/index.js";
+import logger from "../utils/logger.js";
 
 // 獎勵配置緩存
 let rewardsConfigCache = null;
@@ -14,8 +15,8 @@ let cacheTimestamp = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 分鐘緩存
 
 /**
- * 每日登入獎勵（30天週期）- 預設值
- * 每月循環，關鍵日期給額外獎勵激勵用戶維持連續登入
+ * 每日登入獎勵（21天週期）- 預設值
+ * 三週循環，關鍵日期給額外獎勵激勵用戶維持連續登入
  */
 export const DEFAULT_DAILY_REWARDS = [
   // 第一週
@@ -80,12 +81,12 @@ export const DEFAULT_STREAK_MILESTONES = [
   },
   {
     days: 21,
-    rewards: { coins: 30 },
+    rewards: { coins: 100, photoUnlockCards: 3 },
     title: "三週達成",
     description: "連續登入 21 天",
-    badge: "🌟",
+    badge: "🏆",
     color: "#f97316", // 橙色
-    showInModal: false,
+    showInModal: true,
   },
   {
     days: 30,
@@ -201,7 +202,7 @@ async function loadRewardsConfig() {
 
     return rewardsConfigCache;
   } catch (error) {
-    console.error("載入獎勵配置失敗，使用預設值:", error.message);
+    logger.error("載入獎勵配置失敗，使用預設值:", { error: error.message });
     // 返回預設值
     return {
       dailyRewards: DEFAULT_DAILY_REWARDS,
@@ -278,8 +279,8 @@ export const REWARD_TYPES = {
  * @returns {Object} 當日獎勵配置
  */
 export const getDailyReward = (currentStreak) => {
-  // 使用 30 天循環，取餘數決定當天獎勵
-  const dayInCycle = ((currentStreak - 1) % 30) + 1;
+  // 使用 21 天循環，取餘數決定當天獎勵
+  const dayInCycle = ((currentStreak - 1) % 21) + 1;
   return DAILY_REWARDS.find(r => r.day === dayInCycle) || DAILY_REWARDS[0];
 };
 

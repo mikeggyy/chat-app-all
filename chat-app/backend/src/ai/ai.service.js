@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { Tiktoken, encoding_for_model } from "tiktoken";
 import {
   appendConversationMessage,
-  getConversationHistory,
+  getConversationHistorySimple,
 } from "../conversation/conversation.service.js";
 import {
   buildConversationMetadata,
@@ -708,7 +708,8 @@ export const createAiReplyForConversation = async (
     }
   }
 
-  const history = await getConversationHistory(userId, characterId);
+  // ✅ 使用簡化版函數獲取完整歷史（AI 需要完整上下文）
+  const history = await getConversationHistorySimple(userId, characterId);
   const userMessage = sanitizePromptText(
     typeof options.userMessage === "string"
       ? options.userMessage
@@ -752,7 +753,8 @@ export const createAiSuggestionsForConversation = async (
     throw error;
   }
 
-  const history = await getConversationHistory(userId, characterId);
+  // ✅ 使用簡化版函數獲取完整歷史
+  const history = await getConversationHistorySimple(userId, characterId);
 
   if (!Array.isArray(history) || !history.length) {
     return {

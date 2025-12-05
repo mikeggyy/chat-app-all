@@ -113,7 +113,7 @@ defineEmits<Emits>();
 .chat-list-dialog__actions {
   display: flex;
   gap: 0.75rem;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 .chat-list-dialog__btn {

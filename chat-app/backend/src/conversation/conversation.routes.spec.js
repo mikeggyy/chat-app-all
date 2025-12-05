@@ -137,26 +137,70 @@ describe('Conversation API Routes', () => {
         { id: 'msg-2', role: 'partner', text: 'Hi there!', createdAt: '2025-01-13' },
       ];
 
-      conversationService.getConversationHistory.mockResolvedValueOnce(mockMessages);
+      // ✅ 2025-12-02 更新：返回帶分頁信息的對象格式
+      conversationService.getConversationHistory.mockResolvedValueOnce({
+        messages: mockMessages,
+        total: mockMessages.length,
+        hasMore: false,
+        offset: 0,
+        limit: mockMessages.length,
+      });
 
       const response = await request(app)
         .get('/api/conversations/user-123/char-001')
         .expect(200);
 
-      expect(response.body).toHaveProperty('messages');
-      expect(Array.isArray(response.body.messages)).toBe(true);
-      expect(conversationService.getConversationHistory).toHaveBeenCalledWith('user-123', 'char-001');
+      // ✅ 修正：sendSuccess 將數據包裝在 data 中
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('messages');
+      expect(Array.isArray(response.body.data.messages)).toBe(true);
+      // ✅ 更新：現在傳入分頁參數
+      expect(conversationService.getConversationHistory).toHaveBeenCalledWith('user-123', 'char-001', { limit: 50, offset: 0, order: 'asc' });
     });
 
     it('應該處理空對話歷史', async () => {
-      conversationService.getConversationHistory.mockResolvedValueOnce([]);
+      // ✅ 2025-12-02 更新：返回帶分頁信息的對象格式
+      conversationService.getConversationHistory.mockResolvedValueOnce({
+        messages: [],
+        total: 0,
+        hasMore: false,
+        offset: 0,
+        limit: 0,
+      });
 
       const response = await request(app)
         .get('/api/conversations/user-123/char-001')
         .expect(200);
 
-      expect(response.body).toHaveProperty('messages');
-      expect(response.body.messages).toEqual([]);
+      // ✅ 修正：sendSuccess 將數據包裝在 data 中
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('messages');
+      expect(response.body.data.messages).toEqual([]);
+    });
+
+    it('應該支持分頁參數', async () => {
+      const mockMessages = [
+        { id: 'msg-1', role: 'user', text: 'Hello', createdAt: '2025-01-13' },
+      ];
+
+      conversationService.getConversationHistory.mockResolvedValueOnce({
+        messages: mockMessages,
+        total: 100,
+        hasMore: true,
+        offset: 10,
+        limit: 1,
+      });
+
+      const response = await request(app)
+        .get('/api/conversations/user-123/char-001?limit=20&offset=10')
+        .expect(200);
+
+      // ✅ 修正：sendSuccess 將數據包裝在 data 中
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('messages');
+      expect(response.body.data).toHaveProperty('pagination');
+      expect(response.body.data.pagination.hasMore).toBe(true);
+      expect(conversationService.getConversationHistory).toHaveBeenCalledWith('user-123', 'char-001', { limit: 20, offset: 10, order: 'asc' });
     });
   });
 
@@ -398,8 +442,14 @@ describe('Conversation API Routes', () => {
 
   describe('權限和驗證', () => {
     it('應該要求用戶認證（由 requireFirebaseAuth 處理）', async () => {
-      // 設置 mock 返回空消息列表
-      conversationService.getConversationHistory.mockResolvedValueOnce([]);
+      // 設置 mock 返回空消息列表（帶分頁格式）
+      conversationService.getConversationHistory.mockResolvedValueOnce({
+        messages: [],
+        total: 0,
+        hasMore: false,
+        offset: 0,
+        limit: 0,
+      });
 
       // 這個測試示例展示了如何測試認證
       // 實際環境中，認證中間件會檢查 Firebase token
@@ -407,16 +457,28 @@ describe('Conversation API Routes', () => {
         .get('/api/conversations/user-123/char-001')
         .expect(200);
 
-      // 在 mock 中，我們假設所有請求都已認證
-      expect(response.body).toHaveProperty('messages');
+      // ✅ 修正：sendSuccess 將數據包裝在 data 中
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('messages');
     });
 
     it('應該檢查用戶所有權（由 requireOwnership 處理）', async () => {
+      // 設置 mock 返回空消息列表（帶分頁格式）
+      conversationService.getConversationHistory.mockResolvedValueOnce({
+        messages: [],
+        total: 0,
+        hasMore: false,
+        offset: 0,
+        limit: 0,
+      });
+
       // 這個測試示例展示了所有權檢查
       // 實際環境中，中間件會驗證 userId === req.user.uid
-      await request(app)
+      const response = await request(app)
         .get('/api/conversations/user-123/char-001')
         .expect(200);
+
+      expect(response.body.success).toBe(true);
     });
   });
 

@@ -102,7 +102,8 @@ vi.mock('../config/limits.js', () => ({
   },
 }));
 
-vi.mock('../../../shared/utils/errorFormatter.js', () => ({
+// ✅ 2025-12-02 修復：修正 mock 路徑
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
   sendSuccess: (res, data, status) => res.status(status || 200).json({ success: true, ...data }),
   sendError: (res, code, message, details) => res.status(400).json({ success: false, error: code, message, details }),
   ApiError: class ApiError extends Error {
@@ -121,6 +122,13 @@ vi.mock('../utils/logger.js', () => ({
     warn: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+// ✅ 2025-12-02 修復：添加缺失的 mock
+vi.mock('../level/level.service.js', () => ({
+  addPointsFromChat: vi.fn().mockResolvedValue({ pointsAdded: 10 }),
+  addPointsFromSelfie: vi.fn().mockResolvedValue({ pointsAdded: 20 }),
+  addPointsFromVideo: vi.fn().mockResolvedValue({ pointsAdded: 50 }),
 }));
 
 // Import mocked services

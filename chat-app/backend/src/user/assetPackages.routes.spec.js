@@ -25,6 +25,23 @@ vi.mock('../middleware/rateLimiterConfig.js', () => ({
   relaxedRateLimiter: (req, res, next) => next(),
 }));
 
+// ✅ 2025-12-02 修復：添加 errorFormatter mock
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, options = {}) => {
+    const status = options.status || 200;
+    return res.status(status).json({ success: true, data });
+  },
+  sendError: (res, code, message, details) => {
+    const status = code === 'INTERNAL_SERVER_ERROR' ? 500 : 400;
+    return res.status(status).json({
+      success: false,
+      error: code,
+      message,
+      ...(details || {}),
+    });
+  },
+}));
+
 // Mock Firestore
 const mockFirestoreGet = vi.fn();
 const mockFirestoreWhere = vi.fn(() => ({
@@ -92,8 +109,8 @@ describe('AssetPackages API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.packages).toHaveLength(3);
-      expect(response.body.packages[0].id).toBe('video-unlock-1');
+      expect(response.body.data.packages).toHaveLength(3);
+      expect(response.body.data.packages[0].id).toBe('video-unlock-1');
 
       // 驗證 Firestore 查詢
       expect(mockFirestoreCollection).toHaveBeenCalledWith('asset_packages');
@@ -121,9 +138,9 @@ describe('AssetPackages API Routes', () => {
       const response = await request(app).get('/api/assets/packages');
 
       expect(response.status).toBe(200);
-      expect(response.body.packages).toHaveLength(2);
+      expect(response.body.data.packages).toHaveLength(2);
       // 驗證所有返回的商品都是 active
-      response.body.packages.forEach((pkg) => {
+      response.body.data.packages.forEach((pkg) => {
         expect(pkg.status).toBe('active');
       });
 
@@ -153,11 +170,11 @@ describe('AssetPackages API Routes', () => {
       const response = await request(app).get('/api/assets/packages');
 
       expect(response.status).toBe(200);
-      expect(response.body.packages).toHaveLength(3);
+      expect(response.body.data.packages).toHaveLength(3);
       // 驗證排序（應該按 order 從小到大）
-      expect(response.body.packages[0].order).toBe(10);
-      expect(response.body.packages[1].order).toBe(20);
-      expect(response.body.packages[2].order).toBe(30);
+      expect(response.body.data.packages[0].order).toBe(10);
+      expect(response.body.data.packages[1].order).toBe(20);
+      expect(response.body.data.packages[2].order).toBe(30);
     });
 
     it('應該處理沒有 order 欄位的商品（默認為 0）', async () => {
@@ -181,10 +198,10 @@ describe('AssetPackages API Routes', () => {
       const response = await request(app).get('/api/assets/packages');
 
       expect(response.status).toBe(200);
-      expect(response.body.packages).toHaveLength(2);
+      expect(response.body.data.packages).toHaveLength(2);
       // 沒有 order 的商品應該排在前面（order || 0）
-      expect(response.body.packages[0].id).toBe('pkg-1');
-      expect(response.body.packages[1].id).toBe('pkg-2');
+      expect(response.body.data.packages[0].id).toBe('pkg-1');
+      expect(response.body.data.packages[1].id).toBe('pkg-2');
     });
 
     it('應該處理空列表', async () => {
@@ -199,7 +216,7 @@ describe('AssetPackages API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.packages).toHaveLength(0);
+      expect(response.body.data.packages).toHaveLength(0);
     });
 
     it('應該處理 Firestore 錯誤', async () => {
@@ -237,8 +254,8 @@ describe('AssetPackages API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.potions).toHaveLength(3);
-      expect(response.body.potions[0].id).toBe('potion-voice-1h');
+      expect(response.body.data.potions).toHaveLength(3);
+      expect(response.body.data.potions[0].id).toBe('potion-voice-1h');
 
       // 驗證 Firestore 查詢
       expect(mockFirestoreCollection).toHaveBeenCalledWith('potions');
@@ -265,9 +282,9 @@ describe('AssetPackages API Routes', () => {
       const response = await request(app).get('/api/potions/packages');
 
       expect(response.status).toBe(200);
-      expect(response.body.potions).toHaveLength(2);
+      expect(response.body.data.potions).toHaveLength(2);
       // 驗證所有返回的藥水都是 active
-      response.body.potions.forEach((potion) => {
+      response.body.data.potions.forEach((potion) => {
         expect(potion.status).toBe('active');
       });
 
@@ -297,11 +314,11 @@ describe('AssetPackages API Routes', () => {
       const response = await request(app).get('/api/potions/packages');
 
       expect(response.status).toBe(200);
-      expect(response.body.potions).toHaveLength(3);
+      expect(response.body.data.potions).toHaveLength(3);
       // 驗證排序（應該按 order 從小到大）
-      expect(response.body.potions[0].order).toBe(10);
-      expect(response.body.potions[1].order).toBe(20);
-      expect(response.body.potions[2].order).toBe(30);
+      expect(response.body.data.potions[0].order).toBe(10);
+      expect(response.body.data.potions[1].order).toBe(20);
+      expect(response.body.data.potions[2].order).toBe(30);
     });
 
     it('應該處理沒有 order 欄位的藥水（默認為 0）', async () => {
@@ -325,10 +342,10 @@ describe('AssetPackages API Routes', () => {
       const response = await request(app).get('/api/potions/packages');
 
       expect(response.status).toBe(200);
-      expect(response.body.potions).toHaveLength(2);
+      expect(response.body.data.potions).toHaveLength(2);
       // 沒有 order 的藥水應該排在前面（order || 0）
-      expect(response.body.potions[0].id).toBe('potion-1');
-      expect(response.body.potions[1].id).toBe('potion-2');
+      expect(response.body.data.potions[0].id).toBe('potion-1');
+      expect(response.body.data.potions[1].id).toBe('potion-2');
     });
 
     it('應該處理空列表', async () => {
@@ -343,7 +360,7 @@ describe('AssetPackages API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.potions).toHaveLength(0);
+      expect(response.body.data.potions).toHaveLength(0);
     });
 
     it('應該處理 Firestore 錯誤', async () => {

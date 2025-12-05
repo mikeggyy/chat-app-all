@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, type ComputedRef, type Ref } from "vue";
+import {
+  computed,
+  ref,
+  onMounted,
+  onUnmounted,
+  type ComputedRef,
+  type Ref,
+} from "vue";
 import { SparklesIcon } from "@heroicons/vue/24/solid";
 import { ClockIcon } from "@heroicons/vue/24/outline";
 import LoadingSpinner from "../LoadingSpinner.vue";
@@ -19,8 +26,8 @@ interface ShopItemData {
   name: string;
   price: number;
   isCoinPackage?: boolean;
-  isBundlePackage?: boolean;  // ✅ 新增：組合禮包標記
-  currency?: string;          // ✅ 新增：貨幣類型
+  isBundlePackage?: boolean; // ✅ 新增：組合禮包標記
+  currency?: string; // ✅ 新增：貨幣類型
   badge?: string;
   popular?: boolean;
   emoji?: string;
@@ -30,7 +37,8 @@ interface ShopItemData {
   bonusText?: string;
   description?: string;
   effect?: string;
-  purchaseStatus?: PurchaseStatus | null;  // ✅ 新增：購買狀態
+  purchaseStatus?: PurchaseStatus | null; // ✅ 新增：購買狀態
+  purchaseLimit?: "once" | "monthly" | "weekly" | "none"; // ✅ 新增：限購類型
   [key: string]: any;
 }
 
@@ -93,7 +101,8 @@ const isDisabled: ComputedRef<boolean> = computed(() => {
   // 檢查限購狀態
   if (isPurchaseLimited.value) return true;
   // 金幣套餐和組合禮包使用真金購買，不檢查金幣餘額
-  if (!isRealMoneyPurchase.value && props.balance < props.item.price) return true;
+  if (!isRealMoneyPurchase.value && props.balance < props.item.price)
+    return true;
   if (
     props.item.id === "potion-brain-boost" &&
     props.membershipTier === "vvip"
@@ -119,9 +128,55 @@ const disabledTitle: ComputedRef<string> = computed(() => {
 
 // 倒數計時相關
 const countdownText: Ref<string> = ref("");
+const periodCountdownText: Ref<string> = ref(""); // 本週期剩餘時間
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
-// 計算倒數時間
+// 獲取本週期結束時間
+const getPeriodEndTime = (purchaseLimit: string): Date | null => {
+  const now = new Date();
+  switch (purchaseLimit) {
+    case "weekly": {
+      const dayOfWeek = now.getDay();
+      const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+      const nextMonday = new Date(now);
+      nextMonday.setDate(now.getDate() + daysUntilMonday);
+      nextMonday.setHours(0, 0, 0, 0);
+      return nextMonday;
+    }
+    case "monthly": {
+      return new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+    }
+    case "daily": {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return tomorrow;
+    }
+    default:
+      return null;
+  }
+};
+
+// 格式化時間差
+const formatTimeDiff = (diff: number): string => {
+  if (diff <= 0) return "";
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  if (days > 0) {
+    return `${days}天${hours}時${minutes}分`;
+  } else if (hours > 0) {
+    return `${hours}時${minutes}分${seconds}秒`;
+  } else if (minutes > 0) {
+    return `${minutes}分${seconds}秒`;
+  } else {
+    return `${seconds}秒`;
+  }
+};
+
+// 計算倒數時間（不可購買時顯示下次可購買時間）
 const calculateCountdown = (): void => {
   const status = props.item.purchaseStatus;
   if (!status || status.canPurchase || !status.nextAvailableAt) {
@@ -138,30 +193,61 @@ const calculateCountdown = (): void => {
     return;
   }
 
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-  if (days > 0) {
-    countdownText.value = `${days}天 ${hours}小時後`;
-  } else if (hours > 0) {
-    countdownText.value = `${hours}小時 ${minutes}分後`;
-  } else if (minutes > 0) {
-    countdownText.value = `${minutes}分 ${seconds}秒後`;
-  } else {
-    countdownText.value = `${seconds}秒後`;
-  }
+  countdownText.value = formatTimeDiff(diff) + "後";
 };
 
-// 是否顯示倒數計時
+// 計算本週期剩餘時間（可購買時顯示）
+const calculatePeriodCountdown = (): void => {
+  const status = props.item.purchaseStatus;
+  const purchaseLimit = props.item.purchaseLimit;
+
+  // 只有可購買且有限購類型時才顯示
+  if (
+    !status?.canPurchase ||
+    !purchaseLimit ||
+    purchaseLimit === "none" ||
+    purchaseLimit === "once"
+  ) {
+    periodCountdownText.value = "";
+    return;
+  }
+
+  const periodEnd = getPeriodEndTime(purchaseLimit);
+  if (!periodEnd) {
+    periodCountdownText.value = "";
+    return;
+  }
+
+  const diff = periodEnd.getTime() - Date.now();
+  if (diff <= 0) {
+    periodCountdownText.value = "";
+    return;
+  }
+
+  periodCountdownText.value = formatTimeDiff(diff);
+};
+
+// 是否顯示不可購買倒數計時
 const showCountdown: ComputedRef<boolean> = computed(() => {
   const status = props.item.purchaseStatus;
   return !!(status && !status.canPurchase && status.nextAvailableAt);
 });
 
+// 是否顯示本週期剩餘時間
+const showPeriodCountdown: ComputedRef<boolean> = computed(() => {
+  const status = props.item.purchaseStatus;
+  const purchaseLimit = props.item.purchaseLimit;
+  return !!(
+    status?.canPurchase &&
+    purchaseLimit &&
+    purchaseLimit !== "none" &&
+    purchaseLimit !== "once"
+  );
+});
+
 // 啟動/停止倒數計時
 const startCountdown = (): void => {
+  // 不可購買時的倒數
   if (showCountdown.value) {
     calculateCountdown();
     // 根據剩餘時間調整更新頻率
@@ -172,6 +258,12 @@ const startCountdown = (): void => {
       const interval = diff < 3600000 ? 1000 : 60000;
       countdownInterval = setInterval(calculateCountdown, interval);
     }
+  }
+  // 可購買時顯示週期剩餘時間
+  if (showPeriodCountdown.value) {
+    calculatePeriodCountdown();
+    // 每分鐘更新一次
+    countdownInterval = setInterval(calculatePeriodCountdown, 60000);
   }
 };
 
@@ -200,10 +292,7 @@ const handleCoinIconError = (): void => {
 </script>
 
 <template>
-  <div
-    class="shop-item"
-    :class="{ 'shop-item--popular': item.popular }"
-  >
+  <div class="shop-item" :class="{ 'shop-item--popular': item.popular }">
     <div v-if="item.badge" class="shop-item__badge">
       <SparklesIcon class="badge-icon" aria-hidden="true" />
       {{ item.badge }}
@@ -216,9 +305,7 @@ const handleCoinIconError = (): void => {
         [`shop-item__icon-wrapper--${item.iconColor}`]: item.iconColor,
       }"
     >
-      <span v-if="item.emoji" class="shop-item__emoji">{{
-        item.emoji
-      }}</span>
+      <span v-if="item.emoji" class="shop-item__emoji">{{ item.emoji }}</span>
       <img
         v-else-if="item.useCoinImage && isCoinIconAvailable"
         :src="COIN_ICON_PATH"
@@ -243,7 +330,11 @@ const handleCoinIconError = (): void => {
       <!-- 禮包內容列表 -->
       <ul v-if="item.contents" class="shop-item__contents">
         <li v-if="item.contents.coins">
-          <img :src="COIN_ICON_PATH" class="contents-icon contents-icon--coin" alt="" />
+          <img
+            :src="COIN_ICON_PATH"
+            class="contents-icon contents-icon--coin"
+            alt=""
+          />
           <span>{{ item.contents.coins.toLocaleString() }} 金幣</span>
         </li>
         <li v-if="item.contents.characterUnlockCards">
@@ -275,10 +366,19 @@ const handleCoinIconError = (): void => {
         {{ item.effect }}
       </p>
 
-      <!-- 限購倒數計時 -->
+      <!-- 限購倒數計時（不可購買時） -->
       <div v-if="showCountdown && countdownText" class="shop-item__countdown">
         <ClockIcon class="countdown-icon" aria-hidden="true" />
         <span class="countdown-text">{{ countdownText }}可購買</span>
+      </div>
+
+      <!-- 週期剩餘時間（可購買時） -->
+      <div
+        v-if="showPeriodCountdown && periodCountdownText"
+        class="shop-item__period-countdown"
+      >
+        <ClockIcon class="period-countdown-icon" aria-hidden="true" />
+        <span class="period-countdown-text">剩 {{ periodCountdownText }}</span>
       </div>
 
       <button
@@ -290,7 +390,10 @@ const handleCoinIconError = (): void => {
         @click="handlePurchase"
       >
         <LoadingSpinner v-if="isPurchasing" size="sm" />
-        <div v-else-if="isPurchaseLimited" class="button-content button-content--limited">
+        <div
+          v-else-if="isPurchaseLimited"
+          class="button-content button-content--limited"
+        >
           <span class="button-limited-text">{{ purchaseLimitReason }}</span>
         </div>
         <div v-else class="button-content">
@@ -301,9 +404,7 @@ const handleCoinIconError = (): void => {
                 : formatCoins(item.price)
             }}
           </span>
-          <span v-if="!isRealMoneyPurchase" class="button-label"
-            >金幣</span
-          >
+          <span v-if="!isRealMoneyPurchase" class="button-label">金幣</span>
         </div>
       </button>
     </div>
@@ -318,13 +419,14 @@ const handleCoinIconError = (): void => {
   align-items: center;
   gap: 0.6rem;
   padding: 1rem;
+  padding-top: 1.5rem; // ✅ 增加頂部 padding，給 badge 和 emoji 更多空間
   border-radius: 14px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: rgba(15, 23, 42, 0.68);
   backdrop-filter: blur(18px);
   box-shadow: 0 16px 32px rgba(2, 6, 23, 0.4);
   transition: all 0.18s ease;
-  overflow: hidden;
+  // ✅ 移除 overflow: hidden，避免裁切 badge 和 emoji
 
   &:hover {
     transform: translateY(-2px);
@@ -344,8 +446,8 @@ const handleCoinIconError = (): void => {
 
   &__badge {
     position: absolute;
-    top: 0.65rem;
-    right: 0.65rem;
+    top: 0.5rem;
+    right: 0.5rem;
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -362,7 +464,7 @@ const handleCoinIconError = (): void => {
     letter-spacing: 0.03em;
     text-transform: uppercase;
     box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
-    z-index: 2;
+    z-index: 10; // ✅ 提高 z-index 確保顯示在最上層
   }
 
   .badge-icon {
@@ -549,19 +651,22 @@ const handleCoinIconError = (): void => {
   &__emoji {
     font-size: 2rem;
     line-height: 1;
+    position: relative;
+    z-index: 1;
   }
 
   &__icon-wrapper.has-emoji {
     background: transparent;
     border: none;
     box-shadow: none;
+    overflow: visible; // ✅ 確保 emoji 不被裁切
   }
 
   &__content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.45rem;
     flex: 1;
     width: 100%;
     position: relative;
@@ -644,7 +749,11 @@ const handleCoinIconError = (): void => {
     gap: 0.4rem;
     margin-top: 0.5rem;
     padding: 0.45rem 0.75rem;
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+    background: linear-gradient(
+      135deg,
+      rgba(251, 191, 36, 0.15),
+      rgba(245, 158, 11, 0.1)
+    );
     border: 1px solid rgba(251, 191, 36, 0.25);
     border-radius: 8px;
     width: 100%;
@@ -660,6 +769,37 @@ const handleCoinIconError = (): void => {
       font-size: 0.7rem;
       font-weight: 600;
       color: #fbbf24;
+      letter-spacing: 0.01em;
+    }
+  }
+
+  &__period-countdown {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.65rem;
+    background: linear-gradient(
+      135deg,
+      rgba(96, 165, 250, 0.15),
+      rgba(59, 130, 246, 0.1)
+    );
+    border: 1px solid rgba(96, 165, 250, 0.25);
+    border-radius: 8px;
+    width: 100%;
+
+    .period-countdown-icon {
+      width: 13px;
+      height: 13px;
+      color: #60a5fa;
+      flex-shrink: 0;
+    }
+
+    .period-countdown-text {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #60a5fa;
       letter-spacing: 0.01em;
     }
   }
@@ -790,6 +930,7 @@ const handleCoinIconError = (): void => {
 @media (max-width: 420px) {
   .shop-item {
     padding: 0.85rem;
+    padding-top: 2.25rem; // ✅ 保持頂部 padding 給 badge 空間
     gap: 0.6rem;
   }
 
@@ -827,9 +968,14 @@ const handleCoinIconError = (): void => {
 @media (min-width: 1024px) {
   .shop-item {
     padding: 1.25rem;
+    padding-top: 1.75rem; // ✅ 保持頂部 padding 給 badge 空間
     gap: 0.75rem;
     border-radius: 18px;
-    background: linear-gradient(165deg, rgba(30, 33, 48, 0.95) 0%, rgba(22, 25, 43, 0.9) 100%);
+    background: linear-gradient(
+      165deg,
+      rgba(30, 33, 48, 0.95) 0%,
+      rgba(22, 25, 43, 0.9) 100%
+    );
     border: 1px solid rgba(148, 163, 184, 0.1);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 
@@ -907,6 +1053,21 @@ const handleCoinIconError = (): void => {
       }
     }
 
+    &__period-countdown {
+      padding: 0.45rem 0.8rem;
+      border-radius: 10px;
+      margin-top: 0.625rem;
+
+      .period-countdown-icon {
+        width: 15px;
+        height: 15px;
+      }
+
+      .period-countdown-text {
+        font-size: 0.72rem;
+      }
+    }
+
     &__buy-button {
       padding: 1rem 1.5rem;
       border-radius: 14px;
@@ -927,6 +1088,7 @@ const handleCoinIconError = (): void => {
 @media (min-width: 1440px) {
   .shop-item {
     padding: 1.5rem;
+    padding-top: 2rem; // ✅ 保持頂部 padding 給 badge 空間
     gap: 0.875rem;
     border-radius: 20px;
 
@@ -971,6 +1133,20 @@ const handleCoinIconError = (): void => {
 
       .countdown-text {
         font-size: 0.8rem;
+      }
+    }
+
+    &__period-countdown {
+      padding: 0.5rem 0.95rem;
+      border-radius: 12px;
+
+      .period-countdown-icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .period-countdown-text {
+        font-size: 0.78rem;
       }
     }
 

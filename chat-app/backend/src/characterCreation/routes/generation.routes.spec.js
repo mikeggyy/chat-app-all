@@ -59,6 +59,7 @@ vi.mock('../characterCreation.helpers.js', () => ({
 vi.mock('../characterCreationLimit.service.js', () => ({
   canCreateCharacter: vi.fn(),
   getCreationStats: vi.fn(),
+  recordCreation: vi.fn(),
 }));
 
 vi.mock('../../user/assets.service.js', () => ({
@@ -91,20 +92,25 @@ vi.mock('../../middleware/rateLimiterConfig.js', () => ({
   standardRateLimiter: (req, res, next) => next(),
 }));
 
-vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
-  sendSuccess: (res, data, statusCode = 200) => res.status(statusCode).json({ success: true, ...data }),
+// ✅ 2025-12-02 修復：mock 路徑需與實際 import 路徑一致（5 層上級）
+vi.mock('../../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, statusCode = 200) => res.status(typeof statusCode === 'number' ? statusCode : 200).json({ success: true, data }),
   sendError: (res, code, message, details) => {
+    // 避免 details 中的 error 欄位覆蓋 code
+    const { error: detailError, ...safeDetails } = details || {};
     return res.status(
       code === 'RESOURCE_NOT_FOUND' ? 404 :
       code === 'FORBIDDEN' ? 403 :
       code === 'VALIDATION_ERROR' ? 400 :
       code === 'RATE_LIMIT_EXCEEDED' ? 429 :
-      code === 'PERMISSION_DENIED' ? 403 : 400
+      code === 'PERMISSION_DENIED' ? 403 :
+      code === 'INTERNAL_SERVER_ERROR' ? 500 : 400
     ).json({
       success: false,
       error: code,
       message,
-      ...details
+      ...safeDetails,
+      ...(detailError ? { errorDetail: detailError } : {}),
     });
   },
 }));
@@ -224,8 +230,8 @@ describe('Generation API Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.flow).toBeDefined();
-      expect(response.body.reused).toBe(false);
+      expect(response.body.data.flow).toBeDefined();
+      expect(response.body.data.reused).toBe(false);
     });
 
     it('應該返回 404 當流程不存在', async () => {
@@ -323,7 +329,7 @@ describe('Generation API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.persona).toEqual(mockPersona);
+      expect(response.body.data.persona).toEqual(mockPersona);
       expect(generateCharacterPersona).toHaveBeenCalledWith(
         expect.objectContaining({
           selectedImageUrl: mockFlow.appearance.image,
@@ -389,7 +395,7 @@ describe('Generation API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.description).toBe(mockDescription);
+      expect(response.body.data.description).toBe(mockDescription);
       expect(generateAppearanceDescription).toHaveBeenCalledWith(
         expect.objectContaining({
           gender: 'female',
@@ -458,9 +464,9 @@ describe('Generation API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.description).toBe(mockDescription);
-      expect(response.body.usageCount).toBe(1);
-      expect(response.body.remainingUsage).toBe(2);
+      expect(response.body.data.description).toBe(mockDescription);
+      expect(response.body.data.usageCount).toBe(1);
+      expect(response.body.data.remainingUsage).toBe(2);
       expect(mergeCreationFlow).toHaveBeenCalledWith(
         'flow-001',
         expect.objectContaining({
@@ -558,9 +564,9 @@ describe('Generation API Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.flow).toBeDefined();
-      expect(response.body.images).toBeDefined();
-      expect(response.body.reused).toBe(false);
+      expect(response.body.data.flow).toBeDefined();
+      expect(response.body.data.images).toBeDefined();
+      expect(response.body.data.reused).toBe(false);
     });
 
     it('應該返回已生成的圖片（重用）', async () => {
@@ -585,8 +591,8 @@ describe('Generation API Routes', () => {
         .send({});
 
       expect(response.status).toBe(200);
-      expect(response.body.reused).toBe(true);
-      expect(response.body.images).toHaveLength(2);
+      expect(response.body.data.reused).toBe(true);
+      expect(response.body.data.images).toHaveLength(2);
       expect(generateCreationResult).not.toHaveBeenCalled();
     });
 
@@ -615,20 +621,25 @@ describe('Generation API Routes', () => {
       expect(response.status).toBe(403);
     });
 
-    it('應該拒絕未填寫外觀描述的流程', async () => {
+    it('當自動生成描述失敗時應返回錯誤', async () => {
+      // 路由會嘗試自動生成描述，當描述為空時
       const mockFlow = {
         id: 'flow-001',
         userId: 'test-user-123',
         appearance: null,
+        metadata: { gender: 'female' },
+        generation: { status: 'pending' },
       };
       getCreationFlow.mockResolvedValueOnce(mockFlow);
+      // 模擬自動生成描述失敗
+      generateAppearanceDescription.mockRejectedValueOnce(new Error('AI generation failed'));
 
       const response = await request(app)
         .post('/api/character-creation/flows/flow-001/generate-images')
         .send({});
 
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('VALIDATION_ERROR');
+      expect(response.status).toBe(500);
+      expect(response.body.error).toBe('INTERNAL_SERVER_ERROR');
     });
 
     it('應該拒絕超過創建限制的請求', async () => {
@@ -694,8 +705,8 @@ describe('Generation API Routes', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.usageCount).toBe(3);
-      expect(response.body.remainingUsage).toBe(0);
+      expect(response.body.data.usageCount).toBe(3);
+      expect(response.body.data.remainingUsage).toBe(0);
     });
 
     it('應該正確應用速率限制', async () => {

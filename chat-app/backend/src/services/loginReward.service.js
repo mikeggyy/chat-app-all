@@ -20,10 +20,13 @@ import logger from "../utils/logger.js";
  * @param {Array} dailyRewards - 每日獎勵配置
  * @returns {Object} 當日獎勵配置
  */
+// 21 天循環常量
+const CYCLE_DAYS = 21;
+
 const getDailyReward = (currentStreak, dailyRewards) => {
   const rewards = dailyRewards || DEFAULT_DAILY_REWARDS;
-  // 使用 30 天循環
-  const dayInCycle = ((currentStreak - 1) % 30) + 1;
+  // 使用 21 天循環
+  const dayInCycle = ((currentStreak - 1) % CYCLE_DAYS) + 1;
   return rewards.find(r => r.day === dayInCycle) || rewards[0];
 };
 
@@ -138,20 +141,20 @@ export const getLoginRewardStatus = async (userId) => {
       }
     : null;
 
-  // 獲取本月獎勵預覽（30天循環，使用動態配置）
+  // 獲取獎勵預覽（21天循環，使用動態配置）
   // currentStreak 是已完成的連續登入天數
-  // 使用 30 天週期內的位置來計算
-  const currentDayInCycle = status.currentStreak % 30; // 0-29，0 表示剛完成第 30 天
+  // 使用 21 天週期內的位置來計算
+  const currentDayInCycle = status.currentStreak % CYCLE_DAYS; // 0-20，0 表示剛完成第 21 天
   const todayDayInCycle = canClaimToday
-    ? (currentDayInCycle === 0 && status.currentStreak > 0 ? 30 : currentDayInCycle + 1)
-    : (currentDayInCycle === 0 ? 30 : currentDayInCycle);
+    ? (currentDayInCycle === 0 && status.currentStreak > 0 ? CYCLE_DAYS : currentDayInCycle + 1)
+    : (currentDayInCycle === 0 ? CYCLE_DAYS : currentDayInCycle);
 
   const monthRewards = (dailyRewards || []).map((reward, index) => {
-    const dayNumber = index + 1; // Day 1, Day 2, ..., Day 30
+    const dayNumber = index + 1; // Day 1, Day 2, ..., Day 21
 
     // 在當前週期內，已領取的天數
     const cycleCompletedDays = currentDayInCycle === 0 && status.currentStreak > 0
-      ? 30
+      ? CYCLE_DAYS
       : currentDayInCycle;
     const isClaimed = dayNumber <= cycleCompletedDays;
     const isToday = dayNumber === todayDayInCycle;
@@ -163,9 +166,9 @@ export const getLoginRewardStatus = async (userId) => {
     };
   });
 
-  // 獲取要在彈窗中顯示的主要里程碑 (7/14/30天)
+  // 獲取要在彈窗中顯示的主要里程碑 (7/14/21天)
   const displayMilestones = (streakMilestones || DEFAULT_STREAK_MILESTONES)
-    .filter(m => m.showInModal || m.days <= 30)
+    .filter(m => m.showInModal || m.days <= CYCLE_DAYS)
     .slice(0, 3) // 只取前三個
     .map(m => ({
       ...m,
@@ -341,12 +344,16 @@ export const claimDailyReward = async (userId) => {
     // 10. 設置返回結果（使用動態配置）
     const nextMilestone = getNextMilestone(newStreak, streakMilestones);
 
+    // ✅ 計算本次領取的是哪一天（週期內的天數，21天循環）
+    const claimedDayInCycle = ((newStreak - 1) % CYCLE_DAYS) + 1;
+
     result = {
       success: true,
       claimed: true,
       currentStreak: newStreak,
       streakBroken,
       dailyReward: {
+        day: claimedDayInCycle,  // ✅ 新增：返回領取的天數，供前端更新 UI
         coins: dailyReward.coins,
         description: dailyReward.description,
         highlight: dailyReward.highlight || false,

@@ -28,6 +28,7 @@ import { applySelector } from "../utils/responseOptimizer.js";
 export const conversationRouter = Router();
 
 // 獲取對話歷史 - 需要身份驗證且只能訪問自己的對話
+// ✅ 2025-12-02 優化：支持分頁參數
 conversationRouter.get(
   "/:userId/:characterId",
   requireFirebaseAuth,
@@ -36,15 +37,33 @@ conversationRouter.get(
   validateRequest(conversationSchemas.getHistory),
   asyncHandler(async (req, res) => {
     const { userId, characterId } = req.params;
-    const messages = await getConversationHistory(userId, characterId);
+
+    // ✅ 分頁參數
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const offset = parseInt(req.query.offset, 10) || 0;
+    const order = req.query.order === 'desc' ? 'desc' : 'asc';
+
+    const result = await getConversationHistory(userId, characterId, { limit, offset, order });
+
+    // ✅ 向後兼容：如果返回的是數組（limit=-1），直接處理
+    if (Array.isArray(result)) {
+      const optimizedMessages = applySelector(result, 'message');
+      return sendSuccess(res, { messages: optimizedMessages });
+    }
 
     // ✅ 響應優化：應用 message 選擇器
-    // 只保留必要的消息字段（id, role, text, imageUrl, videoUrl, createdAt）
-    // 移除元數據和不必要的字段
-    const optimizedMessages = applySelector(messages, 'message');
+    const optimizedMessages = applySelector(result.messages, 'message');
 
-    // ✅ 修復：使用統一的響應格式 { success: true, data: { messages } }
-    sendSuccess(res, { messages: optimizedMessages });
+    // ✅ 返回分頁信息
+    sendSuccess(res, {
+      messages: optimizedMessages,
+      pagination: {
+        total: result.total,
+        hasMore: result.hasMore,
+        offset: result.offset,
+        limit: result.limit,
+      }
+    });
   })
 );
 

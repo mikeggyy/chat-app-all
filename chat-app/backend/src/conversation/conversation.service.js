@@ -200,48 +200,100 @@ const getConversationRef = (userId, characterId) => {
 };
 
 /**
- * 獲取對話歷史（帶緩存）
+ * 獲取對話歷史（帶緩存和分頁）
+ * ✅ 2025-12-02 優化：添加分頁支持，減少數據傳輸量
+ *
+ * @param {string} userId - 用戶 ID
+ * @param {string} characterId - 角色 ID
+ * @param {Object} options - 分頁選項
+ * @param {number} options.limit - 返回的消息數量（默認 50，-1 表示全部）
+ * @param {number} options.offset - 起始位置（從最新消息開始計算）
+ * @param {string} options.order - 排序方式（'asc' 升序/舊到新，'desc' 降序/新到舊，默認 'asc'）
+ * @returns {Promise<Object>} 包含消息和分頁信息
  */
-export const getConversationHistory = async (userId, characterId) => {
+export const getConversationHistory = async (userId, characterId, options = {}) => {
+  const { limit = 50, offset = 0, order = 'asc' } = options;
   const cacheKey = createConversationKey(userId, characterId);
+
+  let allMessages;
 
   // 1. 先檢查緩存
   const cached = conversationCache.get(cacheKey);
   if (cached !== undefined) {
     logger.info(`[對話服務] 💾 從緩存讀取對話: userId=${userId}, characterId=${characterId}`);
-    // ✅ P1 優化：使用 structuredClone 替代 JSON.parse/stringify（快 5 倍）
-    return structuredClone(cached);
+    allMessages = cached;
+  } else {
+    // 2. 緩存未命中，從 Firestore 讀取
+    const conversationRef = getConversationRef(userId, characterId);
+    const doc = await conversationRef.get();
+
+    if (!doc.exists) {
+      // 空對話也緩存，避免重複查詢
+      conversationCache.set(cacheKey, []);
+      return { messages: [], total: 0, hasMore: false, offset, limit };
+    }
+
+    const data = doc.data();
+    allMessages = Array.isArray(data.messages) ? data.messages : [];
+
+    // 調試：檢查讀取的消息中有多少包含圖片
+    const messagesWithImages = allMessages.filter(m => m.imageUrl);
+    logger.info(`[對話服務] 📖 從 Firestore 讀取對話歷史: userId=${userId}, characterId=${characterId}`);
+    logger.info(`[對話服務] 📖 共 ${allMessages.length} 則訊息, 其中 ${messagesWithImages.length} 則包含圖片`);
+
+    if (messagesWithImages.length > 0) {
+      messagesWithImages.forEach((msg, index) => {
+        logger.info(`[對話服務] 📖 照片消息 ${index + 1}: id=${msg.id}, imageUrlLength=${msg.imageUrl?.length}, imageUrlPrefix=${msg.imageUrl?.substring(0, 100)}`);
+      });
+    }
+
+    // 3. 存入緩存
+    conversationCache.set(cacheKey, allMessages);
   }
 
-  // 2. 緩存未命中，從 Firestore 讀取
-  const conversationRef = getConversationRef(userId, characterId);
-  const doc = await conversationRef.get();
+  const total = allMessages.length;
 
-  if (!doc.exists) {
-    // 空對話也緩存，避免重複查詢
-    conversationCache.set(cacheKey, []);
-    return [];
+  // ✅ 如果 limit 為 -1，返回所有消息（向後兼容）
+  if (limit === -1) {
+    return structuredClone(allMessages);
   }
 
-  const data = doc.data();
-  const messages = Array.isArray(data.messages) ? data.messages : [];
+  // ✅ 分頁邏輯：從最新的消息開始倒序取
+  // offset=0 表示從最新開始，offset=50 表示跳過最新的 50 條
+  let paginatedMessages;
 
-  // 調試：檢查讀取的消息中有多少包含圖片
-  const messagesWithImages = messages.filter(m => m.imageUrl);
-  logger.info(`[對話服務] 📖 從 Firestore 讀取對話歷史: userId=${userId}, characterId=${characterId}`);
-  logger.info(`[對話服務] 📖 共 ${messages.length} 則訊息, 其中 ${messagesWithImages.length} 則包含圖片`);
-
-  if (messagesWithImages.length > 0) {
-    messagesWithImages.forEach((msg, index) => {
-      logger.info(`[對話服務] 📖 照片消息 ${index + 1}: id=${msg.id}, imageUrlLength=${msg.imageUrl?.length}, imageUrlPrefix=${msg.imageUrl?.substring(0, 100)}`);
-    });
+  if (order === 'desc') {
+    // 降序（新到舊）：直接從末尾開始取
+    const startIndex = Math.max(0, total - offset - limit);
+    const endIndex = Math.max(0, total - offset);
+    paginatedMessages = allMessages.slice(startIndex, endIndex).reverse();
+  } else {
+    // 升序（舊到新，默認）：從末尾開始取，但保持原順序
+    const startIndex = Math.max(0, total - offset - limit);
+    const endIndex = Math.max(0, total - offset);
+    paginatedMessages = allMessages.slice(startIndex, endIndex);
   }
 
-  // 3. 存入緩存
-  conversationCache.set(cacheKey, messages);
+  const hasMore = offset + paginatedMessages.length < total;
 
   // ✅ P1 優化：使用 structuredClone 返回深拷貝
-  return structuredClone(messages);
+  return {
+    messages: structuredClone(paginatedMessages),
+    total,
+    hasMore,
+    offset,
+    limit: paginatedMessages.length,
+  };
+};
+
+/**
+ * 獲取對話歷史（簡化版，向後兼容）
+ * ✅ 返回所有消息的數組（不帶分頁信息）
+ */
+export const getConversationHistorySimple = async (userId, characterId) => {
+  const result = await getConversationHistory(userId, characterId, { limit: -1 });
+  // 如果是返回完整數組，直接返回
+  return Array.isArray(result) ? result : result.messages;
 };
 
 /**
@@ -277,7 +329,8 @@ export const replaceConversationHistory = async (userId, characterId, messages) 
   // 清除緩存
   conversationCache.delete(key);
 
-  return getConversationHistory(userId, characterId);
+  // ✅ 返回所有消息（內部調用，需要完整歷史）
+  return getConversationHistorySimple(userId, characterId);
 };
 
 /**
@@ -491,7 +544,8 @@ export const getConversationCacheStats = async () => {
  * @returns {Array} 包含圖片的訊息列表
  */
 export const getConversationPhotos = async (userId, characterId) => {
-  const history = await getConversationHistory(userId, characterId);
+  // ✅ 使用簡化版函數獲取完整歷史
+  const history = await getConversationHistorySimple(userId, characterId);
 
   // 過濾出包含 imageUrl 的訊息
   return history

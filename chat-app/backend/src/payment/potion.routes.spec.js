@@ -92,6 +92,42 @@ vi.mock('../user/userProfileCache.service.js', () => ({
   getUserProfileWithCache: vi.fn(),
 }));
 
+// ✅ 2025-12-02 修復：添加缺失的 mock，需要在 handler 執行後調用 sendSuccess
+vi.mock('../utils/routeHelpers.js', () => ({
+  createFinancialRouteHandler: (handler, options = {}) => async (req, res, next) => {
+    const { requireIdempotencyKey = true } = options;
+    const userId = req.firebaseUser?.uid || 'test-user-123';
+    const idempotencyKey = req.body?.idempotencyKey || req.headers?.['idempotency-key'];
+
+    // 檢查 idempotencyKey
+    if (requireIdempotencyKey && !idempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: '缺少必要參數：idempotencyKey',
+      });
+    }
+
+    try {
+      const result = await handler(req, res, userId);
+      // 調用 sendSuccess 返回結果
+      return res.json({ success: true, ...result });
+    } catch (error) {
+      const isValidationError = error.message && (
+        error.message.includes('不足') ||
+        error.message.includes('無效') ||
+        error.message.includes('已過期')
+      );
+      const status = isValidationError ? 400 : 500;
+      return res.status(status).json({
+        success: false,
+        error: isValidationError ? 'VALIDATION_ERROR' : 'INTERNAL_SERVER_ERROR',
+        message: error.message,
+      });
+    }
+  },
+}));
+
 // Import mocked services after mocks are defined
 import * as potionService from './potion.service.js';
 

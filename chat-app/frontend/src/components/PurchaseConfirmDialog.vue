@@ -257,6 +257,7 @@ onUnmounted(() => {
 /* 按鈕組 */
 .purchase-dialog-actions {
   display: flex;
+  justify-content: center;
   gap: 0.75rem;
 }
 

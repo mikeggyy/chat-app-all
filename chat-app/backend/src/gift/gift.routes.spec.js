@@ -73,6 +73,18 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
+// ✅ 2025-12-02 修復：添加缺失的 mock
+vi.mock('../payment/coins.service.js', () => ({
+  refundCoins: vi.fn(),
+}));
+
+vi.mock('../config/limits.js', () => ({
+  IDEMPOTENCY_TTL: {
+    GIFT: 86400000,
+    DEFAULT: 86400000,
+  },
+}));
+
 describe('Gift API Routes', () => {
   let app;
   let giftService;

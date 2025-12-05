@@ -25,14 +25,14 @@
 <script setup lang="ts">
 // Types
 
-import { ref } from 'vue';
-import { BoltIcon } from '@heroicons/vue/24/outline';
-import { COIN_ICON_PATH } from '../../config/assets';
+import { ref } from "vue";
+import { BoltIcon } from "@heroicons/vue/24/outline";
+import { COIN_ICON_PATH } from "../../config/assets";
 
 defineProps({
   formattedBalance: {
     type: String,
-    default: '0',
+    default: "0",
   },
 });
 
@@ -79,10 +79,6 @@ const handleCoinIconError = () => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.stat-card__icon-wrapper--coins {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
 }
 
 .stat-card__icon {

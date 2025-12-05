@@ -190,7 +190,7 @@ const handleCancelButtonRef = (el: Element | ComponentPublicInstance | null) => 
 
 .logout-confirm__actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 0.875rem;
   margin-top: 0.5rem;
 }

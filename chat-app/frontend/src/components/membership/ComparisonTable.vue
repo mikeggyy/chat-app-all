@@ -205,19 +205,51 @@ defineProps<Props>();
 
 /* 響應式設計 */
 @media (max-width: 640px) {
+  .comparison-section {
+    padding: 1rem;
+    margin-top: 0.75rem;
+    border-radius: 16px;
+  }
+
+  .comparison-section__title {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+  }
+
   .comparison-table__header,
   .comparison-table__row {
     grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr 0.8fr;
-    gap: 0.25rem;
+    gap: 0.2rem;
   }
 
   .comparison-table__cell {
-    padding: 0.5rem 0.25rem;
-    font-size: 0.7rem;
+    padding: 0.4rem 0.2rem;
+    font-size: 0.65rem;
+    border-radius: 6px;
+  }
+
+  .comparison-table__cell--header {
+    font-size: 0.6rem;
+    padding: 0.5rem 0.2rem;
   }
 
   .comparison-table__cell--name {
-    padding-left: 0.5rem;
+    padding-left: 0.4rem;
+    font-size: 0.7rem;
+  }
+
+  .comparison-table__category {
+    margin-bottom: 0.75rem;
+  }
+
+  .comparison-table__category-title {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.5rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .comparison-table__row {
+    margin-bottom: 0.35rem;
   }
 }
 </style>

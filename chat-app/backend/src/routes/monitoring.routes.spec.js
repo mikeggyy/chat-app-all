@@ -21,6 +21,26 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
+// ✅ 2025-12-02 修復：添加 errorFormatter mock
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, statusCode = 200) => res.status(typeof statusCode === 'number' ? statusCode : 200).json({ success: true, data }),
+  sendError: (res, code, message, details) => {
+    const { error: detailError, ...safeDetails } = details || {};
+    return res.status(
+      code === 'RESOURCE_NOT_FOUND' ? 404 :
+      code === 'FORBIDDEN' ? 403 :
+      code === 'VALIDATION_ERROR' ? 400 :
+      code === 'INTERNAL_SERVER_ERROR' ? 500 : 400
+    ).json({
+      success: false,
+      error: code,
+      message,
+      ...safeDetails,
+      ...(detailError ? { errorDetail: detailError } : {}),
+    });
+  },
+}));
+
 // Mock monitoring service
 const mockGetMonitoringDashboard = vi.fn();
 const mockGetAbnormalAdWatchUsers = vi.fn();
@@ -105,7 +125,8 @@ describe('Monitoring API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('Firestore connection failed');
+      expect(response.body.error).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.body.message).toContain('獲取監控儀表板失敗');
     });
   });
 

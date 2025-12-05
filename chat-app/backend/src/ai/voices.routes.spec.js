@@ -110,7 +110,8 @@ vi.mock('./googleTts.service.js', () => ({
   },
 }));
 
-vi.mock('../../shared/utils/errorFormatter.js', () => ({
+// ✅ 2025-12-02 修復：修正 mock 路徑
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
   sendSuccess: (res, data) => res.json({ success: true, ...data }),
   sendError: (res, code, message, details) => res.status(400).json({ success: false, error: code, message, details }),
   ApiError: class ApiError extends Error {

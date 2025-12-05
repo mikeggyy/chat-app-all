@@ -75,7 +75,7 @@
 .chat-confirm-footer {
   display: flex;
   gap: 0.75rem;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 .chat-confirm-btn {

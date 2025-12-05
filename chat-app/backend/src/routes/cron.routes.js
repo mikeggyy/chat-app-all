@@ -20,6 +20,13 @@ import {
   cleanupStaleUpgradeLocks,
   getLockedUsers
 } from "../services/membershipLockCleanup.service.js";
+import {
+  processMembershipReminders,
+  cleanupOldReminders,
+} from "../membership/membershipReminder.service.js";
+import {
+  processMonthlyBonuses,
+} from "../services/yearlyBonus.service.js";
 
 const router = express.Router();
 
@@ -213,6 +220,128 @@ router.post("/idempotency-cleanup", validateCronRequest, async (req, res) => {
     }
   } catch (error) {
     logger.error("[Cron] 冪等性清理任務失敗", error);
+    sendError(res, "INTERNAL_SERVER_ERROR", error.message);
+  }
+});
+
+// ============================================
+// ✅ P1 優化：會員續約提醒系統
+// ============================================
+
+/**
+ * POST /api/cron/membership-reminders
+ * 發送會員到期提醒通知
+ *
+ * Cloud Scheduler 配置：
+ * - 執行頻率：每日上午 10:00
+ * - 用途：檢查即將過期的會員並發送提醒
+ *
+ * 提醒邏輯：
+ * - 7 天前：溫和提醒
+ * - 3 天前：警告提醒 + 10% 折扣碼
+ * - 1 天前：緊急提醒 + 15% 折扣碼
+ */
+router.post("/membership-reminders", validateCronRequest, async (req, res) => {
+  logger.info("[Cron] 開始執行會員續約提醒任務");
+
+  try {
+    const result = await processMembershipReminders();
+
+    if (result.success) {
+      logger.info("[Cron] 會員續約提醒任務完成", {
+        processed: result.processed,
+        sent: result.sent,
+        skipped: result.skipped,
+        errors: result.errors,
+        duration: result.duration,
+      });
+
+      sendSuccess(res, {
+        task: "membership-reminders",
+        result: {
+          processed: result.processed,
+          sent: result.sent,
+          skipped: result.skipped,
+          errors: result.errors,
+          byThreshold: result.byThreshold,
+          duration: result.duration,
+        },
+      });
+    } else {
+      throw new Error(result.error || "Unknown error");
+    }
+  } catch (error) {
+    logger.error("[Cron] 會員續約提醒任務失敗", error);
+    sendError(res, "INTERNAL_SERVER_ERROR", error.message);
+  }
+});
+
+/**
+ * POST /api/cron/cleanup-reminders
+ * 清理過期的提醒記錄
+ *
+ * Cloud Scheduler 配置：
+ * - 執行頻率：每週一凌晨 3:00
+ * - 用途：清理 90 天前的提醒記錄
+ */
+router.post("/cleanup-reminders", validateCronRequest, async (req, res) => {
+  logger.info("[Cron] 開始執行提醒記錄清理任務");
+
+  try {
+    const result = await cleanupOldReminders();
+
+    logger.info("[Cron] 提醒記錄清理任務完成", { deleted: result.deleted });
+
+    sendSuccess(res, {
+      task: "cleanup-reminders",
+      result: {
+        deleted: result.deleted,
+      },
+    });
+  } catch (error) {
+    logger.error("[Cron] 提醒記錄清理任務失敗", error);
+    sendError(res, "INTERNAL_SERVER_ERROR", error.message);
+  }
+});
+
+// ============================================
+// ✅ P2 優化：年訂閱獎勵系統
+// ============================================
+
+/**
+ * POST /api/cron/yearly-bonuses
+ * 發放年訂閱用戶的每月獎勵
+ *
+ * Cloud Scheduler 配置：
+ * - 執行頻率：每月 1 日上午 9:00
+ * - 用途：自動發放年訂閱用戶的每月額外獎勵
+ */
+router.post("/yearly-bonuses", validateCronRequest, async (req, res) => {
+  logger.info("[Cron] 開始執行年訂閱每月獎勵發放任務");
+
+  try {
+    const result = await processMonthlyBonuses();
+
+    logger.info("[Cron] 年訂閱每月獎勵發放完成", {
+      month: result.month,
+      processed: result.processed,
+      granted: result.granted,
+      skipped: result.skipped,
+      errors: result.errors.length,
+    });
+
+    sendSuccess(res, {
+      task: "yearly-bonuses",
+      result: {
+        month: result.month,
+        processed: result.processed,
+        granted: result.granted,
+        skipped: result.skipped,
+        errors: result.errors.length,
+      },
+    });
+  } catch (error) {
+    logger.error("[Cron] 年訂閱每月獎勵發放失敗", error);
     sendError(res, "INTERNAL_SERVER_ERROR", error.message);
   }
 });

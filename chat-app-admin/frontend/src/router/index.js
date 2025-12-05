@@ -86,6 +86,12 @@ const routes = [
         component: () => import("../views/Notifications.vue"),
         meta: { title: "通知管理", icon: "Bell" },
       },
+      {
+        path: "video-generation",
+        name: "VideoGeneration",
+        component: () => import("../views/VideoGeneration.vue"),
+        meta: { title: "影片生成", icon: "VideoCamera" },
+      },
     ],
   },
 ];

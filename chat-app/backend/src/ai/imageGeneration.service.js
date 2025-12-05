@@ -8,7 +8,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { generateGeminiImage, buildGeminiPrompt } from "./gemini.service.js";
 import { getMatchById } from "../match/match.service.js";
-import { getConversationHistory, appendConversationMessage } from "../conversation/conversation.service.js";
+import { getConversationHistorySimple, appendConversationMessage } from "../conversation/conversation.service.js";
 import { canGeneratePhoto, recordPhotoGeneration } from "./photoLimit.service.js";
 import { isDevUser } from "../../../../shared/config/testAccounts.js";
 import { savePhotoToAlbum } from "../photoAlbum/photoAlbum.service.js";
@@ -179,7 +179,8 @@ export const generateSelfieForCharacter = async (userId, characterId, options = 
   }
 
   // 獲取對話歷史以了解情境（減少消息數量以降低 token 成本）
-  const conversation = await getConversationHistory(userId, characterId);
+  // ✅ 使用簡化版函數獲取完整歷史
+  const conversation = await getConversationHistorySimple(userId, characterId);
   const MAX_MESSAGE_LENGTH = 200; // ✅ 限制每條消息最多 200 字符
   const recentMessages = conversation.slice(-3).map(msg => ({
     ...msg,

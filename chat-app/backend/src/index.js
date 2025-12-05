@@ -44,8 +44,13 @@ import firstPurchaseRouter from "./services/firstPurchase.routes.js";
 import specialOfferRouter from "./services/specialOffer.routes.js";
 import flashSaleRouter from "./services/flashSale.routes.js";
 import notificationRouter from "./services/notification.routes.js";
+import referralRouter from "./services/referral.routes.js";
+import upgradeRecommendationRouter from "./services/upgradeRecommendation.routes.js";
+import yearlyBonusRouter from "./services/yearlyBonus.routes.js";
+import membershipConfigRouter from "./config/membershipConfig.routes.js";
 import cronRouter from "./routes/cron.routes.js";
 import monitoringRouter from "./routes/monitoring.routes.js";
+import revenueRouter from "./routes/revenue.routes.js";
 import levelRouter from "./level/level.routes.js";
 import { cleanupInactiveUsers, getAllUsers } from "./user/user.service.js";
 import { conversationLimitService } from "./conversation/conversationLimit.service.js";
@@ -235,12 +240,19 @@ app.use(firstPurchaseRouter);  // 首購優惠 API
 app.use("/api/offers", specialOfferRouter);  // 特殊優惠 API（首購、回歸）
 app.use("/api/flash-sales", flashSaleRouter);  // 限時閃購 API
 app.use(notificationRouter);  // 通知 API
+app.use("/api/referral", referralRouter);  // 邀請獎勵 API
+app.use("/api/upgrade", upgradeRecommendationRouter);  // 智能升級推薦 API
+app.use("/api/yearly-bonus", yearlyBonusRouter);  // 年訂閱獎勵 API
+app.use(membershipConfigRouter);  // 會員配置 API（資料庫驅動）
 
 // 定時任務路由（Cloud Scheduler）
 app.use("/api/cron", cronRouter);
 
 // ✅ 監控增強路由（2025-01-13 優化）
 app.use("/api/monitoring", monitoringRouter);
+
+// ✅ P1 優化：營收統計儀表板 API
+app.use("/api/revenue", revenueRouter);
 
 // 🐛 調試路由（僅開發環境）
 if (process.env.NODE_ENV !== 'production') {

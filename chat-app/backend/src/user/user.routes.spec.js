@@ -90,6 +90,34 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
+// ✅ 2025-12-02 修復：添加 errorFormatter mock
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, options = {}) => {
+    const status = options.status || 200;
+    return res.status(status).json({ success: true, data });
+  },
+  sendError: (res, code, message, details) => {
+    const status = code === 'USER_NOT_FOUND' || code === 'RESOURCE_NOT_FOUND' ? 404 :
+                   code === 'FORBIDDEN' ? 403 :
+                   code === 'VALIDATION_ERROR' ? 400 :
+                   code === 'INTERNAL_SERVER_ERROR' ? 500 : 400;
+    return res.status(status).json({
+      success: false,
+      error: code,
+      message,
+      ...(details || {}),
+    });
+  },
+  ApiError: class ApiError extends Error {
+    constructor(code, message, details) {
+      super(message);
+      this.code = code;
+      this.details = details;
+      this.statusCode = code === 'USER_NOT_FOUND' || code === 'RESOURCE_NOT_FOUND' ? 404 : 400;
+    }
+  },
+}));
+
 describe('User API Routes', () => {
   let app;
   let userService;
@@ -102,6 +130,18 @@ describe('User API Routes', () => {
     app = express();
     app.use(express.json());
     app.use('/api/users', userRouter);
+
+    // ✅ 2025-12-02 修復：添加錯誤處理中間件
+    app.use((err, req, res, next) => {
+      const status = err.statusCode || 500;
+      const code = err.code || 'INTERNAL_SERVER_ERROR';
+      return res.status(status).json({
+        success: false,
+        error: code,
+        message: err.message || 'Internal Server Error',
+        ...(err.details || {}),
+      });
+    });
 
     // 獲取 mock 服務
     const userServiceModule = await import('./user.service.js');
@@ -148,23 +188,18 @@ describe('User API Routes', () => {
       expect(userService.getUserById).toHaveBeenCalledWith('test-user-123');
     });
 
-    it('應該自動創建不存在的測試用戶', async () => {
-      userService.getUserById
-        .mockResolvedValueOnce(null) // 第一次查詢返回 null
-        .mockResolvedValueOnce({ // 第二次查詢返回創建的用戶
-          id: 'test-user-123',
-          uid: 'test-user-123',
-          displayName: '測試使用者',
-          conversations: [],
-          favorites: [],
-        });
+    // ✅ 2025-12-02 修復：路由已更新，GET 請求不再自動創建用戶
+    // 用戶應該通過 POST /api/users 創建
+    it('應該對不存在的用戶返回 404', async () => {
+      userService.getUserById.mockResolvedValueOnce(null);
 
       const response = await request(app)
         .get('/api/users/test-user-123')
-        .expect(200);
+        .expect(404);
 
-      expect(response.body.success).toBe(true);
-      expect(userService.upsertUser).toHaveBeenCalled();
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('USER_NOT_FOUND');
+      expect(userService.upsertUser).not.toHaveBeenCalled();
     });
   });
 

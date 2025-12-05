@@ -68,9 +68,19 @@ vi.mock('../../../../shared/config/testAccounts.js', () => ({
   isTestAccount: vi.fn(() => true),
 }));
 
+// ✅ 2025-12-02 修復：更新 sendError mock 以正確處理狀態碼
 vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
   sendSuccess: (res, data) => res.json({ success: true, ...data }),
-  sendError: (res, code, message, details) => res.status(400).json({ success: false, error: code, message, details }),
+  sendError: (res, code, message, details) => {
+    // 根據錯誤碼決定狀態碼
+    let status = 400;
+    if (code === 'INTERNAL_SERVER_ERROR' || (message && message.includes('Database'))) {
+      status = 500;
+    } else if (code === 'NOT_IMPLEMENTED' || (message && message.includes('未實現'))) {
+      status = 501;
+    }
+    return res.status(status).json({ success: false, error: code, message, details });
+  },
   ApiError: class ApiError extends Error {
     constructor(message, statusCode) {
       super(message);

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, type Ref, type ComputedRef } from "vue";
 import { useRouter } from "vue-router";
 import { GiftIcon, ClockIcon } from "@heroicons/vue/24/solid";
-import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/vue/24/outline";
+import { XMarkIcon } from "@heroicons/vue/24/outline";
 import { useUserProfile } from "../../composables/useUserProfile";
 import { isGuestUser } from "../../../../../shared/config/testAccounts.js";
 import { apiJson } from "../../utils/api";
@@ -31,26 +31,30 @@ const router = useRouter();
 const { user } = useUserProfile();
 
 // localStorage key for dismissal
-const DISMISS_STORAGE_KEY = "bundleFloatDismissedDate";
+const DISMISS_STORAGE_KEY = "bundleFloatDismissedUntil";
+const DISMISS_DURATION_MS = 60 * 60 * 1000; // 1 小時
 
-// 檢查今天是否已經關閉過
-const checkDismissedToday = (): boolean => {
+// 檢查是否在隱藏期間內
+const checkDismissed = (): boolean => {
   try {
-    const dismissedDate = localStorage.getItem(DISMISS_STORAGE_KEY);
-    if (!dismissedDate) return false;
+    const dismissedUntil = localStorage.getItem(DISMISS_STORAGE_KEY);
+    if (!dismissedUntil) return false;
 
-    const today = new Date().toDateString();
-    return dismissedDate === today;
+    const expireTime = parseInt(dismissedUntil, 10);
+    if (isNaN(expireTime)) return false;
+
+    // 如果當前時間小於過期時間，則仍處於隱藏狀態
+    return Date.now() < expireTime;
   } catch {
     return false;
   }
 };
 
-// 儲存今天已關閉
-const saveDismissedToday = (): void => {
+// 儲存隱藏到期時間（1 小時後）
+const saveDismissed = (): void => {
   try {
-    const today = new Date().toDateString();
-    localStorage.setItem(DISMISS_STORAGE_KEY, today);
+    const expireTime = Date.now() + DISMISS_DURATION_MS;
+    localStorage.setItem(DISMISS_STORAGE_KEY, expireTime.toString());
   } catch {
     // localStorage 不可用時忽略
   }
@@ -60,7 +64,7 @@ const saveDismissedToday = (): void => {
 const displayBundles: Ref<DisplayBundle[]> = ref([]);
 const currentIndex: Ref<number> = ref(0);
 const isVisible: Ref<boolean> = ref(false);
-const isDismissed: Ref<boolean> = ref(checkDismissedToday());
+const isDismissed: Ref<boolean> = ref(checkDismissed());
 
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 let rotateInterval: ReturnType<typeof setInterval> | null = null;
@@ -158,10 +162,10 @@ const calculateBundleCountdown = (bundle: DisplayBundle): string => {
       const diff = periodEnd.getTime() - now.getTime();
       if (diff > 0) {
         const timeStr = formatTimeDiff(diff);
-        return `⏳ 剩 ${timeStr}`;
+        return `剩 ${timeStr}`;
       }
     }
-    return "🎁 可購買";
+    return "可購買";
   }
 
   // 如果不能購買但沒有下次可購買時間（如終身限購已購買）
@@ -204,12 +208,23 @@ const loadAvailableBundles = async (): Promise<void> => {
         (pkg: Bundle) => pkg.purchaseLimit && pkg.purchaseLimit !== "none"
       );
 
-      // 所有限購禮包都顯示（無論是否可購買）
-      const bundlesToShow: DisplayBundle[] = limitedBundles.map((pkg: Bundle) => ({
-        ...pkg,
-        limitLabel: getLimitLabel(pkg.purchaseLimit),
-        countdownText: ""
-      }));
+      // 過濾禮包：
+      // - 一次性禮包 (once): 只有可購買時才顯示（購買後完全隱藏）
+      // - 週期性限購 (weekly/monthly/daily): 都顯示（包含倒數）
+      const bundlesToShow: DisplayBundle[] = limitedBundles
+        .filter((pkg: Bundle) => {
+          // 一次性禮包購買後不顯示
+          if (pkg.purchaseLimit === "once") {
+            return pkg.purchaseStatus?.canPurchase === true;
+          }
+          // 其他限購類型都顯示
+          return true;
+        })
+        .map((pkg: Bundle) => ({
+          ...pkg,
+          limitLabel: getLimitLabel(pkg.purchaseLimit),
+          countdownText: ""
+        }));
 
       console.log("[禮包提示] 找到限購禮包:", bundlesToShow.map(b => ({
         name: b.name,
@@ -271,27 +286,10 @@ const stopRotation = (): void => {
   }
 };
 
-// 手動切換
-const goToPrev = (): void => {
-  if (displayBundles.value.length > 1) {
-    currentIndex.value = (currentIndex.value - 1 + displayBundles.value.length) % displayBundles.value.length;
-    // 重置輪播計時
-    startRotation();
-  }
-};
-
-const goToNext = (): void => {
-  if (displayBundles.value.length > 1) {
-    currentIndex.value = (currentIndex.value + 1) % displayBundles.value.length;
-    // 重置輪播計時
-    startRotation();
-  }
-};
-
 // 關閉提示
 const dismiss = (): void => {
   isDismissed.value = true;
-  saveDismissedToday(); // 儲存到 localStorage，當天不再顯示
+  saveDismissed(); // 儲存到 localStorage，1 小時內不再顯示
   stopCountdown();
   stopRotation();
 };
@@ -324,17 +322,6 @@ onUnmounted(() => {
         <XMarkIcon class="dismiss-icon" />
       </button>
 
-      <!-- 左箭頭 -->
-      <button
-        v-if="hasMultiple"
-        type="button"
-        class="float-nav float-nav--prev"
-        aria-label="上一個"
-        @click.stop="goToPrev"
-      >
-        <ChevronLeftIcon class="nav-icon" />
-      </button>
-
       <div class="float-content">
         <div class="float-icon">
           <GiftIcon class="icon-gift" />
@@ -348,17 +335,6 @@ onUnmounted(() => {
           </span>
         </div>
       </div>
-
-      <!-- 右箭頭 -->
-      <button
-        v-if="hasMultiple"
-        type="button"
-        class="float-nav float-nav--next"
-        aria-label="下一個"
-        @click.stop="goToNext"
-      >
-        <ChevronRightIcon class="nav-icon" />
-      </button>
 
       <!-- 指示器 -->
       <div v-if="hasMultiple" class="float-indicators">
@@ -411,13 +387,13 @@ onUnmounted(() => {
 
 .float-dismiss {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 22px;
-  height: 22px;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -425,38 +401,15 @@ onUnmounted(() => {
   transition: all 0.15s ease;
 
   &:hover {
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.85);
     transform: scale(1.1);
   }
 
   .dismiss-icon {
-    width: 14px;
-    height: 14px;
-    color: rgba(255, 255, 255, 0.95);
-  }
-}
-
-.float-nav {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.35);
-  }
-
-  .nav-icon {
-    width: 10px;
-    height: 10px;
+    width: 18px;
+    height: 18px;
     color: #fff;
+    stroke-width: 2.5;
   }
 }
 
@@ -585,16 +538,6 @@ onUnmounted(() => {
 
     &:hover {
       animation: none;
-    }
-  }
-
-  .float-nav {
-    width: 22px;
-    height: 22px;
-
-    .nav-icon {
-      width: 12px;
-      height: 12px;
     }
   }
 

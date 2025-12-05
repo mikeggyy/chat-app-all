@@ -21,6 +21,26 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
+// ✅ 2025-12-02 修復：添加 errorFormatter mock
+vi.mock('../../../../shared/utils/errorFormatter.js', () => ({
+  sendSuccess: (res, data, statusCode = 200) => res.status(typeof statusCode === 'number' ? statusCode : 200).json({ success: true, data }),
+  sendError: (res, code, message, details) => {
+    const { error: detailError, ...safeDetails } = details || {};
+    const isNotFound = code === 'RESOURCE_NOT_FOUND' || (typeof code === 'string' && code.includes('找不到'));
+    return res.status(
+      isNotFound ? 404 :
+      code === 'FORBIDDEN' ? 403 :
+      code === 'VALIDATION_ERROR' ? 400 : 500
+    ).json({
+      success: false,
+      error: code,
+      message,
+      ...safeDetails,
+      ...(detailError ? { errorDetail: detailError } : {}),
+    });
+  },
+}));
+
 vi.mock('../middleware/rateLimiterConfig.js', () => ({
   standardRateLimiter: (req, res, next) => next(),
 }));
@@ -87,8 +107,8 @@ describe('AI Settings API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.settings).toEqual(mockSettings);
-      expect(response.body.cached).toBe(true);
+      expect(response.body.data.settings).toEqual(mockSettings);
+      expect(response.body.data.cached).toBe(true);
       expect(mockGetAiSettings).toHaveBeenCalled();
     });
 
@@ -99,8 +119,8 @@ describe('AI Settings API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('獲取 AI 設定失敗');
-      expect(response.body.message).toContain('Firestore connection failed');
+      expect(response.body.error).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.body.message).toContain('獲取 AI 設定失敗');
     });
 
     it('應該返回空設定（如果 Firestore 沒有數據）', async () => {
@@ -109,7 +129,7 @@ describe('AI Settings API Routes', () => {
       const response = await request(app).get('/api/ai-settings');
 
       expect(response.status).toBe(200);
-      expect(response.body.settings).toEqual({});
+      expect(response.body.data.settings).toEqual({});
     });
   });
 
@@ -127,9 +147,9 @@ describe('AI Settings API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toContain('AI 設定緩存已成功刷新');
-      expect(response.body.settings).toEqual(mockSettings);
-      expect(response.body.refreshedAt).toBeDefined();
+      expect(response.body.data.message).toContain('AI 設定緩存已成功刷新');
+      expect(response.body.data.settings).toEqual(mockSettings);
+      expect(response.body.data.refreshedAt).toBeDefined();
       expect(mockRefreshAiSettings).toHaveBeenCalled();
     });
 
@@ -140,8 +160,8 @@ describe('AI Settings API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('刷新 AI 設定緩存失敗');
-      expect(response.body.message).toContain('Firestore connection failed');
+      expect(response.body.error).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.body.message).toContain('刷新 AI 設定緩存失敗');
     });
 
     it('應該包含刷新時間戳', async () => {
@@ -152,11 +172,11 @@ describe('AI Settings API Routes', () => {
       const afterRefresh = new Date().toISOString();
 
       expect(response.status).toBe(200);
-      expect(response.body.refreshedAt).toBeDefined();
-      expect(response.body.refreshedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      expect(response.body.data.refreshedAt).toBeDefined();
+      expect(response.body.data.refreshedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
       // 驗證時間戳在合理範圍內
-      expect(response.body.refreshedAt >= beforeRefresh).toBe(true);
-      expect(response.body.refreshedAt <= afterRefresh).toBe(true);
+      expect(response.body.data.refreshedAt >= beforeRefresh).toBe(true);
+      expect(response.body.data.refreshedAt <= afterRefresh).toBe(true);
     });
   });
 
@@ -186,8 +206,8 @@ describe('AI Settings API Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.serviceName).toBe('chat');
-      expect(response.body.settings).toEqual(mockAllSettings.chat);
+      expect(response.body.data.serviceName).toBe('chat');
+      expect(response.body.data.settings).toEqual(mockAllSettings.chat);
       expect(mockGetAiSettings).toHaveBeenCalled();
     });
 
@@ -197,8 +217,8 @@ describe('AI Settings API Routes', () => {
       const response = await request(app).get('/api/ai-settings/tts');
 
       expect(response.status).toBe(200);
-      expect(response.body.serviceName).toBe('tts');
-      expect(response.body.settings).toEqual(mockAllSettings.tts);
+      expect(response.body.data.serviceName).toBe('tts');
+      expect(response.body.data.settings).toEqual(mockAllSettings.tts);
     });
 
     it('應該成功獲取 imageGeneration 服務設定', async () => {
@@ -207,8 +227,8 @@ describe('AI Settings API Routes', () => {
       const response = await request(app).get('/api/ai-settings/imageGeneration');
 
       expect(response.status).toBe(200);
-      expect(response.body.serviceName).toBe('imageGeneration');
-      expect(response.body.settings).toEqual(mockAllSettings.imageGeneration);
+      expect(response.body.data.serviceName).toBe('imageGeneration');
+      expect(response.body.data.settings).toEqual(mockAllSettings.imageGeneration);
     });
 
     it('應該處理不存在的服務名稱', async () => {
@@ -218,7 +238,8 @@ describe('AI Settings API Routes', () => {
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('找不到服務 "nonexistent" 的設定');
+      expect(response.body.error).toBe('RESOURCE_NOT_FOUND');
+      expect(response.body.message).toContain('找不到服務 "nonexistent" 的設定');
     });
 
     it('應該處理獲取設定失敗', async () => {
@@ -228,8 +249,8 @@ describe('AI Settings API Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('獲取 AI 服務設定失敗');
-      expect(response.body.message).toContain('Firestore error');
+      expect(response.body.error).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.body.message).toContain('獲取 AI 服務設定失敗');
     });
   });
 
@@ -303,12 +324,12 @@ describe('AI Settings API Routes', () => {
       const response = await request(app).get('/api/ai-settings');
 
       expect(response.status).toBe(200);
-      expect(response.body.settings).toHaveProperty('chat');
-      expect(response.body.settings).toHaveProperty('tts');
-      expect(response.body.settings).toHaveProperty('imageGeneration');
-      expect(response.body.settings).toHaveProperty('videoGeneration');
-      expect(response.body.settings.chat).toHaveProperty('model');
-      expect(response.body.settings.chat).toHaveProperty('temperature');
+      expect(response.body.data.settings).toHaveProperty('chat');
+      expect(response.body.data.settings).toHaveProperty('tts');
+      expect(response.body.data.settings).toHaveProperty('imageGeneration');
+      expect(response.body.data.settings).toHaveProperty('videoGeneration');
+      expect(response.body.data.settings.chat).toHaveProperty('model');
+      expect(response.body.data.settings.chat).toHaveProperty('temperature');
     });
   });
 });

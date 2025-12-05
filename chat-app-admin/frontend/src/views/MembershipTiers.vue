@@ -6,9 +6,13 @@
       <el-table :data="membershipTiers" v-loading="loading" style="width: 100%">
         <el-table-column prop="id" label="等級 ID" width="100" />
         <el-table-column prop="name" label="等級名稱" width="150" />
-        <el-table-column prop="price" label="價格（TWD）" width="120">
+        <el-table-column prop="price" label="價格（TWD）" width="200">
           <template #default="{ row }">
-            <span>{{ row.price || 0 }} TWD</span>
+            <div style="font-size: 12px">
+              <div>月: {{ row.prices?.monthly?.price || row.price || 0 }} TWD</div>
+              <div v-if="row.prices?.quarterly">季: {{ row.prices.quarterly.price }} TWD</div>
+              <div v-if="row.prices?.yearly">年: {{ row.prices.yearly.price }} TWD</div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="狀態" width="100">
@@ -18,7 +22,17 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="功能限制" min-width="400">
+        <el-table-column label="年訂閱獎勵" width="180">
+          <template #default="{ row }">
+            <div v-if="row.yearlyBonus" style="font-size: 12px">
+              <div>註冊送: {{ row.yearlyBonus.signupCoins || 0 }} 金幣</div>
+              <div>每月送: {{ row.yearlyBonus.monthlyCoins || 0 }} 金幣</div>
+              <div>續約折扣: {{ row.yearlyBonus.renewalDiscount || 0 }}%</div>
+            </div>
+            <el-tag v-else size="small" type="info">未配置</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="功能限制" min-width="350">
           <template #default="{ row }">
             <div style="font-size: 12px">
               <div>對話: {{ row.features?.messagesPerCharacter === -1 ? '無限' : row.features?.messagesPerCharacter }}/角色</div>
@@ -55,8 +69,41 @@
           <el-input v-model="editForm.name" placeholder="例如：免費會員、VIP、VVIP" />
         </el-form-item>
 
-        <el-form-item label="價格（TWD）">
-          <el-input-number v-model="editForm.price" :min="0" />
+        <el-divider content-position="left">訂閱週期價格</el-divider>
+
+        <el-form-item label="月訂閱價格（TWD）">
+          <el-input-number v-model="editForm.prices.monthly.price" :min="0" />
+        </el-form-item>
+
+        <el-form-item label="季訂閱價格（TWD）">
+          <el-input-number v-model="editForm.prices.quarterly.price" :min="0" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">
+            月均 {{ Math.round(editForm.prices.quarterly.price / 3) }} TWD
+          </span>
+        </el-form-item>
+
+        <el-form-item label="年訂閱價格（TWD）">
+          <el-input-number v-model="editForm.prices.yearly.price" :min="0" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">
+            月均 {{ Math.round(editForm.prices.yearly.price / 12) }} TWD
+          </span>
+        </el-form-item>
+
+        <el-divider content-position="left">年訂閱專屬獎勵</el-divider>
+
+        <el-form-item label="年訂閱註冊金幣">
+          <el-input-number v-model="editForm.yearlyBonus.signupCoins" :min="0" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">年訂閱用戶註冊時立即獲得</span>
+        </el-form-item>
+
+        <el-form-item label="年訂閱每月金幣">
+          <el-input-number v-model="editForm.yearlyBonus.monthlyCoins" :min="0" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">年訂閱用戶每月額外獲得</span>
+        </el-form-item>
+
+        <el-form-item label="年訂閱續約折扣（%）">
+          <el-input-number v-model="editForm.yearlyBonus.renewalDiscount" :min="0" :max="50" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px">年訂閱用戶續約時享受的折扣</span>
         </el-form-item>
 
         <el-form-item label="計費週期">
@@ -213,6 +260,7 @@ const editFormRef = ref(null);
 
 /**
  * ✅ 2025-11-30 更新：新增 monthlyPhotos, prioritySupport 等欄位
+ * ✅ 2025-12-03 更新：新增訂閱週期價格和年訂閱獎勵配置
  */
 const editForm = reactive({
   id: "",
@@ -221,6 +269,18 @@ const editForm = reactive({
   currency: "TWD",
   billingCycle: "monthly",
   status: "active",
+  // 訂閱週期價格
+  prices: {
+    monthly: { price: 0, currency: "TWD" },
+    quarterly: { price: 0, currency: "TWD" },
+    yearly: { price: 0, currency: "TWD" },
+  },
+  // 年訂閱專屬獎勵
+  yearlyBonus: {
+    signupCoins: 0,
+    monthlyCoins: 0,
+    renewalDiscount: 0,
+  },
   features: {
     messagesPerCharacter: 0,
     unlimitedChats: false,
@@ -279,6 +339,29 @@ function editTier(tier) {
   editForm.billingCycle = tier.billingCycle || "monthly";
   editForm.status = tier.status || "active";
 
+  // ✅ 2025-12-03 新增：複製訂閱週期價格
+  if (tier.prices) {
+    editForm.prices.monthly.price = tier.prices.monthly?.price || tier.price || 0;
+    editForm.prices.quarterly.price = tier.prices.quarterly?.price || 0;
+    editForm.prices.yearly.price = tier.prices.yearly?.price || 0;
+  } else {
+    // 如果沒有 prices，使用舊的 price 作為月訂閱價格
+    editForm.prices.monthly.price = tier.price || 0;
+    editForm.prices.quarterly.price = 0;
+    editForm.prices.yearly.price = 0;
+  }
+
+  // ✅ 2025-12-03 新增：複製年訂閱獎勵配置
+  if (tier.yearlyBonus) {
+    editForm.yearlyBonus.signupCoins = tier.yearlyBonus.signupCoins || 0;
+    editForm.yearlyBonus.monthlyCoins = tier.yearlyBonus.monthlyCoins || 0;
+    editForm.yearlyBonus.renewalDiscount = tier.yearlyBonus.renewalDiscount || 0;
+  } else {
+    editForm.yearlyBonus.signupCoins = 0;
+    editForm.yearlyBonus.monthlyCoins = 0;
+    editForm.yearlyBonus.renewalDiscount = 0;
+  }
+
   // 複製 features 對象
   if (tier.features) {
     Object.keys(editForm.features).forEach((key) => {
@@ -294,12 +377,23 @@ function editTier(tier) {
 async function handleSave() {
   saveLoading.value = true;
   try {
+    // ✅ 2025-12-03 更新：包含訂閱週期價格和年訂閱獎勵
     await api.patch(`/api/membership-tiers/${editForm.id}`, {
       name: editForm.name,
-      price: editForm.price,
+      price: editForm.prices.monthly.price, // 保持向後兼容
       currency: editForm.currency,
       billingCycle: editForm.billingCycle,
       status: editForm.status,
+      prices: {
+        monthly: { price: editForm.prices.monthly.price, currency: "TWD" },
+        quarterly: { price: editForm.prices.quarterly.price, currency: "TWD" },
+        yearly: { price: editForm.prices.yearly.price, currency: "TWD" },
+      },
+      yearlyBonus: {
+        signupCoins: editForm.yearlyBonus.signupCoins,
+        monthlyCoins: editForm.yearlyBonus.monthlyCoins,
+        renewalDiscount: editForm.yearlyBonus.renewalDiscount,
+      },
       features: editForm.features,
     });
 
@@ -320,6 +414,16 @@ function resetEditForm() {
   editForm.currency = "TWD";
   editForm.billingCycle = "monthly";
   editForm.status = "active";
+
+  // ✅ 2025-12-03 新增：重置訂閱週期價格
+  editForm.prices.monthly.price = 0;
+  editForm.prices.quarterly.price = 0;
+  editForm.prices.yearly.price = 0;
+
+  // ✅ 2025-12-03 新增：重置年訂閱獎勵
+  editForm.yearlyBonus.signupCoins = 0;
+  editForm.yearlyBonus.monthlyCoins = 0;
+  editForm.yearlyBonus.renewalDiscount = 0;
 
   // 重置 features
   Object.keys(editForm.features).forEach((key) => {

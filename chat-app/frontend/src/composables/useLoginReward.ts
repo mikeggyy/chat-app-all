@@ -209,6 +209,41 @@ export function useLoginReward() {
           status.value.canClaimToday = false;
           status.value.currentStreak = data.currentStreak;
           status.value.totalLoginDays = data.totalLoginDays;
+
+          // ✅ 更新 monthRewards 中今日的 isClaimed 狀態
+          if (data.dailyReward && data.dailyReward.day !== undefined) {
+            // 確保 claimedDay 是數字類型
+            const claimedDay = Number(data.dailyReward.day);
+            logger.info(`[登入獎勵] 領取成功，更新第 ${claimedDay} 天的狀態`);
+
+            if (status.value.monthRewards && status.value.monthRewards.length > 0) {
+              status.value.monthRewards = status.value.monthRewards.map((reward) => {
+                // 使用 Number() 確保類型一致的比較
+                if (Number(reward.day) === claimedDay) {
+                  logger.info(`[登入獎勵] 標記第 ${reward.day} 天為已領取`);
+                  return { ...reward, isClaimed: true, isToday: true };
+                }
+                return reward;
+              });
+            }
+
+            // 向後兼容：同時更新 weekRewards
+            if (status.value.weekRewards && status.value.weekRewards.length > 0) {
+              status.value.weekRewards = status.value.weekRewards.map((reward) => {
+                if (Number(reward.day) === claimedDay) {
+                  return { ...reward, isClaimed: true, isToday: true };
+                }
+                return reward;
+              });
+            }
+          } else {
+            logger.warn("[登入獎勵] API 回傳的 dailyReward.day 為空，無法更新 UI");
+          }
+
+          // 更新 todayReward 的狀態
+          if (status.value.todayReward) {
+            status.value.todayReward.isClaimed = true;
+          }
         }
 
         return data;

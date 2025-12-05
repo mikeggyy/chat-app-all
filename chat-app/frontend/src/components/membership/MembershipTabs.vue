@@ -99,4 +99,23 @@ defineEmits<Emits>();
 .membership-tabs__item--active .membership-tabs__badge {
   color: rgba(167, 243, 208, 0.9);
 }
+
+/* ✅ 2025-12-03 新增：手機版優化 */
+@media (max-width: 640px) {
+  .membership-tabs {
+    margin: -0.75rem 1rem 1rem;
+    gap: 0.375rem;
+    padding: 0.375rem;
+    border-radius: 16px;
+  }
+
+  .membership-tabs__item {
+    padding: 0.75rem 0.5rem;
+    border-radius: 12px;
+  }
+
+  .membership-tabs__label {
+    font-size: 0.95rem;
+  }
+}
 </style>

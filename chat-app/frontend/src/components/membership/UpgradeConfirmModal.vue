@@ -2,15 +2,18 @@
 /**
  * UpgradeConfirmModal - 升級確認彈窗
  * ✅ 2025-11-30 新增：顯示補差價計算明細
+ * ✅ 2025-12-03 更新：支援訂閱週期顯示和年訂閱優惠
  *
  * 功能：
  * - 顯示升級前後的會員等級
  * - 計算並顯示補差價明細
+ * - 顯示訂閱週期（月/季/年）
+ * - 顯示年訂閱專屬優惠
  * - 讓用戶確認後才執行升級
  */
 
 import { ref, computed, watch } from 'vue';
-import { XMarkIcon, SparklesIcon, CheckCircleIcon } from '@heroicons/vue/24/outline';
+import { XMarkIcon, SparklesIcon, CheckCircleIcon, GiftIcon } from '@heroicons/vue/24/outline';
 import LoadingSpinner from '../LoadingSpinner.vue';
 import { useMembership, type UpgradePriceInfo } from '../../composables/useMembership';
 import type { MembershipTier as TierConfig } from '../../config/membership';
@@ -20,9 +23,12 @@ interface Props {
   isOpen: boolean;
   tier: TierConfig | null;
   userId: string;
+  billingCycle?: string;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  billingCycle: 'monthly',
+});
 
 const emit = defineEmits<{
   'close': [];
@@ -30,6 +36,32 @@ const emit = defineEmits<{
 }>();
 
 const { getUpgradePricePreview, currentTier } = useMembership();
+
+// 訂閱週期文字映射
+const cycleLabels: Record<string, string> = {
+  monthly: '月訂閱',
+  quarterly: '季訂閱',
+  yearly: '年訂閱',
+};
+
+// 年訂閱獎勵配置（根據會員等級）
+const yearlyBonusConfig: Record<string, { signup: number; monthly: number; renewal: number }> = {
+  lite: { signup: 50, monthly: 10, renewal: 5 },
+  vip: { signup: 150, monthly: 30, renewal: 10 },
+  vvip: { signup: 300, monthly: 50, renewal: 15 },
+};
+
+// 當前選中的週期標籤
+const cycleLabel = computed(() => cycleLabels[props.billingCycle] || '月訂閱');
+
+// 是否為年訂閱
+const isYearly = computed(() => props.billingCycle === 'yearly');
+
+// 年訂閱獎勵
+const yearlyBonus = computed(() => {
+  if (!props.tier) return null;
+  return yearlyBonusConfig[props.tier.id] || null;
+});
 
 const isLoading = ref(false);
 const priceInfo = ref<UpgradePriceInfo | null>(null);
@@ -101,6 +133,7 @@ const handleClose = () => {
               <SparklesIcon class="w-6 h-6" />
             </div>
             <h2 class="modal-header__title">確認升級</h2>
+            <span class="modal-header__cycle">{{ cycleLabel }}</span>
             <button
               type="button"
               class="modal-close"
@@ -178,6 +211,28 @@ const handleClose = () => {
                 <div v-if="hasSavings" class="savings-badge">
                   <CheckCircleIcon class="w-4 h-4" />
                   <span>補差價升級，已為您節省 NT$ {{ priceInfo.savings }}</span>
+                </div>
+              </div>
+
+              <!-- 年訂閱專屬優惠 -->
+              <div v-if="isYearly && yearlyBonus" class="yearly-bonus-section">
+                <div class="yearly-bonus-header">
+                  <GiftIcon class="w-5 h-5" />
+                  <span>年訂閱專屬優惠</span>
+                </div>
+                <div class="yearly-bonus-list">
+                  <div class="yearly-bonus-item">
+                    <span class="yearly-bonus-icon">🎁</span>
+                    <span>立即獲得 <strong>{{ yearlyBonus.signup }} 金幣</strong></span>
+                  </div>
+                  <div class="yearly-bonus-item">
+                    <span class="yearly-bonus-icon">📅</span>
+                    <span>每月額外獲得 <strong>{{ yearlyBonus.monthly }} 金幣</strong></span>
+                  </div>
+                  <div class="yearly-bonus-item">
+                    <span class="yearly-bonus-icon">🔄</span>
+                    <span>續約享 <strong>{{ yearlyBonus.renewal }}% 折扣</strong></span>
+                  </div>
                 </div>
               </div>
 
@@ -263,6 +318,17 @@ const handleClose = () => {
   font-size: 1.125rem;
   font-weight: 600;
   color: #f1f5f9;
+}
+
+.modal-header__cycle {
+  padding: 0.25rem 0.625rem;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fbbf24;
+  margin-right: 0.5rem;
 }
 
 .modal-close {
@@ -403,6 +469,47 @@ const handleClose = () => {
   border-radius: 8px;
   color: #34d399;
   font-size: 0.8125rem;
+}
+
+/* Yearly Bonus Section */
+.yearly-bonus-section {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.yearly-bonus-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #fbbf24;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin-bottom: 0.75rem;
+}
+
+.yearly-bonus-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.yearly-bonus-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: rgba(251, 191, 36, 0.9);
+}
+
+.yearly-bonus-item strong {
+  color: #fbbf24;
+}
+
+.yearly-bonus-icon {
+  font-size: 1rem;
 }
 
 /* Info Box */

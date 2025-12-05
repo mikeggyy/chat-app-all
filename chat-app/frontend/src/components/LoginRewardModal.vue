@@ -74,34 +74,36 @@ const showClaimResult = computed(() => {
   return props.claimResult !== null;
 });
 
-// 將 30 天獎勵分成 4 週 + 額外天數
+// 將 21 天獎勵分成 3 週
 const weeklyRewards = computed(() => {
   const rewards = props.monthRewards || props.weekRewards || [];
   if (rewards.length <= 7) {
     // 向後兼容：如果只有 7 天的數據
     return [{ week: 1, label: "本週", days: rewards }];
   }
+  // 只顯示前 21 天（3 週）
   return [
     { week: 1, label: "第一週", days: rewards.slice(0, 7) },
     { week: 2, label: "第二週", days: rewards.slice(7, 14) },
     { week: 3, label: "第三週", days: rewards.slice(14, 21) },
-    { week: 4, label: "第四週", days: rewards.slice(21, 30) },
   ];
 });
 
-// 當前週期內的進度
+// 當前週期內的進度（21 天循環）
 const currentDayInCycle = computed(() => {
   if (props.currentStreak === 0) return 0;
-  const day = props.currentStreak % 30;
-  return day === 0 ? 30 : day;
+  const day = props.currentStreak % 21;
+  return day === 0 ? 21 : day;
 });
 
 // 格式化獎勵文字
 const formatRewards = (rewards: MilestoneReward["rewards"]) => {
   const parts: string[] = [];
   if (rewards.coins) parts.push(`${rewards.coins} 金幣`);
-  if (rewards.photoUnlockCards) parts.push(`${rewards.photoUnlockCards} 照片卡`);
-  if (rewards.characterUnlockCards) parts.push(`${rewards.characterUnlockCards} 角色券`);
+  if (rewards.photoUnlockCards)
+    parts.push(`${rewards.photoUnlockCards} 照片卡`);
+  if (rewards.characterUnlockCards)
+    parts.push(`${rewards.characterUnlockCards} 角色券`);
   return parts.join(" + ");
 };
 
@@ -140,13 +142,19 @@ const handleClaim = () => {
               <span class="streak-count">{{ currentStreak }}</span>
               <span class="streak-label">連續登入</span>
             </div>
-            <div v-if="monthRewards && monthRewards.length > 7" class="cycle-progress">
-              本月進度：{{ currentDayInCycle }}/30 天
+            <div
+              v-if="monthRewards && monthRewards.length > 7"
+              class="cycle-progress"
+            >
+              連續進度：{{ currentDayInCycle }}/21 天
             </div>
           </div>
 
           <!-- 里程碑獎勵預覽 -->
-          <div v-if="displayMilestones && displayMilestones.length > 0" class="milestones-section">
+          <div
+            v-if="displayMilestones && displayMilestones.length > 0"
+            class="milestones-section"
+          >
             <div class="milestones-title">
               <TrophyIcon class="trophy-icon" />
               <span>里程碑獎勵</span>
@@ -171,7 +179,10 @@ const handleClaim = () => {
                 <div v-if="milestone.isClaimed" class="milestone-check">
                   <CheckIcon class="check-icon" />
                 </div>
-                <div v-else-if="!milestone.isCompleted" class="milestone-progress-bar">
+                <div
+                  v-else-if="!milestone.isCompleted"
+                  class="milestone-progress-bar"
+                >
                   <div
                     class="milestone-progress-fill"
                     :style="{ width: `${milestone.progress}%` }"
@@ -185,18 +196,36 @@ const handleClaim = () => {
           <div v-if="showClaimResult && claimResult" class="claim-result">
             <div class="result-title">🎉 獲得獎勵！</div>
             <div class="result-coins">
-              <span class="coins-amount">+{{ claimResult.totalCoinsEarned }}</span>
+              <span class="coins-amount"
+                >+{{ claimResult.totalCoinsEarned }}</span
+              >
               <span class="coins-label">金幣</span>
             </div>
             <div v-if="claimResult.milestoneReward" class="milestone-bonus">
-              <div class="bonus-badge">{{ claimResult.milestoneReward.badge }}</div>
-              <div class="bonus-title">{{ claimResult.milestoneReward.title }}</div>
+              <div class="bonus-badge">
+                {{ claimResult.milestoneReward.badge }}
+              </div>
+              <div class="bonus-title">
+                {{ claimResult.milestoneReward.title }}
+              </div>
               <div class="bonus-rewards">
-                <span v-if="claimResult.milestoneReward.rewards.photoUnlockCards">
-                  +{{ claimResult.milestoneReward.rewards.photoUnlockCards }} 照片卡
+                <span
+                  v-if="claimResult.milestoneReward.rewards.photoUnlockCards"
+                >
+                  +{{
+                    claimResult.milestoneReward.rewards.photoUnlockCards
+                  }}
+                  照片卡
                 </span>
-                <span v-if="claimResult.milestoneReward.rewards.characterUnlockCards">
-                  +{{ claimResult.milestoneReward.rewards.characterUnlockCards }} 角色解鎖券
+                <span
+                  v-if="
+                    claimResult.milestoneReward.rewards.characterUnlockCards
+                  "
+                >
+                  +{{
+                    claimResult.milestoneReward.rewards.characterUnlockCards
+                  }}
+                  角色解鎖券
                 </span>
               </div>
             </div>
@@ -204,7 +233,9 @@ const handleClaim = () => {
 
           <!-- 今日獎勵預覽（未領取時顯示） -->
           <div v-else-if="canClaim && todayReward" class="today-reward">
-            <div class="today-label">今日獎勵（第 {{ todayReward.day }} 天）</div>
+            <div class="today-label">
+              今日獎勵（第 {{ todayReward.day }} 天）
+            </div>
             <div class="today-coins">
               <span class="coins-amount">{{ todayReward.coins }}</span>
               <span class="coins-label">金幣</span>
@@ -231,10 +262,19 @@ const handleClaim = () => {
                     'day-reward--highlight': reward.highlight,
                   }"
                 >
-                  <div class="day-number">{{ reward.day }}</div>
-                  <div class="day-coins">{{ reward.coins }}</div>
-                  <div v-if="reward.isClaimed" class="claimed-mark">✓</div>
-                  <div v-if="reward.milestone" class="milestone-indicator">🎁</div>
+                  <div class="day-number">{{ reward.day }}天</div>
+                  <div class="day-coins">
+                    <img
+                      src="/icons/wallet-coin.png"
+                      alt="金幣"
+                      class="coin-icon"
+                    />
+                    <span>{{ reward.coins }}</span>
+                  </div>
+                  <!-- 已領取覆蓋層 - 覆蓋整個日期格子 -->
+                  <div v-if="reward.isClaimed" class="claimed-overlay">
+                    <CheckIcon class="claimed-check-icon" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -261,12 +301,8 @@ const handleClaim = () => {
               <span v-if="isClaiming">領取中...</span>
               <span v-else>領取獎勵</span>
             </button>
-            <button
-              v-else
-              class="confirm-btn"
-              @click="handleClose"
-            >
-              {{ showClaimResult ? '太棒了！' : '明天再來' }}
+            <button v-else class="confirm-btn" @click="handleClose">
+              {{ showClaimResult ? "太棒了！" : "明天再來" }}
             </button>
           </div>
         </div>
@@ -305,7 +341,11 @@ const handleClaim = () => {
   align-items: center;
   justify-content: center;
   padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(30, 64, 175, 0.2));
+  background: linear-gradient(
+    135deg,
+    rgba(236, 72, 153, 0.2),
+    rgba(30, 64, 175, 0.2)
+  );
 }
 
 .header-icon {
@@ -366,7 +406,11 @@ const handleClaim = () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: linear-gradient(135deg, rgba(251, 146, 60, 0.2), rgba(234, 88, 12, 0.2));
+  background: linear-gradient(
+    135deg,
+    rgba(251, 146, 60, 0.2),
+    rgba(234, 88, 12, 0.2)
+  );
   border: 1px solid rgba(251, 146, 60, 0.3);
   border-radius: 999px;
   padding: 0.4rem 1rem;
@@ -534,9 +578,8 @@ const handleClaim = () => {
   transition: all 0.2s;
 
   &--claimed {
-    opacity: 0.5;
-    background: rgba(34, 197, 94, 0.1);
-    border-color: rgba(34, 197, 94, 0.3);
+    // 已領取的日期用覆蓋層顯示勾勾，不需要降低透明度
+    border-color: rgba(34, 197, 94, 0.4);
   }
 
   &--today {
@@ -547,7 +590,11 @@ const handleClaim = () => {
   }
 
   &--milestone {
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+    background: linear-gradient(
+      135deg,
+      rgba(251, 191, 36, 0.15),
+      rgba(245, 158, 11, 0.1)
+    );
     border-color: rgba(251, 191, 36, 0.3);
   }
 
@@ -562,40 +609,49 @@ const handleClaim = () => {
 }
 
 .day-coins {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
   font-size: 0.7rem;
   font-weight: 700;
   color: #fbbf24;
 }
 
-.claimed-mark {
+.coin-icon {
+  width: 0.7rem;
+  height: 0.7rem;
+  object-fit: contain;
+}
+
+// 已領取覆蓋層 - 覆蓋整個日期格子
+.claimed-overlay {
   position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 12px;
-  height: 12px;
-  background: #22c55e;
-  border-radius: 50%;
+  inset: 0;
+  background: rgba(34, 197, 94, 0.85);
+  border-radius: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.5rem;
-  color: white;
-  font-weight: bold;
+  z-index: 2;
 }
 
-.milestone-indicator {
-  position: absolute;
-  bottom: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.5rem;
+.claimed-check-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: white;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
 // 領取結果
 .claim-result {
   text-align: center;
   padding: 0.75rem;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.05));
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.1),
+    rgba(16, 185, 129, 0.05)
+  );
   margin: 0.5rem 0.75rem;
   border-radius: 12px;
   border: 1px solid rgba(34, 197, 94, 0.3);
@@ -866,6 +922,11 @@ const handleClaim = () => {
 
   .day-coins {
     font-size: 0.8rem;
+  }
+
+  .coin-icon {
+    width: 0.8rem;
+    height: 0.8rem;
   }
 
   .claim-result {

@@ -12,6 +12,7 @@ import PurchaseConfirmDialog from "../components/PurchaseConfirmDialog.vue";
 import ShopHeader from "../components/shop/ShopHeader.vue";
 import ShopCategories from "../components/shop/ShopCategories.vue";
 import ShopItemsList from "../components/shop/ShopItemsList.vue";
+import FirstPurchaseBanner from "../components/shop/FirstPurchaseBanner.vue";
 import { apiJson } from "../utils/api";
 import { useShopCategories } from "../composables/shop/useShopCategories";
 import {
@@ -103,6 +104,13 @@ const handleCoinIconError = () => {
 // but the runtime data always includes category from the shop items
 const onPurchase = (item: ShopItemEvent): void => {
   handlePurchase(item as unknown as ShopItem);
+};
+
+// 處理首購禮包點擊
+const handleFirstPurchaseClick = () => {
+  // 導航到禮包分類並滾動到首購禮包位置
+  handleCategoryChange("bundles");
+  router.push({ query: { ...route.query, category: "bundles" } });
 };
 
 // 從 API 加載解鎖卡套餐
@@ -219,6 +227,12 @@ onMounted(async () => {
       :is-coin-icon-available="isCoinIconAvailable"
       @back="handleBack"
       @coin-icon-error="handleCoinIconError"
+    />
+
+    <!-- ✅ P1 優化：首充禮包橫幅（更顯眼的入口） -->
+    <FirstPurchaseBanner
+      :user-id="user?.id"
+      @purchase="handleFirstPurchaseClick"
     />
 
     <!-- 分類標籤 -->

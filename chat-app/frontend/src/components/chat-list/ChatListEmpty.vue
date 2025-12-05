@@ -203,19 +203,35 @@ withDefaults(defineProps<Props>(), {
     max-width: 300px;
   }
 
+  /* ... */
+}
+
+/* Desktop Styles */
+@media (min-width: 1024px) {
+  .empty-state {
+    max-width: 500px;
+    padding: 4rem 3rem;
+    gap: 2rem;
+    background: linear-gradient(
+      135deg,
+      rgba(30, 41, 59, 0.6) 0%,
+      rgba(15, 23, 42, 0.4) 100%
+    );
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
   .empty-state__icon {
-    width: 64px;
-    height: 64px;
+    width: 96px;
+    height: 96px;
   }
 
   .empty-state__icon svg {
-    width: 32px;
-    height: 32px;
+    width: 48px;
+    height: 48px;
   }
 
   .empty-state__message {
-    font-size: 0.875rem;
-    line-height: 1.6;
+    font-size: 1.1rem;
   }
 }
 

@@ -81,7 +81,11 @@ const handleClaim = async () => {
 
     <!-- 主要內容區 -->
     <main class="app-main" :class="{ 'has-desktop-header': showDesktopHeader }">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </main>
 
     <!-- 手機版底部導航 -->
@@ -115,6 +119,10 @@ const handleClaim = async () => {
   &.is-desktop {
     display: flex;
     flex-direction: column;
+    background: radial-gradient(circle at top right, #1e1b4b, transparent 40%),
+                radial-gradient(circle at bottom left, #312e81, transparent 40%),
+                var(--bg-dark);
+    background-attachment: fixed;
   }
 }
 

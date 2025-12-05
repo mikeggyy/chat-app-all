@@ -48,6 +48,26 @@ interface DecoratedCharacter {
 
 const router = useRouter();
 const { user } = useUserProfile();
+import { useGuestGuard } from "../composables/useGuestGuard"; // ✅ 2025-12-05 新增
+
+const { requireLogin, isGuest } = useGuestGuard(); // ✅ 引入訪客檢查
+
+// ✅ 2025-12-05 修復：進入頁面時檢查權限
+const checkAccess = () => {
+  if (requireLogin({ feature: "管理角色" })) {
+    router.replace({ name: 'profile' });
+    return false;
+  }
+  return true;
+};
+
+// 監聽訪客狀態
+import { watch } from 'vue';
+watch(isGuest, (guest) => {
+  if (guest) {
+    checkAccess();
+  }
+}, { immediate: true });
 
 // 返回上一頁（固定返回 Profile 頁面）
 const handleBack = (): void => {

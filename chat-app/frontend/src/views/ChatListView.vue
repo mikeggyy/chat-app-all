@@ -739,12 +739,17 @@ const handleThreadSelect = (thread: Thread): void => {
     backdrop-filter: blur(12px);
     overflow: hidden;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    
+    /* 限制寬度並置中 */
+    max-width: 800px;
+    margin: 0 auto;
   }
 
   .chat-thread-list {
     padding-bottom: 0;
   }
 }
+
 
 /* 寬螢幕優化 */
 @media (min-width: 1440px) {

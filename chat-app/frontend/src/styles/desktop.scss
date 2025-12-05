@@ -13,7 +13,8 @@
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--bg-dark, #1e2130);
+  background: transparent;
+  /* Background handled by App.vue */
 }
 
 .desktop-main {
@@ -95,8 +96,10 @@
 .desktop-chat-sidebar {
   width: var(--desktop-chat-sidebar-width);
   flex-shrink: 0;
-  border-right: 1px solid rgba(148, 163, 184, 0.15);
-  background: rgba(15, 17, 24, 0.95);
+  border-right: 1px solid var(--glass-border);
+  background: rgba(15, 23, 42, 0.6);
+  /* Semi-transparent Slate-900 */
+  backdrop-filter: blur(12px);
   overflow-y: auto;
 }
 
@@ -118,13 +121,14 @@
   left: 0;
   right: 0;
   height: var(--desktop-header-height);
-  background: rgba(15, 17, 24, 0.95);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--glass-border);
   z-index: 1000;
   display: flex;
   align-items: center;
   padding: 0 var(--desktop-content-padding);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 }
 
 .desktop-header__logo {
@@ -133,8 +137,11 @@
   color: #f8fafc;
   margin-right: 2rem;
 
+  /* Text Glow */
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+
   // Logo 漸變效果
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -161,7 +168,7 @@
 
   &:hover {
     color: #e2e8f0;
-    background: rgba(148, 163, 184, 0.1);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   &.active {
@@ -199,7 +206,7 @@
 
   &:hover {
     color: #e2e8f0;
-    background: rgba(148, 163, 184, 0.1);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .icon {

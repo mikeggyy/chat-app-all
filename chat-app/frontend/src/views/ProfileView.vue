@@ -186,6 +186,23 @@ const handleQuickActionSelect = async (action: { key?: string } | null): Promise
     return;
   }
 
+  // ✅ 2025-12-05 修復：對限制路由進行訪客檢查
+  const restrictedRoutes = ['favorites', 'my-characters', 'notifications', 'orders', 'usage-history'];
+  if (restrictedRoutes.includes(routeName)) {
+    // 映射功能名稱以顯示更友好的提示
+    const featureNameMap: Record<string, string> = {
+      favorites: '查看收藏',
+      'my-characters': '管理角色',
+      notifications: '查看通知',
+      orders: '查看訂單',
+      'usage-history': '查看記錄'
+    };
+    
+    if (requireLogin({ feature: featureNameMap[routeName] || '此功能' })) {
+      return;
+    }
+  }
+
   try {
     await router.push({ name: routeName });
   } catch (error) {
@@ -399,164 +416,166 @@ watch(
 </script>
 
 <template>
-  <main class="profile-view" aria-labelledby="profile-heading">
-    <section class="profile-hero">
-      <div class="profile-hero__overlay"></div>
+  <div>
+    <main class="profile-view" aria-labelledby="profile-heading">
+      <section class="profile-hero">
+        <div class="profile-hero__overlay"></div>
 
-      <header class="profile-hero__top">
-        <!-- ✅ 2025-11-30 更新：新增 Lite 等級支援 -->
-        <ProfileVIPCard
-          :tier="(tier as 'free' | 'lite' | 'vip' | 'vvip')"
-          :tier-name="tierName"
-          :is-lite="isLite"
-          :is-v-i-p="isVIP"
-          :is-v-v-i-p="isVVIP"
-          :is-paid-member="isPaidMember"
-          :formatted-expiry-date="formattedExpiryDate"
-          :days-until-expiry="daysUntilExpiry"
-          :is-expiring-soon="isExpiringSoon"
-          :is-guest="isGuest"
-          @upgrade-click="handleQuickActionSelect({ key: 'membership' })"
-        />
+        <header class="profile-hero__top">
+          <!-- ✅ 2025-11-30 更新：新增 Lite 等級支援 -->
+          <ProfileVIPCard
+            :tier="(tier as 'free' | 'lite' | 'vip' | 'vvip')"
+            :tier-name="tierName"
+            :is-lite="isLite"
+            :is-v-i-p="isVIP"
+            :is-v-v-i-p="isVVIP"
+            :is-paid-member="isPaidMember"
+            :formatted-expiry-date="formattedExpiryDate"
+            :days-until-expiry="daysUntilExpiry"
+            :is-expiring-soon="isExpiringSoon"
+            :is-guest="isGuest"
+            @upgrade-click="handleQuickActionSelect({ key: 'membership' })"
+          />
 
-        <AuxiliaryActions
-          :is-settings-menu-open="settings.isMenuOpen.value"
-          :settings-error="settings.error.value"
-          :settings-menu-button-ref="settings.bindMenuButton"
-          :settings-menu-ref="settings.bindMenu"
-          @edit-click="openProfileEditor"
-          @settings-toggle="settings.toggleMenu"
-          @settings-option-select="settings.handleOptionSelect"
-        />
-      </header>
+          <AuxiliaryActions
+            :is-settings-menu-open="settings.isMenuOpen.value"
+            :settings-error="settings.error.value"
+            :settings-menu-button-ref="settings.bindMenuButton"
+            :settings-menu-ref="settings.bindMenu"
+            @edit-click="openProfileEditor"
+            @settings-toggle="settings.toggleMenu"
+            @settings-option-select="settings.handleOptionSelect"
+          />
+        </header>
 
-      <div class="profile-hero__content">
-        <div class="avatar">
-          <div class="avatar-ring">
-            <img
-              v-if="avatarPreview"
-              :src="avatarPreview"
-              :class="{ 'avatar-ring__image--hidden': avatarUpload.isImageLoading.value }"
-              alt="使用者頭像"
-              @load="avatarUpload.handleLoad"
-              @error="avatarUpload.handleError"
-            />
-            <div
-              v-if="avatarUpload.isImageLoading.value"
-              class="avatar-ring__spinner"
-              role="status"
-              aria-label="頭像載入中"
-            ></div>
+        <div class="profile-hero__content">
+          <div class="avatar">
+            <div class="avatar-ring">
+              <img
+                v-if="avatarPreview"
+                :src="avatarPreview"
+                :class="{ 'avatar-ring__image--hidden': avatarUpload.isImageLoading.value }"
+                alt="使用者頭像"
+                @load="avatarUpload.handleLoad"
+                @error="avatarUpload.handleError"
+              />
+              <div
+                v-if="avatarUpload.isImageLoading.value"
+                class="avatar-ring__spinner"
+                role="status"
+                aria-label="頭像載入中"
+              ></div>
+            </div>
+            <button
+              type="button"
+              class="avatar__edit-button"
+              aria-label="編輯頭像"
+              @click="openAvatarEditor"
+            >
+              <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+              </svg>
+            </button>
           </div>
-          <button
-            type="button"
-            class="avatar__edit-button"
-            aria-label="編輯頭像"
-            @click="openAvatarEditor"
-          >
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-            </svg>
-          </button>
+
+          <div v-if="!isGuest" class="identity">
+            <h1 id="profile-heading">{{ profile.displayName }}</h1>
+            <p>ID：{{ displayedId }}</p>
+          </div>
+
+          <!-- 資產查看按鈕 -->
+          <ProfileAssets
+            :balance="balance"
+            :is-guest="isGuest"
+            @open-stats="openStatsModal"
+          />
         </div>
+      </section>
 
-        <div v-if="!isGuest" class="identity">
-          <h1 id="profile-heading">{{ profile.displayName }}</h1>
-          <p>ID：{{ displayedId }}</p>
-        </div>
+      <ProfileQuickActions
+        :has-unread-notifications="hasUnreadNotifications"
+        :has-unclaimed-reward="loginReward.canClaim.value"
+        @action-select="handleQuickActionSelect"
+      />
+    </main>
 
-        <!-- 資產查看按鈕 -->
-        <ProfileAssets
-          :balance="balance"
-          :is-guest="isGuest"
-          @open-stats="openStatsModal"
-        />
-      </div>
-    </section>
-
-    <ProfileQuickActions
-      :has-unread-notifications="hasUnreadNotifications"
-      :has-unclaimed-reward="loginReward.canClaim.value"
-      @action-select="handleQuickActionSelect"
+    <!-- 頭像編輯器 -->
+    <AvatarEditorModal
+      v-if="avatarUpload.isModalOpen.value"
+      :default-avatars="BUILTIN_AVATAR_OPTIONS"
+      :current-photo="avatarPreview"
+      :saving="avatarUpload.isSaving.value"
+      @close="avatarUpload.closeEditor"
+      @update="avatarUpload.handleUpdate"
     />
-  </main>
 
-  <!-- 頭像編輯器 -->
-  <AvatarEditorModal
-    v-if="avatarUpload.isModalOpen.value"
-    :default-avatars="BUILTIN_AVATAR_OPTIONS"
-    :current-photo="avatarPreview"
-    :saving="avatarUpload.isSaving.value"
-    @close="avatarUpload.closeEditor"
-    @update="avatarUpload.handleUpdate"
-  />
+    <!-- 個人資料編輯器 -->
+    <ProfileEditor
+      :is-open="profileEditor.isOpen.value"
+      :is-saving="profileEditor.isSaving.value"
+      :error="profileEditor.error.value"
+      :form="profileEditor.form"
+      :form-errors="profileEditor.formErrors"
+      :display-name-length="profileEditor.displayNameLength.value"
+      :prompt-length="profileEditor.promptLength.value"
+      :is-form-dirty="profileEditor.isFormDirty.value"
+      :input-ref="profileEditor.inputRef"
+      @close="profileEditor.close"
+      @submit="profileEditor.submit"
+      @overlay-click="profileEditor.close"
+    />
 
-  <!-- 個人資料編輯器 -->
-  <ProfileEditor
-    :is-open="profileEditor.isOpen.value"
-    :is-saving="profileEditor.isSaving.value"
-    :error="profileEditor.error.value"
-    :form="profileEditor.form"
-    :form-errors="profileEditor.formErrors"
-    :display-name-length="profileEditor.displayNameLength.value"
-    :prompt-length="profileEditor.promptLength.value"
-    :is-form-dirty="profileEditor.isFormDirty.value"
-    :input-ref="profileEditor.inputRef"
-    @close="profileEditor.close"
-    @submit="profileEditor.submit"
-    @overlay-click="profileEditor.close"
-  />
+    <!-- 登出確認對話框 -->
+    <LogoutConfirmDialog
+      :is-visible="settings.isLogoutConfirmVisible.value"
+      :is-logging-out="settings.isLoggingOut.value"
+      :error="settings.error.value"
+      :cancel-button-ref="settings.bindLogoutCancelButton"
+      @cancel="settings.cancelLogoutConfirm"
+      @confirm="settings.confirmLogout"
+    />
 
-  <!-- 登出確認對話框 -->
-  <LogoutConfirmDialog
-    :is-visible="settings.isLogoutConfirmVisible.value"
-    :is-logging-out="settings.isLoggingOut.value"
-    :error="settings.error.value"
-    :cancel-button-ref="settings.bindLogoutCancelButton"
-    @cancel="settings.cancelLogoutConfirm"
-    @confirm="settings.confirmLogout"
-  />
+    <!-- 統計彈窗 -->
+    <StatsModal
+      :is-open="isStatsModalOpen"
+      :balance="balance"
+      :formatted-balance="formattedBalance"
+      :character-unlock-cards="userAssets.characterUnlockCards"
+      :photo-unlock-cards="userAssets.photoUnlockCards"
+      :video-unlock-cards="userAssets.videoUnlockCards"
+      :voice-unlock-cards="userAssets.voiceUnlockCards"
+      :create-cards="userAssets.createCards"
+      :potions="userAssets.potions"
+      :tier="tier"
+      :tier-name="tierName"
+      :is-paid-member="isPaidMember"
+      :formatted-expiry-date="formattedExpiryDate"
+      :days-until-expiry="daysUntilExpiry"
+      :is-expiring-soon="isExpiringSoon"
+      :current-photo-usage="0"
+      :current-character-creations="0"
+      @close="closeStatsModal"
+      @buy-unlock-card="handleBuyUnlockCard"
+      @use-unlock-card="handleUseUnlockCard"
+      @use-potion="handleUsePotion"
+    />
 
-  <!-- 統計彈窗 -->
-  <StatsModal
-    :is-open="isStatsModalOpen"
-    :balance="balance"
-    :formatted-balance="formattedBalance"
-    :character-unlock-cards="userAssets.characterUnlockCards"
-    :photo-unlock-cards="userAssets.photoUnlockCards"
-    :video-unlock-cards="userAssets.videoUnlockCards"
-    :voice-unlock-cards="userAssets.voiceUnlockCards"
-    :create-cards="userAssets.createCards"
-    :potions="userAssets.potions"
-    :tier="tier"
-    :tier-name="tierName"
-    :is-paid-member="isPaidMember"
-    :formatted-expiry-date="formattedExpiryDate"
-    :days-until-expiry="daysUntilExpiry"
-    :is-expiring-soon="isExpiringSoon"
-    :current-photo-usage="0"
-    :current-character-creations="0"
-    @close="closeStatsModal"
-    @buy-unlock-card="handleBuyUnlockCard"
-    @use-unlock-card="handleUseUnlockCard"
-    @use-potion="handleUsePotion"
-  />
-
-  <!-- 每日登入獎勵彈窗 -->
-  <LoginRewardModal
-    :is-open="loginReward.showRewardModal.value"
-    :can-claim="loginReward.canClaim.value"
-    :is-claiming="loginReward.isClaiming.value"
-    :current-streak="loginReward.currentStreak.value"
-    :today-reward="loginReward.todayReward.value"
-    :week-rewards="loginReward.weekRewards.value"
-    :month-rewards="loginReward.monthRewards.value"
-    :display-milestones="loginReward.displayMilestones.value"
-    :next-milestone="loginNextMilestone"
-    :claim-result="loginReward.lastClaimResult.value"
-    @close="loginReward.closeModal"
-    @claim="handleClaimReward"
-  />
+    <!-- 每日登入獎勵彈窗 -->
+    <LoginRewardModal
+      :is-open="loginReward.showRewardModal.value"
+      :can-claim="loginReward.canClaim.value"
+      :is-claiming="loginReward.isClaiming.value"
+      :current-streak="loginReward.currentStreak.value"
+      :today-reward="loginReward.todayReward.value"
+      :week-rewards="loginReward.weekRewards.value"
+      :month-rewards="loginReward.monthRewards.value"
+      :display-milestones="loginReward.displayMilestones.value"
+      :next-milestone="loginNextMilestone"
+      :claim-result="loginReward.lastClaimResult.value"
+      @close="loginReward.closeModal"
+      @claim="handleClaimReward"
+    />
+  </div>
 </template>
 
 <style scoped lang="scss">

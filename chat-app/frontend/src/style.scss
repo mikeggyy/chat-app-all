@@ -10,57 +10,84 @@
   -moz-osx-font-smoothing: grayscale;
 
   /* ========================================
-     主題色彩系統
+     主題色彩系統 (Premium Dark Theme)
      ======================================== */
 
-  /* 主色調 - 紫色系 */
-  --primary-color: #8b5cf6;
-  --primary-light: rgba(139, 92, 246, 0.1);
-  --primary-hover: #7c3aed;
-  --primary-active: #6d28d9;
+  /* 主色調 - 霓虹電光藍 (Electric Blue + Violet Gradient) */
+  --primary-color: #6366f1;
+  /* Indigo-500 */
+  --primary-light: rgba(99, 102, 241, 0.15);
+  --primary-hover: #4f46e5;
+  /* Indigo-600 */
+  --primary-active: #4338ca;
+  /* Indigo-700 */
+  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
 
-  /* 背景色 */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb;
-  --bg-tertiary: #f3f4f6;
-  --bg-hover: #f3f4f6;
-  --bg-dark: #1e2130;
+  /* 背景色 (Deep Space Theme) */
+  --bg-primary: #0f172a;
+  /* Slate-900: Deep rich blue-black */
+  --bg-secondary: #1e293b;
+  /* Slate-800: Lighter blue-grey for cards */
+  --bg-tertiary: #334155;
+  /* Slate-700: Inputs and hovers */
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  /* White overlay for glass feel */
+  --bg-dark: #020617;
+  /* Slate-950: Almost black background */
 
-  /* 文字色 */
-  --text-primary: #1a1a1a;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --text-light: #e5e7eb;
+  /* Glassmorphism Variables */
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  /* Translucent Slate-800 */
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 12px;
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
 
-  /* 邊框色 */
-  --border-color: #e5e7eb;
-  --border-light: #f3f4f6;
-  --border-dark: #d1d5db;
+  /* 文字色 (Crisp & High Contrast) */
+  --text-primary: #f1f5f9;
+  /* Slate-100 */
+  --text-secondary: #94a3b8;
+  /* Slate-400 */
+  --text-tertiary: #64748b;
+  /* Slate-500 */
+  --text-light: #475569;
+  /* Slate-600 */
 
-  /* 狀態色 */
+  /* 邊框色 (Subtle Glass Borders) */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.12);
+  --border-dark: #0f172a;
+
+  /* 狀態色 (Vibrant Neon) */
   --error-color: #ef4444;
-  --error-light: rgba(239, 68, 68, 0.1);
-  --success-color: #22c55e;
-  --success-light: rgba(34, 197, 94, 0.1);
+  /* Red-500 */
+  --error-light: rgba(239, 68, 68, 0.2);
+  --success-color: #10b981;
+  /* Emerald-500 */
+  --success-light: rgba(16, 185, 129, 0.2);
   --warning-color: #f59e0b;
-  --warning-light: rgba(245, 158, 11, 0.1);
+  /* Amber-500 */
+  --warning-light: rgba(245, 158, 11, 0.2);
 
-  /* 陰影 */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  /* 陰影 (Deep & Soft) */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 15px rgba(99, 102, 241, 0.3);
+  /* Primary color glow */
 
-  /* 圓角 */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
+  /* 圓角 (Modern & Smooth) */
+  --radius-sm: 0.5rem;
+  /* 8px */
+  --radius-md: 0.75rem;
+  /* 12px */
+  --radius-lg: 1rem;
+  /* 16px */
+  --radius-xl: 1.5rem;
+  /* 24px */
+  --radius-2xl: 2rem;
+  /* 32px */
   --radius-full: 9999px;
 
   /* 間距 */
@@ -149,7 +176,7 @@ a {
 /* 桌面版 (≥ 1024px)：全寬響應式佈局 */
 @media (min-width: 1024px) {
   body {
-    background: #0f0f14;
+    background: var(--bg-dark);
   }
 
   #app {
@@ -209,20 +236,24 @@ h2 {
 }
 
 /* ========================================
-   統一按鈕樣式系統
+   統一按鈕樣式系統 (Modern Dark Theme)
+   ======================================== */
+
+/* ========================================
+   統一按鈕樣式系統 (Premium Glass Buttons)
    ======================================== */
 
 /* 按鈕基礎樣式 */
 .btn-unified {
   min-width: 100px;
   padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 0.95rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  border: none;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -230,121 +261,136 @@ h2 {
   white-space: nowrap;
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(8px);
+
+  /* Glass reflection effect */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none !important;
+    box-shadow: none !important;
+    filter: grayscale(0.8);
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(96, 165, 250, 0.5);
-    outline-offset: 2px;
+    outline: 2px solid var(--primary-hover);
+    outline-offset: 4px;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
   }
 }
 
-/* 取消按鈕（次要按鈕） */
-.btn-cancel,
-.btn-secondary {
-  background: rgba(30, 33, 48, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  color: #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+/* 主要按鈕 */
+.btn-confirm,
+.btn-primary {
+  background: var(--primary-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 
   &:hover:not(:disabled) {
-    background: rgba(51, 65, 85, 0.9);
-    border-color: rgba(148, 163, 184, 0.5);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   &:active:not(:disabled) {
     transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
   }
 }
 
-/* 確認按鈕（主要按鈕） */
-.btn-confirm,
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: 1px solid rgba(102, 126, 234, 0.5);
-  color: #fff;
-  font-weight: 700;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.35);
+/* 次要按鈕 */
+.btn-cancel,
+.btn-secondary {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, #5568d3 0%, #6a3f92 100%);
-    border-color: rgba(102, 126, 234, 0.7);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+    background: rgba(51, 65, 85, 0.8);
+    border-color: rgba(255, 255, 255, 0.15);
     transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
   }
 
   &:active:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+    transform: translateY(0);
+    background: rgba(30, 41, 59, 0.8);
   }
 }
 
-/* 危險按鈕（用於刪除、登出等） */
+/* 危險按鈕 */
 .btn-danger {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  border: 1px solid rgba(239, 68, 68, 0.5);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   color: #fff;
-  font-weight: 700;
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, #dc2626, #b91c1c);
-    border-color: rgba(239, 68, 68, 0.7);
-    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
     transform: translateY(-2px);
+    filter: brightness(1.1);
   }
 
   &:active:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
   }
 }
 
-/* 成功按鈕（用於確認、完成等綠色動作） */
+/* 成功按鈕 */
 .btn-success {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  border: 1px solid rgba(34, 197, 94, 0.5);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   color: #fff;
-  font-weight: 700;
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-    border-color: rgba(34, 197, 94, 0.7);
-    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.45);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
     transform: translateY(-2px);
+    filter: brightness(1.1);
   }
 
   &:active:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
   }
 }
 
-/* 幽靈按鈕（透明背景的次要按鈕） */
+/* 幽靈按鈕 */
 .btn-ghost {
   background: transparent;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  color: #e2e8f0;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
   box-shadow: none;
 
   &:hover:not(:disabled) {
-    background: rgba(148, 163, 184, 0.15);
-    border-color: rgba(148, 163, 184, 0.4);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.05);
   }
 
   &:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: none;
+    background: rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -353,12 +399,14 @@ h2 {
   min-width: 80px;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
+  border-radius: var(--radius-md);
 }
 
 .btn-lg {
   min-width: 140px;
   padding: 1rem 2rem;
   font-size: 1.05rem;
+  border-radius: var(--radius-xl);
 }
 
 .btn-full {
@@ -372,16 +420,43 @@ h2 {
     padding: 0.65rem 1.25rem;
     font-size: 0.9rem;
   }
+}
 
-  .btn-sm {
-    min-width: 70px;
-    padding: 0.45rem 0.875rem;
-    font-size: 0.8rem;
-  }
+/* ========================================
+   Global Animations
+   ======================================== */
 
-  .btn-lg {
-    min-width: 120px;
-    padding: 0.875rem 1.75rem;
-    font-size: 1rem;
-  }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.slide-fade-leave-active {
+  transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateX(20px);
+  opacity: 0;
 }

@@ -47,8 +47,12 @@ interface CharacterCard {
   isMissing: boolean;
 }
 
+// ✅ 2025-12-05 新增：引入 useGuestGuard
+import { useGuestGuard } from "../composables/useGuestGuard";
+
 const router = useRouter();
 const { user } = useUserProfile();
+const { requireLogin, isGuest } = useGuestGuard(); // ✅ 引入訪客檢查
 
 // Tabs
 const activeTab: Ref<string> = ref("chat");
@@ -58,6 +62,25 @@ const isLoading: Ref<boolean> = ref(false);
 const errorMessage: Ref<string> = ref("");
 const fetchedMatches: Ref<Match[]> = ref([]);
 const fetchedConversations: Ref<ConversationEntry[]> = ref([]);
+
+// ✅ 2025-12-05 修復：進入頁面時檢查權限
+const checkAccess = () => {
+  if (requireLogin({ feature: "查看收藏" })) {
+    // 如果是訪客，requireLogin 會觸發彈窗並返回 true
+    // 我們可以選擇重定向回首頁，或者留在當前頁面等待用戶登入
+    // 這裡選擇重定向回 Profile，避免停留在無權限頁面
+    router.replace({ name: 'profile' });
+    return false;
+  }
+  return true;
+};
+
+// 監聽訪客狀態
+watch(isGuest, (guest) => {
+  if (guest) {
+    checkAccess();
+  }
+}, { immediate: true });
 
 const normalizeId = (value: unknown): string => {
   if (typeof value !== "string") {

@@ -109,6 +109,7 @@ const openChat = (profile: CharacterProfile | null): void => {
       <template v-if="!hasSubmittedQuery">
         <!-- 最近對話面板 -->
         <RecentConversationsPanel
+          v-if="isLoadingRecent || (user?.id && recentConversations.length > 0)"
           :conversations="recentlyViewed"
           :is-loading="isLoadingRecent"
           :show-empty="Boolean(user?.id && recentConversations.length === 0)"

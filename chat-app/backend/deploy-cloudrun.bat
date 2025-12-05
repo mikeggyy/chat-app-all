@@ -24,17 +24,17 @@ echo 已登入：%GCP_ACCOUNT%
 
 REM 設置專案
 echo 設置 GCP 專案...
-gcloud config set project %PROJECT_ID%
+call gcloud config set project %PROJECT_ID%
 
 REM 啟用必要的 API（首次部署需要）
 echo 啟用必要的 Google Cloud API...
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable run.googleapis.com
-gcloud services enable containerregistry.googleapis.com
+call gcloud services enable cloudbuild.googleapis.com
+call gcloud services enable run.googleapis.com
+call gcloud services enable containerregistry.googleapis.com
 
 REM 構建 Docker 映像
 echo 構建 Docker 映像...
-gcloud builds submit --tag %IMAGE_NAME% --quiet
+call gcloud builds submit --tag %IMAGE_NAME% --quiet
 
 REM 獲取新構建的映像 digest
 echo 獲取映像 digest...
@@ -46,7 +46,7 @@ REM 部署到 Cloud Run（只更新映像，保留所有環境變數）
 echo.
 echo 部署到 Cloud Run...
 echo 注意：保留所有現有環境變數，只更新 Docker 映像
-gcloud run deploy %SERVICE_NAME% ^
+call gcloud run deploy %SERVICE_NAME% ^
   --image %FULL_IMAGE% ^
   --region %REGION% ^
   --platform managed ^

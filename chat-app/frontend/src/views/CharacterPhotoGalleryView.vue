@@ -218,7 +218,7 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .photo-gallery-screen {
   min-height: 100vh;
   min-height: 100dvh;

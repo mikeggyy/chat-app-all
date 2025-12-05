@@ -574,7 +574,7 @@ const handleCardClick = (characterId: string): void => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .favorites-screen {
   min-height: 100vh;
   min-height: 100dvh;

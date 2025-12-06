@@ -21,6 +21,12 @@ const showBottomNav = computed(() => {
   return !isDesktop.value && Boolean(route.meta?.showBottomNav);
 });
 
+// 是否可以顯示登入獎勵彈窗（排除 onboarding、login、guest-upgrade 頁面）
+const canShowLoginReward = computed(() => {
+  const excludedRoutes = ['login', 'onboarding', 'guest-upgrade'];
+  return !excludedRoutes.includes(String(route.name || ''));
+});
+
 // 是否顯示桌面版頂部導航
 const showDesktopHeader = computed(() => {
   // 登入頁和 onboarding 頁面不顯示桌面版導航
@@ -91,9 +97,9 @@ const handleClaim = async () => {
     <!-- 手機版底部導航 -->
     <BottomNavBar v-if="showBottomNav" />
 
-    <!-- 每日登入獎勵彈窗 -->
+    <!-- 每日登入獎勵彈窗（不在 onboarding/login 頁面顯示） -->
     <LoginRewardModal
-      :is-open="showRewardModal"
+      :is-open="showRewardModal && canShowLoginReward"
       :can-claim="canClaim"
       :is-claiming="isClaiming"
       :current-streak="currentStreak"
